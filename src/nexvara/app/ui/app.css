@@ -155,4 +155,27 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto
 .btn.danger { border-color: color-mix(in srgb, var(--err) 50%, var(--border)); color: var(--err); }
 .files-table td:nth-child(3) { color: var(--muted); font-size: 12px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-info { margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--surface-2); }
+.bi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; margin: 16px 0; }
+.bi-widget { min-width: 0; }
+.bi-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-top: 16px; }
+.bi-kpis .card { margin: 0; }
+.bi-widget.bi-table, .bi-widget.bi-line { grid-column: 1 / -1; }
+.bi-widget-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bi-tools { display: flex; gap: 2px; opacity: .5; }
+.bi-widget:hover .bi-tools { opacity: 1; }
+.icon-btn { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 6px; }
+.icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.bi-body svg { width: 100%; height: auto; display: block; }
+.bi-body svg text { fill: var(--muted); }
+.bi-hit { cursor: pointer; }
+.bi-hit:hover { opacity: .8; }
+.bi-kpi-value { font-size: 24px; font-weight: 700; margin-top: 8px; }
+.bi-growth { font-size: 13px; margin-top: 4px; }
+.bi-growth.up { color: var(--ok); }
+.bi-growth.down { color: var(--err); }
+.bi-table-wrap { max-height: 360px; overflow: auto; }
+.bi-filters { margin-top: 10px; }
+.chip { margin: 2px 4px 2px 0; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.bi-tip { position: fixed; z-index: 20; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0,0,0,.25); font-size: 12px; }
+.bi-steps { padding-left: 0; list-style: none; }
 .check-label { flex-direction: row !important; align-items: center; gap: 8px !important; grid-column: 1 / -1; color: var(--text) !important; font-size: 13px !important; }

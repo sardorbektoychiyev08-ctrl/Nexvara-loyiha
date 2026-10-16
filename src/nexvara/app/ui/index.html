@@ -430,6 +430,51 @@
       </div>
     </section>
 
+    <section class="page" id="page-bi">
+      <h1>NEXVARA BI</h1>
+      <p class="muted">Excel, CSV, JSON, XML yoki TXT fayldan (yoki papkadagi bir nechta fayldan)
+        interaktiv dashboard. Power BI kerak emas. Chatda «Savdo.xlsx dan dashboard yarat» deb
+        yozsangiz ham bo‘ladi.</p>
+      <div class="card wide">
+        <div class="row wrap">
+          <button class="btn primary" id="bi-source" type="button">Fayl tanlash</button>
+          <button class="btn" id="bi-folder" type="button">Papka (bir nechta fayl)</button>
+          <select id="bi-sheet" hidden></select>
+          <select id="bi-saved"></select>
+          <button class="btn" id="bi-open" type="button">Ochish</button>
+          <button class="btn danger" id="bi-del" type="button">O‘chirish</button>
+        </div>
+        <div class="muted small" id="bi-msg"></div>
+        <div class="error" id="bi-error" hidden></div>
+      </div>
+      <div id="bi-board" hidden>
+        <div class="card wide">
+          <div class="row wrap">
+            <input class="grow-input" id="bi-name" type="text" placeholder="Dashboard nomi">
+            <button class="btn primary" id="bi-save" type="button">Saqlash</button>
+            <button class="btn" id="bi-add-widget" type="button">+ Vidjet</button>
+            <button class="btn" data-bi-export="png" type="button">PNG</button>
+            <button class="btn" data-bi-export="pdf" type="button">PDF</button>
+            <button class="btn" data-bi-export="xlsx" type="button">Excel</button>
+            <button class="btn" data-bi-export="csv" type="button">CSV</button>
+          </div>
+          <div class="row wrap" id="bi-tabs"></div>
+          <div class="form-grid bi-filters" id="bi-filters"></div>
+          <div class="row wrap"><span id="bi-chips"></span>
+            <button class="btn small-btn" id="bi-clear" type="button">Filtrlarni tozalash</button>
+            <span class="muted small" id="bi-rows"></span></div>
+        </div>
+        <div class="card wide" id="bi-wform" hidden></div>
+        <div class="bi-kpis" id="bi-kpis"></div>
+        <div class="bi-grid" id="bi-grid"></div>
+        <div class="card wide">
+          <button class="btn" id="bi-etl-toggle" type="button">Ma’lumotni tayyorlash (tozalash, formula, birlashtirish) ▾</button>
+          <div id="bi-etl-body" hidden></div>
+        </div>
+      </div>
+      <div class="bi-tip" id="bi-tip" hidden></div>
+    </section>
+
     <section class="page" id="page-placeholder">
       <h1 id="placeholder-title"></h1>
       <p class="muted" id="placeholder-text"></p>
@@ -454,5 +499,6 @@
   </aside>
 
   <script src="app.js"></script>
+  <script src="bi.js"></script>
 </body>
 </html>

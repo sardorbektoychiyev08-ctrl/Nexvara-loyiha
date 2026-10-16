@@ -10,7 +10,7 @@ const STATUS_LABEL = {
   pending: "Kutilmoqda", running: "Bajarilmoqda", succeeded: "Bajarildi",
   failed: "Xato", cancelled: "Bekor qilindi",
 };
-const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows"]);
+const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows", "bi"]);
 
 let currentTaskId = null;
 let pollTimer = null;
@@ -45,6 +45,7 @@ function show(page) {
   if (page === "teach") renderTeach();
   if (page === "files") renderFiles();
   if (page === "workflows") renderWorkflows();
+  if (page === "bi") renderBi();
 }
 
 $("#nav").addEventListener("click", (e) => {
@@ -82,6 +83,7 @@ function handleReply(r) {
   if (r.reply) addMsg(r.reply, false);
   if (r.confirm) addConfirm(r.confirm);
   if (r.task) track(r.task, true);
+  if (r.open_bi) biOpenSource(r.open_bi);
 }
 
 // A paid AI request waits for the user's answer; nothing is sent before "Ha".
