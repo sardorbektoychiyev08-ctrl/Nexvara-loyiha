@@ -66,8 +66,10 @@ def test_ui_button_runs_real_excel(tmp_path):
         timeout=300,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "SELFTEST PASS" in proc.stdout
+    assert "SELFTEST PASS [run-excel]" in proc.stdout
+    assert "SELFTEST PASS [run-dashboard]" in proc.stdout
     assert len(list(tmp_path.glob("nexvara-jadval-*.xlsx"))) == 1
+    assert len(list(tmp_path.glob("nexvara-dashboard-*.xlsx"))) == 1
 
 
 def test_formulas_are_locale_independent(tmp_path):
@@ -93,3 +95,20 @@ def test_formulas_are_locale_independent(tmp_path):
     assert value == 6.75
     if ui_lang == 1049:  # Russian
         assert local.startswith("=СУММ("), local
+
+
+def test_excel_dashboard_end_to_end(tmp_path):
+    from nexvara.core.task import TaskRunner
+    from nexvara.skills.excel.dashboard import run_dashboard
+
+    out = tmp_path / "dashboard.xlsx"
+    task = TaskRunner().start(
+        "dashboard", lambda t: run_dashboard(t, out, keep_open=False, pause=0)
+    )
+    assert task.wait(300), "dashboard task did not finish in 300s"
+    snap = task.snapshot()
+    assert snap["status"] == "succeeded", (snap["error"], snap["steps"])
+    assert out.is_file()
+    checks = snap["result"]["checks"]
+    assert all(c["ok"] for c in checks), [c for c in checks if not c["ok"]]
+    assert len(checks) == 14

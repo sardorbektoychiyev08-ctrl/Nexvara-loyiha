@@ -83,25 +83,38 @@ def main(argv: list[str] | None = None) -> int:
     return 0 if result["ok"] else 1
 
 
-def excel_button_selftest(window: webview.Window, timeout: float = 180) -> bool:
-    """Click the real Office Agent button and watch the task panel until it finishes."""
+def excel_button_selftest(window: webview.Window) -> bool:
+    """Click each real Office Agent button and watch the task panel until it finishes."""
+    window.evaluate_js("document.querySelector('.nav-item[data-page=office]').click()")
+    ok = _click_and_watch(window, "run-excel", "Excel: 10 qatorli jadval", steps=6, checks=7)
+    dash = _click_and_watch(window, "run-dashboard", "Excel: savdo dashboardi", steps=8, checks=14)
+    return ok and dash
+
+
+def _click_and_watch(
+    window: webview.Window, button: str, title: str, steps: int, checks: int
+) -> bool:
     js = window.evaluate_js
-    js("document.querySelector('.nav-item[data-page=\"office\"]').click()")
-    js("document.getElementById('run-excel').click()")
+    # Wait until the button is enabled (a previous task may still be finishing).
+    deadline = time.monotonic() + 30
+    while js(f"document.getElementById('{button}').disabled") and time.monotonic() < deadline:
+        time.sleep(0.3)
+    js(f"document.getElementById('{button}').click()")
     status = ""
-    deadline = time.monotonic() + timeout
+    deadline = time.monotonic() + 300
     while time.monotonic() < deadline:
         time.sleep(0.5)
         status = js("document.getElementById('task-status').className") or ""
-        if any(s in status for s in ("succeeded", "failed", "cancelled")):
+        shown = js("document.getElementById('task-title').textContent") or ""
+        if shown == title and any(s in status for s in ("succeeded", "failed", "cancelled")):
             break
-    steps = js("document.querySelectorAll('#task-steps li.succeeded').length")
+    steps_ok = js("document.querySelectorAll('#task-steps li.succeeded').length")
     checks_ok = js("document.querySelectorAll('#task-result .check.ok').length")
     checks_bad = js("document.querySelectorAll('#task-result .check.bad').length")
     error = js("document.getElementById('task-error').textContent")
-    ok = "succeeded" in status and steps == 6 and checks_ok >= 6 and checks_bad == 0
+    ok = "succeeded" in status and steps_ok == steps and checks_ok == checks and checks_bad == 0
     print(
-        f"SELFTEST {'PASS' if ok else 'FAIL'}: status={status!r} steps_ok={steps} "
+        f"SELFTEST {'PASS' if ok else 'FAIL'} [{button}]: status={status!r} steps_ok={steps_ok} "
         f"checks_ok={checks_ok} checks_bad={checks_bad} error={error!r}"
     )
     return ok
