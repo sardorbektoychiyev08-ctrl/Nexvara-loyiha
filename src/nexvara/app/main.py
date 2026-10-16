@@ -96,6 +96,8 @@ def main(argv: list[str] | None = None) -> int:
         api = Api(keep_office_open=False)
     else:
         api = Api(persist=True)  # history and settings survive restarts
+        if not args.smoke:
+            api.start_background()  # workflow folder watchers and daily schedules
     window = webview.create_window(
         "NEXVARA",
         url=str(UI_DIR / "index.html"),

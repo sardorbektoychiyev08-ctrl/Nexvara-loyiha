@@ -16,6 +16,7 @@ from typing import Any
 from nexvara import __version__, config
 from nexvara.app.api_files import FilesApi
 from nexvara.app.api_memory import MemoryApi
+from nexvara.app.api_workflows import WorkflowsApi
 from nexvara.core.task import TaskFn, TaskRunner
 
 # kind -> (task title, module, runner function). Every runner takes (task, out, keep_open=...)
@@ -41,7 +42,7 @@ def _wants_ai(text: str) -> bool:
     return bool(re.search(r"\b(ai|sun.?iy intellekt\w*|aqlli)\b", fold(text)))
 
 
-class Api(MemoryApi, FilesApi):
+class Api(MemoryApi, FilesApi, WorkflowsApi):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
 

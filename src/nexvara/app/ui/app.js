@@ -10,7 +10,7 @@ const STATUS_LABEL = {
   pending: "Kutilmoqda", running: "Bajarilmoqda", succeeded: "Bajarildi",
   failed: "Xato", cancelled: "Bekor qilindi",
 };
-const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files"]);
+const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows"]);
 
 let currentTaskId = null;
 let pollTimer = null;
@@ -44,6 +44,7 @@ function show(page) {
   if (page === "memory") renderMemory();
   if (page === "teach") renderTeach();
   if (page === "files") renderFiles();
+  if (page === "workflows") renderWorkflows();
 }
 
 $("#nav").addEventListener("click", (e) => {
@@ -801,6 +802,190 @@ async function drawFileLog() {
     t.appendChild(tr);
   });
 }
+
+// ---- workflows ----
+let wfEditing = { id: 0, steps: [] };
+let wfTimer = null;
+const TRIG = (w) => w.trigger.type === "folder" ? `papka: ${w.trigger.folder} (${w.trigger.ext || "barcha fayllar"})`
+  : w.trigger.type === "daily" ? `har kuni ${w.trigger.time}` : "qo‘lda";
+const RUN_STATUS = { running: "Bajarilmoqda", succeeded: "Bajarildi", failed: "Xato", cancelled: "Bekor qilindi" };
+
+async function renderWorkflows() {
+  if (!api()) return;
+  const tpl = $("#wf-template");
+  if (tpl.options.length === 1) {
+    (await api().wf_templates()).forEach((t, i) => { const o = el("option", "", t.name); o.value = i; tpl.appendChild(o); });
+  }
+  drawWorkflows(await api().wf_list());
+  drawRuns();
+  wfPoll();
+  if (!wfEditing.steps.length) wfReset();
+}
+
+function wfPoll() {
+  clearInterval(wfTimer);
+  wfTimer = setInterval(async () => {
+    if (!$("#page-workflows").classList.contains("active")) { clearInterval(wfTimer); return; }
+    drawActive(await api().wf_active());
+  }, 1200);
+}
+
+function drawActive(list) {
+  $("#wf-active-card").hidden = !list.length;
+  const box = $("#wf-active");
+  box.textContent = "";
+  list.forEach((a) => {
+    const row = el("div", "item-row");
+    row.append(el("span", "grow", `${a.name}${a.paused ? " — pauzada" : ""}${a.waiting_approval ? ` — tasdiq: ${a.waiting_approval}` : ""}`));
+    if (a.waiting_approval) {
+      const ok = el("button", "btn primary small-btn", "Tasdiqlash");
+      ok.addEventListener("click", async () => { await api().wf_approve(a.run_id); });
+      row.appendChild(ok);
+    }
+    const pause = el("button", "btn small-btn", a.paused ? "Davom ettirish" : "Pauza");
+    pause.addEventListener("click", async () => { a.paused ? await api().wf_resume(a.run_id) : await api().wf_pause(a.run_id); });
+    const stop = el("button", "btn small-btn danger", "To‘xtatish");
+    stop.addEventListener("click", async () => { if (confirm("Workflow to‘xtatilsinmi?")) await api().cancel_task(a.task_id); });
+    row.append(pause, stop);
+    box.appendChild(row);
+  });
+}
+
+function drawWorkflows(list) {
+  const box = $("#wf-list");
+  box.textContent = "";
+  if (!list.length) box.appendChild(el("div", "muted", "Hali workflow yo‘q — pastda yarating yoki shablondan boshlang."));
+  list.forEach((w) => {
+    const row = el("div", "ai-prov");
+    const head = el("div", "ai-prov-head");
+    head.append(el("strong", "", w.name), el("span", "badge", TRIG(w)));
+    const last = w.last_run ? `Oxirgi: ${RUN_STATUS[w.last_run.status] || w.last_run.status}, ${when(w.last_run.started)}` : "Hali bajarilmagan";
+    const info = el("div", "muted small", `${w.steps.length} ta qadam · ${last}${w.enabled ? "" : " · o‘chirilgan"}`);
+    const btns = el("div", "row wrap");
+    const run = el("button", "btn primary small-btn", "Ishga tushirish");
+    run.addEventListener("click", async () => {
+      let file = "";
+      if (w.trigger.type === "folder") { file = await api().wf_pick_file(); if (!file) return; }
+      const r = await api().wf_run(w.id, file);
+      if (!r.ok) { alert(r.error); return; }
+      track(r.task);
+      setTimeout(async () => drawActive(await api().wf_active()), 300);
+    });
+    const edit = el("button", "btn small-btn", "Tahrirlash");
+    edit.addEventListener("click", () => wfLoad(w));
+    const tog = el("button", "btn small-btn", w.enabled ? "O‘chirib qo‘yish" : "Yoqish");
+    tog.addEventListener("click", async () => {
+      const r = await api().wf_save({ ...w, enabled: !w.enabled });
+      if (!r.ok) { alert(r.error); return; }
+      drawWorkflows(r.workflows);
+    });
+    const hist = el("button", "btn small-btn", "Tarix");
+    hist.addEventListener("click", () => drawRuns(w.id));
+    const del = el("button", "btn small-btn danger", "O‘chirish");
+    del.addEventListener("click", async () => {
+      if (!confirm(`«${w.name}» o‘chirilsinmi?`)) return;
+      drawWorkflows(await api().wf_delete(w.id));
+    });
+    btns.append(run, edit, tog, hist, del);
+    row.append(head, info, btns);
+    box.appendChild(row);
+  });
+}
+
+async function drawRuns(wfId = 0) {
+  const runs = await api().wf_runs(wfId);
+  const t = $("#wf-runs");
+  t.textContent = "";
+  if (!runs.length) { t.appendChild(el("tr")).appendChild(el("td", "muted", "Hali bajarilmagan")); return; }
+  const names = Object.fromEntries((await api().wf_list()).map((w) => [w.id, w.name]));
+  runs.forEach((r) => {
+    const tr = el("tr");
+    const steps = r.log.map((x) => `${x.ok ? "✓" : "✗"} ${x.step}: ${x.text}`).join("\n");
+    tr.append(el("td", "", when(r.started)), el("td", "", names[r.wf_id] || `#${r.wf_id}`),
+      el("td", "", r.trigger), el("td", "", RUN_STATUS[r.status] || r.status), el("td", "mono", steps));
+    t.appendChild(tr);
+  });
+}
+
+function wfReset() {
+  wfEditing = { id: 0, steps: [{ kind: "command", text: "" }], enabled: true };
+  $("#wf-form-title").textContent = "Yangi workflow";
+  $("#wf-name").value = ""; $("#wf-trigger").value = "manual"; $("#wf-folder").value = "";
+  $("#wf-ext").value = ""; $("#wf-time").value = "08:00"; $("#wf-retries").value = 1; $("#wf-onerror").value = "stop";
+  $("#wf-error").hidden = true; $("#wf-saved").textContent = "";
+  drawSteps(); wfTrigger();
+}
+
+function wfLoad(w) {
+  wfEditing = JSON.parse(JSON.stringify(w));
+  $("#wf-form-title").textContent = w.id ? `Tahrirlash: ${w.name}` : "Yangi workflow (shablondan)";
+  $("#wf-name").value = w.name;
+  $("#wf-trigger").value = w.trigger.type || "manual";
+  $("#wf-folder").value = w.trigger.folder || "";
+  $("#wf-ext").value = w.trigger.ext || "";
+  $("#wf-time").value = w.trigger.time || "08:00";
+  $("#wf-retries").value = w.retries ?? 1;
+  $("#wf-onerror").value = w.on_error || "stop";
+  drawSteps(); wfTrigger();
+  $("#wf-form").scrollIntoView({ block: "start" });
+}
+
+function drawSteps() {
+  const box = $("#wf-steps");
+  box.textContent = "";
+  wfEditing.steps.forEach((s, i) => {
+    const row = el("div", "item-row");
+    const LABEL = { command: "Buyruq", approve: "Tasdiq", wait: "Kutish" };
+    row.appendChild(el("span", "badge", `${i + 1}. ${LABEL[s.kind]}`));
+    const inp = el("input", "grow-input");
+    if (s.kind === "wait") { inp.type = "number"; inp.min = 1; inp.max = 3600; inp.value = s.seconds || 10; inp.placeholder = "soniya"; }
+    else { inp.type = "text"; inp.value = s.text || ""; inp.placeholder = s.kind === "approve" ? "Savol (masalan: Davom etaymi?)" : "masalan: {fayl} ni och, jadvalni formatla, PDF qilib saqla"; }
+    inp.addEventListener("input", () => { if (s.kind === "wait") s.seconds = Number(inp.value); else s.text = inp.value; });
+    row.appendChild(inp);
+    const up = el("button", "btn small-btn", "↑"); up.type = "button";
+    up.addEventListener("click", () => { if (i) { [wfEditing.steps[i - 1], wfEditing.steps[i]] = [wfEditing.steps[i], wfEditing.steps[i - 1]]; drawSteps(); } });
+    const rm = el("button", "btn small-btn", "✕"); rm.type = "button";
+    rm.addEventListener("click", () => { wfEditing.steps.splice(i, 1); drawSteps(); });
+    row.append(up, rm);
+    box.appendChild(row);
+  });
+}
+
+function wfTrigger() {
+  const t = $("#wf-trigger").value;
+  document.querySelectorAll("[data-trig]").forEach((x) => { x.hidden = x.dataset.trig !== t; });
+}
+$("#wf-trigger").addEventListener("change", wfTrigger);
+document.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => {
+  wfEditing.steps.push(b.dataset.add === "wait" ? { kind: "wait", seconds: 10 } : { kind: b.dataset.add, text: "" });
+  drawSteps();
+}));
+$("#wf-folder-pick").addEventListener("click", async () => { const f = await api().files_pick_folder(); if (f) $("#wf-folder").value = f; });
+$("#wf-new").addEventListener("click", wfReset);
+$("#wf-template").addEventListener("change", async () => {
+  const i = $("#wf-template").value;
+  if (i === "") return;
+  const t = (await api().wf_templates())[Number(i)];
+  wfLoad({ ...t, id: 0, retries: 1, on_error: "stop", enabled: true });
+  $("#wf-template").value = "";
+});
+$("#wf-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const t = $("#wf-trigger").value;
+  const trigger = { type: t };
+  if (t === "folder") { trigger.folder = $("#wf-folder").value; trigger.ext = $("#wf-ext").value; }
+  if (t === "daily") trigger.time = $("#wf-time").value;
+  const r = await api().wf_save({
+    ...wfEditing, name: $("#wf-name").value, trigger,
+    retries: Number($("#wf-retries").value), on_error: $("#wf-onerror").value,
+  });
+  $("#wf-error").hidden = r.ok; $("#wf-error").textContent = r.ok ? "" : r.error;
+  if (!r.ok) return;
+  wfEditing.id = r.id;
+  $("#wf-saved").textContent = "Saqlandi ✓";
+  $("#wf-form-title").textContent = `Tahrirlash: ${$("#wf-name").value}`;
+  drawWorkflows(r.workflows);
+});
 
 // ---- boot ----
 window.addEventListener("pywebviewready", async () => {

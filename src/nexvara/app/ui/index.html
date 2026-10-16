@@ -376,6 +376,60 @@
       </div>
     </section>
 
+    <section class="page" id="page-workflows">
+      <h1>Workflows</h1>
+      <p class="muted">Bir necha buyruqni ketma-ket saqlab qo‘ying: qo‘lda, papkaga yangi fayl
+        tushganda yoki har kuni belgilangan vaqtda bajariladi. Buyruqlar chatdagi kabi yoziladi;
+        <b>{fayl}</b> — ishlanayotgan fayl o‘rni. Pullik AI so‘rovlari workflow ichida bajarilmaydi.</p>
+      <div class="card wide" id="wf-active-card" hidden>
+        <div class="card-label">Hozir bajarilmoqda</div>
+        <div id="wf-active"></div>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Saqlangan workflowlar</div>
+        <div id="wf-list"></div>
+      </div>
+      <form class="card wide" id="wf-form">
+        <div class="card-label" id="wf-form-title">Yangi workflow</div>
+        <div class="form-grid">
+          <label class="wide-field">Shablondan boshlash <select id="wf-template"><option value="">—</option></select></label>
+          <label class="wide-field">Nomi <input id="wf-name" type="text" placeholder="masalan: Kelgan hisobotlarni tayyorlash"></label>
+        </div>
+        <div class="card-label" style="margin-top:12px">Qadamlar</div>
+        <div id="wf-steps"></div>
+        <div class="row wrap">
+          <button class="btn small-btn" type="button" data-add="command">+ Buyruq</button>
+          <button class="btn small-btn" type="button" data-add="approve">+ Tasdiq</button>
+          <button class="btn small-btn" type="button" data-add="wait">+ Kutish</button>
+        </div>
+        <div class="form-grid">
+          <label>Ishga tushishi <select id="wf-trigger">
+            <option value="manual">Qo‘lda</option>
+            <option value="folder">Papkaga yangi fayl tushganda</option>
+            <option value="daily">Har kuni</option>
+          </select></label>
+          <label data-trig="folder">Papka <input id="wf-folder" type="text" readonly placeholder="tanlang"></label>
+          <label data-trig="folder">Fayl turlari <input id="wf-ext" type="text" placeholder=".xlsx .csv"></label>
+          <label data-trig="daily">Vaqt <input id="wf-time" type="time" value="08:00"></label>
+          <label>Xatoda qayta urinish <input id="wf-retries" type="number" min="0" max="5" value="1"></label>
+          <label>Qadam bajarilmasa <select id="wf-onerror">
+            <option value="stop">To‘xtatish</option><option value="continue">Keyingisiga o‘tish</option>
+          </select></label>
+        </div>
+        <div class="row wrap">
+          <button class="btn" id="wf-folder-pick" type="button" data-trig="folder">Papka tanlash</button>
+          <button class="btn primary" type="submit">Saqlash</button>
+          <button class="btn" id="wf-new" type="button">Yangi</button>
+        </div>
+        <div class="error" id="wf-error" hidden></div>
+        <div class="muted small" id="wf-saved"></div>
+      </form>
+      <div class="card wide">
+        <div class="card-label">Bajarilganlar tarixi</div>
+        <table class="lib-table" id="wf-runs"></table>
+      </div>
+    </section>
+
     <section class="page" id="page-placeholder">
       <h1 id="placeholder-title"></h1>
       <p class="muted" id="placeholder-text"></p>
