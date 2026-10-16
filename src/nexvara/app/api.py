@@ -12,7 +12,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from nexvara import __version__
+from nexvara import __version__, config
 from nexvara.core.task import TaskFn, TaskRunner
 
 # kind -> (task title, module, runner function). Every runner takes (task, out, keep_open=...)
@@ -41,16 +41,32 @@ class Api:
         output_dir: Path | None = None,
         keep_office_open: bool = True,
         overrides: dict[str, TaskFn] | None = None,
+        persist: bool = False,
     ) -> None:
         self._runner = runner or TaskRunner()
         self._output_dir = output_dir
         self._keep_office_open = keep_office_open
         self._overrides = dict(overrides or {})
         self._context_file: str | None = None  # "shu fayl": the last file worked on
+        # The desktop app keeps history and settings in D:\NEXVARA; tests run without.
+        self._history = None
+        if persist:
+            from nexvara.appdata import History
+
+            self._history = History()
+            self._runner.on_finish = lambda t: self._history.save(t.snapshot())
         if excel_demo:
             self._overrides["excel_demo"] = excel_demo
         if excel_dashboard:
             self._overrides["excel_dashboard"] = excel_dashboard
+
+    def _keep_open(self) -> bool:
+        """Leave Office open after a task? The desktop app follows the user's setting."""
+        if self._history is None:
+            return self._keep_office_open
+        from nexvara.appdata import Settings
+
+        return bool(Settings().load()["keep_office_open"])
 
     def _task_fn(self, kind: str) -> TaskFn:
         if kind in self._overrides:
@@ -62,7 +78,7 @@ class Api:
             out = module.default_output_path()
             if self._output_dir is not None:
                 out = self._output_dir / out.name
-            return getattr(module, fn_name)(task, out, keep_open=self._keep_office_open)
+            return getattr(module, fn_name)(task, out, keep_open=self._keep_open())
 
         return run
 
@@ -76,6 +92,7 @@ class Api:
             "os": f"{platform.system()} {platform.release()}",
             "python": platform.python_version(),
             "ai_connected": False,
+            "data_dir": str(config.data_dir()),
         }
 
     def chat(self, text: str) -> dict[str, Any]:
@@ -186,7 +203,7 @@ class Api:
                       "powerpoint": run_ppt_plan}[plan.app]  # fmt: skip
 
             def fn(task: Any) -> dict[str, Any]:
-                return runner(task, plan, Path(source), keep_open=self._keep_office_open)
+                return runner(task, plan, Path(source), keep_open=self._keep_open())
 
         return self._runner.start(f"Buyruq: {Path(source).name}", fn).snapshot()
 
@@ -237,7 +254,7 @@ class Api:
                 out = None
                 if self._output_dir is not None:
                     out = self._output_dir / default_presentation_path(topic).name
-                return run_topic_presentation(task, req, out, keep_open=self._keep_office_open)
+                return run_topic_presentation(task, req, out, keep_open=self._keep_open())
 
         snap = self._runner.start(f"Taqdimot: {topic.title}", fn).snapshot()
         return {
@@ -296,7 +313,7 @@ class Api:
                 out = None
                 if self._output_dir is not None:
                     out = self._output_dir / default_topic_path(_found or lookup(req)).name
-                return run_topic(task, req, out, keep_open=self._keep_office_open)
+                return run_topic(task, req, out, keep_open=self._keep_open())
 
         title = "Mavzu: " + (_found.title if _found is not None else req.topic)
         return self._runner.start(title, fn).snapshot()
@@ -473,7 +490,7 @@ class Api:
 
                     book, topic, _ = make_quizzes(req)
                     out = self._output_dir / default_test_path(book, topic).name
-                return run_make_test(task, req, out, keep_open=self._keep_office_open)
+                return run_make_test(task, req, out, keep_open=self._keep_open())
 
         what = " ".join(
             x for x in (f"{req.grade}-sinf" if req.grade else "", req.subject or "") if x
@@ -505,7 +522,48 @@ class Api:
         return True
 
     def list_tasks(self) -> list[dict[str, Any]]:
-        return [t.snapshot() for t in self._runner.list()]
+        live = [t.snapshot() for t in self._runner.list()]
+        if self._history is None:
+            return live
+        ids = {t["id"] for t in live}
+        older = [h for h in self._history.list() if h["id"] not in ids]
+        return sorted(live + older, key=lambda t: t["created_at"], reverse=True)
+
+    def clear_history(self) -> bool:
+        if self._history is not None:
+            self._history.clear()
+        return True
+
+    # ----- settings -----
+    def get_settings(self) -> dict[str, Any]:
+        from nexvara.appdata import Settings
+
+        return Settings().load()
+
+    def save_settings(self, changes: dict[str, Any]) -> dict[str, Any]:
+        from nexvara.appdata import Settings
+
+        try:
+            return {"ok": True, "settings": Settings().update(changes or {})}
+        except (TypeError, ValueError) as e:
+            return {"ok": False, "error": str(e)}
+
+    def open_data_folder(self) -> str:
+        from nexvara import config
+
+        folder = config.data_dir()
+        folder.mkdir(parents=True, exist_ok=True)
+        if os.name == "nt":
+            subprocess.Popen(["explorer", str(folder)])
+        return str(folder)
+
+    def create_shortcut(self) -> dict[str, Any]:
+        from nexvara.app.shortcut import create_desktop_shortcut
+
+        try:
+            return {"ok": True, "path": str(create_desktop_shortcut())}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
 
     def reveal_file(self, path: str) -> bool:
         """Show a task's output file in Explorer. Only existing files are accepted."""

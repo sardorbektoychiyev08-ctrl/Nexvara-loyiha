@@ -148,10 +148,15 @@ DEFAULT_TIMEOUT = 600.0  # seconds; Office work that takes longer is treated as 
 class TaskRunner:
     """Starts tasks in background threads and keeps them for status queries."""
 
-    def __init__(self, timeout: float | None = DEFAULT_TIMEOUT) -> None:
+    def __init__(
+        self,
+        timeout: float | None = DEFAULT_TIMEOUT,
+        on_finish: Callable[[Task], None] | None = None,
+    ) -> None:
         self._tasks: dict[str, Task] = {}
         self._lock = threading.Lock()
         self.timeout = timeout
+        self.on_finish = on_finish  # e.g. persist to the history database
 
     def start(self, title: str, fn: TaskFn, timeout: float | None = None) -> Task:
         """Run `fn` in a thread. After `timeout` seconds a hung task is marked failed
@@ -169,6 +174,11 @@ class TaskRunner:
                 task.error = error
                 task.status = status
                 task.finished_at = time.time()
+            if self.on_finish is not None:
+                try:
+                    self.on_finish(task)
+                except Exception:
+                    log.exception("on_finish failed for task %s", task.id)
 
         def run() -> None:
             task.status = Status.RUNNING
