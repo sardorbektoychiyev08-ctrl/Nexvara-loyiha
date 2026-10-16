@@ -10,7 +10,7 @@ const STATUS_LABEL = {
   pending: "Kutilmoqda", running: "Bajarilmoqda", succeeded: "Bajarildi",
   failed: "Xato", cancelled: "Bekor qilindi",
 };
-const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows", "bi"]);
+const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows", "bi", "devices"]);
 
 let currentTaskId = null;
 let pollTimer = null;
@@ -46,6 +46,7 @@ function show(page) {
   if (page === "files") renderFiles();
   if (page === "workflows") renderWorkflows();
   if (page === "bi") renderBi();
+  if (page === "devices") renderDevices();
 }
 
 $("#nav").addEventListener("click", (e) => {
@@ -988,6 +989,63 @@ $("#wf-form").addEventListener("submit", async (e) => {
   $("#wf-form-title").textContent = `Tahrirlash: ${$("#wf-name").value}`;
   drawWorkflows(r.workflows);
 });
+
+// ---- devices ----
+let devTimer = null;
+async function renderDevices() {
+  if (!api()) return;
+  drawDevices(await api().devices_status());
+  clearInterval(devTimer);
+  devTimer = setInterval(async () => {
+    if (!$("#page-devices").classList.contains("active")) { clearInterval(devTimer); return; }
+    drawDevices(await api().devices_status());
+  }, 2000);
+}
+
+function drawDevices(st) {
+  $("#dev-pc").textContent = st.pc;
+  $("#dev-os").textContent = st.os;
+  $("#dev-toggle").disabled = !st.available;
+  $("#dev-toggle").textContent = st.running ? "O‘chirish" : "Yoqish";
+  $("#dev-toggle").className = st.running ? "btn" : "btn primary";
+  $("#dev-state").textContent = st.running ? `Yoqilgan: ${st.url}` : "O‘chiq";
+  $("#dev-pair").hidden = !st.running;
+  if (st.running) {
+    $("#dev-url").textContent = st.url;
+    if (st.code) {
+      $("#dev-qr").innerHTML = st.qr_svg; // made by NEXVARA itself (segno), not user input
+      $("#dev-code").textContent = st.code;
+      $("#dev-left").textContent = `${Math.floor(st.code_left / 60)}:${String(st.code_left % 60).padStart(2, "0")} qoldi`;
+    } else {
+      $("#dev-qr").textContent = "";
+      $("#dev-code").textContent = "——————";
+      $("#dev-left").textContent = st.locked ? "Ko‘p noto‘g‘ri urinish — yangi kod oling" : "Kod ishlatildi yoki eskirdi — yangi kod oling";
+    }
+  }
+  const box = $("#dev-list");
+  box.textContent = "";
+  if (!st.devices.length) box.appendChild(el("div", "muted", "Hali qurilma bog‘lanmagan"));
+  st.devices.forEach((d) => {
+    const row = el("div", "item-row");
+    row.append(el("span", "grow", `📱 ${d.name}`),
+      el("span", "muted small", d.last_seen ? `oxirgi: ${when(d.last_seen)} (${d.last_ip})` : "hali ulanmagan"));
+    const rm = el("button", "btn small-btn danger", "Uzish");
+    rm.addEventListener("click", async () => {
+      if (!confirm(`«${d.name}» uzilsinmi? U qayta bog‘lanishi uchun yangi kod kerak bo‘ladi.`)) return;
+      drawDevices(await api().devices_revoke(d.id));
+    });
+    row.appendChild(rm);
+    box.appendChild(row);
+  });
+}
+
+$("#dev-toggle").addEventListener("click", async () => {
+  const st = await api().devices_status();
+  const r = st.running ? await api().devices_stop() : await api().devices_start();
+  $("#dev-error").hidden = r.ok !== false; $("#dev-error").textContent = r.error || "";
+  drawDevices(r.ok === false ? st : r);
+});
+$("#dev-newcode").addEventListener("click", async () => drawDevices(await api().devices_new_code()));
 
 // ---- boot ----
 window.addEventListener("pywebviewready", async () => {

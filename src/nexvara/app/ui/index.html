@@ -475,6 +475,48 @@
       <div class="bi-tip" id="bi-tip" hidden></div>
     </section>
 
+    <section class="page" id="page-devices">
+      <h1>Qurilmalar</h1>
+      <p class="muted">NEXVARA'ni telefoningizdan boshqaring: buyruq yozing, fayl yoki rasm yuboring,
+        vazifa jarayonini kuzating va natijani telefonga yuklab oling. Telefon va kompyuter bitta
+        Wi-Fi tarmog‘ida bo‘lishi kerak; internetga hech narsa ochilmaydi.</p>
+      <div class="card wide">
+        <div class="card-label">Bu kompyuter</div>
+        <div class="card-value" id="dev-pc">—</div>
+        <div class="muted small" id="dev-os"></div>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Telefondan boshqarish</div>
+        <div class="row wrap">
+          <button class="btn primary" id="dev-toggle" type="button">Yoqish</button>
+          <span class="muted small" id="dev-state">O‘chiq</span>
+        </div>
+        <div class="error" id="dev-error" hidden></div>
+        <div class="dev-pair" id="dev-pair" hidden>
+          <div class="dev-qr" id="dev-qr"></div>
+          <div>
+            <div class="muted small">Telefon kamerasi bilan QR kodni skanerlang yoki brauzerda oching:</div>
+            <div class="mono dev-url" id="dev-url"></div>
+            <div class="muted small" style="margin-top:10px">Bog‘lash kodi</div>
+            <div class="dev-code" id="dev-code">——————</div>
+            <div class="muted small" id="dev-left"></div>
+            <div class="row"><button class="btn small-btn" id="dev-newcode" type="button">Yangi kod</button></div>
+            <ol class="muted small dev-help">
+              <li>Telefonda «Xavfsiz emas / Not private» chiqsa: «Qo‘shimcha» → «Davom etish» (bu sertifikat sizning kompyuteringizda yaratilgan).</li>
+              <li>Windows «Brandmauer» oynasi chiqsa: «Ruxsat berish» (faqat shaxsiy tarmoq).</li>
+              <li>Kod 10 daqiqa amal qiladi va bir marta ishlatiladi.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Bog‘langan qurilmalar</div>
+        <div id="dev-list"></div>
+      </div>
+      <p class="muted small">Alohida Android ilova va Google orqali kirish keyingi bosqichda (ular uchun
+        Android SDK va Google Cloud loyihasi kerak). Hozirgi telefon paneli istalgan telefon brauzerida ishlaydi.</p>
+    </section>
+
     <section class="page" id="page-placeholder">
       <h1 id="placeholder-title"></h1>
       <p class="muted" id="placeholder-text"></p>

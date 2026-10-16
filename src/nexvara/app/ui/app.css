@@ -178,4 +178,9 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto
 .chip { margin: 2px 4px 2px 0; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
 .bi-tip { position: fixed; z-index: 20; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0,0,0,.25); font-size: 12px; }
 .bi-steps { padding-left: 0; list-style: none; }
+.dev-pair { display: flex; gap: 24px; margin-top: 16px; flex-wrap: wrap; align-items: flex-start; }
+.dev-qr { background: #fff; padding: 10px; border-radius: 12px; line-height: 0; min-width: 120px; min-height: 120px; }
+.dev-url { font-size: 15px; margin-top: 4px; }
+.dev-code { font-size: 34px; font-weight: 700; letter-spacing: .25em; font-family: Consolas, monospace; }
+.dev-help { padding-left: 18px; margin: 12px 0 0; }
 .check-label { flex-direction: row !important; align-items: center; gap: 8px !important; grid-column: 1 / -1; color: var(--text) !important; font-size: 13px !important; }

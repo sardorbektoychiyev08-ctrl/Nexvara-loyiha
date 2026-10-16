@@ -34,6 +34,7 @@ class WorkflowsApi:
         eng = self._wf()
         if eng is not None:
             eng.start_watching()
+        self.start_remote_if_enabled()  # phone access, if the user turned it on
 
     def _need_wf(self):
         eng = self._wf()
