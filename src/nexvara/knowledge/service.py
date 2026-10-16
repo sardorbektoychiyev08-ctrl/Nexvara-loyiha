@@ -192,6 +192,34 @@ def _pages_for(lib: Library, req: TestRequest) -> tuple[Book, list[tuple[int, st
 
 
 MAX_EXTRA_PAGES = 18
+MAX_FIGURE_PAGES = 40  # the whole book only for the caption pool, pictures from the topic
+
+
+def figures_tmp_dir() -> Path:
+    return config.data_dir() / "tmp"
+
+
+def _figures_for(book: Book, pages: list[int]):
+    """Pictures (cut out to a temp folder) on the test's pages, plus every caption of the
+    book as the distractor pool. Empty for scanned books (no caption text to anchor on)."""
+    import logging
+    import uuid
+
+    from nexvara.knowledge.figures import book_captions, extract_figures, figures_in_pdf
+
+    pdf = Path(book.path)
+    if not pdf.is_file() or book.note.startswith("OCR"):
+        return [], []
+    try:
+        wanted = sorted(set(pages))[:MAX_FIGURE_PAGES]
+        figs = figures_in_pdf(pdf, wanted)
+        if not figs:
+            return [], []
+        out = figures_tmp_dir() / f"rasm_{uuid.uuid4().hex[:8]}"
+        return extract_figures(pdf, figs, out), book_captions(pdf)
+    except Exception:  # pictures are a bonus; never fail the whole test because of them
+        logging.getLogger(__name__).exception("figure extraction failed for %s", pdf)
+        return [], []
 
 
 def _topic_pages(lib: Library, req: TestRequest, book, hit_pages, topic_label):
@@ -222,9 +250,12 @@ def make_quizzes(req: TestRequest) -> tuple[Book, str, list[QuizResult]]:
         if req.topic:
             book, pages, topic = _topic_pages(lib, req, book, pages, topic)
         pool = [d.term for d in extract_definitions(lib.book_pages(book.id))]
+        figures, captions = _figures_for(book, [p for p, _t in pages])
         quizzes = [
-            build_quiz(pages, req.count, seed=1000 + v, term_pool=pool) for v in range(req.variants)
-        ]
+            build_quiz(pages, req.count, seed=1000 + v, term_pool=pool, figures=figures,
+                       caption_pool=captions)
+            for v in range(req.variants)
+        ]  # fmt: skip
         return book, topic, quizzes
     finally:
         lib.close()

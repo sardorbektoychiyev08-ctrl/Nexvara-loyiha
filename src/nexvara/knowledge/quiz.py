@@ -70,6 +70,7 @@ class Question:
     options: list[str] = field(default_factory=list)
     pairs: list[tuple[str, str]] = field(default_factory=list)  # match: (term, definition)
     source: str = ""  # "93-bet"
+    image: str = ""  # picture shown under the question (path to a PNG)
 
 
 @dataclass
@@ -201,6 +202,50 @@ def _mcq(stem: str, answer: str, distractors: list[str], rng: random.Random, sou
     return Question("mcq", stem, LETTERS[options.index(answer)], options, source=source)
 
 
+def _short_caption(caption: str, words: int = 12) -> str:
+    c = re.sub(r"\s*\((?:[a-dA-D]|[IVX]+)\)", "", caption)  # "(a)", "(b)" panel labels
+    c = re.sub(r"[:;→]+.*$", "", c).strip(" .,-")  # keep the head of "X: a) ... b) ..."
+    w = c.split()
+    # Drop trailing drawing labels: "Kuchlar muvozanati F", "... to‘qnashishi m2 m1".
+    while w and re.fullmatch(r"[A-Za-z]{1,2}\d?|\d+|[→↑↓←]", w[-1]):
+        w.pop()
+    return " ".join(w[:words]) + ("…" if len(w) > words else "")
+
+
+def picture_questions(
+    figures: list, caption_pool: list[str], rng: random.Random, extra: list[str] | None = None
+) -> list[Question]:
+    """ "Rasmda nima tasvirlangan?" — answer: the figure's caption; distractors: captions of
+    other figures in the same book (so every option is a real figure of that subject)."""
+    pool = []
+    for c in caption_pool:
+        s = _short_caption(c)
+        if len(s.split()) >= 2 and fold(s) not in {fold(p) for p in pool}:
+            pool.append(s)
+    out = []
+    for f in figures:
+        if not getattr(f, "image", None):
+            continue
+        answer = _short_caption(f.caption)
+        if len(answer.split()) < 2:
+            continue
+        head = fold(" ".join(answer.split()[:2]))
+        others = [p for p in pool if fold(p) != fold(answer)
+                  and fold(" ".join(p.split()[:2])) != head]  # fmt: skip
+        rng.shuffle(others)
+        if len(others) < 3:  # few figures in the book: pad with the book's own concepts
+            spare = [t for t in (extra or []) if fold(t) != fold(answer) and t not in others]
+            rng.shuffle(spare)
+            others += spare[: 3 - len(others)]
+        what = "Chizmada" if f.is_drawing else "Rasmda"
+        q = _mcq(f"{what} nima tasvirlangan?", answer, others[:3], rng, f"{f.page}-bet")
+        if q:
+            q.image = str(f.image)
+            out.append(q)
+    rng.shuffle(out)
+    return out
+
+
 @dataclass
 class QuizResult:
     questions: list[Question]
@@ -214,6 +259,8 @@ def build_quiz(
     seed: int = 1,
     kinds: tuple[str, ...] = ("mcq", "fill", "tf", "match"),
     term_pool: list[str] | None = None,
+    figures: list | None = None,
+    caption_pool: list[str] | None = None,
 ) -> QuizResult:
     """Up to `count` questions (a matching block counts as one). Deterministic for a seed.
 
@@ -305,10 +352,15 @@ def build_quiz(
             source=", ".join(sorted({src(d.page) for d in chosen})),
         )
 
+    # Picture questions: "what does the picture show?" — about a quarter of the test.
+    pictures = picture_questions(figures or [], caption_pool or [], rng, pool)
+    n_pic = min(len(pictures), max(1, round(count * 0.25))) if pictures else 0
+
     # Mix: mostly multiple choice, then fill-in, then true/false; top up from what is left.
-    target = count - (1 if match_q else 0)
+    target = count - (1 if match_q else 0) - n_pic
     quota = {"mcq": round(target * 0.6), "fill": round(target * 0.2), "tf": target}
-    picked: list[Question] = []
+    picked: list[Question] = pictures[:n_pic]
+    target += n_pic
     for kind in ("mcq", "fill", "tf"):
         room = max(min(quota[kind], target - len(picked)), 0)
         picked += by_kind[kind][:room]

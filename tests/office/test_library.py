@@ -134,3 +134,52 @@ def test_chat_topic_request(data_dir, tmp_path):
     task = runner.get(reply["task"]["id"])
     assert task.wait(300) and task.snapshot()["status"] == "succeeded", task.error
     assert "topilmadi" in api.chat("7-sinf fizika fotosintez mavzusi kerak")["reply"]
+
+
+def test_picture_questions_in_word(tmp_path, monkeypatch):
+    """A textbook with figures: the test gets "Rasmda nima tasvirlangan?" questions with the
+    picture embedded and the caption hidden from the picture."""
+    import pymupdf
+    from tests.textbook_fixture import PAGES
+
+    from nexvara.core.task import TaskRunner
+    from nexvara.knowledge.service import TestRequest, index_library
+    from nexvara.knowledge.testdoc import run_make_test
+    from nexvara.skills.png_chart import bar_chart_png
+
+    monkeypatch.setenv("NEXVARA_DATA", str(tmp_path / "data"))
+    books = tmp_path / "data" / "Darsliklar" / "7-sinf"
+    books.mkdir(parents=True)
+    png = bar_chart_png([3, 5, 2, 4], tmp_path / "chart.png", width=400, height=240)
+    captions = {
+        1: "1-rasm. Ikki aravachaning to'qnashishi",
+        2: "2-rasm. Prujinaning cho'zilishi",
+        3: "3-rasm. Gidravlik press sxemasi",
+    }
+    doc = pymupdf.open()
+    for i, text in enumerate(PAGES):
+        page = doc.new_page(width=595, height=842)
+        y = 80
+        for line in text.split("\n"):
+            page.insert_text((40, y), line, fontsize=10)
+            y += 16
+        if i in captions:
+            page.insert_image(pymupdf.Rect(150, 420, 450, 600), filename=str(png))
+            page.insert_text((150, 618), captions[i], fontsize=10)
+    doc.save(str(books / "Fizika.pdf"))
+
+    runner = TaskRunner()
+    assert runner.start("index", index_library).wait(120)
+    req = TestRequest(7, "Fizika", "tezlik va kuch", count=8, variants=1)
+    t = runner.start("test", lambda task: run_make_test(task, req, keep_open=False, pause=0))
+    assert t.wait(300)
+    snap = t.snapshot()
+    assert snap["status"] == "succeeded", (snap["error"], snap["steps"])
+    res = snap["result"]
+    assert res["pictures"] >= 1, res
+    assert all(c["ok"] for c in res["checks"]), res["checks"]
+    with pymupdf.open(res["pdf"]) as out:
+        text = "".join(p.get_text() for p in out)
+        assert "Rasmda nima tasvirlangan?" in text
+        assert sum(len(p.get_images()) for p in out) == res["pictures"]
+    assert not list((tmp_path / "data" / "tmp").glob("*")), "temp pictures must be cleaned up"

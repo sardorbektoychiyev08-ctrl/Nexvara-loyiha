@@ -196,3 +196,37 @@ def test_source_rank_from_folder(tmp_path):
     assert source_rank(tmp_path / "rtm" / "7-sinf" / "a.pdf", tmp_path) == 2
     assert source_rank(tmp_path / "eduportal" / "7-sinf" / "a.pdf", tmp_path) == 0
     assert source_rank(tmp_path / "7-sinf" / "a.pdf", tmp_path) == 1
+
+
+def test_picture_questions_use_captions_as_answers(tmp_path):
+    import random
+
+    from nexvara.knowledge.figures import captions_in_text
+    from nexvara.knowledge.quiz import _short_caption, picture_questions
+
+    text = (
+        "Matn: 61-rasmda ko‘rsatilganidek, kuch ta’sir etadi.\n"
+        "61-rasm. Ikki qayiqning bir-biriga\ntortilishi.\n"
+        "62-rasm. Kuchlar muvozanati F\n"
+        "63-rasm. Tok kuchini o‘lchash sxemasi"
+    )
+    figs = captions_in_text(5, text)
+    assert [(f.number, f.caption) for f in figs] == [
+        (61, "Ikki qayiqning bir-biriga tortilishi"),  # wrapped caption joined
+        (62, "Kuchlar muvozanati F"),
+        (63, "Tok kuchini o‘lchash sxemasi"),
+    ]  # "61-rasmda ..." in running text is not a caption
+    assert figs[2].is_drawing and not figs[0].is_drawing
+    assert _short_caption("Kuchlar muvozanati F") == "Kuchlar muvozanati"
+    assert _short_caption("Havo frontlari: a) sovuq front; b) iliq front") == "Havo frontlari"
+
+    img = tmp_path / "r.png"
+    img.write_bytes(b"png")
+    figs[0].image = img
+    pool = ["Kuchlar muvozanati F", "Tok kuchini o‘lchash sxemasi", "Prujinaning cho‘zilishi",
+            "Erkin tushish tajribasi", "Ikki qayiqning bir-biriga tortilishi"]  # fmt: skip
+    (q,) = picture_questions(figs, pool, random.Random(1))
+    assert q.text == "Rasmda nima tasvirlangan?" and q.image == str(img)
+    assert q.options[LETTERS.index(q.answer)] == "Ikki qayiqning bir-biriga tortilishi"
+    assert len(set(q.options)) == 4 and q.source == "5-bet"
+    assert picture_questions(figs[1:], pool, random.Random(1)) == []  # no picture -> no question

@@ -143,7 +143,7 @@ def library_selftest(window: webview.Window) -> bool:
     js("document.getElementById('t-topic').value = 'kuch massa bosim'")
     js("document.getElementById('t-count').value = '6'")
     title = f"Test: {first_grade}-sinf {subject} · kuch massa bosim"
-    made = _click_and_watch(window, "t-make", title, steps=6, checks=5)
+    made = _click_and_watch(window, "t-make", title, steps=6, checks=6)
     print(f"SELFTEST library: grade={first_grade!r} subject={subject!r}")
     return ok and shown and made
 
