@@ -230,3 +230,16 @@ def test_picture_questions_use_captions_as_answers(tmp_path):
     assert q.options[LETTERS.index(q.answer)] == "Ikki qayiqning bir-biriga tortilishi"
     assert len(set(q.options)) == 4 and q.source == "5-bet"
     assert picture_questions(figs[1:], pool, random.Random(1)) == []  # no picture -> no question
+
+
+@pytest.mark.parametrize(
+    ("name", "grade", "subject"),
+    [
+        ("MATEMATICS WORKBOOK G6 P2 UZB.pdf", 6, "Matematika"),
+        ("Physics Grade 7 UZB.pdf", 7, "Fizika"),
+        ("Science_5-sinf_uzb.pdf", 5, "Tabiiy fanlar"),
+    ],
+)
+def test_english_named_rtm_files(tmp_path, name, grade, subject):
+    info = catalog.describe(tmp_path / name, "", None)
+    assert (info.grade, info.subject) == (grade, subject)

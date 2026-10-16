@@ -22,16 +22,16 @@ SUBJECTS: list[tuple[str, tuple[str, ...]]] = [
     ("Fransuz tili", ("fransuz",)),
     ("Tasviriy san’at", ("tasviriy",)),
     ("Atrofimizdagi olam", ("atrofimizdagi",)),
-    ("Tabiiy fanlar", ("tabiiy fan", "tabiiy_fan")),
+    ("Tabiiy fanlar", ("tabiiy fan", "tabiiy_fan", "science")),
     ("Davlat va huquq asoslari", ("huquq",)),
     ("Algebra", ("algebra",)),
     ("Geometriya", ("geometriya",)),
-    ("Matematika", ("matematika",)),
-    ("Fizika", ("fizika",)),
-    ("Kimyo", ("kimyo",)),
-    ("Biologiya", ("biologiya", "botanika", "zoologiya", "odam va uning salomatligi")),
-    ("Geografiya", ("geografiya",)),
-    ("Informatika", ("informatika",)),
+    ("Matematika", ("matematika", "matemati", "mathemati", "maths", " math ")),
+    ("Fizika", ("fizika", "physics")),
+    ("Kimyo", ("kimyo", "chemistry")),
+    ("Biologiya", ("biologiya", "botanika", "zoologiya", "odam va uning salomatligi", "biology")),
+    ("Geografiya", ("geografiya", "geography")),
+    ("Informatika", ("informatika", "informatics", "computer science")),
     ("Adabiyot", ("adabiyot",)),
     ("O‘qish", ("oqish",)),
     ("Alifbe", ("alifbe", "alifbo")),
@@ -55,6 +55,7 @@ SUBJECTS: list[tuple[str, tuple[str, ...]]] = [
 _GRADE_PATTERNS = [
     re.compile(r"(?<!\d)(1[01]|[1-9])\s*[-_ ]?\s*sinf"),
     re.compile(r"sinf\s*[-_ ]?\s*(1[01]|[1-9])(?!\d)"),
+    re.compile(r"(?:^|[^a-z])(?:g|grade\s*)(1[01]|[1-9])(?!\d)"),  # "G6", "Grade 6"
     re.compile(r"(?:^|[_\- .(])(1[01]|[1-9])(?:[_\- .)]|$)"),
 ]
 _YEAR = re.compile(r"(?<!\d)(20[0-4]\d)(?!\d)")
