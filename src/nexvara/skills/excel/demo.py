@@ -95,6 +95,14 @@ def verify_workbook(ws: Any) -> list[dict[str, Any]]:
     check("Raqamlar markazda", not misaligned, ", ".join(misaligned[:5]))
 
     check("Sarlavha qalin", bool(ws.Cells(TOP, LEFT).Font.Bold))
+
+    # What the user sees: thousands grouped with Excel's own separator, no decimals.
+    from nexvara.skills.excel.ops import separators
+
+    _dec, thou = separators(ws.Application)
+    want = f"{exp_amount:,}".replace(",", thou)
+    shown = ws.Cells(total_row, 6).Text
+    check("Raqam formati ekranda", shown == want, f"{shown!r} (kutilgan {want!r})")
     return checks
 
 

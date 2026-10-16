@@ -47,3 +47,5 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
 - Lint/format: `ruff` (pyproject.toml). Har commitdan oldin `ruff check` va `ruff format --check` toza bo'lishi kerak.
 - Office 2016 (32-bit) o'rnatilgan, Python 64-bit: COM out-of-process ishlaydi.
 - Formulalarni `Range.Formula` (inglizcha) orqali yozing, `FormulaLocal` orqali emas. Office ruscha bo'lishi ham mumkin.
+- Raqam formatlari: faqat `ops.set_number_format` orqali (Excel 2016 + uz-Latn mintaqasida `NumberFormat` tarjima qilinmaydi, `NumberFormatLocal` + Excel ajratgichlari kerak). Sanalar: faqat `ops.write_rows`/`to_excel_value` orqali (pywin32 naive datetime ni 5 soatga siljitadi).
+- Office testlarida `Windows fatal exception: code 0x80010108` chiqishi zararsiz: Excel yopilgandan keyin COM proxy bo'shatilganda pywin32 ichida ushlanadigan xato. Natija = pytest PASS/FAIL.
