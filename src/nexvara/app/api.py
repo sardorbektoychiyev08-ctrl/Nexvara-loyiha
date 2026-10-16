@@ -114,13 +114,84 @@ class Api:
                 ),
                 "task": snap,
             }
+        from nexvara.knowledge.service import parse_topic_request
+
+        topic_req = parse_topic_request(text)
+        if topic_req is not None:
+            return self._chat_topic(topic_req)
         return {
             "reply": (
-                "AI provayder hali ulanmagan (M7 bosqichi). Hozir men test tuza olaman, masalan: "
+                "AI provayder hali ulanmagan (M7 bosqichi). Hozir men darsliklardan foydalana "
+                "olaman, masalan: «7-sinf fizika Nyuton qonunlari mavzusini chiqarib ber» yoki "
                 "«7-sinf fizika Nyuton qonunlari 20 ta test». Office Agent bo‘limida Excel, Word "
                 "va PowerPoint vazifalari ham bor."
             )
         }
+
+    def _chat_topic(self, req: Any) -> dict[str, Any]:
+        from nexvara.knowledge.topicdoc import lookup
+        from nexvara.knowledge.topics import preview
+
+        if not self.library_info()["books"]:
+            return {
+                "reply": (
+                    "Mavzuni topish uchun avval darsliklarni qo‘shing: «Darsliklar» bo‘limida "
+                    "papkani oching, PDF darsliklarni tashlang va «Yangilash»ni bosing."
+                )
+            }
+        try:
+            topic = lookup(req)
+        except (LookupError, ValueError) as e:
+            return {"reply": str(e)}
+        snap = self.show_topic(
+            {"grade": req.grade, "subject": req.subject, "topic": req.topic}, _found=topic
+        )
+        return {
+            "reply": (
+                f"{topic.book.label()}, {topic.pages_label}:\n{topic.title}\n\n{preview(topic)}\n\n"
+                "To‘liq matnni Word'da, asl sahifalarni (rasm va formulalar bilan) PDF'da "
+                "ochyapman."
+            ),
+            "task": snap,
+        }
+
+    def show_topic(self, params: dict[str, Any], _found: Any = None) -> dict[str, Any]:
+        from nexvara.knowledge.topicdoc import TopicRequest
+
+        grade = params.get("grade")
+        req = TopicRequest(
+            grade=int(grade) if grade not in (None, "") else None,
+            subject=params.get("subject") or None,
+            topic=str(params.get("topic") or "").strip(),
+        )
+        if not req.topic:
+            return {"error": "Qaysi mavzu kerakligini yozing"}
+        if "show_topic" in self._overrides:
+            fn = self._overrides["show_topic"]
+        else:
+            from nexvara.knowledge.topicdoc import default_topic_path, lookup, run_topic
+
+            def fn(task: Any) -> dict[str, Any]:
+                out = None
+                if self._output_dir is not None:
+                    out = self._output_dir / default_topic_path(_found or lookup(req)).name
+                return run_topic(task, req, out, keep_open=self._keep_office_open)
+
+        title = "Mavzu: " + (_found.title if _found is not None else req.topic)
+        return self._runner.start(title, fn).snapshot()
+
+    def open_book_page(self, path: str, page: int) -> bool:
+        """Open a library PDF at a page (Edge supports #page=N; otherwise the default viewer)."""
+        p = Path(path)
+        if not p.is_absolute() or not p.is_file() or p.suffix.lower() != ".pdf":
+            return False
+        if os.name == "nt":
+            uri = p.resolve().as_uri() + f"#page={int(page)}"
+            try:
+                subprocess.Popen(["cmd", "/c", "start", "", "msedge", uri])
+            except OSError:
+                os.startfile(str(p))  # noqa: S606 - opening the user's own PDF
+        return True
 
     # ----- textbook library -----
     def library_info(self) -> dict[str, Any]:

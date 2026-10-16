@@ -96,7 +96,7 @@
       </div>
 
       <form class="card wide" id="test-form" hidden>
-        <div class="card-label">Test tuzish</div>
+        <div class="card-label">Mavzu va test</div>
         <div class="form-grid">
           <label>Sinf <select id="t-grade"></select></label>
           <label>Fan <select id="t-subject"></select></label>
@@ -106,9 +106,13 @@
           <label>Variantlar <input id="t-variants" type="number" min="1" max="6" value="1"></label>
         </div>
         <div class="error" id="t-error" hidden></div>
-        <div class="row"><button class="btn primary run-task" id="t-make" type="submit">Test tuzish</button></div>
+        <div class="row">
+          <button class="btn run-task" id="t-topic-show" type="button">Mavzuni chiqarish</button>
+          <button class="btn primary run-task" id="t-make" type="submit">Test tuzish</button>
+        </div>
         <p class="muted small">Hozir AI'siz rejim: savollar darslik matnidagi ta'riflar, sanalar va
-          raqamlardan tuziladi. Word'da tahrirlab olishingiz mumkin. AI ulanganda sifat oshadi.</p>
+          raqamlardan tuziladi. Word'da tahrirlab olishingiz mumkin. AI ulanganda sifat oshadi.
+          «Mavzuni chiqarish» mavzu matnini Word'da va darslikning asl sahifalarini PDF'da beradi.</p>
       </form>
 
       <div class="card wide">

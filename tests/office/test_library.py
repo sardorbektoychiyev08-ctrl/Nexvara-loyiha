@@ -94,5 +94,43 @@ def test_library_page_in_real_ui(data_dir, tmp_path):
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "SELFTEST PASS [lib-index]" in proc.stdout
+    assert "SELFTEST PASS [t-topic-show]" in proc.stdout
     assert "SELFTEST PASS [t-make]" in proc.stdout
     assert len(list(out.glob("test_7-sinf_Fizika_*.docx"))) == 1
+
+
+def test_show_topic_in_word_with_original_pages(data_dir):
+    from pypdf import PdfReader
+
+    from nexvara.core.task import TaskRunner
+    from nexvara.knowledge.service import index_library
+    from nexvara.knowledge.topicdoc import TopicRequest, run_topic
+
+    runner = TaskRunner()
+    assert runner.start("index", index_library).wait(120)
+    req = TopicRequest(7, "Fizika", "bosim")
+    t = runner.start("topic", lambda task: run_topic(task, req, keep_open=False, pause=0))
+    assert t.wait(300)
+    snap = t.snapshot()
+    assert snap["status"] == "succeeded", (snap["error"], snap["steps"])
+    res = snap["result"]
+    assert all(c["ok"] for c in res["checks"]), res["checks"]
+    assert res["title"] == "3-§. Bosim" and res["start_page"] == res["end_page"] == 4
+    assert res["path"].startswith(str(data_dir / "Mavzular"))
+    excerpt = PdfReader(res["excerpt"])
+    assert len(excerpt.pages) == 1 and "Paskal" in excerpt.pages[0].extract_text()
+
+
+def test_chat_topic_request(data_dir, tmp_path):
+    from nexvara.app.api import Api
+    from nexvara.core.task import TaskRunner
+
+    runner = TaskRunner()
+    api = Api(runner, output_dir=tmp_path / "out", keep_office_open=False)
+    assert runner.get(api.index_library()["id"]).wait(120)
+
+    reply = api.chat("7-sinf fizika bosim mavzusini chiqarib ber")
+    assert "3-§. Bosim" in reply["reply"] and "4-bet" in reply["reply"], reply
+    task = runner.get(reply["task"]["id"])
+    assert task.wait(300) and task.snapshot()["status"] == "succeeded", task.error
+    assert "topilmadi" in api.chat("7-sinf fizika fotosintez mavzusi kerak")["reply"]

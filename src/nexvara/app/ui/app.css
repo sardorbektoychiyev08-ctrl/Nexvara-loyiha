@@ -104,3 +104,6 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto
 .lib-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
 .lib-table th, .lib-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
 .lib-table th { color: var(--muted); font-weight: 600; }
+
+.msg { white-space: pre-wrap; }
+.row.wrap { flex-wrap: wrap; }
