@@ -170,3 +170,29 @@ def test_request_validation():
         TestRequest(12, "Fizika").validate()
     with pytest.raises(ValueError):
         TestRequest(7, "Fizika", variants=9).validate()
+
+
+def test_current_edition_prefers_rtm_and_keeps_all_quarters(tmp_path):
+    lib = Library(tmp_path / "t.db")
+    old = ["Eski nashr: bosim haqida."]
+    q1 = ["Yangi 1-chorak: bosim haqida."]
+    q2 = ["Yangi 2-chorak: kuch haqida."]
+    lib.add_book(path="e", sha256="1", title="eski", grade=7, subject="Fizika", year=2017,
+                 pages=old, rank=0)  # fmt: skip
+    lib.add_book(path="r1", sha256="2", title="1-chorak", grade=7, subject="Fizika", year=2025,
+                 pages=q1, rank=2)  # fmt: skip
+    lib.add_book(path="r2", sha256="3", title="2-chorak", grade=7, subject="Fizika", year=2026,
+                 pages=q2, rank=2)  # fmt: skip
+    assert {b.title for b in lib.current_edition(7, "Fizika")} == {"1-chorak", "2-chorak"}
+    assert [h.book.title for h in lib.search("bosim", 7, "Fizika")] == ["1-chorak"]
+    assert [h.book.title for h in lib.search("kuch", 7, "Fizika")] == ["2-chorak"]
+    assert len(lib.search("bosim", 7, "Fizika", newest_only=False)) == 2
+    lib.close()
+
+
+def test_source_rank_from_folder(tmp_path):
+    from nexvara.knowledge.ingest import source_rank
+
+    assert source_rank(tmp_path / "rtm" / "7-sinf" / "a.pdf", tmp_path) == 2
+    assert source_rank(tmp_path / "eduportal" / "7-sinf" / "a.pdf", tmp_path) == 0
+    assert source_rank(tmp_path / "7-sinf" / "a.pdf", tmp_path) == 1

@@ -301,6 +301,91 @@ class Api:
         title = "Mavzu: " + (_found.title if _found is not None else req.topic)
         return self._runner.start(title, fn).snapshot()
 
+    # ----- textbook sources -----
+    def _tg(self):
+        if getattr(self, "_telegram", None) is None:
+            from nexvara import config
+            from nexvara.sources.telegram_rtm import TelegramRtm
+
+            self._telegram = TelegramRtm(config.data_dir(), self._overrides.get("tg_factory"))
+        return self._telegram
+
+    def sources_status(self) -> dict[str, Any]:
+        from nexvara import config
+
+        root = config.textbooks_dir()
+        count = {
+            name: sum(1 for _ in (root / name).rglob("*.pdf")) if (root / name).is_dir() else 0
+            for name in ("eduportal", "rtm")
+        }
+        tg = self._tg()
+        status = {"configured": tg.api() is not None, "authorized": False}
+        if status["configured"]:
+            status = tg.status()
+        return {"eduportal": count["eduportal"], "rtm": count["rtm"], "telegram": status}
+
+    def download_eduportal(self) -> dict[str, Any]:
+        from nexvara import config
+        from nexvara.knowledge.service import index_library
+        from nexvara.sources import eduportal
+
+        def fn(task: Any) -> dict[str, Any]:
+            with task.step("Ro‘yxatni olish (eduportal.uz)") as s:
+                books = eduportal.list_textbooks()
+                s.detail = f"{len(books)} ta o‘zbekcha darslik"
+            with task.step("Yuklab olish") as s:
+
+                def progress(i: int, n: int, name: str) -> None:
+                    task.check_cancelled()
+                    s.detail = f"{i}/{n}: {name}"
+
+                rep = eduportal.download_all(config.textbooks_dir(), books, progress)
+                s.detail = rep.summary()
+            result = index_library(task)
+            return {"report": [rep.summary(), result["summary"]], "failed": rep.failed}
+
+        return self._runner.start("Rasmiy darsliklarni yuklash", fn, timeout=6 * 3600).snapshot()
+
+    def tg_save_api(self, api_id: str, api_hash: str) -> dict[str, Any]:
+        try:
+            self._tg().save_api(api_id, api_hash)
+        except (TypeError, ValueError) as e:
+            return {"ok": False, "error": str(e) or "API ID raqam bo‘lishi kerak"}
+        return {"ok": True}
+
+    def tg_send_code(self, phone: str) -> dict[str, Any]:
+        try:
+            self._tg().send_code(phone)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True}
+
+    def tg_sign_in(self, code: str, password: str = "") -> dict[str, Any]:
+        try:
+            self._tg().sign_in(code, password)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True}
+
+    def tg_download(self) -> dict[str, Any]:
+        from nexvara import config
+        from nexvara.knowledge.service import index_library
+
+        tg = self._tg()
+
+        def fn(task: Any) -> dict[str, Any]:
+            with task.step("RTM kanalidan yangi darsliklar") as s:
+
+                def progress(seen: int, name: str) -> None:
+                    s.detail = f"{seen}-xabar: {name}"
+
+                rep = tg.download(config.textbooks_dir(), progress, lambda: task.cancel_requested)
+                s.detail = rep.summary()
+            result = index_library(task)
+            return {"report": [rep.summary(), result["summary"]], "failed": rep.failed}
+
+        return self._runner.start("Yangi darsliklar (Telegram)", fn, timeout=6 * 3600).snapshot()
+
     def open_book_page(self, path: str, page: int) -> bool:
         """Open a library PDF at a page (Edge supports #page=N; otherwise the default viewer)."""
         p = Path(path)

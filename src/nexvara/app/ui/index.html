@@ -103,6 +103,49 @@
         </div>
       </div>
 
+      <div class="card wide" id="sources">
+        <div class="card-label">Darslik manbalari</div>
+        <div class="source-row">
+          <div>
+            <b>Rasmiy eski nashr</b> — eduportal.uz (vazirlik portali, 2017–2019, 205 ta o‘zbekcha darslik)
+            <div class="muted small" id="src-edu"></div>
+          </div>
+          <button class="btn run-task" id="src-edu-btn" type="button">Yuklab olish</button>
+        </div>
+        <div class="source-row">
+          <div>
+            <b>Yangi darsliklar</b> — Respublika ta’lim markazi rasmiy Telegram kanali
+            <div class="muted small" id="src-tg"></div>
+          </div>
+          <button class="btn primary run-task" id="src-tg-btn" type="button" hidden>Yuklab olish</button>
+        </div>
+        <div id="tg-setup" class="tg-steps" hidden>
+          <div class="hint small">
+            <b>1-qadam (bir marta):</b> <span class="mono">my.telegram.org</span> saytiga telefon raqamingiz bilan
+            kiring → «API development tools» → istalgan nom bilan ilova yarating → <b>App api_id</b> va
+            <b>App api_hash</b> ni shu yerga yozing. Bu bepul; ma’lumot faqat shu kompyuterda saqlanadi.
+          </div>
+          <div class="form-grid">
+            <label>API ID <input id="tg-id" type="text" inputmode="numeric"></label>
+            <label class="wide-field">API hash <input id="tg-hash" type="text"></label>
+          </div>
+          <div class="row"><button class="btn" id="tg-save" type="button">Saqlash</button></div>
+        </div>
+        <div id="tg-login" class="tg-steps" hidden>
+          <div class="hint small"><b>2-qadam:</b> Telegram'ga kirish. Kod Telegram ilovangizga keladi.</div>
+          <div class="form-grid">
+            <label>Telefon <input id="tg-phone" type="tel" placeholder="+998901234567"></label>
+            <label>Kod <input id="tg-code" type="text" inputmode="numeric"></label>
+            <label>Ikki bosqichli parol (bo‘lsa) <input id="tg-pass" type="password"></label>
+          </div>
+          <div class="row">
+            <button class="btn" id="tg-send" type="button">Kod yuborish</button>
+            <button class="btn primary" id="tg-signin" type="button">Kirish</button>
+          </div>
+        </div>
+        <div class="error" id="src-error" hidden></div>
+      </div>
+
       <form class="card wide" id="test-form" hidden>
         <div class="card-label">Mavzu va test</div>
         <div class="form-grid">

@@ -154,7 +154,9 @@ def extract_facts(pages: list[tuple[int, str]]) -> list[Fact]:
                 continue
             numbers = re.findall(r"\d+", s)
             m = _NUMBER.search(s)
-            if m and len(numbers) == 1 and not s.startswith(m.group(1)):
+            # "01" is OCR noise (a lost decimal comma), not a number worth asking about.
+            plausible = m and not (len(m.group(1)) > 1 and m.group(1).startswith("0"))
+            if plausible and len(numbers) == 1 and not s.startswith(m.group(1)):
                 out.append(Fact(s, m.group(1), "number", page))
                 seen.add(fold(s))
     return out

@@ -227,8 +227,44 @@ function fillSubjects() {
   $("#t-subject").replaceChildren(option("", "— fan —"), ...subjects.map((s) => option(s, s)));
 }
 
+function srcError(msg) {
+  $("#src-error").textContent = msg || "";
+  $("#src-error").hidden = !msg;
+}
+
+async function renderSources() {
+  const st = await api().sources_status();
+  $("#src-edu").textContent = st.eduportal ? `${st.eduportal} ta fayl yuklangan` : "hali yuklanmagan";
+  const tg = st.telegram;
+  $("#tg-setup").hidden = tg.configured;
+  $("#tg-login").hidden = !tg.configured || tg.authorized;
+  $("#src-tg-btn").hidden = !tg.authorized;
+  $("#src-tg").textContent = !tg.configured ? "sozlanmagan (pastdagi 1-qadam)"
+    : !tg.authorized ? "Telegram'ga kirish kerak (2-qadam)"
+    : `ulangan · ${st.rtm} ta yangi darslik yuklangan`;
+}
+
+$("#src-edu-btn").addEventListener("click", async () => { if (api()) track(await api().download_eduportal()); });
+$("#src-tg-btn").addEventListener("click", async () => { if (api()) track(await api().tg_download()); });
+$("#tg-save").addEventListener("click", async () => {
+  const r = await api().tg_save_api($("#tg-id").value, $("#tg-hash").value);
+  srcError(r.ok ? "" : r.error);
+  renderSources();
+});
+$("#tg-send").addEventListener("click", async () => {
+  const r = await api().tg_send_code($("#tg-phone").value);
+  srcError(r.ok ? "" : r.error);
+  if (r.ok) $("#src-tg").textContent = "Kod yuborildi — Telegram ilovangizni tekshiring";
+});
+$("#tg-signin").addEventListener("click", async () => {
+  const r = await api().tg_sign_in($("#tg-code").value, $("#tg-pass").value);
+  srcError(r.ok ? "" : r.error);
+  renderSources();
+});
+
 async function renderLibrary() {
   if (!api()) return;
+  renderSources();
   const info = await api().library_info();
   $("#lib-folder").textContent = info.folder;
   catalog = info.catalog;

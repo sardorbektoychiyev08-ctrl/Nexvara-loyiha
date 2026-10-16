@@ -61,6 +61,10 @@ src/nexvara/
     testdoc.py            # Word'da test: variantlar + javoblar kaliti, DOCX/PDF, tekshiruv
     topics.py             # Mavzu = §-bo'lim: sarlavha/matn bo'yicha topish, mundarija + bet siljishi
     topicdoc.py           # Mavzu: Word matni + asl sahifalar PDF, tekshiruv
+  sources/
+    eduportal.py          # Vazirlik portali: 205 ta rasmiy (eski) o'zbekcha darslik yuklovchi
+    telegram_rtm.py       # RTM rasmiy Telegram kanali: yangi darsliklar (foydalanuvchi hisobi bilan)
+  knowledge/ocr.py        # Windows o'zidagi OCR (skaner PDF'lar uchun), PyMuPDF bilan
   agent/
     parse.py              # O'zbekcha buyruq -> reja (amallar, fayl, ilova); AI'siz
     files.py              # Faylni nomi bo'yicha topish; xavfsiz chiqish yo'li (_NEXVARA), .bak

@@ -166,7 +166,9 @@ def index_library(task: Task) -> dict[str, Any]:
 
 
 def _pages_for(lib: Library, req: TestRequest) -> tuple[Book, list[tuple[int, str]], str]:
-    books = lib.best_books(req.grade, req.subject)
+    from nexvara.knowledge.topics import candidate_books
+
+    books = candidate_books(lib, req.grade, req.subject)
     if not books:
         what = " ".join(
             x for x in (f"{req.grade}-sinf" if req.grade else "", req.subject or "") if x
@@ -174,12 +176,42 @@ def _pages_for(lib: Library, req: TestRequest) -> tuple[Book, list[tuple[int, st
         raise LookupError(f"Kutubxonada {what or 'mos'} darslik topilmadi")
     book = books[0]
     if req.topic:
-        hits = lib.search(req.topic, book.grade, book.subject, limit=12)
-        pages = [(h.page_no, h.text) for h in hits]
+        # Search every part of the current edition (1-chorak, 2-chorak, ...).
+        hits = []
+        for g, s in dict.fromkeys((b.grade, b.subject) for b in books):
+            hits += lib.search(req.topic, g, s, limit=12)
+        hits.sort(key=lambda h: -h.score)
+        pages = [(h.page_no, h.text) for h in hits[:12]]
         if not pages:
             raise LookupError(f"«{req.topic}» mavzusi {book.label()} darsligida topilmadi")
+        book = hits[0].book
         return book, sorted(pages), req.topic
-    return book, lib.book_pages(book.id), "umumiy"
+    pages = [pg for b in books if (b.grade, b.subject) == (book.grade, book.subject)
+             for pg in lib.book_pages(b.id)]  # fmt: skip
+    return book, pages, "umumiy"
+
+
+MAX_EXTRA_PAGES = 18
+
+
+def _topic_pages(lib: Library, req: TestRequest, book, hit_pages, topic_label):
+    """Pages for a topic test: the whole §-section of the topic, widened with the following
+    pages until the text yields enough questions (a short section gives few questions)."""
+    from nexvara.knowledge.topics import find_topic
+
+    try:
+        t = find_topic(lib, req.grade, req.subject, req.topic)
+    except (LookupError, ValueError):
+        return book, hit_pages, topic_label
+    book = t.book
+    start, end = t.start_page, t.end_page
+    pages = [(p, lib.page_text(book.id, p)) for p in range(start, end + 1)]
+    while len(build_quiz(pages, req.count, seed=1000).questions) < req.count and end < min(
+        book.pages, t.end_page + MAX_EXTRA_PAGES
+    ):
+        end += 3
+        pages = [(p, lib.page_text(book.id, p)) for p in range(start, min(end, book.pages) + 1)]
+    return book, pages, t.title
 
 
 def make_quizzes(req: TestRequest) -> tuple[Book, str, list[QuizResult]]:
@@ -187,6 +219,8 @@ def make_quizzes(req: TestRequest) -> tuple[Book, str, list[QuizResult]]:
     lib = open_library()
     try:
         book, pages, topic = _pages_for(lib, req)
+        if req.topic:
+            book, pages, topic = _topic_pages(lib, req, book, pages, topic)
         pool = [d.term for d in extract_definitions(lib.book_pages(book.id))]
         quizzes = [
             build_quiz(pages, req.count, seed=1000 + v, term_pool=pool) for v in range(req.variants)

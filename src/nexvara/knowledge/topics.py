@@ -147,8 +147,9 @@ def section_starts(lib: Library, book: Book) -> list[tuple[int, str]]:
 
 
 def _stems(text: str) -> list[str]:
+    # Uzbek suffixes run up to 4 letters ("qonun-lari", "Nyuton-ning"): compare stems.
     words = [w for w in re.findall(r"\w+", fold(text)) if len(w) >= 3]
-    return [w[: max(4, len(w) - 3)] for w in words]
+    return [w[: max(4, len(w) - 4)] for w in words]
 
 
 def _title_score(query: str, title: str) -> float:
@@ -205,19 +206,15 @@ def _strip_running_lines(parts: list[tuple[int, str]]) -> str:
 
 
 def candidate_books(lib: Library, grade: int | None, subject: str | None) -> list[Book]:
-    """Newest book per grade+subject. A generic subject ("Tarix") also matches
-    "O‘zbekiston tarixi" and "Jahon tarixi"."""
-    books = lib.best_books(grade, subject)
+    """Every part of the edition in use per grade+subject (new RTM quarters beat the old
+    portal edition). A generic subject ("Tarix") also matches "O‘zbekiston tarixi"."""
+    books = lib.current_edition(grade, subject)
     if not books and subject:
         key = fold(subject)
-        books = [b for b in lib.best_books(grade, None) if b.subject and key in fold(b.subject)]
-    seen: set[tuple] = set()
-    out = []
-    for b in books:
-        if (b.grade, b.subject) not in seen:
-            seen.add((b.grade, b.subject))
-            out.append(b)
-    return out
+        books = [
+            b for b in lib.current_edition(grade, None) if b.subject and key in fold(b.subject)
+        ]
+    return books
 
 
 def find_topic(lib: Library, grade: int | None, subject: str | None, query: str) -> Topic:
@@ -247,10 +244,16 @@ def _find_in_book(lib: Library, book: Book, query: str) -> Topic:
 
     # Best title match; on a tie the earlier section wins.
     scored = sorted((-_title_score(query, t), i) for i, (_p, t) in enumerate(starts))
-    if scored and -scored[0][0] >= 0.5:
+    best = -scored[0][0] if scored else 0.0
+    # Pages of THIS book that contain every word of the query.
+    hits = [
+        h for h in lib.search(query, book.grade, book.subject, limit=30) if h.book.id == book.id
+    ]
+    # A title that matches every word wins. A partial title match ("amir" ~ "Amirligida")
+    # is only trusted when the text itself has no better answer.
+    if best == 1.0 or (best >= 0.67 and not hits):
         idx, how = scored[0][1], "sarlavha"
     else:
-        hits = lib.search(query, book.grade, book.subject, limit=1)
         if not hits:
             raise LookupError(f"«{query}» mavzusi {book.label()} darsligida topilmadi")
         page = hits[0].page_no
@@ -258,7 +261,8 @@ def _find_in_book(lib: Library, book: Book, query: str) -> Topic:
         if not before:  # no § headings in this book: return the matching page and its neighbour
             end = min(page + 1, book.pages)
             parts = [(p, lib.page_text(book.id, p)) for p in range(page, end + 1)]
-            return Topic(book, query, page, end, _strip_running_lines(parts), "matn")
+            title = query.strip()[:1].upper() + query.strip()[1:]
+            return Topic(book, title, page, end, _strip_running_lines(parts), "matn")
         idx, how = before[-1], "matn"
 
     start = starts[idx]

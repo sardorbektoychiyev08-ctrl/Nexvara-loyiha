@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS books (
     year INTEGER,
     pages INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'ok',      -- ok | no_text | cyrillic | error
+    rank INTEGER NOT NULL DEFAULT 1,        -- source priority: rtm 2 > user 1 > eduportal 0
     note TEXT NOT NULL DEFAULT '',
     added_at REAL NOT NULL
 );
@@ -42,7 +43,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
 );
 """
 
-SCHEMA_VERSION = 3  # 2: multi-line section titles, 3: table-of-contents lines skipped
+SCHEMA_VERSION = 4  # 2: multi-line titles, 3: contents lines skipped, 4: source rank
 _TOC_LEADER = re.compile(r"(?:\.\s?){4,}|…{2,}")
 
 # "§ 25. Prujina bikirligi", "25-§. ...", "12-mavzu. ...", "IV bob. Harakat qonunlari"
@@ -173,6 +174,7 @@ class Library:
         pages: Iterable[str],
         status: str = "ok",
         note: str = "",
+        rank: int = 1,
     ) -> int:
         """Insert (or replace) a book with its page texts. Returns the book id."""
         old = self.book_by_path(path)
@@ -181,8 +183,20 @@ class Library:
         page_list = list(pages)
         cur = self.db.execute(
             "INSERT INTO books (path, sha256, title, grade, subject, year, pages, status, note, "
-            "added_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (path, sha256, title, grade, subject, year, len(page_list), status, note, time.time()),
+            "rank, added_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                path,
+                sha256,
+                title,
+                grade,
+                subject,
+                year,
+                len(page_list),
+                status,
+                note,
+                rank,
+                time.time(),
+            ),
         )
         book_id = int(cur.lastrowid)
         if status == "ok":
@@ -220,7 +234,7 @@ class Library:
         return out
 
     def best_books(self, grade: int | None, subject: str | None) -> list[Book]:
-        """Matching books, newest edition first (so a new textbook wins over an old one)."""
+        """Matching books, best source and newest edition first."""
         sql = f"SELECT {self._COLS} FROM books WHERE status = 'ok'"
         args: list = []
         if grade is not None:
@@ -229,8 +243,31 @@ class Library:
         if subject is not None:
             sql += " AND subject = ?"
             args.append(subject)
-        sql += " ORDER BY COALESCE(year, 0) DESC, added_at DESC"
+        sql += " ORDER BY rank DESC, COALESCE(year, 0) DESC, added_at DESC"
         return [self._book(r) for r in self.db.execute(sql, args)]
+
+    def current_edition(self, grade: int | None, subject: str | None) -> list[Book]:
+        """For every grade+subject: all parts of the edition in use (e.g. 1- and 2-chorak of
+        the new RTM textbook), ignoring older editions from lower-priority sources."""
+        rows = self.db.execute(
+            f"SELECT {self._COLS}, rank FROM books WHERE status = 'ok'"
+            + (" AND grade = ?" if grade is not None else "")
+            + (" AND subject = ?" if subject is not None else "")
+            + " ORDER BY rank DESC, COALESCE(year, 0) DESC, added_at",
+            [x for x in (grade, subject) if x is not None],
+        ).fetchall()
+        best: dict[tuple, tuple[int, int]] = {}
+        out = []
+        for r in rows:
+            book, rank = self._book(r[:-1]), r[-1]
+            key = (book.grade, book.subject)
+            if key not in best:
+                best[key] = (rank, book.year or 0)
+            top_rank, top_year = best[key]
+            # Same source, and the same or the previous year (quarters span a new year).
+            if rank == top_rank and (book.year is None or book.year >= top_year - 1):
+                out.append(book)
+        return out
 
     def page_text(self, book_id: int, page_no: int) -> str:
         row = self.db.execute(
@@ -262,16 +299,10 @@ class Library:
         newest_only: bool = True,
     ) -> list[Hit]:
         """Best-matching pages. With newest_only, only the newest edition per grade+subject."""
-        books = {b.id: b for b in self.best_books(grade, subject)}
         if newest_only:
-            seen: set[tuple] = set()
-            keep = {}
-            for b in books.values():  # already newest first
-                key = (b.grade, b.subject)
-                if key not in seen:
-                    seen.add(key)
-                    keep[b.id] = b
-            books = keep
+            books = {b.id: b for b in self.current_edition(grade, subject)}
+        else:
+            books = {b.id: b for b in self.best_books(grade, subject)}
         if not books:
             return []
         q = fts_query(query)
