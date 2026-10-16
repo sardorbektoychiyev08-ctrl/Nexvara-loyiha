@@ -12,6 +12,14 @@ dependencies = [
     "pywebview>=5",
     "pypdf>=4",
     "telethon>=1.36",
+    "cryptography>=41",  # AES-encrypted textbook PDFs
+    "pymupdf>=1.24",  # render scanned pages for OCR
+    "winrt-Windows.Media.Ocr>=2",  # Windows built-in OCR (no API, no install)
+    "winrt-Windows.Graphics.Imaging>=2",
+    "winrt-Windows.Storage.Streams>=2",
+    "winrt-Windows.Globalization>=2",
+    "winrt-Windows.Foundation>=2",
+    "winrt-Windows.Foundation.Collections>=2",
 ]
 
 [project.optional-dependencies]
