@@ -68,8 +68,12 @@ def test_ui_button_runs_real_excel(tmp_path):
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "SELFTEST PASS [run-excel]" in proc.stdout
     assert "SELFTEST PASS [run-dashboard]" in proc.stdout
+    assert "SELFTEST PASS [run-word]" in proc.stdout
+    assert "SELFTEST PASS [run-ppt]" in proc.stdout
     assert len(list(tmp_path.glob("nexvara-jadval-*.xlsx"))) == 1
     assert len(list(tmp_path.glob("nexvara-dashboard-*.xlsx"))) == 1
+    assert len(list(tmp_path.glob("nexvara-hisobot-*.docx"))) == 1
+    assert len(list(tmp_path.glob("nexvara-taqdimot-*.pptx"))) == 1
 
 
 def test_formulas_are_locale_independent(tmp_path):

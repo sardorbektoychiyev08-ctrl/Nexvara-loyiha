@@ -5,6 +5,7 @@ Every public method must return JSON-serialisable data.
 
 from __future__ import annotations
 
+import importlib
 import os
 import platform
 import subprocess
@@ -14,10 +15,23 @@ from typing import Any
 from nexvara import __version__
 from nexvara.core.task import TaskFn, TaskRunner
 
+# kind -> (task title, module, runner function). Every runner takes (task, out, keep_open=...)
+# and its module has default_output_path().
+OFFICE_TASKS: dict[str, tuple[str, str, str]] = {
+    "excel_demo": ("Excel: 10 qatorli jadval", "nexvara.skills.excel.demo", "run_demo"),
+    "excel_dashboard": (
+        "Excel: savdo dashboardi",
+        "nexvara.skills.excel.dashboard",
+        "run_dashboard",
+    ),
+    "word_report": ("Word: rasmiy hisobot", "nexvara.skills.word.demo", "run_word_report"),
+    "presentation": ("PowerPoint: taqdimot", "nexvara.skills.powerpoint.demo", "run_presentation"),
+}
+
 
 class Api:
-    """`output_dir`/`keep_excel_open` exist so the UI self-test can run the real
-    button flow without leaving files in Documents or Excel open."""
+    """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
+    button flow without leaving files in Documents or Office windows open."""
 
     def __init__(
         self,
@@ -25,29 +39,35 @@ class Api:
         excel_demo: TaskFn | None = None,
         excel_dashboard: TaskFn | None = None,
         output_dir: Path | None = None,
-        keep_excel_open: bool = True,
+        keep_office_open: bool = True,
+        overrides: dict[str, TaskFn] | None = None,
     ) -> None:
         self._runner = runner or TaskRunner()
-        self._excel_demo = excel_demo or self._real_excel_demo
-        self._excel_dashboard = excel_dashboard or self._real_excel_dashboard
         self._output_dir = output_dir
-        self._keep_excel_open = keep_excel_open
+        self._keep_office_open = keep_office_open
+        self._overrides = dict(overrides or {})
+        if excel_demo:
+            self._overrides["excel_demo"] = excel_demo
+        if excel_dashboard:
+            self._overrides["excel_dashboard"] = excel_dashboard
 
-    def _real_excel_demo(self, task: Any) -> dict[str, Any]:
-        from nexvara.skills.excel.demo import default_output_path, run_demo
+    def _task_fn(self, kind: str) -> TaskFn:
+        if kind in self._overrides:
+            return self._overrides[kind]
+        _title, module_name, fn_name = OFFICE_TASKS[kind]
 
-        out = default_output_path()
-        if self._output_dir is not None:
-            out = self._output_dir / out.name
-        return run_demo(task, out, keep_open=self._keep_excel_open)
+        def run(task: Any) -> dict[str, Any]:
+            module = importlib.import_module(module_name)
+            out = module.default_output_path()
+            if self._output_dir is not None:
+                out = self._output_dir / out.name
+            return getattr(module, fn_name)(task, out, keep_open=self._keep_office_open)
 
-    def _real_excel_dashboard(self, task: Any) -> dict[str, Any]:
-        from nexvara.skills.excel.dashboard import default_output_path, run_dashboard
+        return run
 
-        out = default_output_path()
-        if self._output_dir is not None:
-            out = self._output_dir / out.name
-        return run_dashboard(task, out, keep_open=self._keep_excel_open)
+    def _start(self, kind: str) -> dict[str, Any]:
+        task = self._runner.start(OFFICE_TASKS[kind][0], self._task_fn(kind))
+        return task.snapshot()
 
     def get_info(self) -> dict[str, Any]:
         return {
@@ -64,17 +84,21 @@ class Api:
         return {
             "reply": (
                 "AI provayder hali ulanmagan (M7 bosqichi). Hozircha Office Agent "
-                "bo'limidagi Excel sinovini ishga tushirishingiz mumkin."
+                "bo'limidagi Excel, Word va PowerPoint vazifalarini ishga tushirishingiz mumkin."
             )
         }
 
     def run_excel_demo(self) -> dict[str, Any]:
-        task = self._runner.start("Excel: 10 qatorli jadval", self._excel_demo)
-        return task.snapshot()
+        return self._start("excel_demo")
 
     def run_excel_dashboard(self) -> dict[str, Any]:
-        task = self._runner.start("Excel: savdo dashboardi", self._excel_dashboard)
-        return task.snapshot()
+        return self._start("excel_dashboard")
+
+    def run_word_report(self) -> dict[str, Any]:
+        return self._start("word_report")
+
+    def run_presentation(self) -> dict[str, Any]:
+        return self._start("presentation")
 
     def get_task(self, task_id: str) -> dict[str, Any] | None:
         task = self._runner.get(task_id)

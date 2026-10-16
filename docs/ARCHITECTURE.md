@@ -40,8 +40,18 @@ src/nexvara/
                           #   grafik, pivot, CSV/PDF eksport
     formulas.py           # SUMIFS/growth/lookup; XLOOKUP yo'q bo'lsa INDEX/MATCH
     dashboard.py          # Savdo dashboardi: ma'lumot, formulalar, KPI, 3 grafik, pivot, 14 tekshiruv
+  skills/common.py        # bring_to_front, validate_output_path
+  skills/office_session.py # Word/PowerPoint session: faqat o'z hujjatlarini yopadi
+  skills/png_chart.py     # Tashqi kutubxonasiz PNG diagramma (Word/PPT rasmlari uchun)
+  skills/word/
+    ops.py                # WordSession + hujjat amallari (pozitsion COM argumentlar)
+    demo.py               # Rasmiy hisobot: DOCX + PDF, 15 tekshiruv
+  skills/powerpoint/
+    ops.py                # PowerPointSession + slayd amallari
+    layout.py             # Matn sig'ishi / ustma-ust / slayddan tashqari tekshiruvlari
+    demo.py               # 6 slaydli taqdimot: PPTX + PDF, 11 tekshiruv
   app/
-    main.py               # pywebview oynasi; --smoke rejimi
+    main.py               # pywebview oynasi; --smoke va --selftest-excel (4 tugma) rejimlari
     api.py                # JS -> Python ko'prigi (window.pywebview.api)
     ui/                   # index.html, app.css, app.js
 tests/

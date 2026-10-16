@@ -15,12 +15,13 @@ log = logging.getLogger(__name__)
 def bring_to_front(hwnd: int, maximize: bool = True) -> bool:
     """Show an Office window and make it the foreground window so the user sees the work."""
     try:
+        hwnd = int(hwnd)  # PowerPoint returns HWND as a non-int COM value
         win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE if maximize else win32con.SW_RESTORE)
         # Windows only lets the foreground process hand over focus; an Alt tap lifts that lock.
         win32api.keybd_event(win32con.VK_MENU, 0, 0, 0)
         win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0)
         win32gui.SetForegroundWindow(hwnd)
-    except pywintypes.error as e:
+    except (pywintypes.error, TypeError, ValueError) as e:
         log.warning("Could not bring window %s to front: %s", hwnd, e)
         return False
     return True

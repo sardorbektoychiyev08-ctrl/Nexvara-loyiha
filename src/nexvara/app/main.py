@@ -41,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     if selftest:
         args.smoke = True
         args.selftest_excel.mkdir(parents=True, exist_ok=True)
-        api = Api(output_dir=args.selftest_excel.resolve(), keep_excel_open=False)
+        api = Api(output_dir=args.selftest_excel.resolve(), keep_office_open=False)
     else:
         api = Api()
     window = webview.create_window(
@@ -88,7 +88,9 @@ def excel_button_selftest(window: webview.Window) -> bool:
     window.evaluate_js("document.querySelector('.nav-item[data-page=office]').click()")
     ok = _click_and_watch(window, "run-excel", "Excel: 10 qatorli jadval", steps=6, checks=7)
     dash = _click_and_watch(window, "run-dashboard", "Excel: savdo dashboardi", steps=8, checks=14)
-    return ok and dash
+    word = _click_and_watch(window, "run-word", "Word: rasmiy hisobot", steps=8, checks=15)
+    ppt = _click_and_watch(window, "run-ppt", "PowerPoint: taqdimot", steps=8, checks=11)
+    return ok and dash and word and ppt
 
 
 def _click_and_watch(

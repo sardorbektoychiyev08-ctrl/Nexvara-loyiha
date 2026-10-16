@@ -15,17 +15,17 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
 
 ## Git tarmoqlari (Claude va Codex parallel ishlashi uchun)
 - `main`: faqat testlardan o'tgan (PASS) kod. To'g'ridan-to'g'ri `main` ga commit qilinmaydi, faqat merge qilinadi.
-- `claude/<mavzu>`: Claude Code ishlaydigan tarmoqlar (hozir: `claude/excel-skill`).
+- `claude/<mavzu>`: Claude Code ishlaydigan tarmoqlar (hozir: `claude/office-skills`).
 - `codex/<mavzu>`: Codex ishlaydigan tarmoqlar (hozir: `codex/model-router`).
 - Har agent **faqat o'z tarmog'ida** ishlaydi. Boshqa agentning tarmog'ini faqat limit tugab ish shu agentga o'tganda davom ettiradi, va bu PROGRESS.md da yoziladi.
 - Merge qilishdan oldin: tarmoqqa `main` ni merge qiling, `.\scripts\test.ps1` (Office kodi o'zgargan bo'lsa `-Office` bilan) PASS bo'lsin, keyin `git checkout main && git merge --no-ff <tarmoq>`.
 - Konfliktlarni kamaytirish uchun papka egaligi:
-  - `src/nexvara/skills/excel/`, `tests/office/` → `claude/excel-skill`
+  - `src/nexvara/skills/` (excel, word, powerpoint, common), `tests/office/` → Claude (`claude/*`)
   - `src/nexvara/models/` (yangi paket), `tests/unit/test_models*.py` → `codex/model-router`
   - Umumiy fayllar (`PROGRESS.md`, `ROADMAP.md`, `pyproject.toml`, `app/`) → kichik, alohida commitlarda o'zgartiring; konflikt bo'lsa ikkala tomonning yozuvlarini saqlang.
 
 ## Hozirgi vazifalar taqsimoti
-- **Claude → `claude/excel-skill`**: Excel skill kengaytmasi (formulalar, formatlash, PivotTable, grafiklar, filtrlar, katta fayllar, dashboard).
+- **Claude → `claude/office-skills`**: Excel, Word, PowerPoint skill'lari.
 - **Codex → `codex/model-router`**: M7 Model Router skeleti, `src/nexvara/models/`: provayder interfeysi, CHEAP/BALANCED/POWERFUL/SPECIALIST darajalari, model nomlari konfiguratsiyadan, token/xarajat hisobi, kunlik/oylik budget, fallback. **Faqat soxta (fake/offline) provayder bilan testlar; haqiqiy pullik API chaqirilmaydi.** Kalitlar faqat `.env` dan o'qiladi.
 
 ## Foydalanuvchi haqida
@@ -46,6 +46,8 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
 - Kod: `src/nexvara/` (core, skills/<nom>, app). Testlar: `tests/unit` (Office'siz), `tests/office` (haqiqiy Office).
 - Lint/format: `ruff` (pyproject.toml). Har commitdan oldin `ruff check` va `ruff format --check` toza bo'lishi kerak.
 - Office 2016 (32-bit) o'rnatilgan, Python 64-bit: COM out-of-process ishlaydi.
+- **Word/PowerPoint COM: faqat pozitsion argumentlar.** Nomli argumentlar (`Range=...`, `Replace=...`) jimgina e'tiborsiz qoldiriladi. Uslub va layoutlar faqat raqamli konstanta orqali beriladi (ruscha Office'da nomlar boshqacha). Word paragraf obyektlarini keyinroq ishlatish uchun saqlamang, matn bo'yicha toping.
+- PowerPoint bitta nusxada ishlaydi: foydalanuvchining taqdimotlariga tegmang (`OfficeSession` faqat o'z hujjatlarini yopadi).
 - Formulalarni `Range.Formula` (inglizcha) orqali yozing, `FormulaLocal` orqali emas. Office ruscha bo'lishi ham mumkin.
 - Raqam formatlari: faqat `ops.set_number_format` orqali (Excel 2016 + uz-Latn mintaqasida `NumberFormat` tarjima qilinmaydi, `NumberFormatLocal` + Excel ajratgichlari kerak). Sanalar: faqat `ops.write_rows`/`to_excel_value` orqali (pywin32 naive datetime ni 5 soatga siljitadi).
 - Office testlarida `Windows fatal exception: code 0x80010108` chiqishi zararsiz: Excel yopilgandan keyin COM proxy bo'shatilganda pywin32 ichida ushlanadigan xato. Natija = pytest PASS/FAIL.

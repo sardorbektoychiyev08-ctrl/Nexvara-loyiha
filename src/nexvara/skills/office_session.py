@@ -68,9 +68,13 @@ class OfficeSession:
                 # Iterate by index from the end; keep no Python reference past Quit().
                 for i in range(coll.Count, 0, -1):
                     if str(coll(i).FullName) in self._owned:
+                        log.info("%s: closing %s", self.prog_id, coll(i).FullName)
                         self._close_doc(coll(i))
+                del coll
                 if not self._preexisting and self._collection().Count == 0:
+                    log.info("%s: quitting", self.prog_id)
                     self._quit()
+                    log.info("%s: quit returned", self.prog_id)
         except Exception:
             log.exception("Error while closing %s", self.prog_id)
         finally:
