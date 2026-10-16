@@ -4,6 +4,18 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-16 (11) — Claude Code — Oyna ekranga sig'adi
+
+**Foydalanuvchi:** "ko'rinmayabdi oxiri" (aylantirish tuzatilgandan keyin ham).
+
+**Sabab:** foydalanuvchi ekrani 1920×1080, 125% kattalashtirish → ishlatiladigan maydon 1536×816 (mantiqiy piksel). Oyna qat'iy 1320×820 ochilardi, pastki qismi vazifalar paneli ostida qolardi. Ilova ichidagi aylantirish to'g'ri ishlardi (barcha sahifalar 3 o'lchamda o'lchandi).
+
+**Qilindi:** `app/main.py`: `work_area()` (SPI_GETWORKAREA, DPI hisobga olinadi) va `window_geometry()`: oyna ekranga sig'adigan o'lchamda va markazda ochiladi; minimal o'lcham 900×560.
+
+**Testlar:** unit 135 PASS (+3 oyna o'lchami); haqiqiy oynada: oyna pastki cheti 1005 px ≤ ish maydoni 1020 px (fizik) — PASS; smoke PASS.
+
+---
+
 ## 2026-10-16 (10) — Claude Code — M7: AI ulanishi (kalit kiritish joyi, xarajat, limit)
 
 **Foydalanuvchi talabi:** NEXVARA'ni to'liq tugatish; API kalit kerak bo'lganda aytish. Codex `codex/model-router` da ish qilmagani uchun M7 ni Claude oldi.

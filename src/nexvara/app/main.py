@@ -20,6 +20,40 @@ from nexvara import __version__
 from nexvara.app.api import Api
 
 UI_DIR = Path(__file__).parent / "ui"
+WANTED_SIZE = (1320, 820)
+MIN_SIZE = (900, 560)
+
+
+def work_area() -> tuple[int, int, int, int] | None:
+    """Usable desktop (without the taskbar) in the logical pixels pywebview uses."""
+    if sys.platform != "win32":
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    rect = wintypes.RECT()
+    if not ctypes.windll.user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0):
+        return None
+    try:
+        scale = ctypes.windll.user32.GetDpiForSystem() / 96
+    except AttributeError:
+        scale = 1.0
+    # The rectangle is physical when the process is DPI aware, logical otherwise.
+    aware = bool(ctypes.windll.user32.IsProcessDPIAware())
+    s = scale if aware else 1.0
+    return (round(rect.left / s), round(rect.top / s),
+            round((rect.right - rect.left) / s), round((rect.bottom - rect.top) / s))  # fmt: skip
+
+
+def window_geometry(area: tuple[int, int, int, int] | None) -> dict[str, int]:
+    """Fit the window inside the screen (a 125% laptop has only ~816 px of height), centered."""
+    w, h = WANTED_SIZE
+    if area is None:
+        return {"width": w, "height": h}
+    x0, y0, aw, ah = area
+    w = max(min(w, aw - 24), MIN_SIZE[0])
+    h = max(min(h, ah - 24), MIN_SIZE[1])
+    return {"width": w, "height": h, "x": x0 + (aw - w) // 2, "y": y0 + (ah - h) // 2}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -66,9 +100,8 @@ def main(argv: list[str] | None = None) -> int:
         "NEXVARA",
         url=str(UI_DIR / "index.html"),
         js_api=api,
-        width=1320,
-        height=820,
-        min_size=(980, 620),
+        **window_geometry(work_area()),
+        min_size=MIN_SIZE,
         background_color="#0B1020",
     )
 
