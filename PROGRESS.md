@@ -4,6 +4,49 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-16 (3) — Claude Code — GitHub (private), Word va PowerPoint Skills (M4)
+
+**GitHub:**
+- Foydalanuvchi GCM orqali `sardorbektoychiyev08-ctrl` hisobiga kirdi. GitHub API orqali tekshirildi: `Nexvara-loyiha` repozitoriyasi **private** (`"private": true`) va bo'sh edi.
+- Push'dan oldin Git tarixi qayta tekshirildi: kalitlar, tokenlar, parollar, shaxsiy fayllar va Office/PDF fayllari yo'q.
+- `main` push qilindi (940eaac). Ushbu bosqich `main` ga merge qilingandan keyin yana push qilindi.
+
+**Tarmoqlar:** Claude: `claude/office-skills` (yangi). Codex: `codex/model-router`, `main` bilan tenglashtirildi, vazifasi AGENTS.md da. Codex o'z ishini shu tarmoqda boshlaydi.
+
+**Word skill** (`skills/word/`):
+- `ops.py`: sarlavhalar (uslublar raqamli konstanta orqali, ruscha Word'da ham ishlaydi), punktlar, jadval (ConvertToTable, sarlavha rangi, raqamlar markazda), rasm, izoh (matn bo'yicha bog'lanadi), header, sahifa raqamlari, mundarija (`{MUNDARIJA}` belgisi orqali), find/replace (natija qayta sanab tekshiriladi), A4 va chetlar (3/1,5/2/2 sm), DOCX/PDF.
+- `demo.py`: rasmiy hisobot, 8 qadam, **15 tekshiruv**.
+
+**PowerPoint skill** (`skills/powerpoint/`):
+- `ops.py`: 16:9, brend mavzusi (master), sarlavha, punktlar, jadval, haqiqiy grafik (AddChart2 + ichki workbook), rasm, ma'ruzachi izohlari, o'tishlar, animatsiya, slaydlarni ko'chirish, PPTX/PDF.
+- `layout.py`: matn sig'ishi, slayddan chiqib ketish va ustma-ust tushish tekshiruvi (salbiy test bilan isbotlangan).
+- `demo.py`: 6 slayd, 8 qadam, **11 tekshiruv**.
+- PowerPoint bitta nusxada ishlaydi. Session foydalanuvchining ochiq taqdimotlarini yopmasligi alohida test bilan tasdiqlandi.
+
+**Office 2016 (ruscha) da topilgan va hal qilingan muammolar:**
+1. Word COM'da **nomli argumentlar jimgina e'tiborsiz qoldiriladi** (`Find.Execute(Replace=...)`, `AddPicture(Range=...)`, `Comments.Add(Range=...)`): almashtirish bajarilmasdi, rasm sarlavha ichiga tushardi. Hammasi pozitsion argumentlarga o'tkazildi va regressiya testlari qo'shildi.
+2. Word `Paragraphs.Last` obyekti "siljiydi": saqlangan paragraf keyin boshqa paragrafga ishora qiladi. Endi izohlar matn bo'yicha bog'lanadi.
+3. `Application.CentimetersToPoints` COM orqali ishlamaydi. Hisob Python'da (`cm_to_pt`).
+4. PowerPoint: grafik faqat oynali taqdimotda yaratiladi; `SetSourceData` uchun PlotBy argumenti kerak; `HWND` mavjud emas (oyna `PPTFrameClass` orqali topiladi); `ExportAsFixedFormat` pywin32'da ishlamaydi (`SaveCopyAs(..., 32)` ishlatiladi).
+
+**UI:** Office Agent sahifasida 4 ta tugma bor: Excel jadval, Excel dashboard, Word hisobot, PowerPoint taqdimot. Self-test to'rttalasini ham haqiqiy UI orqali bosadi.
+
+**Testlar** (`.\scripts\test.ps1 -Office`, foydalanuvchi ruxsati bilan):
+| Test | Natija |
+|---|---|
+| ruff check + format | PASS |
+| Unit testlar (41 ta) | PASS |
+| Office testlari (24 ta: Excel 15, Word 5, PowerPoint 4) | PASS |
+| UI self-test: 4 ta tugma (Excel 7/7, dashboard 14/14, Word 15/15, PowerPoint 11/11) | PASS (4 ishga tushirishdan 3 tasida) |
+| UI self-test: PowerPoint tugmasi (birinchi ishga tushirish) | FAIL (1 marta): 8 qadamning hammasi o'tdi, lekin vazifa yakunlanmay osilib qoldi va PowerPoint jarayoni yetim qoldi. Sababi aniqlanmadi, keyingi 3 ta to'liq ishga tushirish PASS. Session yopilishiga log yozuvlari qo'shildi; takrorlansa joyi ko'rinadi |
+| Oyna smoke | PASS |
+| Office 2019/2021/365 | NOT TESTED |
+
+**Keyingi qadam (Claude):** PowerPoint osilishini kuzatish va vazifalar uchun watchdog/timeout qo'shish; mavjud Word/PowerPoint faylini ochib tahrirlash (shablon); Excel'dagi qolgan ishlar (mavjud faylni tahlil, xato formulalar, fayllarni birlashtirish). Keyin M2 (agent tool sxemalari).
+**Codex (`codex/model-router`):** M7 Model Router, faqat soxta provayder bilan, pullik API'siz.
+
+---
+
 ## 2026-10-16 (2) — Claude Code — Excel skill 1–2-bosqich, UI sinovi, ruscha Office, tarmoqlar
 
 **Qilindi:**

@@ -30,7 +30,7 @@
       <h1>Xush kelibsiz</h1>
       <p class="muted">Siz buyruq berasiz — NEXVARA ishni bajaradi — natijani ko'rasiz.</p>
       <div class="cards">
-        <div class="card"><div class="card-label">Office</div><div class="card-value">Excel 2016</div><div class="muted">COM orqali, ko'rinadigan rejim</div></div>
+        <div class="card"><div class="card-label">Office</div><div class="card-value">Excel · Word · PowerPoint</div><div class="muted">COM orqali, ko'rinadigan rejim</div></div>
         <div class="card"><div class="card-label">AI provayder</div><div class="card-value" id="ai-status">Ulanmagan</div><div class="muted">M7 bosqichida</div></div>
         <div class="card"><div class="card-label">Vazifalar</div><div class="card-value" id="task-count">0</div><div class="muted">shu sessiyada</div></div>
       </div>
@@ -61,9 +61,17 @@
           3 ta grafik, PivotTable va shartli formatlash. Har bir raqam qayta ochib tekshiriladi.</p>
         <button class="btn primary run-task" id="run-dashboard" data-api="run_excel_dashboard">Excel dashboard yaratish</button>
       </div>
-      <div class="card wide disabled">
-        <div class="card-label">Word va PowerPoint</div>
-        <p class="muted">M4 bosqichida qo'shiladi.</p>
+      <div class="card wide">
+        <div class="card-label">Word — rasmiy hisobot</div>
+        <p>A4 sahifa, sarlavha, mundarija, bo'limlar, jadval, diagramma rasmi, izoh, kolontitul va
+          sahifa raqamlari. DOCX va PDF saqlanadi, qayta ochib 15 ta tekshiruvdan o'tkaziladi.</p>
+        <button class="btn primary run-task" id="run-word" data-api="run_word_report">Word hisobot yaratish</button>
+      </div>
+      <div class="card wide">
+        <div class="card-label">PowerPoint — taqdimot</div>
+        <p>6 slayd (16:9): jadval, haqiqiy grafik, rasm, ma'ruzachi izohlari, o'tishlar va animatsiya.
+          Matn sig'ishi va obyektlar ustma-ust tushmasligi tekshiriladi. PPTX va PDF saqlanadi.</p>
+        <button class="btn primary run-task" id="run-ppt" data-api="run_presentation">PowerPoint taqdimot yaratish</button>
       </div>
     </section>
 
