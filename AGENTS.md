@@ -22,6 +22,7 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
 - Konfliktlarni kamaytirish uchun papka egaligi:
   - `src/nexvara/skills/` (excel, word, powerpoint, common), `tests/office/` → Claude (`claude/*`)
   - `src/nexvara/knowledge/` (darsliklar, testlar), `config.py` → Claude (`claude/*`)
+  - `src/nexvara/agent/` (buyruqlar) → Claude (`claude/*`)
   - `src/nexvara/models/` (yangi paket), `tests/unit/test_models*.py` → `codex/model-router`
   - Umumiy fayllar (`PROGRESS.md`, `ROADMAP.md`, `pyproject.toml`, `app/`) → kichik, alohida commitlarda o'zgartiring; konflikt bo'lsa ikkala tomonning yozuvlarini saqlang.
 

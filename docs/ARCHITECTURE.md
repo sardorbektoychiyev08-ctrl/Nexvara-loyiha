@@ -61,6 +61,12 @@ src/nexvara/
     testdoc.py            # Word'da test: variantlar + javoblar kaliti, DOCX/PDF, tekshiruv
     topics.py             # Mavzu = §-bo'lim: sarlavha/matn bo'yicha topish, mundarija + bet siljishi
     topicdoc.py           # Mavzu: Word matni + asl sahifalar PDF, tekshiruv
+  agent/
+    parse.py              # O'zbekcha buyruq -> reja (amallar, fayl, ilova); AI'siz
+    files.py              # Faylni nomi bo'yicha topish; xavfsiz chiqish yo'li (_NEXVARA), .bak
+    excel_exec.py         # Excel rejasini bajarish + har qadam tekshiruvi
+    word_exec.py          # Word rejasini bajarish + tekshiruv
+    ppt_exec.py           # Mavzudan dars taqdimoti; .pptx -> PDF
   app/
     main.py               # pywebview oynasi; --smoke va --selftest-excel (4 tugma) rejimlari
     api.py                # JS -> Python ko'prigi (window.pywebview.api)
@@ -80,6 +86,8 @@ Spec'dagi nomlar bilan moslik: `packages/core` -> `nexvara.core`, `skills/excel`
 - **Raqam formatlari va sanalar**: Excel 2016 + uz-Latn mintaqasida `NumberFormat` inglizcha kodni tarjima qilmaydi. Shuning uchun raqam formatlari Excel'ning o'z ajratgichlari bilan `NumberFormatLocal` orqali yoziladi. pywin32 naive `datetime` ni UTC ga siljitadi, shuning uchun sanalar seriya raqami sifatida yoziladi (`table.to_excel_value`).
 - **Til mustaqilligi**: formulalar `Range.Formula` orqali yoziladi (inglizcha nomlar, lokalga bog'liq emas). Sheet nomi aniq beriladi (`Лист1`/`Sheet1` farqi muhim emas). Ekran koordinatalari ishlatilmaydi.
 - **Xavfsiz saqlash**: `validate_save_path` nisbiy yo'lni, `.xlsx` bo'lmagan faylni va mavjud faylni (`overwrite=True` berilmasa) rad etadi. Overwrite qilishdan oldin `.bak-<vaqt>.xlsx` zaxira nusxasi olinadi.
+- **Buyruqlar (AI'siz)**: `agent/parse.py` qoidaga asoslangan reja tuzadi; keyin M7 dagi AI planner xuddi shu amallar (tool'lar) to'plamidan foydalanadi. Asl fayllar o'zgartirilmaydi.
+- **Vaqt chegarasi**: har vazifa sukut bo'yicha 10 daqiqa; osilgan COM chaqiruvi UI'ni bloklamaydi.
 - **Task modeli**: har bir vazifa alohida thread'da ishlaydi. Qadamlar (`task.step(...)`) UI'ga jonli ko'rinadi. Bekor qilish kooperativ: har bir qadam boshida tekshiriladi.
 - **UI <-> backend**: UI har 300 ms'da `get_task` snapshot'ini so'raydi. Bu oddiy va ishonchli; keyinchalik push-hodisalarga o'tkazish mumkin.
 - **AI**: hali ulanmagan (M7). Chat buni foydalanuvchiga ochiq aytadi. Pullik API chaqirilmaydi.

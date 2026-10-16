@@ -7,6 +7,7 @@ python -m nexvara.app.main --smoke    # open, check the UI rendered, close (exit
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 import threading
@@ -36,6 +37,12 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="smoke test, then index the textbook folder and make a test from the UI form",
     )
+    parser.add_argument(
+        "--selftest-chat",
+        metavar="FILE",
+        type=Path,
+        help="smoke test, then type an Office command about FILE into the chat and wait",
+    )
     parser.add_argument("--debug", action="store_true", help="enable WebView dev tools")
     args = parser.parse_args(argv)
 
@@ -45,10 +52,14 @@ def main(argv: list[str] | None = None) -> int:
 
     selftest = args.selftest_excel is not None
     selftest_dir = args.selftest_excel or args.selftest_library
+    if args.selftest_chat is not None:
+        args.smoke = True
     if selftest_dir is not None:
         args.smoke = True
         selftest_dir.mkdir(parents=True, exist_ok=True)
         api = Api(output_dir=selftest_dir.resolve(), keep_office_open=False)
+    elif args.selftest_chat is not None:
+        api = Api(keep_office_open=False)
     else:
         api = Api()
     window = webview.create_window(
@@ -84,12 +95,33 @@ def main(argv: list[str] | None = None) -> int:
                 ok = excel_button_selftest(window)
             if ok and args.selftest_library is not None:
                 ok = library_selftest(window)
+            if ok and args.selftest_chat is not None:
+                ok = chat_selftest(window, args.selftest_chat)
             result["ok"] = ok
         finally:
             window.destroy()
 
     webview.start(smoke if args.smoke else None, debug=args.debug)
     return 0 if result["ok"] else 1
+
+
+def chat_selftest(window: webview.Window, file: Path) -> bool:
+    """Type a multi-step command into the chat and wait for the final "Tayyor" message."""
+    js = window.evaluate_js
+    js("document.querySelector('.nav-item[data-page=chat]').click()")
+    command = f"«{file.resolve()}» ni och, formatla, jami qo‘sh va saqla"
+    js(f"document.getElementById('chat-text').value = {json.dumps(command)}")
+    js("document.getElementById('chat-form').requestSubmit()")
+    last = ""
+    deadline = time.monotonic() + 300
+    while time.monotonic() < deadline:
+        time.sleep(0.5)
+        last = js("(document.querySelector('#chat-log .msg:last-child')||{}).textContent") or ""
+        if last.startswith(("Tayyor", "Bajarilmadi", "Bekor")):
+            break
+    ok = last.startswith("Tayyor ✓") and "Tekshiruv:" in last
+    print(f"SELFTEST {'PASS' if ok else 'FAIL'} [chat]: {last.splitlines()[0] if last else ''!r}")
+    return ok
 
 
 def library_selftest(window: webview.Window) -> bool:

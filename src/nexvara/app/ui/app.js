@@ -65,8 +65,40 @@ $("#chat-form").addEventListener("submit", async (e) => {
   addMsg(text, true);
   const r = await api().chat(text);
   if (r.reply) addMsg(r.reply, false);
-  if (r.task) track(r.task);
+  if (r.task) track(r.task, true);
+  showContext(await api().get_context_file());
 });
+
+function showContext(path) {
+  $("#chat-context").hidden = !path;
+  $("#chat-file").textContent = path || "";
+}
+
+$("#chat-attach").addEventListener("click", async () => {
+  if (!api()) return;
+  const r = await api().pick_file();
+  if (r.path) {
+    showContext(r.path);
+    addMsg(`Fayl tanlandi: ${r.path}\nEndi buyruq yozing, masalan: «shu faylni formatla va saqla».`, false);
+  }
+});
+
+function summary(t) {
+  if (t.status === "succeeded") {
+    const r = t.result || {};
+    const lines = [`Tayyor ✓ ${t.title}`];
+    (r.report || []).forEach((x) => lines.push(`• ${x}`));
+    if (r.path) lines.push(`Natija: ${r.path}`);
+    if (r.pdf) lines.push(`PDF: ${r.pdf}`);
+    if (r.excerpt) lines.push(`Asl sahifalar: ${r.excerpt}`);
+    const checks = r.checks || [];
+    if (checks.length) lines.push(`Tekshiruv: ${checks.filter((c) => c.ok).length}/${checks.length}`);
+    if (r.note) lines.push(r.note);
+    return lines.join("\n");
+  }
+  if (t.status === "cancelled") return `Bekor qilindi: ${t.title}`;
+  return `Bajarilmadi: ${t.title}\n${t.error}`;
+}
 
 // ---- tasks ----
 function renderTask(t) {
@@ -129,11 +161,15 @@ async function poll() {
     clearInterval(pollTimer);
     pollTimer = null;
     refreshCount();
+    if (chatTasks.has(t.id)) { chatTasks.delete(t.id); addMsg(summary(t), false); }
     if ($("#page-library").classList.contains("active")) renderLibrary();
   }
 }
 
-function track(t) {
+const chatTasks = new Set();
+
+function track(t, fromChat) {
+  if (fromChat) chatTasks.add(t.id);
   currentTaskId = t.id;
   renderTask(t);
   refreshCount();

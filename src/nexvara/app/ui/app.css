@@ -107,3 +107,6 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto
 
 .msg { white-space: pre-wrap; }
 .row.wrap { flex-wrap: wrap; }
+
+.chat-context { font-size: 12px; color: var(--muted); margin: 0 0 6px; word-break: break-all; }
+#chat-attach { padding: 9px 12px; }

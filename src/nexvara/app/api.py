@@ -46,6 +46,7 @@ class Api:
         self._output_dir = output_dir
         self._keep_office_open = keep_office_open
         self._overrides = dict(overrides or {})
+        self._context_file: str | None = None  # "shu fayl": the last file worked on
         if excel_demo:
             self._overrides["excel_demo"] = excel_demo
         if excel_dashboard:
@@ -81,8 +82,15 @@ class Api:
         text = (text or "").strip()
         if not text:
             return {"reply": ""}
+        from nexvara.agent.parse import find_file
         from nexvara.knowledge.service import parse_test_request
 
+        # A named file means an Office command, whatever words its path contains
+        # ("D:\Testlar\hisobot.xlsx" is not a request for a test).
+        if find_file(text):
+            command = self._chat_command(text)
+            if command is not None:
+                return command
         req = parse_test_request(text)
         if req is not None:
             what = " ".join(
@@ -114,11 +122,17 @@ class Api:
                 ),
                 "task": snap,
             }
-        from nexvara.knowledge.service import parse_topic_request
+        from nexvara.knowledge.service import parse_presentation_request, parse_topic_request
 
+        pres_req = parse_presentation_request(text)
+        if pres_req is not None:
+            return self._chat_presentation(pres_req)
         topic_req = parse_topic_request(text)
         if topic_req is not None:
             return self._chat_topic(topic_req)
+        command = self._chat_command(text)
+        if command is not None:
+            return command
         return {
             "reply": (
                 "AI provayder hali ulanmagan (M7 bosqichi). Hozir men darsliklardan foydalana "
@@ -126,6 +140,113 @@ class Api:
                 "«7-sinf fizika Nyuton qonunlari 20 ta test». Office Agent bo‘limida Excel, Word "
                 "va PowerPoint vazifalari ham bor."
             )
+        }
+
+    # ----- Office commands ("Hisobot.xlsx ni och, ... va saqla") -----
+    def _chat_command(self, text: str) -> dict[str, Any] | None:
+        from nexvara.agent import files
+        from nexvara.agent.parse import parse_command
+
+        plan = parse_command(text, self._context_file)
+        if plan is None:
+            return None
+        if not plan.file:
+            what = {"excel": "Excel", "word": "Word", "powerpoint": "PowerPoint"}.get(
+                plan.app or "", "Office"
+            )
+            return {
+                "reply": (
+                    f"Qaysi {what} fayli bilan ishlashni yozing (masalan «Hisobot.xlsx») "
+                    "yoki 📎 tugmasi bilan faylni tanlang."
+                ),
+                "plan": plan.describe(),
+            }
+        try:
+            near = Path(self._context_file).parent if self._context_file else None
+            source = files.resolve(plan.file, near)
+        except LookupError as e:
+            return {"reply": str(e)}
+        self._context_file = str(source)
+        snap = self.run_command_plan(plan, str(source))
+        steps = "\n".join(f"• {d}" for d in plan.describe())
+        reply = f"Fayl: {source}\nBajaraman:\n{steps}"
+        if plan.unknown:
+            reply += "\n\nTushunmadim (bajarilmaydi): " + "; ".join(f"«{u}»" for u in plan.unknown)
+        return {"reply": reply, "task": snap, "plan": plan.describe()}
+
+    def run_command_plan(self, plan: Any, source: str) -> dict[str, Any]:
+        if "command" in self._overrides:
+            fn = self._overrides["command"]
+        else:
+            from nexvara.agent.excel_exec import run_excel_plan
+            from nexvara.agent.ppt_exec import run_ppt_plan
+            from nexvara.agent.word_exec import run_word_plan
+
+            runner = {"excel": run_excel_plan, "word": run_word_plan,
+                      "powerpoint": run_ppt_plan}[plan.app]  # fmt: skip
+
+            def fn(task: Any) -> dict[str, Any]:
+                return runner(task, plan, Path(source), keep_open=self._keep_office_open)
+
+        return self._runner.start(f"Buyruq: {Path(source).name}", fn).snapshot()
+
+    def pick_file(self) -> dict[str, Any]:
+        """Native "open file" dialog; the chosen file becomes "shu fayl" for commands."""
+        import webview
+
+        if not webview.windows:
+            return {"path": ""}
+        result = webview.windows[0].create_file_dialog(
+            webview.OPEN_DIALOG,
+            file_types=(
+                "Office fayllar (*.xlsx;*.xlsm;*.xls;*.csv;*.docx;*.doc;*.pptx;*.ppt)",
+                "Barcha fayllar (*.*)",
+            ),
+        )
+        if not result:
+            return {"path": ""}
+        self._context_file = str(result[0])
+        return {"path": self._context_file}
+
+    def set_context_file(self, path: str) -> dict[str, Any]:
+        p = Path(path)
+        if not p.is_absolute() or not p.is_file():
+            return {"path": "", "error": "Fayl topilmadi"}
+        self._context_file = str(p)
+        return {"path": self._context_file}
+
+    def get_context_file(self) -> str:
+        return self._context_file or ""
+
+    # ----- lesson presentation from a textbook topic -----
+    def _chat_presentation(self, req: Any) -> dict[str, Any]:
+        from nexvara.knowledge.topicdoc import lookup
+
+        if not self.library_info()["books"]:
+            return {"reply": "Taqdimot uchun avval darsliklarni «Darsliklar» bo‘limida qo‘shing."}
+        try:
+            topic = lookup(req)
+        except (LookupError, ValueError) as e:
+            return {"reply": str(e)}
+        if "presentation_topic" in self._overrides:
+            fn = self._overrides["presentation_topic"]
+        else:
+            from nexvara.agent.ppt_exec import default_presentation_path, run_topic_presentation
+
+            def fn(task: Any) -> dict[str, Any]:
+                out = None
+                if self._output_dir is not None:
+                    out = self._output_dir / default_presentation_path(topic).name
+                return run_topic_presentation(task, req, out, keep_open=self._keep_office_open)
+
+        snap = self._runner.start(f"Taqdimot: {topic.title}", fn).snapshot()
+        return {
+            "reply": (
+                f"{topic.book.label()}, {topic.pages_label}: «{topic.title}» bo‘yicha dars "
+                "taqdimotini PowerPoint'da tayyorlayapman (mazmun, tushunchalar, sanalar, "
+                "savollar, uyga vazifa; ma’ruzachi izohlari bilan)."
+            ),
+            "task": snap,
         }
 
     def _chat_topic(self, req: Any) -> dict[str, Any]:

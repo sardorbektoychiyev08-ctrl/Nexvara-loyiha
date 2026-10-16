@@ -18,6 +18,7 @@ _HYPHEN_SPACE = re.compile(r"(\w{2,})- ([a-zа-яўқғҳ]{2,})")
 _BULLETS = re.compile(r"^[►•▪●■◆➤✓*]+\s*")
 _SPACES = re.compile(r"[ \t ]+")
 _BLANK_LINES = re.compile(r"\n{3,}")
+_INITIAL_END = re.compile(r"(?:^|\s)[A-ZА-ЯЎҚҒҲ]\.$")
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-ZА-ЯЎҚҒҲ0-9«\"(])")
 
 
@@ -65,7 +66,16 @@ def content_lines(text: str) -> list[str]:
 def sentences(text: str) -> list[str]:
     """Split normalized text into sentences (line breaks inside a sentence are joined)."""
     flat = " ".join(content_lines(text))
-    return [s.strip() for s in _SENT_SPLIT.split(flat) if s.strip()]
+    out: list[str] = []
+    for piece in (s.strip() for s in _SENT_SPLIT.split(flat)):
+        if not piece:
+            continue
+        # "... chekingan M." + "Chernyayev ..." is one sentence: a single initial is not an end.
+        if out and _INITIAL_END.search(out[-1]):
+            out[-1] = f"{out[-1]} {piece}"
+        else:
+            out.append(piece)
+    return out
 
 
 def letter_ratio(s: str) -> float:

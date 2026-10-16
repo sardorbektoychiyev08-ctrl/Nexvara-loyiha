@@ -32,6 +32,11 @@ class TaskCancelled(Exception):
     """Raised inside a task when the user asked to cancel it."""
 
 
+class UserError(Exception):
+    """A problem the user can fix (file not found, column missing...). Shown without a
+    technical prefix."""
+
+
 @dataclass
 class Step:
     name: str
@@ -96,11 +101,23 @@ class Task:
             s.finished_at = time.time()
 
     def wait(self, timeout: float | None = None) -> bool:
-        """Block until the task thread ends. Returns False on timeout."""
+        """Block until the task is finished (or given up by the watchdog). False on timeout."""
         if self._thread is None:
             return True
-        self._thread.join(timeout)
-        return not self._thread.is_alive()
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while self._thread.is_alive() and not self.done:
+            left = None if deadline is None else deadline - time.monotonic()
+            if left is not None and left <= 0:
+                return False
+            self._thread.join(0.2 if left is None else min(0.2, left))
+        if self._thread.is_alive():
+            return True  # given up by the watchdog
+        # The worker may have just returned; let it publish its final status.
+        for _ in range(50):
+            if self.done:
+                break
+            time.sleep(0.01)
+        return True
 
     @property
     def done(self) -> bool:
@@ -125,34 +142,64 @@ class Task:
 TaskFn = Callable[[Task], dict[str, Any] | None]
 
 
+DEFAULT_TIMEOUT = 600.0  # seconds; Office work that takes longer is treated as hung
+
+
 class TaskRunner:
     """Starts tasks in background threads and keeps them for status queries."""
 
-    def __init__(self) -> None:
+    def __init__(self, timeout: float | None = DEFAULT_TIMEOUT) -> None:
         self._tasks: dict[str, Task] = {}
         self._lock = threading.Lock()
+        self.timeout = timeout
 
-    def start(self, title: str, fn: TaskFn) -> Task:
+    def start(self, title: str, fn: TaskFn, timeout: float | None = None) -> Task:
+        """Run `fn` in a thread. After `timeout` seconds a hung task is marked failed
+        (and asked to cancel) so the UI never waits forever on a stuck Office call."""
         task = Task(title)
+        limit = timeout if timeout is not None else self.timeout
+        finish_lock = threading.Lock()
+
+        def finish(status: Status, error: str = "", result: dict | None = None) -> None:
+            with finish_lock:
+                if task.done:
+                    return  # the watchdog already gave up on this task
+                if result is not None:
+                    task.result = result
+                task.error = error
+                task.status = status
+                task.finished_at = time.time()
 
         def run() -> None:
             task.status = Status.RUNNING
             try:
-                task.result = fn(task) or {}
-                task.status = Status.SUCCEEDED
+                finish(Status.SUCCEEDED, result=fn(task) or {})
             except TaskCancelled:
-                task.status = Status.CANCELLED
+                finish(Status.CANCELLED)
             except Exception as e:
                 log.exception("Task %s (%s) failed", task.id, title)
-                task.error = f"{type(e).__name__}: {e}"
-                task.status = Status.FAILED
-            finally:
-                task.finished_at = time.time()
+                friendly = isinstance(e, UserError | LookupError)
+                finish(Status.FAILED, str(e) if friendly else f"{type(e).__name__}: {e}")
+
+        def watchdog() -> None:
+            if task._thread is not None:
+                task._thread.join(limit)
+                if task._thread.is_alive():
+                    log.error("Task %s (%s) timed out after %ss", task.id, title, limit)
+                    task.cancel()
+                    finish(
+                        Status.FAILED,
+                        f"Vaqt tugadi ({int(limit // 60) or 1} daqiqa): dastur javob bermadi. "
+                        "Office oynasida ochiq dialog yo‘qligini tekshiring va qayta urinib "
+                        "ko‘ring.",
+                    )
 
         with self._lock:
             self._tasks[task.id] = task
         task._thread = threading.Thread(target=run, name=f"task-{task.id}", daemon=True)
         task._thread.start()
+        if limit:
+            threading.Thread(target=watchdog, name=f"watchdog-{task.id}", daemon=True).start()
         return task
 
     def get(self, task_id: str) -> Task | None:
