@@ -15,8 +15,8 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
 
 ## Git tarmoqlari (Claude va Codex parallel ishlashi uchun)
 - `main`: faqat testlardan o'tgan (PASS) kod. To'g'ridan-to'g'ri `main` ga commit qilinmaydi, faqat merge qilinadi.
-- `claude/<mavzu>`: Claude Code ishlaydigan tarmoqlar (hozir: `claude/office-skills`).
-- `codex/<mavzu>`: Codex ishlaydigan tarmoqlar (hozir: `codex/model-router`).
+- `claude/<mavzu>`: Claude Code ishlaydigan tarmoqlar (hozir: `claude/ai-router`).
+- `codex/<mavzu>`: Codex ishlaydigan tarmoqlar (`codex/model-router` hozircha bo'sh, `main` bilan teng).
 - Har agent **faqat o'z tarmog'ida** ishlaydi. Boshqa agentning tarmog'ini faqat limit tugab ish shu agentga o'tganda davom ettiradi, va bu PROGRESS.md da yoziladi.
 - Merge qilishdan oldin: tarmoqqa `main` ni merge qiling, `.\scripts\test.ps1` (Office kodi o'zgargan bo'lsa `-Office` bilan) PASS bo'lsin, keyin `git checkout main && git merge --no-ff <tarmoq>`.
 - Konfliktlarni kamaytirish uchun papka egaligi:
@@ -24,12 +24,13 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
   - `src/nexvara/knowledge/` (darsliklar, testlar), `config.py` → Claude (`claude/*`)
   - `src/nexvara/agent/` (buyruqlar) → Claude (`claude/*`)
   - `src/nexvara/sources/` (darslik manbalari) → Claude (`claude/*`)
-  - `src/nexvara/models/` (yangi paket), `tests/unit/test_models*.py` → `codex/model-router`
+  - `src/nexvara/ai/` (provayderlar, router, xarajat, AI imkoniyatlari), `tests/unit/test_ai.py` → Claude (`claude/*`)
   - Umumiy fayllar (`PROGRESS.md`, `ROADMAP.md`, `pyproject.toml`, `app/`) → kichik, alohida commitlarda o'zgartiring; konflikt bo'lsa ikkala tomonning yozuvlarini saqlang.
 
 ## Hozirgi vazifalar taqsimoti
-- **Claude → `claude/office-skills`**: Excel, Word, PowerPoint skill'lari.
-- **Codex → `codex/model-router`**: M7 Model Router skeleti, `src/nexvara/models/`: provayder interfeysi, CHEAP/BALANCED/POWERFUL/SPECIALIST darajalari, model nomlari konfiguratsiyadan, token/xarajat hisobi, kunlik/oylik budget, fallback. **Faqat soxta (fake/offline) provayder bilan testlar; haqiqiy pullik API chaqirilmaydi.** Kalitlar faqat `.env` dan o'qiladi.
+- **Claude**: Office skill'lari, darsliklar, buyruqlar va M7 (AI). Codex `codex/model-router` da hech narsa commit qilmagani uchun M7 ni Claude o'z zimmasiga oldi (2026-10-16): `src/nexvara/ai/`.
+- **Codex**: limit tugaganda Claude'ning so'nggi `claude/*` tarmog'ini davom ettiradi (PROGRESS.md dagi oxirgi yozuvdan boshlab).
+- **AI qoidalari**: API kalitlar faqat Windows Credential Manager'da (`NEXVARA/ai/<provayder>`), hech qachon faylda yoki Git'da emas. Testlarda faqat soxta provayder; haqiqiy pullik chaqiruv faqat foydalanuvchi kalit kiritib, AI'ni o'zi yoqqanda. Har chaqiruv `app.db` dagi `ai_usage` jadvaliga yoziladi, kunlik/oylik limit va "qimmat so'rovda so'rash" chegarasi `settings.json` da.
 
 ## Foydalanuvchi haqida
 - Dasturchi emas, o'zbek tilida yozadi. Javoblar o'zbekcha, sodda, texnik tafsilotsiz bo'lsin.

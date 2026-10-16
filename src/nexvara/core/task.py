@@ -111,7 +111,10 @@ class Task:
                 return False
             self._thread.join(0.2 if left is None else min(0.2, left))
         if self._thread.is_alive():
-            return True  # given up by the watchdog
+            # Finished: the worker is running its on_finish hook (history). A worker given
+            # up by the watchdog stays alive; don't wait on it for long.
+            self._thread.join(1.0)
+            return True
         # The worker may have just returned; let it publish its final status.
         for _ in range(50):
             if self.done:

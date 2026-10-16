@@ -29,6 +29,15 @@ OFFICE_TASKS: dict[str, tuple[str, str, str]] = {
 }
 
 
+def _wants_ai(text: str) -> bool:
+    """'AI bilan test tuz', 'sun'iy intellekt yordamida' -> the user asks for the AI version."""
+    import re
+
+    from nexvara.knowledge.textnorm import fold
+
+    return bool(re.search(r"\b(ai|sun.?iy intellekt\w*|aqlli)\b", fold(text)))
+
+
 class Api:
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
@@ -48,6 +57,8 @@ class Api:
         self._keep_office_open = keep_office_open
         self._overrides = dict(overrides or {})
         self._context_file: str | None = None  # "shu fayl": the last file worked on
+        self._pending: dict[str, tuple[str, Any]] = {}  # AI requests waiting for "Ha"
+        self._ai = None
         # The desktop app keeps history and settings in D:\NEXVARA; tests run without.
         self._history = None
         if persist:
@@ -91,11 +102,11 @@ class Api:
             "version": __version__,
             "os": f"{platform.system()} {platform.release()}",
             "python": platform.python_version(),
-            "ai_connected": False,
+            "ai_connected": self._ai_ready(),
             "data_dir": str(config.data_dir()),
         }
 
-    def chat(self, text: str) -> dict[str, Any]:
+    def chat(self, text: str, _use_ai: bool = True) -> dict[str, Any]:
         text = (text or "").strip()
         if not text:
             return {"reply": ""}
@@ -120,22 +131,25 @@ class Api:
                         "papkani oching, PDF darsliklarni tashlang va «Yangilash»ni bosing."
                     )
                 }
-            snap = self.make_test(
-                {
-                    "grade": req.grade,
-                    "subject": req.subject,
-                    "topic": req.topic,
-                    "count": req.count,
-                    "variants": req.variants,
-                }
-            )
+            params = {
+                "grade": req.grade,
+                "subject": req.subject,
+                "topic": req.topic,
+                "count": req.count,
+                "variants": req.variants,
+                "ai": _wants_ai(text),
+            }
+            snap = self.make_test(params)
+            if "confirm" in snap:
+                return {"reply": snap["confirm"]["text"], "confirm": snap["confirm"]["token"]}
             if "id" not in snap:  # request rejected before a task was started
                 return {"reply": snap["error"]}
             topic = f", mavzu: «{req.topic}»" if req.topic else ""
+            by = "AI yordamida " if params["ai"] else ""
             return {
                 "reply": (
                     f"Tushundim: {what or 'darslik'}{topic}, {req.count} ta savol, "
-                    f"{req.variants} ta variant. Word'da tuzyapman — jarayon o‘ng panelda."
+                    f"{req.variants} ta variant. {by}Word'da tuzyapman — jarayon o‘ng panelda."
                 ),
                 "task": snap,
             }
@@ -150,14 +164,110 @@ class Api:
         command = self._chat_command(text)
         if command is not None:
             return command
+        if _use_ai and self._ai_ready():
+            return self._chat_ai(text)
+        if not _use_ai:
+            return {"reply": "", "unhandled": True}
         return {
             "reply": (
-                "AI provayder hali ulanmagan (M7 bosqichi). Hozir men darsliklardan foydalana "
-                "olaman, masalan: «7-sinf fizika Nyuton qonunlari mavzusini chiqarib ber» yoki "
-                "«7-sinf fizika Nyuton qonunlari 20 ta test». Office Agent bo‘limida Excel, Word "
-                "va PowerPoint vazifalari ham bor."
+                "Buni tushunmadim. AI’siz men quyidagilarni bajaraman: «7-sinf fizika Nyuton "
+                "qonunlari mavzusini chiqarib ber», «7-sinf fizika Nyuton qonunlari 20 ta test», "
+                "«Hisobot.xlsx ni och, B ustun bo‘yicha saralab, PDF qilib saqla». Erkin savollar "
+                "uchun Sozlamalar → AI bo‘limida API kalit kiriting."
             )
         }
+
+    # ----- AI (optional; nothing is sent without a key and the user's budget) -----
+    def _router(self):
+        if self._ai is None:
+            if "ai_router" in self._overrides:
+                self._ai = self._overrides["ai_router"]
+            else:
+                from nexvara.ai.router import AiRouter
+
+                self._ai = AiRouter()
+        return self._ai
+
+    def _ai_ready(self) -> bool:
+        if self._history is None and "ai_router" not in self._overrides:
+            return False  # tests and self-tests never reach a paid API
+        try:
+            return self._router().ready()
+        except Exception:
+            return False
+
+    def _ask(self, kind: str, payload: Any, estimate: Any) -> dict[str, Any]:
+        import uuid
+
+        token = uuid.uuid4().hex[:12]
+        self._pending[token] = (kind, payload)
+        text = f"Bu ish pullik AI orqali bajariladi: {estimate.describe()}. Davom etaymi?"
+        return {"token": token, "text": text}
+
+    def _chat_ai(self, text: str, approved: bool = False) -> dict[str, Any]:
+        from nexvara.ai import features
+        from nexvara.ai.router import NeedsConfirmation
+        from nexvara.core.task import UserError
+
+        router = self._router()
+        try:
+            intent = features.classify(router, text, approved)
+            if intent.kind in ("test", "topic", "presentation", "command") and intent.command:
+                out = self.chat(intent.command, _use_ai=False)
+                if not out.get("unhandled"):
+                    out["reply"] = f"Tushundim: «{intent.command}»\n\n" + out["reply"]
+                    return out
+            if intent.kind == "question":
+                ans = features.answer_question(
+                    router, text, approved, intent.grade, intent.subject or None
+                )
+            else:
+                ans = features.chat_reply(router, text, approved)
+        except NeedsConfirmation as e:
+            ask = self._ask("chat", text, e.estimate)
+            return {"reply": ask["text"], "confirm": ask["token"]}
+        except UserError as e:
+            return {"reply": str(e)}
+        reply = ans.text
+        if ans.sources:
+            pages = "; ".join(f"{s['book']}, {s['page']}-bet" for s in ans.sources)
+            reply += "\n\nManba: " + pages
+        return {"reply": reply, "sources": ans.sources}
+
+    def confirm_ai(self, token: str, yes: bool = True) -> dict[str, Any]:
+        item = self._pending.pop(token, None)
+        if item is None:
+            return {"reply": "Bu so‘rov eskirgan; qaytadan yozing."}
+        if not yes:
+            return {"reply": "Bekor qilindi, hech narsa sarflanmadi."}
+        kind, payload = item
+        if kind == "chat":
+            return self._chat_ai(payload, approved=True)
+        snap = self.make_test({**payload, "approved": True})
+        if "id" not in snap:
+            return {"reply": snap.get("error") or "Test boshlanmadi"}
+        return {"reply": "AI test tuzmoqda — jarayon o‘ng panelda.", "task": snap}
+
+    def ai_status(self) -> dict[str, Any]:
+        return self._router().status()
+
+    def ai_save_key(self, provider: str, key: str) -> dict[str, Any]:
+        from nexvara.core.task import UserError
+
+        try:
+            info = self._router().save_key(provider, key)
+        except (UserError, ValueError) as e:
+            return {"ok": False, "error": str(e)}
+        except Exception as e:
+            return {"ok": False, "error": f"Kalitni tekshirib bo‘lmadi: {e}"}
+        return {"ok": True, **info, "status": self._router().status()}
+
+    def ai_delete_key(self, provider: str) -> dict[str, Any]:
+        self._router().delete_key(provider)
+        return self._router().status()
+
+    def ai_usage(self) -> list[dict[str, Any]]:
+        return self._router().ledger.recent()
 
     # ----- Office commands ("Hisobot.xlsx ni och, ... va saqla") -----
     def _chat_command(self, text: str) -> dict[str, Any] | None:
@@ -478,6 +588,28 @@ class Api:
             req.validate()
         except (TypeError, ValueError) as e:
             return {"error": f"Noto‘g‘ri so‘rov: {e}"}
+        make = None
+        if params.get("ai"):
+            from nexvara.ai import features
+            from nexvara.ai.router import NeedsConfirmation
+            from nexvara.core.task import UserError
+
+            if not self._ai_ready():
+                return {"error": "AI ulanmagan: Sozlamalar → AI bo‘limida API kalit kiriting."}
+            router = self._router()
+            if not params.get("approved"):
+                try:
+                    router.check_budget(features.estimate_test(router, req), approved=False)
+                except NeedsConfirmation as e:
+                    clean = {k: v for k, v in params.items() if k != "approved"}
+                    return {"confirm": self._ask("test", clean, e.estimate)}
+                except (UserError, LookupError, ValueError) as e:
+                    return {"error": str(e)}
+
+            def make(r: Any):
+                book, topic, quizzes, _cost = features.make_ai_quizzes(router, r, approved=True)
+                return book, topic, quizzes
+
         if "make_test" in self._overrides:
             fn = self._overrides["make_test"]
         else:
@@ -486,16 +618,17 @@ class Api:
             def fn(task: Any) -> dict[str, Any]:
                 out = None
                 if self._output_dir is not None:
-                    from nexvara.knowledge.service import default_test_path, make_quizzes
+                    from nexvara.knowledge.service import default_test_path, topic_material
 
-                    book, topic, _ = make_quizzes(req)
+                    book, _pages, topic = topic_material(req)
                     out = self._output_dir / default_test_path(book, topic).name
-                return run_make_test(task, req, out, keep_open=self._keep_open())
+                return run_make_test(task, req, out, keep_open=self._keep_open(), make=make)
 
         what = " ".join(
             x for x in (f"{req.grade}-sinf" if req.grade else "", req.subject or "") if x
         )
-        title = f"Test: {what or 'darslik'}" + (f" · {req.topic}" if req.topic else "")
+        title = ("AI test: " if make else "Test: ") + (what or "darslik")
+        title += f" · {req.topic}" if req.topic else ""
         return self._runner.start(title, fn).snapshot()
 
     def run_excel_demo(self) -> dict[str, Any]:
@@ -564,6 +697,17 @@ class Api:
             return {"ok": True, "path": str(create_desktop_shortcut())}
         except Exception as e:
             return {"ok": False, "error": str(e)}
+
+    def open_url(self, url: str) -> bool:
+        """Open a provider's key page in the browser (only the known https pages)."""
+        import webbrowser
+
+        from nexvara.ai.models import PROVIDERS
+
+        if url not in {p["key_url"] for p in PROVIDERS.values()}:
+            return False
+        webbrowser.open(url)
+        return True
 
     def reveal_file(self, path: str) -> bool:
         """Show a task's output file in Explorer. Only existing files are accepted."""

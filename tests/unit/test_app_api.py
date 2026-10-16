@@ -14,7 +14,9 @@ def test_get_info():
 def test_chat_without_provider_is_explicit():
     api = Api()
     assert api.chat("   ") == {"reply": ""}
-    assert "ulanmagan" in api.chat("salom")["reply"]
+    reply = api.chat("salom")["reply"]
+    assert "tushunmadim" in reply and "API kalit" in reply
+    assert api.get_info()["ai_connected"] is False  # tests never reach a paid API
 
 
 def test_run_excel_demo_goes_through_runner():

@@ -95,7 +95,7 @@ Spec'dagi nomlar bilan moslik: `packages/core` -> `nexvara.core`, `skills/excel`
 - **Vaqt chegarasi**: har vazifa sukut bo'yicha 10 daqiqa; osilgan COM chaqiruvi UI'ni bloklamaydi.
 - **Task modeli**: har bir vazifa alohida thread'da ishlaydi. Qadamlar (`task.step(...)`) UI'ga jonli ko'rinadi. Bekor qilish kooperativ: har bir qadam boshida tekshiriladi.
 - **UI <-> backend**: UI har 300 ms'da `get_task` snapshot'ini so'raydi. Bu oddiy va ishonchli; keyinchalik push-hodisalarga o'tkazish mumkin.
-- **AI**: hali ulanmagan (M7). Chat buni foydalanuvchiga ochiq aytadi. Pullik API chaqirilmaydi.
+- **AI (ixtiyoriy, M7)**: `ai/providers.py` (Anthropic rasmiy SDK orqali; OpenAI, Gemini, DeepSeek bir xil `chat/completions` formatida urllib bilan), `ai/router.py` (vazifa → daraja → model, narx taxmini, limit, tasdiq, `ai_usage` daftari), `ai/features.py` (buyruqni tushunish: AI erkin matnni AI'siz parser tushunadigan buyruqqa qayta yozadi, keyin odatdagi sinalgan ijrochilar ishlaydi; darsliklar bo'yicha savol-javob FTS qidiruv + manba bet bilan; AI test savollari JSON → o'sha Word chiqishi, rasmli savollar AI'siz qoladi). Kalit yo'q yoki AI o'chiq bo'lsa hech narsa yuborilmaydi.
 
 ## Ishga tushirish
 
