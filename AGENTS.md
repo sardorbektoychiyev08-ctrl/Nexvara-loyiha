@@ -13,6 +13,21 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
 3. ROADMAP'dagi holatlarni yangilang.
 4. Mantiqiy commit qiling. Push faqat foydalanuvchi tasdig'i bilan va maxfiy ma'lumot yo'qligini tekshirgandan keyin.
 
+## Git tarmoqlari (Claude va Codex parallel ishlashi uchun)
+- `main`: faqat testlardan o'tgan (PASS) kod. To'g'ridan-to'g'ri `main` ga commit qilinmaydi, faqat merge qilinadi.
+- `claude/<mavzu>`: Claude Code ishlaydigan tarmoqlar (hozir: `claude/excel-skill`).
+- `codex/<mavzu>`: Codex ishlaydigan tarmoqlar (hozir: `codex/model-router`).
+- Har agent **faqat o'z tarmog'ida** ishlaydi. Boshqa agentning tarmog'ini faqat limit tugab ish shu agentga o'tganda davom ettiradi, va bu PROGRESS.md da yoziladi.
+- Merge qilishdan oldin: tarmoqqa `main` ni merge qiling, `.\scripts\test.ps1` (Office kodi o'zgargan bo'lsa `-Office` bilan) PASS bo'lsin, keyin `git checkout main && git merge --no-ff <tarmoq>`.
+- Konfliktlarni kamaytirish uchun papka egaligi:
+  - `src/nexvara/skills/excel/`, `tests/office/` → `claude/excel-skill`
+  - `src/nexvara/models/` (yangi paket), `tests/unit/test_models*.py` → `codex/model-router`
+  - Umumiy fayllar (`PROGRESS.md`, `ROADMAP.md`, `pyproject.toml`, `app/`) → kichik, alohida commitlarda o'zgartiring; konflikt bo'lsa ikkala tomonning yozuvlarini saqlang.
+
+## Hozirgi vazifalar taqsimoti
+- **Claude → `claude/excel-skill`**: Excel skill kengaytmasi (formulalar, formatlash, PivotTable, grafiklar, filtrlar, katta fayllar, dashboard).
+- **Codex → `codex/model-router`**: M7 Model Router skeleti, `src/nexvara/models/`: provayder interfeysi, CHEAP/BALANCED/POWERFUL/SPECIALIST darajalari, model nomlari konfiguratsiyadan, token/xarajat hisobi, kunlik/oylik budget, fallback. **Faqat soxta (fake/offline) provayder bilan testlar; haqiqiy pullik API chaqirilmaydi.** Kalitlar faqat `.env` dan o'qiladi.
+
 ## Foydalanuvchi haqida
 - Dasturchi emas, o'zbek tilida yozadi. Javoblar o'zbekcha, sodda, texnik tafsilotsiz bo'lsin.
 - Kod, test, build va hujjatlarni o'zingiz boshqaring.
