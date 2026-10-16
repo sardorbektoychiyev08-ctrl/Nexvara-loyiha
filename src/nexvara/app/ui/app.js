@@ -35,6 +35,7 @@ function show(page) {
   }
   if (page === "history") renderHistory();
   if (page === "library") renderLibrary();
+  if (page === "settings") renderSettings();
 }
 
 $("#nav").addEventListener("click", (e) => {
@@ -44,9 +45,10 @@ $("#nav").addEventListener("click", (e) => {
 document.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => show(b.dataset.goto)));
 
 // ---- theme ----
-function setTheme(t) {
+function setTheme(t, save = true) {
   document.documentElement.dataset.theme = t;
   try { localStorage.setItem("nexvara-theme", t); } catch (_) { /* storage unavailable */ }
+  if (save && api()) api().save_settings({ theme: t });
 }
 try { const t = localStorage.getItem("nexvara-theme"); if (t) setTheme(t); } catch (_) { /* ignore */ }
 document.querySelectorAll("[data-theme-set]").forEach((b) => b.addEventListener("click", () => setTheme(b.dataset.themeSet)));
@@ -170,6 +172,7 @@ const chatTasks = new Set();
 
 function track(t, fromChat) {
   if (fromChat) chatTasks.add(t.id);
+  document.body.classList.add("show-panel");  // narrow windows: reveal the task panel
   currentTaskId = t.id;
   renderTask(t);
   refreshCount();
@@ -312,10 +315,57 @@ $("#test-form").addEventListener("submit", async (e) => {
   track(r);
 });
 
+$("#panel-close").addEventListener("click", () => document.body.classList.remove("show-panel"));
+
+// ---- settings ----
+let settings = null;
+
+async function renderSettings() {
+  if (!api()) return;
+  settings = await api().get_settings();
+  $("#s-count").value = settings.test_count;
+  $("#s-variants").value = settings.test_variants;
+  $("#s-keep-open").checked = settings.keep_office_open;
+  const info = await api().get_info();
+  $("#s-data").textContent = info.data_dir || "";
+}
+
+$("#settings-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const r = await api().save_settings({
+    test_count: Number($("#s-count").value), test_variants: Number($("#s-variants").value),
+    keep_office_open: $("#s-keep-open").checked,
+  });
+  $("#s-error").hidden = r.ok; $("#s-error").textContent = r.ok ? "" : r.error;
+  $("#s-saved").textContent = r.ok ? "Saqlandi ✓" : "";
+  if (r.ok) { settings = r.settings; applySettings(); }
+});
+$("#s-open-data").addEventListener("click", () => api() && api().open_data_folder());
+$("#s-shortcut").addEventListener("click", async () => {
+  const r = await api().create_shortcut();
+  $("#s-msg").textContent = r.ok ? `Yorliq yaratildi: ${r.path}` : `Xato: ${r.error}`;
+});
+$("#s-clear-history").addEventListener("click", async () => {
+  if (!confirm("Barcha vazifalar tarixi o‘chirilsinmi? Yaratilgan fayllar o‘chmaydi.")) return;
+  await api().clear_history();
+  $("#s-msg").textContent = "Tarix tozalandi";
+});
+
+function applySettings() {
+  if (!settings) return;
+  if ($("#t-count") && !$("#t-count").dataset.touched) $("#t-count").value = settings.test_count;
+  if ($("#t-variants") && !$("#t-variants").dataset.touched) $("#t-variants").value = settings.test_variants;
+}
+["t-count", "t-variants"].forEach((id) => $("#" + id).addEventListener("input", (e) => { e.target.dataset.touched = "1"; }));
+
 // ---- boot ----
 window.addEventListener("pywebviewready", async () => {
   const info = await api().get_info();
   $("#version").textContent = `NEXVARA v${info.version}`;
   $("#sys-info").textContent = JSON.stringify(info, null, 2);
   $("#ai-status").textContent = info.ai_connected ? "Ulangan" : "Ulanmagan";
+  settings = await api().get_settings();
+  setTheme(settings.theme, false);
+  applySettings();
+  refreshCount();
 });

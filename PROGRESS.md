@@ -4,6 +4,25 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-16 (9) — Claude Code — Ilova asoslari: aylantirish, tarix, sozlamalar, belgi
+
+**Foydalanuvchi talabi:** "ilovani pastga sursam oxiri ko'rinmayabdi"; ilovadagi kamchiliklarni tuzatish.
+
+**Qilindi:**
+- Aylantirish: oyna butunligicha aylanmaydi, chap menyu, markaziy sahifa va vazifa paneli har biri o'zi aylanadi; sahifa oxiri doim ko'rinadi (haqiqiy oynada tekshirildi). Darsliklar jadvali o'z ichida aylanadi. Tor oynada vazifa paneli yashiriladi va yopish tugmasi bilan chiqadi.
+- `appdata.py`: vazifalar tarixi (`D:\NEXVARA\app.db`, oxirgi 500 ta) va sozlamalar (`settings.json`) qayta ishga tushirishda saqlanadi.
+- Sozlamalar sahifasi: mavzu (qorong'i/yorug'), savollar soni va variantlar (sukut), Office oynasi ochiq qolsinmi, ma'lumotlar papkasini ochish, ish stolida yorliq, tarixni tozalash.
+- `app/shortcut.py`: NEXVARA belgisi (.ico, dasturda chiziladi) va ish stolidagi yorliq (konsolsiz `pythonw`).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format + unit testlar (119 ta; +sozlamalar, tarix) | PASS |
+| Office: kutubxona va buyruqlar testlari (17 ta, haqiqiy Excel/Word/PowerPoint) | PASS |
+| Smoke (12 menyu bandi) | PASS |
+
+---
+
 ## 2026-10-16 (8) — Claude Code — Testlarda rasmli va chizmali savollar
 
 **Foydalanuvchi talabi:** test tuzilganda rasm va chizmali savollar ham bo'lsin ("Rasmda nima ko'rsatilgan?").

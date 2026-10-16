@@ -185,13 +185,35 @@
     </section>
 
     <section class="page" id="page-settings">
-      <h1>Settings</h1>
+      <h1>Sozlamalar</h1>
       <div class="card wide">
-        <div class="card-label">Ko'rinish</div>
+        <div class="card-label">Ko‘rinish</div>
         <div class="row">
-          <button class="btn" data-theme-set="dark">Dark</button>
-          <button class="btn" data-theme-set="light">Light</button>
+          <button class="btn" data-theme-set="dark" type="button">Qorong‘i</button>
+          <button class="btn" data-theme-set="light" type="button">Yorug‘</button>
         </div>
+      </div>
+      <form class="card wide" id="settings-form">
+        <div class="card-label">Testlar va Office</div>
+        <div class="form-grid">
+          <label>Savollar soni (sukut) <input id="s-count" type="number" min="1" max="60"></label>
+          <label>Variantlar (sukut) <input id="s-variants" type="number" min="1" max="6"></label>
+          <label class="check-label"><input id="s-keep-open" type="checkbox">
+            Ish tugagach Office oynasi ochiq qolsin</label>
+        </div>
+        <div class="row"><button class="btn primary" type="submit">Saqlash</button>
+          <span class="muted small" id="s-saved"></span></div>
+        <div class="error" id="s-error" hidden></div>
+      </form>
+      <div class="card wide">
+        <div class="card-label">Ma’lumotlar</div>
+        <div class="mono" id="s-data"></div>
+        <div class="row">
+          <button class="btn" id="s-open-data" type="button">Papkani ochish</button>
+          <button class="btn" id="s-shortcut" type="button">Ish stolida yorliq yaratish</button>
+          <button class="btn" id="s-clear-history" type="button">Vazifalar tarixini tozalash</button>
+        </div>
+        <div class="muted small" id="s-msg"></div>
       </div>
       <div class="card wide"><div class="card-label">Tizim</div><pre id="sys-info" class="mono"></pre></div>
     </section>
@@ -203,7 +225,7 @@
   </main>
 
   <aside class="panel">
-    <div class="panel-title">Joriy vazifa</div>
+    <div class="panel-title">Joriy vazifa <button class="panel-close" id="panel-close" type="button" title="Yopish">×</button></div>
     <div id="task-empty" class="muted">Hozir vazifa yo'q.</div>
     <div id="task-box" hidden>
       <div class="task-head">

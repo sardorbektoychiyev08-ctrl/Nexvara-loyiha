@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.selftest_chat is not None:
         api = Api(keep_office_open=False)
     else:
-        api = Api()
+        api = Api(persist=True)  # history and settings survive restarts
     window = webview.create_window(
         "NEXVARA",
         url=str(UI_DIR / "index.html"),

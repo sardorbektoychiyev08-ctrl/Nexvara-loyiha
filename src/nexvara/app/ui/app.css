@@ -28,6 +28,11 @@ html, body { height: 100%; margin: 0; }
 body {
   display: grid;
   grid-template-columns: 220px 1fr 300px;
+  /* The window never scrolls as a whole: each column scrolls on its own, so the end of
+     a long page is always reachable. */
+  grid-template-rows: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
@@ -113,3 +118,22 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto
 
 .source-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .tg-steps { margin-top: 10px; }
+
+/* Scrolling: every column fills the window height and scrolls independently. */
+.sidebar, .content, .panel { height: 100vh; min-height: 0; box-sizing: border-box; }
+.sidebar { overflow-y: auto; }
+.content { overflow-y: auto; padding-bottom: 64px; }
+.panel { overflow-y: auto; padding-bottom: 48px; }
+.chat-log { max-height: none; }
+/* Narrow windows: the task panel moves under the content instead of squeezing it. */
+@media (max-width: 1100px) {
+  body { grid-template-columns: 200px 1fr; grid-template-rows: 100vh; }
+  .panel { display: none; }
+  body.show-panel .panel { display: block; position: fixed; right: 0; top: 0; width: 300px; z-index: 5; box-shadow: -6px 0 18px rgba(0,0,0,.25); }
+}
+.lib-table { display: block; max-height: 380px; overflow-y: auto; }
+.lib-table thead th { position: sticky; top: 0; background: var(--surface); }
+.panel-close { display: none; float: right; border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; }
+@media (max-width: 1100px) { .panel-close { display: block; } }
+
+.check-label { flex-direction: row !important; align-items: center; gap: 8px !important; grid-column: 1 / -1; color: var(--text) !important; font-size: 13px !important; }
