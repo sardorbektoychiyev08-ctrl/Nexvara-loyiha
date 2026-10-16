@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="uz" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NEXVARA</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><span class="logo">N</span><span>NEXVARA</span></div>
+    <nav id="nav">
+      <button class="nav-item active" data-page="home">Home</button>
+      <button class="nav-item" data-page="chat">AI Chat</button>
+      <button class="nav-item" data-page="office">Office Agent</button>
+      <button class="nav-item" data-page="files" data-milestone="M5">Files</button>
+      <button class="nav-item" data-page="bi" data-milestone="M8">NEXVARA BI</button>
+      <button class="nav-item" data-page="workflows" data-milestone="M6">Workflows</button>
+      <button class="nav-item" data-page="teach" data-milestone="M6">Teach NEXVARA</button>
+      <button class="nav-item" data-page="memory" data-milestone="M6">Memory</button>
+      <button class="nav-item" data-page="history">Tasks / History</button>
+      <button class="nav-item" data-page="devices" data-milestone="M12">Devices</button>
+      <button class="nav-item" data-page="settings">Settings</button>
+    </nav>
+    <div class="sidebar-foot" id="version">v—</div>
+  </aside>
+
+  <main class="content">
+    <section class="page active" id="page-home">
+      <h1>Xush kelibsiz</h1>
+      <p class="muted">Siz buyruq berasiz — NEXVARA ishni bajaradi — natijani ko'rasiz.</p>
+      <div class="cards">
+        <div class="card"><div class="card-label">Office</div><div class="card-value">Excel 2016</div><div class="muted">COM orqali, ko'rinadigan rejim</div></div>
+        <div class="card"><div class="card-label">AI provayder</div><div class="card-value" id="ai-status">Ulanmagan</div><div class="muted">M7 bosqichida</div></div>
+        <div class="card"><div class="card-label">Vazifalar</div><div class="card-value" id="task-count">0</div><div class="muted">shu sessiyada</div></div>
+      </div>
+      <button class="btn primary" data-goto="office">Excel sinovini boshlash →</button>
+    </section>
+
+    <section class="page" id="page-chat">
+      <h1>AI Chat</h1>
+      <div class="chat-log" id="chat-log"></div>
+      <form class="chat-input" id="chat-form">
+        <input id="chat-text" type="text" placeholder="Buyruq yozing… masalan: Excel'da jadval yarat" autocomplete="off">
+        <button class="btn primary" type="submit">Yuborish</button>
+      </form>
+    </section>
+
+    <section class="page" id="page-office">
+      <h1>Office Agent</h1>
+      <div class="card wide">
+        <div class="card-label">Excel — birinchi real sinov</div>
+        <p>Excel ochiladi, yangi workbook yaratiladi, 10 qatorli jadval kiritiladi, hisob-kitob qilinadi,
+          formatlanadi, <b>Documents\NEXVARA</b> papkasiga saqlanadi va qayta ochib tekshiriladi.
+          Hammasi sizning ko'z oldingizda bajariladi.</p>
+        <button class="btn primary" id="run-excel">Excel'da jadval yaratish</button>
+      </div>
+      <div class="card wide disabled">
+        <div class="card-label">Word va PowerPoint</div>
+        <p class="muted">M4 bosqichida qo'shiladi.</p>
+      </div>
+    </section>
+
+    <section class="page" id="page-history">
+      <h1>Tasks / History</h1>
+      <div id="history-list" class="history"></div>
+    </section>
+
+    <section class="page" id="page-settings">
+      <h1>Settings</h1>
+      <div class="card wide">
+        <div class="card-label">Ko'rinish</div>
+        <div class="row">
+          <button class="btn" data-theme-set="dark">Dark</button>
+          <button class="btn" data-theme-set="light">Light</button>
+        </div>
+      </div>
+      <div class="card wide"><div class="card-label">Tizim</div><pre id="sys-info" class="mono"></pre></div>
+    </section>
+
+    <section class="page" id="page-placeholder">
+      <h1 id="placeholder-title"></h1>
+      <p class="muted" id="placeholder-text"></p>
+    </section>
+  </main>
+
+  <aside class="panel">
+    <div class="panel-title">Joriy vazifa</div>
+    <div id="task-empty" class="muted">Hozir vazifa yo'q.</div>
+    <div id="task-box" hidden>
+      <div class="task-head">
+        <span id="task-title"></span>
+        <span class="badge" id="task-status"></span>
+      </div>
+      <ol id="task-steps" class="steps"></ol>
+      <div id="task-error" class="error" hidden></div>
+      <div id="task-result" hidden></div>
+      <div class="row">
+        <button class="btn" id="task-cancel">Bekor qilish</button>
+      </div>
+    </div>
+  </aside>
+
+  <script src="app.js"></script>
+</body>
+</html>

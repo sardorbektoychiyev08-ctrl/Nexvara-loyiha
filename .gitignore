@@ -1,0 +1,47 @@
+# NEXVARA - maxfiy ma'lumotlar
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Node.js
+node_modules/
+dist/
+build/
+coverage/
+.npm/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Android
+.gradle/
+**/build/
+*.apk
+*.aab
+local.properties
+*.keystore
+*.jks
+
+# Windows
+Thumbs.db
+Desktop.ini
+*.log
+
+# Vaqtinchalik fayllar
+tmp/
+temp/
+.cache/
+
+# Python build/test artefaktlari
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
