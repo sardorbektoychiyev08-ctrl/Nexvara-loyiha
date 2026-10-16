@@ -4,6 +4,33 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-16 (12) — Claude Code — Qolgan barcha bo'limlar: Memory, Teach, Files, Workflows, NEXVARA BI, Devices
+
+**Foydalanuvchi talabi:** "qolgan barcha bo'limlarni mukammal darajada qo'sh". Endi 12 bo'limning hech biri bo'sh emas (smoke buni tekshiradi).
+
+**Qilindi:**
+- **Memory** (`memory/store.py`): eslatmalar (qo'shish/tahrir/o'chirish), suhbatlar tarixi (ilova qayta ochilganda chat davom etadi), oxirgi fayllar, o'zbekcha qo'shimchalarni tushunadigan qidiruv ("maktabimizda" → "maktab"), JSON zaxira va tiklash (takrorlamasdan). AI'ga faqat mos eslatmalar yuboriladi.
+- **Teach NEXVARA** (`memory/teach.py`): chatda "Har doim Excel raqamlarini markazga joyla", "testlar doim 2 variant bo'lsin", "Mana shu Word shablonini ishlat: D:\...\x.dotx" → nima qilishi ko'rsatiladi, "Ha"dan keyin saqlanadi. Qoidalar keyingi buyruqlarga (saqlash/eksportdan oldin, takrorlanmasdan), testlarga va yangi Word hujjatlarga qo'llanadi. Versiyalar, yoqish/o'chirish. Tuzatildi: "raqamlarini" so'zi "sahifa raqamlari" deb tushunilardi.
+- **Fayllar** (`fileagent.py`): qidiruv, ma'lumot + SHA-256, nusxa/ko'chirish (hech qachon ustiga yozmaydi), nomlash va ommaviy nomlash, ZIP (papkadan tashqariga chiqadigan xavfli arxiv rad etiladi), zaxira/versiyalar/tiklash, papkani turlarga ajratib tartiblash, Savatga o'chirish, Word/Excel/PowerPoint → PDF ommaviy, amallar jurnali. Chatda "hisobot fayllarini top".
+- **Workflows** (`workflows.py`): qadamlar (buyruq / tasdiq / kutish), qo'lda, papkaga yangi fayl tushganda (har fayl bir marta, `_NEXVARA` chiqishlar e'tiborsiz) yoki har kuni soat X da; qayta urinish, xatoda to'xtash yoki davom etish, pauza/davom, to'xtatish, tarix, 3 ta shablon. Workflow pullik AI'ni o'zi chaqirmaydi.
+- **NEXVARA BI** (`bi/`, `ui/bi.js`): XLSX/CSV/JSON/XML/TXT/papka; ustun turlari, tozalash, bo'sh qiymatlar, formula ustun (xavfsiz, `eval`siz), boshqa fayl bilan birlashtirish; avtomatik dashboard (daromad+xarajat bo'lsa sof foyda, rentabellik, oylik o'sish); KPI, ustunli, chiziqli, doiraviy, nuqtali, jadval; filtrlar, sana oralig'i, bosib drill-down, sahifalar, vidjet qo'shish/tahrirlash; saqlash; PNG/PDF/Excel/CSV eksport. Chatda "Savdo.xlsx dan dashboard yarat".
+- **Devices** (`remote.py`, `ui/mobile.html`): telefon brauzeridan boshqarish. QR + bir martalik 6 xonali kod (10 daqiqa, 5 xatodan keyin blok), HTTPS (kompyuterning o'z sertifikati), tokenlar faqat xesh holida va haftalik almashadi, qurilmani uzish, takroriy so'rov ikki marta bajarilmaydi, kompyuter javob bermasa buyruqlar navbatda kutadi, fayl/rasm yuborish, natijani telefonga yuklab olish. Sukut bo'yicha o'chiq.
+- Smoke endi har bir sahifani ochib, JS xatolari yo'qligini tekshiradi; `tests/ui_scripts/` haqiqiy oynada har bo'limni bosib chiqadi.
+- Yangi kutubxonalar: `openpyxl` (BI), `segno` (QR).
+
+**Testlar** (`.\scripts\test.ps1 -Office`):
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit (179 ta; +memory, teach, fayllar, workflow, BI, telefon serveri HTTPS bilan) | PASS |
+| Office: 227/228 birinchi ishga tushirishda; yiqilgan bitta — band kompyuterda oyna 20 soniyada yuklanmagan (skript kutish vaqti), 90 soniyaga oshirilgach UI sinovlari 5/5 | PASS |
+| Haqiqiy Office: ommaviy PDF (Word+Excel), papka kuzatuvchi workflow (Excel), AI test Word'da (soxta AI) | PASS |
+| UI (haqiqiy oyna): Memory/Teach, Fayllar, Workflows, BI (eksportlar bilan), Devices (ikki oyna: kompyuter + telefon) | PASS |
+| Haqiqiy telefon bilan ulanish | NOT TESTED — foydalanuvchi telefoni kerak |
+| Native Android ilova, Google login | TODO (Android SDK / Google Cloud loyihasi kerak) |
+
+---
+
 ## 2026-10-16 (11) — Claude Code — Oyna ekranga sig'adi
 
 **Foydalanuvchi:** "ko'rinmayabdi oxiri" (aylantirish tuzatilgandan keyin ham).

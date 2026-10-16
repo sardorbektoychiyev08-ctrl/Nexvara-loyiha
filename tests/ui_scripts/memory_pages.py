@@ -36,8 +36,8 @@ def wait_for(js, timeout=10):
 
 def run():
     try:
-        ready.wait(30)
-        wait_for("document.getElementById('version').textContent.startsWith('NEXVARA v')")
+        ready.wait(90)
+        wait_for("document.getElementById('version').textContent.startsWith('NEXVARA v')", 90)
         js = win.evaluate_js
         # Chat: teach a fact and a rule with the confirm buttons.
         js("document.querySelector('.nav-item[data-page=chat]').click()")

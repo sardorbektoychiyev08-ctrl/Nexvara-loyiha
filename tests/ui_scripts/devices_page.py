@@ -43,8 +43,8 @@ def wait_for(win, js, timeout=20):
 def run():
     phone = None
     try:
-        ready.wait(30)
-        wait_for(desk, "document.getElementById('version').textContent.startsWith('NEXVARA v')")
+        ready.wait(90)
+        wait_for(desk, "document.getElementById('version').textContent.startsWith('NEXVARA v')", 90)
         desk.evaluate_js("window.confirm = () => true;")
         desk.evaluate_js("document.querySelector('.nav-item[data-page=devices]').click()")
         desk.evaluate_js("document.getElementById('dev-toggle').click()")

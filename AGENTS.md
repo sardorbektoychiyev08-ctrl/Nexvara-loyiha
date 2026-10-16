@@ -25,6 +25,7 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
   - `src/nexvara/agent/` (buyruqlar) → Claude (`claude/*`)
   - `src/nexvara/sources/` (darslik manbalari) → Claude (`claude/*`)
   - `src/nexvara/ai/` (provayderlar, router, xarajat, AI imkoniyatlari), `tests/unit/test_ai.py` → Claude (`claude/*`)
+  - `src/nexvara/memory/`, `fileagent.py`, `workflows.py`, `bi/`, `remote.py`, `app/api_*.py`, `app/ui/bi.js`, `app/ui/mobile.html`, `tests/ui_scripts/` → Claude (`claude/*`)
   - Umumiy fayllar (`PROGRESS.md`, `ROADMAP.md`, `pyproject.toml`, `app/`) → kichik, alohida commitlarda o'zgartiring; konflikt bo'lsa ikkala tomonning yozuvlarini saqlang.
 
 ## Hozirgi vazifalar taqsimoti
@@ -55,5 +56,8 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
 - Formulalarni `Range.Formula` (inglizcha) orqali yozing, `FormulaLocal` orqali emas. Office ruscha bo'lishi ham mumkin.
 - Raqam formatlari: faqat `ops.set_number_format` orqali (Excel 2016 + uz-Latn mintaqasida `NumberFormat` tarjima qilinmaydi, `NumberFormatLocal` + Excel ajratgichlari kerak). Sanalar: faqat `ops.write_rows`/`to_excel_value` orqali (pywin32 naive datetime ni 5 soatga siljitadi).
 - Telegram session va API ma'lumotlari faqat `D:\NEXVARA\telegram` da; Git'ga hech qachon qo'shilmaydi.
+- Telefon ulanishi: sertifikat `D:\NEXVARA\remote`, qurilma tokenlari faqat SHA-256 xesh holida `app.db` da. Sukut bo'yicha o'chiq.
+- UI sinovlari: `tests/ui_scripts/*.py` haqiqiy oyna ochadi (`tests/office/test_ui_pages.py` orqali, `-Office` bilan). Smoke har bir sahifani ochadi va JS xatolarini tekshiradi.
+- `api.py` katta bo'lmasligi uchun har bo'lim o'z mixin faylida: `app/api_memory.py`, `api_files.py`, `api_workflows.py`, `api_bi.py`, `api_devices.py`.
 - Darsliklar: haqiqiy darslik PDF'lari Git'ga **hech qachon** qo'shilmaydi (mualliflik huquqi). Testlar `tests/textbook_fixture.py` dagi sintetik matn va PDF bilan ishlaydi. Foydalanuvchi ma'lumotlari `D:\NEXVARA` da.
 - Office testlarida `Windows fatal exception: code 0x80010108` chiqishi zararsiz: Excel yopilgandan keyin COM proxy bo'shatilganda pywin32 ichida ushlanadigan xato. Natija = pytest PASS/FAIL.
