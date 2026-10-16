@@ -14,12 +14,9 @@ from pathlib import Path
 from typing import Any
 
 import pythoncom
-import pywintypes
-import win32api
 import win32com.client
-import win32con
-import win32gui
 
+from nexvara.skills.common import bring_to_front
 from nexvara.skills.excel.ops import set_number_format
 from nexvara.skills.excel.table import (
     XL_CENTER,
@@ -37,19 +34,6 @@ log = logging.getLogger(__name__)
 HEADER_FILL = "#6366F1"
 HEADER_FONT = "#FFFFFF"
 BORDER_COLOR = "#CBD5E1"
-
-
-def bring_to_front(hwnd: int) -> bool:
-    try:
-        win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
-        # Windows only lets the foreground process hand over focus; an Alt tap lifts that lock.
-        win32api.keybd_event(win32con.VK_MENU, 0, 0, 0)
-        win32api.keybd_event(win32con.VK_MENU, 0, win32con.KEYEVENTF_KEYUP, 0)
-        win32gui.SetForegroundWindow(hwnd)
-    except pywintypes.error as e:
-        log.warning("Could not bring Excel to front: %s", e)
-        return False
-    return True
 
 
 class ExcelSession:
