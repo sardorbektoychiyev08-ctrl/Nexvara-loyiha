@@ -18,7 +18,7 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 - **`skills/excel/dashboard.py`**: savdo dashboardi: 144 qatorli ma'lumot varag'i, oylik/hudud/kategoriya SUMIFS jadvallari, 7 ta KPI (SUM, IF, AVERAGE, COUNTIF, lookup), 3 ta grafik, PivotTable, shartli formatlash. Natija qayta ochiladi va 14 ta tekshiruvdan o'tkaziladi (Python hisobi bilan solishtiriladi).
 - **UI**: Office Agent sahifasiga "Excel dashboard yaratish" tugmasi qo'shildi. `--selftest-excel DIR` ikkala tugmani haqiqiy UI'da bosib, natijani tekshiradi.
 
-**Testlar** (`.\scripts	est.ps1 -Office`, foydalanuvchi ruxsati bilan):
+**Testlar** (`.\scripts\test.ps1 -Office`, foydalanuvchi ruxsati bilan):
 | Test | Natija |
 |---|---|
 | ruff check + format | PASS |
