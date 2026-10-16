@@ -53,8 +53,18 @@ def run_make_test(
             time.sleep(pause)
         task.check_cancelled()
 
-    with WordSession(visible=visible, keep_open=keep_open) as w:
-        checks = _write_and_verify(task, w, book.label(), topic, quizzes, out, pdf, beat, keep_open)
+    try:
+        with WordSession(visible=visible, keep_open=keep_open) as w:
+            checks = _write_and_verify(
+                task, w, book.label(), topic, quizzes, out, pdf, beat, keep_open
+            )
+    finally:
+        # The cut-out pictures are embedded in the .docx now; drop the temp copies.
+        import shutil
+
+        for d in {Path(x.image).parent for q in quizzes for x in q.questions if x.image}:
+            shutil.rmtree(d, ignore_errors=True)
+    pictures = sum(1 for x in quizzes[0].questions if x.image)
 
     notes = [q.note for q in quizzes if q.note]
     return {
@@ -66,6 +76,7 @@ def run_make_test(
         "questions": n,
         "variants": len(quizzes),
         "note": notes[0] if notes else "",
+        "pictures": pictures,
     }
 
 
@@ -105,9 +116,20 @@ def _write_and_verify(
             )
             for i, q in enumerate(quiz.questions, start=1):
                 lines = question_lines(q, i)
-                ops.add_paragraph(doc, lines[0], bold=True)
-                for line in lines[1:]:
-                    ops.add_paragraph(doc, line)
+                # A question never breaks across pages: stem, picture and options stay together.
+                stem = ops.add_paragraph(doc, lines[0], bold=True)
+                stem.KeepWithNext = True
+                if q.image:
+                    shape = ops.add_picture(doc, q.image, width_cm=8)
+                    if shape.Height > ops.cm_to_pt(7):  # tall pictures: cap the height
+                        ratio = shape.Width / shape.Height
+                        shape.Height = ops.cm_to_pt(7)
+                        shape.Width = shape.Height * ratio
+                    doc.Paragraphs.Last.KeepWithNext = True
+                    del shape
+                for k, line in enumerate(lines[1:], start=1):
+                    p = ops.add_paragraph(doc, line)
+                    p.KeepWithNext = k < len(lines) - 1
                 if q.kind == "match":
                     rows = [["Tushuncha", "Ta’rif"]] + [
                         [f"{k + 1}. {term}", f"{LETTERS[k]}) {defn}"]
@@ -190,5 +212,7 @@ def verify_test(doc: Any, quizzes: list[QuizResult], pdf: Path) -> list[dict[str
         if x.kind == "mcq"
     )  # fmt: skip
     check("A/B/C/D variantlar", mcq_ok)
+    pictures = sum(1 for q in quizzes for x in q.questions if x.image)
+    check("Rasmli savollar", doc.InlineShapes.Count == pictures, f"{pictures} ta rasm")
     check("PDF", pdf.is_file() and pdf.read_bytes()[:5] == b"%PDF-", str(pdf))
     return checks

@@ -4,6 +4,32 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-16 (8) — Claude Code — Testlarda rasmli va chizmali savollar
+
+**Foydalanuvchi talabi:** test tuzilganda rasm va chizmali savollar ham bo'lsin ("Rasmda nima ko'rsatilgan?").
+
+**Qilindi** (`knowledge/figures.py`, `quiz.py`, `testdoc.py`):
+- Darslikdagi rasm izohlari ("61-rasm. Ikki qayiqning bir-biriga tortilishi") PyMuPDF bilan topiladi. Ikki qatorga o'tgan izoh birlashtiriladi, matndagi havolalar ("61-rasmda ...") izoh deb olinmaydi.
+- Izohga tegishli rasm topiladi: eng yaqin rasm, unga tegib turgan bo'laklar (strelka, yozuvlar) qo'shiladi; vektor chizmalar uchun chiziqlar to'plami olinadi. Rasm 2× sifatda qirqib olinadi.
+- **Javob oshkor qilinmaydi:** rasm ichiga tushgan izoh so'zlari oq rang bilan yopiladi.
+- Himoya: sahifa sarlavhasi bezaklari, banner rasmlar, bo'sh yoki matnli qirqimlar rad etiladi (noto'g'ri rasmdan ko'ra savol bo'lmagani yaxshi).
+- Savol: "Rasmda nima tasvirlangan?" (sxema/grafik/jadval/xarita bo'lsa "Chizmada..."). Variantlar: to'g'ri izoh + shu darslikdagi boshqa rasm izohlari (yetmasa, darslik tushunchalari). Rasmli savollar testning ~25% i, har variantda boshqacha.
+- Word: rasm savol ostida (eni 8 sm, balandligi 7 sm gacha). Savol, rasm va variantlar bir sahifada qoladi (KeepWithNext). Javoblar kalitida harf va bet.
+
+**Topilgan va tuzatilgan:** sahifa bo'ylab ko'rinmas suv belgisi ("http:eduportal.uz") butun rasmni oq qilib yuborardi; matndagi "68-rasm" havolasi izoh deb olinardi; sarlavha bezagi rasm deb olinardi; savol matni va rasm turli sahifaga bo'linardi.
+
+**Haqiqiy darsliklarda:** 6 ta kitobdan 72 ta izoh, 57 tasida rasm to'g'ri qirqildi (7-fizika 12/13, 8-kimyo 7/7, 9-kimyo 8/9, 10-biologiya 19/20, 7-biologiya 11/23). OCR qilingan (skaner) kitoblarda rasmli savol yo'q, chunki izoh matni yo'q. 7-sinf fizika "Nyuton qonunlari" testi: 12 savoldan 3 tasi rasmli, hammasi rasmi bilan bir sahifada.
+
+**Testlar** (`.\scripts\test.ps1 -Office`):
+| Test | Natija |
+|---|---|
+| ruff + unit testlar (112 ta; +rasm izohlari, javob yashirilishi, chalg'ituvchilar) | PASS |
+| Office testlari: 152/153 birinchi ishga tushirishda; yiqilgan bitta UI self-test eskirgan kutilgan son (5→6 tekshiruv) sababli, tuzatilgandan keyin kutubxona testlari 7/7 | PASS |
+| Word'da rasmli test (sintetik darslik rasmlar bilan): rasm hujjatda, PDF'da rasmlar soni = rasmli savollar soni, vaqtinchalik fayllar o'chirilgan | PASS |
+| Haqiqiy darsliklarda rasm qirqish (6 kitob) | 57/72 (79%), qolganlari xavfsiz o'tkazib yuborildi |
+
+---
+
 ## 2026-10-16 (7) — Claude Code — Darsliklarni avtomatik yuklash, OCR, Telegram yuklovchi
 
 **Foydalanuvchi talabi:** "kitoblarni o'zing yuklab ol". Tanlov: **ikkalasi**, ya'ni hozir eski rasmiy nashr, yangilari esa Telegram orqali.

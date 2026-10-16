@@ -59,6 +59,7 @@ src/nexvara/
     quiz.py               # AI'siz savollar: ta'rif, yil/raqam, bo'sh joy, to'g'ri/noto'g'ri, moslash
     service.py            # Chat buyrug'ini tushunish, test so'rovi, kutubxona amallari
     testdoc.py            # Word'da test: variantlar + javoblar kaliti, DOCX/PDF, tekshiruv
+    figures.py            # Rasm izohlari + rasmni qirqish (izoh yashiriladi) rasmli savollar uchun
     topics.py             # Mavzu = §-bo'lim: sarlavha/matn bo'yicha topish, mundarija + bet siljishi
     topicdoc.py           # Mavzu: Word matni + asl sahifalar PDF, tekshiruv
   sources/
