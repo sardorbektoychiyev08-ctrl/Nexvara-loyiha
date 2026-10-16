@@ -314,6 +314,68 @@
       </div>
     </section>
 
+    <section class="page" id="page-files">
+      <h1>Fayllar</h1>
+      <p class="muted">Fayllarni topish, nusxalash, ko‘chirish, nomlash, ZIP, PDF'ga aylantirish,
+        zaxira va tiklash. Hech bir fayl ustiga yozilmaydi; o‘chirilganlar Savatga tushadi.</p>
+      <form class="card wide" id="f-form">
+        <div class="card-label">Qidirish</div>
+        <div class="form-grid">
+          <label class="wide-field">Fayl nomidagi so‘z <input id="f-query" type="text" placeholder="masalan: hisobot"></label>
+          <label>Turi <select id="f-ext">
+            <option value="">Barchasi</option>
+            <option value=".docx .doc .rtf">Word</option>
+            <option value=".xlsx .xlsm .xls .csv">Excel</option>
+            <option value=".pptx .ppt">PowerPoint</option>
+            <option value=".pdf">PDF</option>
+            <option value=".jpg .jpeg .png .gif .bmp .webp">Rasmlar</option>
+            <option value=".zip .rar .7z">Arxivlar</option>
+          </select></label>
+          <label>Papka <input id="f-folder" type="text" placeholder="hamma odatiy joylar" readonly></label>
+        </div>
+        <div class="row wrap">
+          <button class="btn primary" type="submit">Qidirish</button>
+          <button class="btn" id="f-pick" type="button">Papka tanlash</button>
+          <button class="btn" id="f-clear-folder" type="button">Hamma joyda</button>
+        </div>
+        <div class="error" id="f-error" hidden></div>
+      </form>
+      <div class="card wide">
+        <div class="card-label">Natija <span class="muted" id="f-count"></span></div>
+        <div class="row wrap" id="f-actions">
+          <button class="btn small-btn" data-fa="open">Ochish</button>
+          <button class="btn small-btn" data-fa="reveal">Papkada ko‘rsatish</button>
+          <button class="btn small-btn" data-fa="copy">Nusxalash…</button>
+          <button class="btn small-btn" data-fa="move">Ko‘chirish…</button>
+          <button class="btn small-btn" data-fa="rename">Nomini o‘zgartirish</button>
+          <button class="btn small-btn" data-fa="zip">ZIP qilish</button>
+          <button class="btn small-btn" data-fa="unzip">Arxivdan chiqarish</button>
+          <button class="btn small-btn" data-fa="pdf">PDF'ga aylantirish</button>
+          <button class="btn small-btn" data-fa="backup">Zaxira nusxa</button>
+          <button class="btn small-btn" data-fa="versions">Versiyalar</button>
+          <button class="btn small-btn danger" data-fa="recycle">Savatga o‘chirish</button>
+        </div>
+        <div class="muted small" id="f-msg"></div>
+        <table class="lib-table files-table" id="f-table"></table>
+        <div class="file-info" id="f-info" hidden></div>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Papkani tartiblash</div>
+        <p class="muted small">Papkadagi fayllar turiga qarab ichki papkalarga ajratiladi (Hujjatlar,
+          Jadvallar, Taqdimotlar, PDF, Rasmlar, Arxivlar…). Avval reja ko‘rsatiladi.</p>
+        <div class="row wrap">
+          <button class="btn" id="f-tidy-pick" type="button">Papka tanlash</button>
+          <button class="btn primary" id="f-tidy-run" type="button" disabled>Tartiblash</button>
+          <span class="mono" id="f-tidy-folder"></span>
+        </div>
+        <table class="lib-table" id="f-tidy-plan"></table>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Amallar jurnali</div>
+        <table class="lib-table" id="f-log"></table>
+      </div>
+    </section>
+
     <section class="page" id="page-placeholder">
       <h1 id="placeholder-title"></h1>
       <p class="muted" id="placeholder-text"></p>

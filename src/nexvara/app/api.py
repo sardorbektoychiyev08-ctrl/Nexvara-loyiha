@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from nexvara import __version__, config
+from nexvara.app.api_files import FilesApi
 from nexvara.app.api_memory import MemoryApi
 from nexvara.core.task import TaskFn, TaskRunner
 
@@ -40,7 +41,7 @@ def _wants_ai(text: str) -> bool:
     return bool(re.search(r"\b(ai|sun.?iy intellekt\w*|aqlli)\b", fold(text)))
 
 
-class Api(MemoryApi):
+class Api(MemoryApi, FilesApi):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
 
@@ -127,6 +128,10 @@ class Api(MemoryApi):
         teach = self._chat_teach(text)
         if teach is not None:
             return teach
+        if not find_file(text):
+            found = self._chat_find_files(text)
+            if found is not None:
+                return found
 
         # A named file means an Office command, whatever words its path contains
         # ("D:\Testlar\hisobot.xlsx" is not a request for a test).

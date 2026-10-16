@@ -10,7 +10,7 @@ const STATUS_LABEL = {
   pending: "Kutilmoqda", running: "Bajarilmoqda", succeeded: "Bajarildi",
   failed: "Xato", cancelled: "Bekor qilindi",
 };
-const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach"]);
+const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files"]);
 
 let currentTaskId = null;
 let pollTimer = null;
@@ -43,6 +43,7 @@ function show(page) {
   if (page === "settings") renderSettings();
   if (page === "memory") renderMemory();
   if (page === "teach") renderTeach();
+  if (page === "files") renderFiles();
 }
 
 $("#nav").addEventListener("click", (e) => {
@@ -633,6 +634,171 @@ function drawRules(rules) {
     btns.append(edit, vers, del);
     row.append(head, acts, btns);
     box.appendChild(row);
+  });
+}
+
+// ---- files ----
+let fileRows = [];
+const selected = new Set();
+const fmtSize = (n) => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+
+async function renderFiles() { if (api()) drawFileLog(); }
+
+$("#f-form").addEventListener("submit", async (e) => { e.preventDefault(); await filesSearch(); });
+async function filesSearch() {
+  $("#f-count").textContent = "(qidirilmoqda…)";
+  const r = await api().files_search($("#f-query").value, $("#f-folder").value, $("#f-ext").value);
+  $("#f-error").hidden = r.ok; $("#f-error").textContent = r.ok ? "" : r.error;
+  fileRows = r.ok ? r.files : [];
+  selected.clear();
+  drawFiles();
+}
+$("#f-pick").addEventListener("click", async () => {
+  const f = await api().files_pick_folder();
+  if (f) { $("#f-folder").value = f; filesSearch(); }
+});
+$("#f-clear-folder").addEventListener("click", () => { $("#f-folder").value = ""; });
+
+function drawFiles() {
+  const t = $("#f-table");
+  t.textContent = "";
+  $("#f-count").textContent = fileRows.length ? `(${fileRows.length} ta, tanlangan: ${selected.size})` : "";
+  if (!fileRows.length) return;
+  const head = el("tr");
+  const all = el("input"); all.type = "checkbox";
+  all.checked = selected.size === fileRows.length;
+  all.addEventListener("change", () => {
+    fileRows.forEach((f) => (all.checked ? selected.add(f.path) : selected.delete(f.path)));
+    drawFiles();
+  });
+  const th0 = el("th"); th0.appendChild(all); head.appendChild(th0);
+  ["Nomi", "Papka", "Hajmi", "O‘zgargan"].forEach((h) => head.appendChild(el("th", "", h)));
+  t.appendChild(head);
+  fileRows.forEach((f) => {
+    const tr = el("tr", "clickable");
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = selected.has(f.path);
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", () => { cb.checked ? selected.add(f.path) : selected.delete(f.path); drawFiles(); });
+    const td0 = el("td"); td0.appendChild(cb); tr.appendChild(td0);
+    [f.name, f.folder, fmtSize(f.size), new Date(f.modified * 1000).toLocaleString()].forEach((v) => tr.appendChild(el("td", "", v)));
+    tr.addEventListener("click", () => showFileInfo(f.path));
+    tr.addEventListener("dblclick", () => api().open_file(f.path));
+    t.appendChild(tr);
+  });
+}
+
+async function showFileInfo(path) {
+  const r = await api().files_info(path);
+  const box = $("#f-info");
+  box.hidden = false; box.textContent = "";
+  if (!r.ok) { box.textContent = r.error; return; }
+  const i = r.result;
+  box.append(el("strong", "", i.name), el("div", "mono", [
+    `Joyi: ${i.folder}`, `Hajmi: ${fmtSize(i.size)} (${i.size} bayt)`,
+    `Yaratilgan: ${new Date(i.created * 1000).toLocaleString()}`,
+    `O‘zgargan: ${new Date(i.modified * 1000).toLocaleString()}`,
+    `SHA-256: ${i.sha256}`, i.zip_entries !== undefined ? `Arxivda: ${i.zip_entries} ta element` : "",
+  ].filter(Boolean).join("\n")));
+}
+
+function chosen(min = 1) {
+  const list = [...selected];
+  if (list.length < min) { $("#f-msg").textContent = "Avval jadvaldan fayl(lar)ni belgilang ☑"; return null; }
+  return list;
+}
+const fileResult = (r, okText) => {
+  $("#f-msg").textContent = r.ok ? okText(r.result) : `Xato: ${r.error}`;
+  drawFileLog();
+  return r.ok;
+};
+
+$("#f-actions").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-fa]");
+  if (!b || !api()) return;
+  const act = b.dataset.fa;
+  const list = chosen();
+  if (!list) return;
+  if (act === "open") list.slice(0, 5).forEach((p) => api().open_file(p));
+  if (act === "reveal") api().reveal_file(list[0]);
+  if (act === "copy" || act === "move") {
+    const folder = await api().files_pick_folder();
+    if (!folder) return;
+    if (act === "move" && !confirm(`${list.length} ta fayl ko‘chirilsinmi?\n→ ${folder}`)) return;
+    const r = await (act === "copy" ? api().files_copy(list, folder) : api().files_move(list, folder));
+    if (fileResult(r, (x) => `${x.length} ta fayl ${act === "copy" ? "nusxalandi" : "ko‘chirildi"} → ${folder}`)) filesSearch();
+  }
+  if (act === "rename") {
+    if (list.length === 1) {
+      const name = prompt("Yangi nom (kengaytmasiz ham bo‘ladi):", list[0].split("\\").pop());
+      if (!name) return;
+      if (fileResult(await api().files_rename(list[0], name), (x) => `Yangi nom: ${x}`)) filesSearch();
+    } else {
+      const pattern = prompt(`${list.length} ta fayl uchun nom namunasi ({n} — tartib raqami):`, "Hujjat_{n}");
+      if (!pattern) return;
+      if (fileResult(await api().files_rename_batch(list, pattern), (x) => `${x.length} ta fayl qayta nomlandi`)) filesSearch();
+    }
+  }
+  if (act === "zip") fileResult(await api().files_zip(list), (x) => `Arxiv: ${x}`);
+  if (act === "unzip") {
+    const zips = list.filter((p) => p.toLowerCase().endsWith(".zip"));
+    if (!zips.length) { $("#f-msg").textContent = "ZIP fayl tanlang"; return; }
+    fileResult(await api().files_unzip(zips[0]), (x) => `Chiqarildi: ${x}`);
+  }
+  if (act === "pdf") {
+    const snap = await api().files_to_pdf(list);
+    if (snap.id) { track(snap); $("#f-msg").textContent = "PDF'ga aylantirilmoqda — jarayon o‘ng panelda"; }
+    else $("#f-msg").textContent = snap.error;
+  }
+  if (act === "backup") fileResult(await api().files_backup(list), (x) => `${x.length} ta zaxira nusxa olindi (D:\\NEXVARA\\Zaxira\\Fayllar)`);
+  if (act === "versions") {
+    const vers = await api().files_versions(list[0]);
+    if (!vers.length) { $("#f-msg").textContent = "Bu faylning zaxira nusxasi yo‘q. Avval «Zaxira nusxa»ni bosing."; return; }
+    const pick = prompt(vers.map((v, i) => `${i + 1}) ${new Date(v.modified * 1000).toLocaleString()} — ${fmtSize(v.size)}`).join("\n") +
+      "\n\nQaysi versiyani tiklay? Raqamini yozing (hozirgi fayl ham zaxiraga olinadi):");
+    const v = vers[Number(pick) - 1];
+    if (!v) return;
+    fileResult(await api().files_restore(v.path, list[0]), () => "Tiklandi ✓ (oldingi holati ham zaxirada)");
+  }
+  if (act === "recycle") {
+    if (!confirm(`${list.length} ta fayl Savatga (Recycle Bin) o‘chirilsinmi?\nKerak bo‘lsa Savatdan qaytarish mumkin.`)) return;
+    if (fileResult(await api().files_recycle(list), (n) => `${n} ta fayl Savatga o‘tkazildi`)) filesSearch();
+  }
+});
+
+let tidyFolder = "";
+$("#f-tidy-pick").addEventListener("click", async () => {
+  tidyFolder = await api().files_pick_folder();
+  if (!tidyFolder) return;
+  $("#f-tidy-folder").textContent = tidyFolder;
+  const r = await api().files_tidy_plan(tidyFolder);
+  const t = $("#f-tidy-plan");
+  t.textContent = "";
+  $("#f-tidy-run").disabled = !(r.ok && r.result.length);
+  if (!r.ok) { t.appendChild(el("tr")).appendChild(el("td", "error", r.error)); return; }
+  if (!r.result.length) { t.appendChild(el("tr")).appendChild(el("td", "muted", "Tartiblanadigan fayl yo‘q")); return; }
+  r.result.forEach((x) => { const tr = el("tr"); tr.append(el("td", "", x.name), el("td", "", `→ ${x.to}`)); t.appendChild(tr); });
+});
+$("#f-tidy-run").addEventListener("click", async () => {
+  if (!confirm(`«${tidyFolder}» papkasidagi fayllar ichki papkalarga ajratilsinmi?`)) return;
+  const r = await api().files_tidy(tidyFolder);
+  $("#f-tidy-plan").textContent = "";
+  $("#f-tidy-run").disabled = true;
+  $("#f-tidy-folder").textContent = r.ok ? `Tayyor: ${Object.entries(r.result).map(([k, v]) => `${k}: ${v}`).join(", ")}` : `Xato: ${r.error}`;
+  drawFileLog();
+});
+
+const OPS = { copy: "Nusxa", move: "Ko‘chirish", rename: "Nomlash", zip: "ZIP", unzip: "ZIP ochish",
+  backup: "Zaxira", restore: "Tiklash", recycle: "Savatga", pdf: "PDF" };
+async function drawFileLog() {
+  const rows = await api().files_log();
+  const t = $("#f-log");
+  t.textContent = "";
+  if (!rows.length) { t.appendChild(el("tr")).appendChild(el("td", "muted", "Hali amal bajarilmagan")); return; }
+  rows.slice(0, 40).forEach((x) => {
+    const tr = el("tr");
+    const what = x.dst || (x.files ? x.files.join(", ") : x.src || "");
+    tr.append(el("td", "", new Date(x.ts * 1000).toLocaleString()), el("td", "", OPS[x.action] || x.action), el("td", "", what));
+    t.appendChild(tr);
   });
 }
 
