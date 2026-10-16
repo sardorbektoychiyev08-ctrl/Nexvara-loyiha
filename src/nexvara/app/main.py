@@ -106,12 +106,14 @@ def library_selftest(window: webview.Window) -> bool:
     js("document.getElementById('t-grade').dispatchEvent(new Event('change'))")
     subject = js("(document.querySelector('#t-subject option[value]:not([value=\"\"])')||{}).value")
     js(f"document.getElementById('t-subject').value = {subject!r}")
+    js("document.getElementById('t-topic').value = 'bosim'")
+    shown = _click_and_watch(window, "t-topic-show", "Mavzu: bosim", steps=5, checks=4)
     js("document.getElementById('t-topic').value = 'kuch massa bosim'")
     js("document.getElementById('t-count').value = '6'")
     title = f"Test: {first_grade}-sinf {subject} · kuch massa bosim"
     made = _click_and_watch(window, "t-make", title, steps=6, checks=5)
     print(f"SELFTEST library: grade={first_grade!r} subject={subject!r}")
-    return ok and made
+    return ok and shown and made
 
 
 def excel_button_selftest(window: webview.Window) -> bool:

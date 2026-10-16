@@ -42,6 +42,9 @@ CREATE VIRTUAL TABLE IF NOT EXISTS pages_fts USING fts5(
 );
 """
 
+SCHEMA_VERSION = 3  # 2: multi-line section titles, 3: table-of-contents lines skipped
+_TOC_LEADER = re.compile(r"(?:\.\s?){4,}|…{2,}")
+
 # "§ 25. Prujina bikirligi", "25-§. ...", "12-mavzu. ...", "IV bob. Harakat qonunlari"
 _SECTION = re.compile(
     r"^\s*(?:§\s*\d+|\d+\s*-\s*§|\d+\s*-\s*mavzu|\d+\s*-\s*dars|[IVXL]+\s+bob)\s*[.:]?\s*(.{3,90})$",
@@ -75,12 +78,30 @@ class Hit:
     score: float
 
 
+def _upper_share(s: str) -> float:
+    letters = [c for c in s if c.isalpha()]
+    return sum(c.isupper() for c in letters) / len(letters) if letters else 0.0
+
+
 def find_sections(page_text: str) -> list[str]:
+    """Section headings on a page. An all-caps heading wrapped over several lines
+    ("11-§. XIVA XONLIGI USTIDAN" + "ROSSIYA IMPERIYASI ...") is joined back together."""
+    lines = page_text.split("\n")
     out = []
-    for line in page_text.split("\n"):
+    for i, line in enumerate(lines):
         m = _SECTION.match(line)
-        if m and sum(ch.isalpha() for ch in m.group(1)) >= 3:
-            out.append(line.strip())
+        if not (m and sum(ch.isalpha() for ch in m.group(1)) >= 3):
+            continue
+        if _TOC_LEADER.search(line):
+            continue  # a table-of-contents line ("11-§. ... . . . . 36"), not the section itself
+        title = line.strip()
+        if _upper_share(m.group(1)) > 0.6:
+            for nxt in lines[i + 1 : i + 3]:
+                if nxt.strip() and _upper_share(nxt) > 0.6 and not _SECTION.match(nxt):
+                    title += " " + nxt.strip()
+                else:
+                    break
+        out.append(title)
     return out
 
 
@@ -96,7 +117,16 @@ class Library:
         db_path.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(str(db_path), check_same_thread=False)
         self.db.execute("PRAGMA foreign_keys = ON")
+        version = self.db.execute("PRAGMA user_version").fetchone()[0]
+        if version < SCHEMA_VERSION:
+            # Everything here is derived from the PDFs, so an old index is simply rebuilt
+            # on the next "Yangilash".
+            self.db.executescript(
+                "DROP TABLE IF EXISTS pages_fts; DROP TABLE IF EXISTS sections; "
+                "DROP TABLE IF EXISTS pages; DROP TABLE IF EXISTS books;"
+            )
         self.db.executescript(SCHEMA)
+        self.db.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
 
     def close(self) -> None:
         self.db.close()

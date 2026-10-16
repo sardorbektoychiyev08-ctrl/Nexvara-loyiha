@@ -97,10 +97,20 @@ function renderTask(t) {
     t.result.checks.forEach((c) => res.appendChild(el("div", `check ${c.ok ? "ok" : "bad"}`, c.name)));
   }
   if (t.result && t.result.path) {
+    const row = el("div", "row wrap");
     const b = el("button", "btn", "Faylni ko'rsatish");
     b.addEventListener("click", () => api().reveal_file(t.result.path));
-    const row = el("div", "row");
     row.appendChild(b);
+    if (t.result.excerpt) {
+      const ex = el("button", "btn", "Asl sahifalar (PDF)");
+      ex.addEventListener("click", () => api().reveal_file(t.result.excerpt));
+      row.appendChild(ex);
+    }
+    if (t.result.book_path) {
+      const bk = el("button", "btn", `Kitobda ochish (${t.result.start_page}-bet)`);
+      bk.addEventListener("click", () => api().open_book_page(t.result.book_path, t.result.start_page));
+      row.appendChild(bk);
+    }
     res.appendChild(row);
   }
   res.hidden = !res.childElementCount;
@@ -208,6 +218,16 @@ async function renderLibrary() {
 $("#t-grade").addEventListener("change", fillSubjects);
 $("#lib-open").addEventListener("click", () => api() && api().open_library_folder());
 $("#lib-index").addEventListener("click", async () => { if (api()) track(await api().index_library()); });
+$("#t-topic-show").addEventListener("click", async () => {
+  if (!api()) return;
+  const r = await api().show_topic({
+    grade: $("#t-grade").value, subject: $("#t-subject").value, topic: $("#t-topic").value,
+  });
+  if (!r.id) { $("#t-error").textContent = r.error; $("#t-error").hidden = false; return; }
+  $("#t-error").hidden = true;
+  track(r);
+});
+
 $("#test-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!api()) return;

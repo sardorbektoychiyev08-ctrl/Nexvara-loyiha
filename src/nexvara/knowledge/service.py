@@ -55,25 +55,54 @@ def parse_test_request(text: str) -> TestRequest | None:
     count = int(m.group(1)) if m else 20
     v = _VARIANTS.search(f)
     variants = int(v.group(1)) if v else 1
-    topic = f
-    # Drop the parts we understood; what remains is the topic.
-    removals = [
+    return TestRequest(grade, subject, _remaining_topic(f, subject), count, variants)
+
+
+# Words that ask for a topic's text rather than a test.
+_TOPIC_WORDS = ("mavzu", "chiqar", "korsat", "matn", "oqib", "topib", "kerak", "ochib", "bolim")
+_FILLER = (
+    r"\b(?:test\w*|savol\w*|tuz\w*|ber\w*|yarat\w*|kerak\w*|iltimos|menga|uchun|boyicha|"
+    r"mavzu\w*|dan|haqida|darslik\w*|chiqar\w*|korsat\w*|matn\w*|oqib|topib|top|ochib|och|"
+    r"bolim\w*|shu|ushbu|qilib|ham|va|bilan|mana|bu|ni|kitob\w*)\b"
+)
+
+
+def _remaining_topic(folded: str, subject: str | None) -> str:
+    """Drop what we understood (grade, counts, subject, filler words); the rest is the topic."""
+    topic = folded
+    for pat in (
         r"\d{1,2}\s*-?\s*sinf\w*",
         r"\d{1,3}\s*(?:ta)?\s*(?:test|savol)\w*",
         r"\d\s*(?:ta)?\s*variant\w*",
-        r"\b(?:test|savol|tuz\w*|ber\w*|yarat\w*|kerak|iltimos|menga|uchun|bo[‘’']?yicha|"
-        r"mavzu\w*|dan|haqida|darslik\w*)\b",
-    ]
-    for pat in removals:
+        _FILLER,
+    ):
         topic = re.sub(pat, " ", topic)
     if subject:
         for name, keys in SUBJECTS:
             if name == subject:
                 for k in keys:
-                    topic = topic.replace(k, " ")
+                    # "tarixdan", "fizikadan": drop the subject word with its suffix
+                    topic = re.sub(rf"\b{re.escape(k)}\w*", " ", topic)
     topic = re.sub(r"[^\w‘’' -]", " ", topic)
-    topic = re.sub(r"\s+", " ", topic).strip()
-    return TestRequest(grade, subject, topic, count, variants)
+    return re.sub(r"\s+", " ", topic).strip()
+
+
+def parse_topic_request(text: str):
+    """'7-sinf fizika Nyuton qonunlari mavzusini chiqarib ber' -> TopicRequest; else None.
+
+    Tests take priority (see parse_test_request). A topic request must name a grade or a
+    subject, so ordinary chat ("menga yordam kerak") is not mistaken for one.
+    """
+    from nexvara.knowledge.topicdoc import TopicRequest
+
+    f = fold(text)
+    if any(w in f for w in _TEST_WORDS) or not any(w in f for w in _TOPIC_WORDS):
+        return None
+    grade, subject = detect_grade(text), detect_subject(text)
+    if grade is None and subject is None:
+        return None
+    topic = _remaining_topic(f, subject)
+    return TopicRequest(grade, subject, topic) if topic else None
 
 
 def open_library() -> Library:

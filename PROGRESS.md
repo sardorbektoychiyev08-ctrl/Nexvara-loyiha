@@ -4,6 +4,34 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-16 (5) — Claude Code — "Shu mavzu kerak": darslikdan mavzuni chiqarish
+
+**Foydalanuvchi talabi:** test bilan cheklanmasin; "shu mavzu kerak" desam, mavzuni chiqarib bersin.
+
+**Qilindi:**
+- `knowledge/topics.py`: mavzu = §-bo'lim (sarlavhasidan keyingi § gacha). Avval bo'lim sarlavhalari bo'yicha qidiradi (o'zbekcha qo'shimchalar hisobga olinadi), topilmasa matn bo'yicha qidirib, shu sahifa tegishli bo'limni oladi. Kolontitullar va bet raqamlari olib tashlanadi, ko'p qatorli KATTA HARFLI sarlavhalar birlashtirib o'qishga qulay qilinadi.
+- Ba'zi darsliklarda § sarlavhasi rasm sifatida chizilgan (matn qatlamida yo'q). Bunday bo'limlar **mundarija** (`N-§. ... 75`) va bosma bet siljishi (masalan, PDF 62 = kitob 69) orqali joylashtiriladi. 7-sinf fizikada 46 dan 44 ta bo'lim topildi.
+- Mundarija qatorlari va mundarija sahifalari bo'lim deb olinmaydi. Baza sxemasi versiyasi 3: eski indeks "Yangilash"da o'zi qayta quriladi.
+- Umumiy fan nomi ("tarixdan") kutubxonadagi aniq fanga mos keladi ("O‘zbekiston tarixi", "Jahon tarixi").
+- `knowledge/topicdoc.py`: natija ikki xil. **Word** (tahrirlanadigan matn: sarlavha, manba "kitob, 65–70-betlar", paragraflar) va **asl sahifalar PDF** (kitobning o'sha betlari: rasm, formula, jadval bilan). Qayta ochib 4 ta tekshiruv. Fayllar `D:\NEXVARA\Mavzular` da.
+- Chat: "7-sinf fizika Nyuton qonunlari mavzusini chiqarib ber" yozilsa, chatda mavzu nomi, betlar va qisqa ko'rinish chiqadi, so'ng Word va PDF yaratiladi. Test so'rovlari ustuvor; mavzu so'rovi uchun sinf yoki fan aytilishi shart (oddiy suhbat adashib so'rov deb olinmasligi uchun).
+- UI: "Mavzuni chiqarish" tugmasi; natija panelida "Asl sahifalar (PDF)" va "Kitobda ochish (N-bet)" tugmalari.
+
+**Haqiqiy darslik bilan sinov** (eduportal sinov nusxalari, kutubxonaga qo'shilmagan): "Nyuton qonunlari" → 19-§. Nyutonning birinchi qonuni (65–70-betlar); "tarixdan Jadidlar" → 9-sinf O‘zbekiston tarixi, Jadidlar bo'limi; "Toshkentning bosib olinishi" → 7-§ (23–26-betlar); kitobda yo'q mavzu → "topilmadi".
+
+**Ma'lum kamchilik:** sarlavhasi rasm bo'lgan bo'limda Word matni boshida oldingi bo'limning oxirgi qatorlari bo'lishi mumkin, chunki chegarani matndan aniqlab bo'lmaydi. Asl sahifalar PDF'i baribir to'g'ri betlarni beradi.
+
+**Testlar** (`.\scripts\test.ps1 -Office`):
+| Test | Natija |
+|---|---|
+| ruff check + format | PASS |
+| Unit testlar (75 ta; +11 mavzu testi) | PASS |
+| Office testlari (30 ta; +mavzu Word/PDF, chat orqali mavzu, UI'da "Mavzuni chiqarish") | PASS |
+| Oyna smoke | PASS |
+| Haqiqiy yangi darsliklar bilan | BLOCKED: foydalanuvchi hali PDF qo'shmagan |
+
+---
+
 ## 2026-10-16 (4) — Claude Code — Darsliklar kutubxonasi va AI'siz test tuzish
 
 **Foydalanuvchi talabi:** NEXVARA xotirasiga maktab darsliklarini yuklash va "test tuzib ber" deyilganda test tuzish. Qarorlar (foydalanuvchi tanlovi): manba — faqat **yangi** darsliklar (foydalanuvchi o'zi qo'shadi), barcha sinf/fanlar, til — o'zbek (lotin), AI hozircha ulanmaydi (oddiy avtomatik testlar).

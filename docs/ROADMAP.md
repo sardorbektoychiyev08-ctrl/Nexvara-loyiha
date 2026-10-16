@@ -10,7 +10,7 @@ Bosqichlar [MASTER_SPEC.md](MASTER_SPEC.md) 26-bo'limidan olingan. Holat belgila
 | M3 | Excel Live Automation | IN PROGRESS | PASS: jadval demo, ops (sort/filter/dublikat/format/shartli format/grafik/pivot/CSV/PDF/20k qator), dashboard, UI tugmalari, ruscha Office. Qolgan: mavjud faylni tahlil, xato formulalar, fayllarni birlashtirish, print, data validation |
 | M4 | Word va PowerPoint | IN PROGRESS | PASS: Word hisobot (15 tekshiruv), PowerPoint taqdimot (11 tekshiruv), UI tugmalari, ruscha Office. Qolgan: mavjud fayl/shablonni tahrirlash, tarjima/qayta yozish (M7 dan keyin), SmartArt |
 | M5 | File, Vision, Web, Computer Control | TODO | |
-| M6 | Memory, Teach, Workflow | IN PROGRESS | Darsliklar kutubxonasi (SQLite FTS5) + AI'siz test tuzish: PASS (sintetik darslik). Haqiqiy yangi darsliklar bilan: BLOCKED (PDF yo'q). Memory/Teach/Workflow: TODO |
+| M6 | Memory, Teach, Workflow | IN PROGRESS | Darsliklar kutubxonasi (SQLite FTS5), AI'siz test tuzish va mavzuni chiqarish (Word + asl sahifalar PDF): PASS (sintetik darslik). Haqiqiy yangi darsliklar bilan: BLOCKED (PDF yo'q). Memory/Teach/Workflow: TODO |
 | M7 | Model Router | TODO | Codex: `codex/model-router` tarmog'ida, avval fake provayder bilan; pullik chaqiruv yo'q |
 | M8 | NEXVARA BI | TODO | Node.js + React/ECharts o'rnatish kerak bo'lishi mumkin |
 | M9 | Google Login va Sync | TODO | |
