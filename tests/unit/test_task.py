@@ -81,3 +81,26 @@ def test_runner_lookup_and_order():
     assert runner.get(a.id) is a
     assert runner.get("missing") is None
     assert {t.id for t in runner.list()} == {a.id, b.id}
+
+
+def test_watchdog_fails_a_hung_task():
+    gate = threading.Event()
+    runner = TaskRunner(timeout=0.5)
+    t = runner.start("hung", lambda task: gate.wait(10))
+    assert t.wait(5)
+    assert t.status is Status.FAILED and "Vaqt tugadi" in t.error
+    assert t.cancel_requested
+    gate.set()  # the worker finishing later must not overwrite the failure
+    t._thread.join(2)
+    assert t.status is Status.FAILED
+
+
+def test_user_errors_have_no_technical_prefix():
+    from nexvara.core.task import UserError
+
+    def boom(task):
+        raise UserError("Ustun topilmadi: «narx»")
+
+    t = TaskRunner().start("x", boom)
+    assert t.wait(5)
+    assert t.error == "Ustun topilmadi: «narx»"

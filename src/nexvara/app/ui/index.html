@@ -40,8 +40,16 @@
 
     <section class="page" id="page-chat">
       <h1>AI Chat</h1>
+      <p class="muted small">Masalan: «Hisobot.xlsx ni och, dublikatlarni o‘chir, Summa bo‘yicha
+        kamayish tartibida sarala, jami qo‘sh, diagramma qo‘sh va saqla» ·
+        «ariza.docx ni rasmiy formatla va PDF ga saqla» ·
+        «7-sinf fizika Nyuton qonunlari mavzusini chiqarib ber» ·
+        «… bo‘yicha taqdimot tayyorla» · «… 20 ta test tuz». Asl fayllar o‘zgarmaydi:
+        natija «_NEXVARA» nusxasiga saqlanadi.</p>
       <div class="chat-log" id="chat-log"></div>
+      <div class="chat-context" id="chat-context" hidden>📄 <span id="chat-file"></span></div>
       <form class="chat-input" id="chat-form">
+        <button class="btn" id="chat-attach" type="button" title="Fayl tanlash">📎</button>
         <input id="chat-text" type="text" placeholder="Masalan: 7-sinf fizika Nyuton qonunlari 20 ta test" autocomplete="off">
         <button class="btn primary" type="submit">Yuborish</button>
       </form>

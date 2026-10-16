@@ -6,7 +6,7 @@ Bosqichlar [MASTER_SPEC.md](MASTER_SPEC.md) 26-bo'limidan olingan. Holat belgila
 |---|---|---|---|
 | M0 | Environment | PASS | Audit [ARCHITECTURE.md](ARCHITECTURE.md) da. Node/Android toolchain yo'q, M8/M11 da kerak bo'ladi |
 | M1 | Windows Shell | IN PROGRESS | Oyna, navigatsiya, chat UI, task paneli, dark/light: smoke PASS. Birinchi ishga tushirish ustasi va sozlamalarni saqlash qolgan |
-| M2 | Core Agent | IN PROGRESS | Task state machine + runner + cancel: PASS. Planner, tool calling, replanning: TODO (M7 ga bog'liq) |
+| M2 | Core Agent | IN PROGRESS | Task runner + cancel + vaqt chegarasi: PASS. AI'siz buyruq rejalashtiruvchi (o'zbekcha → Excel/Word/PowerPoint amallari, tekshiruv bilan): PASS. AI planner, replanning: TODO (M7) |
 | M3 | Excel Live Automation | IN PROGRESS | PASS: jadval demo, ops (sort/filter/dublikat/format/shartli format/grafik/pivot/CSV/PDF/20k qator), dashboard, UI tugmalari, ruscha Office. Qolgan: mavjud faylni tahlil, xato formulalar, fayllarni birlashtirish, print, data validation |
 | M4 | Word va PowerPoint | IN PROGRESS | PASS: Word hisobot (15 tekshiruv), PowerPoint taqdimot (11 tekshiruv), UI tugmalari, ruscha Office. Qolgan: mavjud fayl/shablonni tahrirlash, tarjima/qayta yozish (M7 dan keyin), SmartArt |
 | M5 | File, Vision, Web, Computer Control | TODO | |

@@ -4,6 +4,37 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-16 (6) — Claude Code — Office buyruqlari (AI'siz), chat, vaqt chegarasi
+
+**Foydalanuvchi talabi:** darsliklar kelguncha qolgan ishlarni qilish; hammasi **API kalitsiz** ishlashi; Office buyruq berilganda mukammal bajarishi.
+
+**Qilindi** (`src/nexvara/agent/`):
+- `parse.py`: o'zbekcha buyruq → reja. Gap bo'laklarga bo'linadi ("," / "va" / "keyin"; "1,5" bo'linmaydi). Fayl nomi, ilova (Excel/Word/PowerPoint) va har bir amal aniqlanadi; tushunilmagan qism alohida aytiladi. Qisqa yordamchi so'zlar ("da", "bu", "ga") faqat butun so'z sifatida olinadi, shuning uchun "Daromad", "Buxoro" buzilmaydi.
+- `excel_exec.py`: ochish, tozalash, dublikat, saralash (ustun nomi yoki harfi; o'sish/kamayish), filtr (matn qiymati jadvaldagi haqiqiy qiymatga moslanadi: "Toshkentni" → "Toshkent"; raqam: "500000 dan katta"), formatlash, jami (takror so'ralsa bitta qator qoladi), diagramma (takrorlanuvchi toifalar SUMIFS bilan jamlanadi, "JAMI" kirmaydi), pivot, qotirish, PDF, CSV. Har amal tekshiriladi, oxirida fayl qayta ochiladi.
+- `word_exec.py`: almashtirish (topilmasa ochiq aytadi), shrift, qator oralig'i, xatboshi, A4/chetlar, sahifa raqamlari, mundarija, imlo, "rasmiy formatla" (Times New Roman 14, 1,5, 1,25 sm, A4), PDF.
+- `ppt_exec.py`: darslik mavzusidan dars taqdimoti (mazmun, asosiy tushunchalar, sanalar, darslikning o'z savollari, uyga vazifa, ma'ruzachi izohlari, o'tishlar, animatsiya, joylashuv tekshiruvi), mavjud .pptx → PDF.
+- `files.py`: faylni nomi bo'yicha topish (Ish stoli, Hujjatlar, Yuklanmalar, D:\ ...). **Asl fayl hech qachon o'zgarmaydi**: natija `<nom>_NEXVARA.xlsx/.docx` ga yoziladi; "ustiga saqla" deyilsa avval `.bak` nusxa olinadi.
+- Chat: test → taqdimot → mavzu → Office buyrug'i tartibida tushunadi. 📎 bilan fayl tanlanadi, "shu fayl" esda qoladi. Vazifa tugaganda chatga hisobot chiqadi (nima qilindi, fayl, tekshiruv).
+- `core/task.py`: **vaqt chegarasi** (10 daqiqa). Osilib qolgan Office vazifasi "Vaqt tugadi" deb yakunlanadi va UI bloklanmaydi (avvalgi PowerPoint osilishiga qarshi). Foydalanuvchi xatolari texnik prefikssiz ko'rsatiladi.
+- Gap ajratishda bosh harflar ("M. Chernyayev") gapni bo'lmaydi.
+
+**Topilgan va tuzatilgan:** "JAMI" qatori saralash/diagramma/pivotga ma'lumot sifatida tushardi; ", keyin" bog'lovchisi bo'lak boshida qolardi; fayl yo'lidagi so'zlar ("...\Testlar\...") buyruqni "test tuz" deb adashtirardi (endi fayl ko'rsatilsa, bu Office buyrug'i hisoblanadi).
+
+**Testlar** (`.\scripts\test.ps1 -Office`, foydalanuvchi ruxsati bilan):
+| Test | Natija |
+|---|---|
+| ruff check + format | PASS |
+| Unit testlar (94 ta; +parser 18, vaqt chegarasi, fayl yo'li regressiyasi) | PASS |
+| Office testlari (40 ta; +Excel ko'p qadamli buyruq, filtrlar, noto'g'ri ustun, ustiga saqlash + .bak, Word buyrug'i 7/7, yo'q matn, mavzudan taqdimot + PPTX→PDF, chat konteksti, UI'da chatga buyruq yozish) | PASS |
+| Oyna smoke | PASS |
+| Asl fayl o'zgarmasligi (SHA-256 bilan tekshirildi) | PASS |
+| Haqiqiy foydalanuvchi fayllari bilan | NOT TESTED: foydalanuvchi o'z fayllarida sinab ko'radi |
+| Ruscha/inglizcha buyruqlar | NOT TESTED: hozircha faqat o'zbekcha lotin |
+
+**Keyingi qadam:** foydalanuvchi o'z fayllari va darsliklarida sinaganidan keyin parserni kengaytirish; ruscha buyruqlar; Excel'da formula yozish, shartli formatlash va bir nechta faylni birlashtirish buyruqlari.
+
+---
+
 ## 2026-10-16 (5) — Claude Code — "Shu mavzu kerak": darslikdan mavzuni chiqarish
 
 **Foydalanuvchi talabi:** test bilan cheklanmasin; "shu mavzu kerak" desam, mavzuni chiqarib bersin.

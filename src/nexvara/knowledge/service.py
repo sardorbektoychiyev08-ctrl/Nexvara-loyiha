@@ -44,8 +44,16 @@ _VARIANTS = re.compile(r"(\d)\s*(?:ta)?\s*variant")
 _TEST_WORDS = ("test", "savol", "nazorat ishi", "viktorina")
 
 
+def _without_files(text: str) -> str:
+    """Drop file names/paths: words inside "D:/Testlar/x.xlsx" are not part of the request."""
+    from nexvara.agent.parse import _FILE
+
+    return _FILE.sub(" ", text)
+
+
 def parse_test_request(text: str) -> TestRequest | None:
     """'7-sinf fizika Nyuton qonunlari 20 ta test 2 variant' -> TestRequest; None if not a test."""
+    text = _without_files(text)
     f = fold(text)
     if not any(w in f for w in _TEST_WORDS):
         return None
@@ -63,8 +71,30 @@ _TOPIC_WORDS = ("mavzu", "chiqar", "korsat", "matn", "oqib", "topib", "kerak", "
 _FILLER = (
     r"\b(?:test\w*|savol\w*|tuz\w*|ber\w*|yarat\w*|kerak\w*|iltimos|menga|uchun|boyicha|"
     r"mavzu\w*|dan|haqida|darslik\w*|chiqar\w*|korsat\w*|matn\w*|oqib|topib|top|ochib|och|"
-    r"bolim\w*|shu|ushbu|qilib|ham|va|bilan|mana|bu|ni|kitob\w*)\b"
+    r"bolim\w*|shu|ushbu|qilib|ham|va|bilan|mana|bu|ni|kitob\w*|taqdimot\w*|prezentats\w*|"
+    r"slayd\w*|tayyorla\w*|yasa\w*)\b"
 )
+_PRESENTATION_WORDS = ("taqdimot", "prezentats", "slayd")
+
+
+def parse_presentation_request(text: str):
+    """'7-sinf fizika Nyuton qonunlari bo‘yicha taqdimot tayyorla' -> TopicRequest; else None.
+
+    Needs a grade or subject (otherwise it is an ordinary PowerPoint command).
+    """
+    from nexvara.agent.parse import find_file
+    from nexvara.knowledge.topicdoc import TopicRequest
+
+    f = fold(text)
+    if not any(w in f for w in _PRESENTATION_WORDS) or any(w in f for w in _TEST_WORDS):
+        return None
+    if find_file(text):
+        return None  # a command about an existing .pptx file
+    grade, subject = detect_grade(text), detect_subject(text)
+    if grade is None and subject is None:
+        return None
+    topic = _remaining_topic(f, subject)
+    return TopicRequest(grade, subject, topic) if topic else None
 
 
 def _remaining_topic(folded: str, subject: str | None) -> str:
@@ -95,6 +125,7 @@ def parse_topic_request(text: str):
     """
     from nexvara.knowledge.topicdoc import TopicRequest
 
+    text = _without_files(text)
     f = fold(text)
     if any(w in f for w in _TEST_WORDS) or not any(w in f for w in _TOPIC_WORDS):
         return None
