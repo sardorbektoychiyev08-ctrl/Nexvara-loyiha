@@ -245,6 +245,278 @@
       <div class="card wide"><div class="card-label">Tizim</div><pre id="sys-info" class="mono"></pre></div>
     </section>
 
+    <section class="page" id="page-memory">
+      <h1>Xotira</h1>
+      <p class="muted">NEXVARA eslab qolgan narsalar, suhbatlar va fayllar. Hammasi faqat shu
+        kompyuterda (D:\NEXVARA\app.db) saqlanadi. Chatda «Eslab qol: ...» deb yozsangiz ham bo‘ladi.</p>
+      <div class="card wide">
+        <div class="card-label">Qidiruv</div>
+        <form class="row" id="mem-search-form">
+          <input class="grow-input" id="mem-search" type="text" placeholder="masalan: maktab, hisobot, fizika">
+          <button class="btn primary" type="submit">Qidirish</button>
+        </form>
+        <ul class="plain-list" id="mem-search-results"></ul>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Eslab qolinganlar</div>
+        <form class="row" id="mem-fact-form">
+          <input class="grow-input" id="mem-fact" type="text" placeholder="masalan: Men 12-maktabda fizika o‘qituvchisiman">
+          <button class="btn primary" type="submit">Qo‘shish</button>
+        </form>
+        <ul class="plain-list" id="mem-facts"></ul>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Suhbatlar tarixi</div>
+        <div class="mem-chat" id="mem-chat"></div>
+        <div class="row"><button class="btn" id="mem-clear-chat" type="button">Suhbatlarni tozalash</button></div>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Oxirgi fayllar</div>
+        <table class="lib-table" id="mem-files"></table>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Zaxira va tiklash</div>
+        <div class="row wrap">
+          <button class="btn" id="mem-export" type="button">Zaxira nusxa olish</button>
+          <button class="btn" id="mem-import" type="button">Zaxiradan tiklash</button>
+        </div>
+        <div class="muted small" id="mem-backup-msg"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-teach">
+      <h1>Teach NEXVARA</h1>
+      <p class="muted">Bir marta o‘rgating — NEXVARA keyingi har bir ishda qo‘llaydi. Masalan:
+        «Har doim Excel raqamlarini markazga joyla», «Word hujjatlarida doim sahifa raqamini qo‘y»,
+        «testlar doim 2 variant bo‘lsin». Chatda ham shunday yozsangiz bo‘ladi.</p>
+      <form class="card wide" id="teach-form">
+        <div class="card-label">Yangi qoida</div>
+        <div class="form-grid">
+          <label>Qaysi ish uchun <select id="teach-app">
+            <option value="excel">Excel</option><option value="word">Word</option>
+            <option value="powerpoint">PowerPoint</option><option value="test">Testlar</option>
+          </select></label>
+          <label class="wide-field">Qoida <input id="teach-text" type="text"
+            placeholder="masalan: jadvalni formatla va sarlavhani qotir"></label>
+        </div>
+        <div class="row">
+          <button class="btn" id="teach-check" type="button">Tekshirish</button>
+          <button class="btn primary" type="submit">Saqlash</button>
+        </div>
+        <div class="muted small" id="teach-preview"></div>
+        <div class="error" id="teach-error" hidden></div>
+        <p class="muted small">Word shablon: «shablon: D:\Shablonlar\maktab.dotx» deb yozing —
+          yangi Word hujjatlar (testlar, mavzular) shu shablondan yaratiladi.</p>
+      </form>
+      <div class="card wide">
+        <div class="card-label">O‘rgatilgan qoidalar</div>
+        <div id="teach-rules"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-files">
+      <h1>Fayllar</h1>
+      <p class="muted">Fayllarni topish, nusxalash, ko‘chirish, nomlash, ZIP, PDF'ga aylantirish,
+        zaxira va tiklash. Hech bir fayl ustiga yozilmaydi; o‘chirilganlar Savatga tushadi.</p>
+      <form class="card wide" id="f-form">
+        <div class="card-label">Qidirish</div>
+        <div class="form-grid">
+          <label class="wide-field">Fayl nomidagi so‘z <input id="f-query" type="text" placeholder="masalan: hisobot"></label>
+          <label>Turi <select id="f-ext">
+            <option value="">Barchasi</option>
+            <option value=".docx .doc .rtf">Word</option>
+            <option value=".xlsx .xlsm .xls .csv">Excel</option>
+            <option value=".pptx .ppt">PowerPoint</option>
+            <option value=".pdf">PDF</option>
+            <option value=".jpg .jpeg .png .gif .bmp .webp">Rasmlar</option>
+            <option value=".zip .rar .7z">Arxivlar</option>
+          </select></label>
+          <label>Papka <input id="f-folder" type="text" placeholder="hamma odatiy joylar" readonly></label>
+        </div>
+        <div class="row wrap">
+          <button class="btn primary" type="submit">Qidirish</button>
+          <button class="btn" id="f-pick" type="button">Papka tanlash</button>
+          <button class="btn" id="f-clear-folder" type="button">Hamma joyda</button>
+        </div>
+        <div class="error" id="f-error" hidden></div>
+      </form>
+      <div class="card wide">
+        <div class="card-label">Natija <span class="muted" id="f-count"></span></div>
+        <div class="row wrap" id="f-actions">
+          <button class="btn small-btn" data-fa="open">Ochish</button>
+          <button class="btn small-btn" data-fa="reveal">Papkada ko‘rsatish</button>
+          <button class="btn small-btn" data-fa="copy">Nusxalash…</button>
+          <button class="btn small-btn" data-fa="move">Ko‘chirish…</button>
+          <button class="btn small-btn" data-fa="rename">Nomini o‘zgartirish</button>
+          <button class="btn small-btn" data-fa="zip">ZIP qilish</button>
+          <button class="btn small-btn" data-fa="unzip">Arxivdan chiqarish</button>
+          <button class="btn small-btn" data-fa="pdf">PDF'ga aylantirish</button>
+          <button class="btn small-btn" data-fa="backup">Zaxira nusxa</button>
+          <button class="btn small-btn" data-fa="versions">Versiyalar</button>
+          <button class="btn small-btn danger" data-fa="recycle">Savatga o‘chirish</button>
+        </div>
+        <div class="muted small" id="f-msg"></div>
+        <table class="lib-table files-table" id="f-table"></table>
+        <div class="file-info" id="f-info" hidden></div>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Papkani tartiblash</div>
+        <p class="muted small">Papkadagi fayllar turiga qarab ichki papkalarga ajratiladi (Hujjatlar,
+          Jadvallar, Taqdimotlar, PDF, Rasmlar, Arxivlar…). Avval reja ko‘rsatiladi.</p>
+        <div class="row wrap">
+          <button class="btn" id="f-tidy-pick" type="button">Papka tanlash</button>
+          <button class="btn primary" id="f-tidy-run" type="button" disabled>Tartiblash</button>
+          <span class="mono" id="f-tidy-folder"></span>
+        </div>
+        <table class="lib-table" id="f-tidy-plan"></table>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Amallar jurnali</div>
+        <table class="lib-table" id="f-log"></table>
+      </div>
+    </section>
+
+    <section class="page" id="page-workflows">
+      <h1>Workflows</h1>
+      <p class="muted">Bir necha buyruqni ketma-ket saqlab qo‘ying: qo‘lda, papkaga yangi fayl
+        tushganda yoki har kuni belgilangan vaqtda bajariladi. Buyruqlar chatdagi kabi yoziladi;
+        <b>{fayl}</b> — ishlanayotgan fayl o‘rni. Pullik AI so‘rovlari workflow ichida bajarilmaydi.</p>
+      <div class="card wide" id="wf-active-card" hidden>
+        <div class="card-label">Hozir bajarilmoqda</div>
+        <div id="wf-active"></div>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Saqlangan workflowlar</div>
+        <div id="wf-list"></div>
+      </div>
+      <form class="card wide" id="wf-form">
+        <div class="card-label" id="wf-form-title">Yangi workflow</div>
+        <div class="form-grid">
+          <label class="wide-field">Shablondan boshlash <select id="wf-template"><option value="">—</option></select></label>
+          <label class="wide-field">Nomi <input id="wf-name" type="text" placeholder="masalan: Kelgan hisobotlarni tayyorlash"></label>
+        </div>
+        <div class="card-label" style="margin-top:12px">Qadamlar</div>
+        <div id="wf-steps"></div>
+        <div class="row wrap">
+          <button class="btn small-btn" type="button" data-add="command">+ Buyruq</button>
+          <button class="btn small-btn" type="button" data-add="approve">+ Tasdiq</button>
+          <button class="btn small-btn" type="button" data-add="wait">+ Kutish</button>
+        </div>
+        <div class="form-grid">
+          <label>Ishga tushishi <select id="wf-trigger">
+            <option value="manual">Qo‘lda</option>
+            <option value="folder">Papkaga yangi fayl tushganda</option>
+            <option value="daily">Har kuni</option>
+          </select></label>
+          <label data-trig="folder">Papka <input id="wf-folder" type="text" readonly placeholder="tanlang"></label>
+          <label data-trig="folder">Fayl turlari <input id="wf-ext" type="text" placeholder=".xlsx .csv"></label>
+          <label data-trig="daily">Vaqt <input id="wf-time" type="time" value="08:00"></label>
+          <label>Xatoda qayta urinish <input id="wf-retries" type="number" min="0" max="5" value="1"></label>
+          <label>Qadam bajarilmasa <select id="wf-onerror">
+            <option value="stop">To‘xtatish</option><option value="continue">Keyingisiga o‘tish</option>
+          </select></label>
+        </div>
+        <div class="row wrap">
+          <button class="btn" id="wf-folder-pick" type="button" data-trig="folder">Papka tanlash</button>
+          <button class="btn primary" type="submit">Saqlash</button>
+          <button class="btn" id="wf-new" type="button">Yangi</button>
+        </div>
+        <div class="error" id="wf-error" hidden></div>
+        <div class="muted small" id="wf-saved"></div>
+      </form>
+      <div class="card wide">
+        <div class="card-label">Bajarilganlar tarixi</div>
+        <table class="lib-table" id="wf-runs"></table>
+      </div>
+    </section>
+
+    <section class="page" id="page-bi">
+      <h1>NEXVARA BI</h1>
+      <p class="muted">Excel, CSV, JSON, XML yoki TXT fayldan (yoki papkadagi bir nechta fayldan)
+        interaktiv dashboard. Power BI kerak emas. Chatda «Savdo.xlsx dan dashboard yarat» deb
+        yozsangiz ham bo‘ladi.</p>
+      <div class="card wide">
+        <div class="row wrap">
+          <button class="btn primary" id="bi-source" type="button">Fayl tanlash</button>
+          <button class="btn" id="bi-folder" type="button">Papka (bir nechta fayl)</button>
+          <select id="bi-sheet" hidden></select>
+          <select id="bi-saved"></select>
+          <button class="btn" id="bi-open" type="button">Ochish</button>
+          <button class="btn danger" id="bi-del" type="button">O‘chirish</button>
+        </div>
+        <div class="muted small" id="bi-msg"></div>
+        <div class="error" id="bi-error" hidden></div>
+      </div>
+      <div id="bi-board" hidden>
+        <div class="card wide">
+          <div class="row wrap">
+            <input class="grow-input" id="bi-name" type="text" placeholder="Dashboard nomi">
+            <button class="btn primary" id="bi-save" type="button">Saqlash</button>
+            <button class="btn" id="bi-add-widget" type="button">+ Vidjet</button>
+            <button class="btn" data-bi-export="png" type="button">PNG</button>
+            <button class="btn" data-bi-export="pdf" type="button">PDF</button>
+            <button class="btn" data-bi-export="xlsx" type="button">Excel</button>
+            <button class="btn" data-bi-export="csv" type="button">CSV</button>
+          </div>
+          <div class="row wrap" id="bi-tabs"></div>
+          <div class="form-grid bi-filters" id="bi-filters"></div>
+          <div class="row wrap"><span id="bi-chips"></span>
+            <button class="btn small-btn" id="bi-clear" type="button">Filtrlarni tozalash</button>
+            <span class="muted small" id="bi-rows"></span></div>
+        </div>
+        <div class="card wide" id="bi-wform" hidden></div>
+        <div class="bi-kpis" id="bi-kpis"></div>
+        <div class="bi-grid" id="bi-grid"></div>
+        <div class="card wide">
+          <button class="btn" id="bi-etl-toggle" type="button">Ma’lumotni tayyorlash (tozalash, formula, birlashtirish) ▾</button>
+          <div id="bi-etl-body" hidden></div>
+        </div>
+      </div>
+      <div class="bi-tip" id="bi-tip" hidden></div>
+    </section>
+
+    <section class="page" id="page-devices">
+      <h1>Qurilmalar</h1>
+      <p class="muted">NEXVARA'ni telefoningizdan boshqaring: buyruq yozing, fayl yoki rasm yuboring,
+        vazifa jarayonini kuzating va natijani telefonga yuklab oling. Telefon va kompyuter bitta
+        Wi-Fi tarmog‘ida bo‘lishi kerak; internetga hech narsa ochilmaydi.</p>
+      <div class="card wide">
+        <div class="card-label">Bu kompyuter</div>
+        <div class="card-value" id="dev-pc">—</div>
+        <div class="muted small" id="dev-os"></div>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Telefondan boshqarish</div>
+        <div class="row wrap">
+          <button class="btn primary" id="dev-toggle" type="button">Yoqish</button>
+          <span class="muted small" id="dev-state">O‘chiq</span>
+        </div>
+        <div class="error" id="dev-error" hidden></div>
+        <div class="dev-pair" id="dev-pair" hidden>
+          <div class="dev-qr" id="dev-qr"></div>
+          <div>
+            <div class="muted small">Telefon kamerasi bilan QR kodni skanerlang yoki brauzerda oching:</div>
+            <div class="mono dev-url" id="dev-url"></div>
+            <div class="muted small" style="margin-top:10px">Bog‘lash kodi</div>
+            <div class="dev-code" id="dev-code">——————</div>
+            <div class="muted small" id="dev-left"></div>
+            <div class="row"><button class="btn small-btn" id="dev-newcode" type="button">Yangi kod</button></div>
+            <ol class="muted small dev-help">
+              <li>Telefonda «Xavfsiz emas / Not private» chiqsa: «Qo‘shimcha» → «Davom etish» (bu sertifikat sizning kompyuteringizda yaratilgan).</li>
+              <li>Windows «Brandmauer» oynasi chiqsa: «Ruxsat berish» (faqat shaxsiy tarmoq).</li>
+              <li>Kod 10 daqiqa amal qiladi va bir marta ishlatiladi.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Bog‘langan qurilmalar</div>
+        <div id="dev-list"></div>
+      </div>
+      <p class="muted small">Alohida Android ilova va Google orqali kirish keyingi bosqichda (ular uchun
+        Android SDK va Google Cloud loyihasi kerak). Hozirgi telefon paneli istalgan telefon brauzerida ishlaydi.</p>
+    </section>
+
     <section class="page" id="page-placeholder">
       <h1 id="placeholder-title"></h1>
       <p class="muted" id="placeholder-text"></p>
@@ -269,5 +541,6 @@
   </aside>
 
   <script src="app.js"></script>
+  <script src="bi.js"></script>
 </body>
 </html>

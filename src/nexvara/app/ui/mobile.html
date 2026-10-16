@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B1020">
+<title>NEXVARA</title>
+<style>
+  :root { --accent: #6366F1; --accent-2: #06B6D4; --ok: #22C55E; --err: #EF4444; --warn: #F59E0B;
+    --bg: #F5F7FB; --surface: #fff; --surface-2: #EEF1F8; --border: #DCE1EE; --text: #121933; --muted: #5B6488; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0B1020; --surface: #121933; --surface-2: #1A2242; --border: #26305A; --text: #E6E9F5; --muted: #8A93B8; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, "Segoe UI", sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .logo { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; color: #fff; font-weight: 700; background: linear-gradient(135deg, var(--accent), var(--accent-2)); }
+  header b { letter-spacing: .08em; }
+  #conn { margin-left: auto; font-size: 12px; color: var(--muted); }
+  #conn.off { color: var(--err); }
+  main { flex: 1; overflow-y: auto; padding: 14px 16px 90px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  h2 { font-size: 18px; margin: 0 0 8px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  input, button { font: inherit; }
+  .in { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+  .btn { padding: 11px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.small { padding: 6px 10px; font-size: 13px; }
+  .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .msgs { display: flex; flex-direction: column; gap: 8px; }
+  .msg { max-width: 86%; padding: 10px 13px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); white-space: pre-wrap; word-break: break-word; }
+  .msg.me { align-self: flex-end; background: var(--accent); border-color: var(--accent); color: #fff; }
+  .msg.wait { opacity: .6; }
+  nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: var(--surface); border-top: 1px solid var(--border); padding-bottom: env(safe-area-inset-bottom); }
+  nav button { flex: 1; padding: 12px; border: 0; background: none; color: var(--muted); }
+  nav button.active { color: var(--accent); font-weight: 600; }
+  .composer { position: fixed; bottom: 48px; left: 0; right: 0; display: flex; gap: 6px; padding: 8px 10px; background: var(--bg); border-top: 1px solid var(--border); }
+  .composer .in { flex: 1; }
+  .icon { width: 44px; padding: 0; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
+  .badge.running { color: var(--accent-2); } .badge.succeeded { color: var(--ok); } .badge.failed { color: var(--err); } .badge.cancelled { color: var(--warn); }
+  .task-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-weight: 600; }
+  .steps { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+  .toast { position: fixed; top: 64px; left: 16px; right: 16px; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  .err { color: var(--err); font-size: 14px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header><div class="logo">N</div><b>NEXVARA</b><span id="conn">…</span></header>
+
+<main id="pair" hidden>
+  <div class="card">
+    <h2>Telefonni bog‘lash</h2>
+    <p class="muted">Kompyuterdagi NEXVARA → Devices bo‘limida ko‘rsatilgan 6 xonali kodni yozing
+      (QR kod orqali ochgan bo‘lsangiz, kod o‘zi qo‘yiladi).</p>
+    <input class="in" id="code" inputmode="numeric" maxlength="6" placeholder="123456">
+    <input class="in" id="dname" style="margin-top:8px" placeholder="Qurilma nomi (masalan: Mening telefonim)">
+    <div class="row"><button class="btn primary" id="pair-btn">Bog‘lash</button></div>
+    <div class="err" id="pair-err"></div>
+  </div>
+</main>
+
+<main id="chat" hidden>
+  <div class="msgs" id="msgs"></div>
+</main>
+<main id="tasks" hidden></main>
+
+<div class="composer" id="composer" hidden>
+  <button class="btn icon" id="attach" title="Fayl yuborish">📎</button>
+  <button class="btn icon" id="camera" title="Rasm olish">📷</button>
+  <input class="in" id="text" placeholder="Buyruq yozing…" autocomplete="off">
+  <button class="btn icon" id="mic" title="Ovozli buyruq" hidden>🎤</button>
+  <button class="btn primary icon" id="send">➤</button>
+  <input type="file" id="file" hidden>
+  <input type="file" id="photo" accept="image/*" capture="environment" hidden>
+</div>
+<nav id="nav" hidden>
+  <button data-tab="chat" class="active">Chat</button>
+  <button data-tab="tasks">Vazifalar</button>
+  <button id="unpair">Chiqish</button>
+</nav>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const store = { get: (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } },
+  set: (k, v) => { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (_) {} } };
+let token = store.get("nexvara-token");
+let lastStatus = {};
+
+function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; }
+function toast(t) { const x = $("#toast"); x.textContent = t; x.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { x.hidden = true; }, 4000); }
+function conn(ok, text) { $("#conn").textContent = text || (ok ? "Kompyuter ulangan" : "Kompyuter javob bermayapti"); $("#conn").className = ok ? "" : "off"; }
+const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+async function call(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const r = await fetch(path, { ...opts, headers });
+  if (r.status === 401) { store.set("nexvara-token", null); token = null; showPair("Bog‘lanish bekor qilingan. Qaytadan bog‘lang."); throw new Error("401"); }
+  return r;
+}
+async function post(path, data, id) {
+  const r = await call(path, { method: "POST", body: JSON.stringify(data || {}),
+    headers: { "Content-Type": "application/json", ...(id ? { "X-Request-Id": id } : {}) } });
+  return r.json();
+}
+
+// ----- pairing -----
+function showPair(err) {
+  ["#chat", "#tasks", "#composer", "#nav"].forEach((s) => { $(s).hidden = true; });
+  $("#pair").hidden = false;
+  $("#pair-err").textContent = err || "";
+  const m = location.hash.match(/p=(\d{6})/);
+  if (m) $("#code").value = m[1];
+}
+$("#pair-btn").addEventListener("click", async () => {
+  $("#pair-err").textContent = "";
+  try {
+    const r = await fetch("/api/pair", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: $("#code").value, name: $("#dname").value || navigator.platform || "Telefon" }) });
+    const d = await r.json();
+    if (!d.token) { $("#pair-err").textContent = d.error || "Bog‘lanmadi"; return; }
+    token = d.token; store.set("nexvara-token", token);
+    history.replaceState(null, "", "/");
+    start();
+  } catch (e) { $("#pair-err").textContent = "Kompyuterga ulanib bo‘lmadi. Bir xil Wi-Fi tarmog‘idami?"; }
+});
+
+// ----- chat -----
+function addMsg(text, me, cls) {
+  const m = el("div", `msg${me ? " me" : ""}${cls ? " " + cls : ""}`, text);
+  $("#msgs").appendChild(m);
+  m.scrollIntoView({ block: "end" });
+  return m;
+}
+function handle(r) {
+  if (r.reply) addMsg(r.reply, false);
+  if (r.confirm) {
+    const row = el("div", "row");
+    const yes = el("button", "btn primary small", "Ha, davom et"), no = el("button", "btn small", "Yo‘q");
+    const ans = async (ok) => { yes.disabled = no.disabled = true; handle(await post("/api/confirm", { token: r.confirm, yes: ok }, rid())); };
+    yes.onclick = () => ans(true); no.onclick = () => ans(false);
+    row.append(yes, no); $("#msgs").appendChild(row);
+  }
+  if (r.task) { lastStatus[r.task.id] = r.task.status; pollSoon(); }
+}
+
+// Commands typed while the PC is unreachable wait here and are resent with the same id,
+// so a command is never executed twice.
+function queue() { try { return JSON.parse(store.get("nexvara-queue") || "[]"); } catch (_) { return []; } }
+function saveQueue(q) { store.set("nexvara-queue", JSON.stringify(q)); }
+async function flush() {
+  const q = queue();
+  while (q.length) {
+    const item = q[0];
+    try { const r = await post("/api/chat", { text: item.text }, item.id); conn(true); handle(r); }
+    catch (e) { conn(false); saveQueue(q); return false; }
+    q.shift(); saveQueue(q);
+  }
+  return true;
+}
+async function send() {
+  const text = $("#text").value.trim();
+  if (!text) return;
+  $("#text").value = "";
+  addMsg(text, true);
+  const q = queue(); q.push({ id: rid(), text }); saveQueue(q);
+  if (!(await flush())) addMsg("Kompyuter javob bermayapti (o‘chiq yoki boshqa tarmoqda). Ulanish tiklanganda buyruq yuboriladi.", false, "wait");
+}
+$("#send").addEventListener("click", send);
+$("#text").addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+
+async function upload(f) {
+  if (!f) return;
+  if (f.size > 50 * 1024 * 1024) { toast("Fayl 50 MB dan katta"); return; }
+  addMsg(`📎 ${f.name} yuborilmoqda…`, true);
+  try {
+    const r = await call("/api/upload", { method: "POST", body: f, headers: { "X-Filename": encodeURIComponent(f.name), "X-Request-Id": rid() } });
+    handle(await r.json()); conn(true);
+  } catch (e) { conn(false); addMsg("Fayl yuborilmadi — kompyuter javob bermayapti.", false, "wait"); }
+}
+$("#attach").onclick = () => $("#file").click();
+$("#camera").onclick = () => $("#photo").click();
+$("#file").onchange = (e) => upload(e.target.files[0]);
+$("#photo").onchange = (e) => upload(e.target.files[0]);
+
+const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (Speech) {
+  $("#mic").hidden = false;
+  $("#mic").onclick = () => {
+    const rec = new Speech(); rec.lang = "uz-UZ"; rec.interimResults = false;
+    rec.onresult = (e) => { $("#text").value = e.results[0][0].transcript; };
+    rec.onerror = () => toast("Ovozni tanib bo‘lmadi");
+    rec.start(); toast("Gapiring…");
+  };
+}
+
+// ----- tasks -----
+const STATUS = { pending: "Kutilmoqda", running: "Bajarilmoqda", succeeded: "Bajarildi", failed: "Xato", cancelled: "Bekor qilindi" };
+async function loadTasks() {
+  const list = await (await call("/api/tasks")).json();
+  conn(true);
+  const box = $("#tasks"); box.textContent = "";
+  if (!list.length) box.appendChild(el("div", "card muted", "Hali vazifa yo‘q"));
+  list.forEach((t) => {
+    if (lastStatus[t.id] === "running" && t.status !== "running") {
+      toast(`${t.status === "succeeded" ? "Tayyor ✓" : "Tugadi"}: ${t.title}`);
+      if (navigator.vibrate) navigator.vibrate(200);
+    }
+    lastStatus[t.id] = t.status;
+    const c = el("div", "card");
+    const h = el("div", "task-head"); h.append(el("span", "", t.title), el("span", `badge ${t.status}`, STATUS[t.status] || t.status));
+    c.appendChild(h);
+    if (t.error) c.appendChild(el("div", "err", t.error));
+    const ol = el("ol", "steps"); t.steps.forEach((s) => ol.appendChild(el("li", "", `${s.name}${s.detail ? " — " + s.detail : ""}`))); c.appendChild(ol);
+    t.report.forEach((r) => c.appendChild(el("div", "muted", r)));
+    const row = el("div", "row");
+    t.files.forEach((p) => {
+      const b = el("button", "btn small", `⬇ ${p.split(/[\\/]/).pop()}`);
+      b.onclick = async () => {
+        const r = await call(`/api/file?path=${encodeURIComponent(p)}`);
+        if (!r.ok) { toast("Fayl topilmadi"); return; }
+        const url = URL.createObjectURL(await r.blob());
+        const a = el("a"); a.href = url; a.download = p.split(/[\\/]/).pop(); a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      };
+      row.appendChild(b);
+    });
+    if (t.status === "running") {
+      const x = el("button", "btn small", "To‘xtatish");
+      x.onclick = async () => { await post(`/api/cancel/${t.id}`, {}, rid()); loadTasks(); };
+      row.appendChild(x);
+    }
+    if (row.children.length) c.appendChild(row);
+    box.appendChild(c);
+  });
+  return list.some((t) => t.status === "running" || t.status === "pending");
+}
+let pollTimer = null;
+function pollSoon() { clearTimeout(pollTimer); pollTimer = setTimeout(poll, 1500); }
+async function poll() {
+  let busy = false;
+  try { busy = await loadTasks(); await flush(); } catch (e) { if (e.message !== "401") conn(false); }
+  pollTimer = setTimeout(poll, busy ? 2000 : 8000);
+}
+
+// ----- tabs -----
+document.querySelectorAll("nav [data-tab]").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("nav [data-tab]").forEach((x) => x.classList.toggle("active", x === b));
+  $("#chat").hidden = b.dataset.tab !== "chat"; $("#composer").hidden = b.dataset.tab !== "chat";
+  $("#tasks").hidden = b.dataset.tab !== "tasks";
+  if (b.dataset.tab === "tasks") loadTasks().catch(() => conn(false));
+}));
+$("#unpair").onclick = () => { if (confirm("Bu telefon NEXVARA'dan uzilsinmi?")) { store.set("nexvara-token", null); token = null; showPair(); } };
+
+async function start() {
+  if (!token) { showPair(); return; }
+  try {
+    const h = await (await call("/api/hello")).json();
+    if (h.new_token) { token = h.new_token; store.set("nexvara-token", token); }
+    conn(true, `${h.pc} · ${h.device}`);
+  } catch (e) { if (e.message === "401") return; conn(false); }
+  $("#pair").hidden = true;
+  ["#chat", "#composer", "#nav"].forEach((s) => { $(s).hidden = false; });
+  if (!$("#msgs").children.length) addMsg("Salom! Buyruq yozing, masalan: «7-sinf fizika Nyuton qonunlari 20 ta test» yoki fayl yuboring 📎.", false);
+  poll();
+}
+start();
+</script>
+</body>
+</html>

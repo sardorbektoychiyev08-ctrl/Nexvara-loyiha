@@ -51,6 +51,16 @@ def cm_to_pt(cm: float) -> float:
 # silently dropped), so every Word call below passes arguments positionally.
 
 
+def _taught_template() -> str | None:
+    try:
+        from nexvara.memory.store import MemoryStore
+        from nexvara.memory.teach import word_template
+
+        return word_template(MemoryStore())
+    except Exception:
+        return None  # memory unavailable: a plain document is always fine
+
+
 class WordSession(OfficeSession):
     prog_id = "Word.Application"
 
@@ -72,7 +82,11 @@ class WordSession(OfficeSession):
         self.app.WindowState = WD_WINDOW_MAXIMIZE
         bring_to_front(self.app.ActiveWindow.Hwnd)
 
-    def new_document(self) -> Any:
+    def new_document(self, template: str | None = None) -> Any:
+        """A new document; from the user's taught template ("shu shablonni ishlat") if any."""
+        template = template or _taught_template()
+        if template:
+            return self.own(self.app.Documents.Add(str(Path(template).resolve())))
         return self.own(self.app.Documents.Add())
 
     def open_document(self, path: str | Path) -> Any:

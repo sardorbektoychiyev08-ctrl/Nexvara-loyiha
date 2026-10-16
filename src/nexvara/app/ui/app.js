@@ -1,11 +1,16 @@
 "use strict";
 
+// Script errors are collected so the smoke test can fail on them.
+window.__errors = [];
+window.addEventListener("error", (e) => window.__errors.push(String(e.message)));
+window.addEventListener("unhandledrejection", (e) => window.__errors.push(String(e.reason)));
+
 const $ = (sel) => document.querySelector(sel);
 const STATUS_LABEL = {
   pending: "Kutilmoqda", running: "Bajarilmoqda", succeeded: "Bajarildi",
   failed: "Xato", cancelled: "Bekor qilindi",
 };
-const PAGES = new Set(["home", "chat", "office", "library", "history", "settings"]);
+const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows", "bi", "devices"]);
 
 let currentTaskId = null;
 let pollTimer = null;
@@ -36,6 +41,12 @@ function show(page) {
   if (page === "history") renderHistory();
   if (page === "library") renderLibrary();
   if (page === "settings") renderSettings();
+  if (page === "memory") renderMemory();
+  if (page === "teach") renderTeach();
+  if (page === "files") renderFiles();
+  if (page === "workflows") renderWorkflows();
+  if (page === "bi") renderBi();
+  if (page === "devices") renderDevices();
 }
 
 $("#nav").addEventListener("click", (e) => {
@@ -73,6 +84,7 @@ function handleReply(r) {
   if (r.reply) addMsg(r.reply, false);
   if (r.confirm) addConfirm(r.confirm);
   if (r.task) track(r.task, true);
+  if (r.open_bi) biOpenSource(r.open_bi);
 }
 
 // A paid AI request waits for the user's answer; nothing is sent before "Ha".
@@ -481,12 +493,568 @@ function applySettings() {
 }
 ["t-count", "t-variants"].forEach((id) => $("#" + id).addEventListener("input", (e) => { e.target.dataset.touched = "1"; }));
 
+// ---- memory ----
+const when = (ts) => (ts ? new Date(ts * 1000).toLocaleString() : "");
+
+async function renderMemory() {
+  if (!api()) return;
+  const facts = await api().memory_facts();
+  const list = $("#mem-facts");
+  list.textContent = "";
+  if (!facts.length) list.appendChild(el("li", "muted", "Hozircha bo‘sh"));
+  facts.forEach((f) => {
+    const li = el("li", "item-row");
+    li.append(el("span", "grow", f.text));
+    const edit = el("button", "btn small-btn", "Tahrirlash");
+    const del = el("button", "btn small-btn", "O‘chirish");
+    edit.addEventListener("click", async () => {
+      const t = prompt("Yangi matn:", f.text);
+      if (t === null) return;
+      const r = await api().memory_update_fact(f.id, t);
+      if (!r.ok) alert(r.error);
+      renderMemory();
+    });
+    del.addEventListener("click", async () => {
+      if (!confirm(`O‘chirilsinmi?\n${f.text}`)) return;
+      await api().memory_delete_fact(f.id);
+      renderMemory();
+    });
+    li.append(edit, del);
+    list.appendChild(li);
+  });
+  const chat = await api().memory_chat(300);
+  const box = $("#mem-chat");
+  box.textContent = "";
+  if (!chat.length) box.appendChild(el("div", "muted", "Suhbatlar yo‘q"));
+  chat.forEach((c) => {
+    const row = el("div", c.role === "user" ? "mem-line me" : "mem-line");
+    row.append(el("span", "muted small", when(c.ts) + " "), el("span", "", c.text));
+    box.appendChild(row);
+  });
+  box.scrollTop = box.scrollHeight;
+  const files = await api().recent_files();
+  const t = $("#mem-files");
+  t.textContent = "";
+  if (!files.length) { t.appendChild(el("tr")).appendChild(el("td", "muted", "Hozircha fayl yo‘q")); }
+  files.forEach((f) => {
+    const tr = el("tr", "clickable");
+    [f.name, f.task, when(f.ts)].forEach((v) => tr.appendChild(el("td", "", v)));
+    tr.title = f.path;
+    tr.addEventListener("click", () => api().reveal_file(f.path));
+    t.appendChild(tr);
+  });
+}
+
+$("#mem-fact-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const r = await api().memory_add_fact($("#mem-fact").value);
+  if (!r.ok) { alert(r.error); return; }
+  $("#mem-fact").value = "";
+  renderMemory();
+});
+$("#mem-search-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const found = await api().memory_search($("#mem-search").value);
+  const ul = $("#mem-search-results");
+  ul.textContent = "";
+  const KIND = { fact: "Eslab qolingan", chat: "Suhbat", rule: "Qoida", task: "Vazifa" };
+  if (!found.length) ul.appendChild(el("li", "muted", "Hech narsa topilmadi"));
+  found.forEach((x) => {
+    const li = el("li", "item-row");
+    li.append(el("span", "badge", KIND[x.kind] || x.kind), el("span", "grow", x.text),
+      el("span", "muted small", when(x.ts)));
+    ul.appendChild(li);
+  });
+});
+$("#mem-clear-chat").addEventListener("click", async () => {
+  if (!confirm("Barcha suhbatlar tarixi o‘chirilsinmi? Eslab qolinganlar va qoidalar qoladi.")) return;
+  await api().memory_clear_chat();
+  renderMemory();
+});
+$("#mem-export").addEventListener("click", async () => {
+  const r = await api().memory_export();
+  $("#mem-backup-msg").textContent = r.ok ? `Saqlandi: ${r.path}` : `Xato: ${r.error}`;
+});
+$("#mem-import").addEventListener("click", async () => {
+  const r = await api().memory_import("");
+  if (!r.ok && !r.error) return;
+  $("#mem-backup-msg").textContent = r.ok
+    ? `Tiklandi: ${r.facts} ta eslatma, ${r.rules} ta qoida (borlari takrorlanmadi)` : `Xato: ${r.error}`;
+  renderMemory();
+});
+
+// ---- Teach NEXVARA ----
+async function teachCheck() {
+  const r = await api().teach_preview($("#teach-app").value, $("#teach-text").value);
+  $("#teach-preview").textContent = r.actions && r.actions.length ? `Har safar: ${r.actions.join("; ")}` : "";
+  $("#teach-error").hidden = !r.error; $("#teach-error").textContent = r.error || "";
+  return r;
+}
+$("#teach-check").addEventListener("click", teachCheck);
+$("#teach-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const r = await api().teach_add($("#teach-app").value, $("#teach-text").value);
+  if (!r.ok) { $("#teach-error").hidden = false; $("#teach-error").textContent = r.error; return; }
+  $("#teach-text").value = ""; $("#teach-preview").textContent = "Saqlandi ✓"; $("#teach-error").hidden = true;
+  drawRules(r.rules);
+});
+
+async function renderTeach() { if (api()) drawRules(await api().teach_rules()); }
+
+function drawRules(rules) {
+  const box = $("#teach-rules");
+  box.textContent = "";
+  if (!rules.length) box.appendChild(el("div", "muted", "Hali qoida yo‘q"));
+  rules.forEach((r) => {
+    const row = el("div", "ai-prov");
+    const head = el("div", "ai-prov-head");
+    const tog = el("label", "check-inline");
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = r.enabled;
+    cb.addEventListener("change", async () => drawRules((await api().teach_update(r.id, null, cb.checked)).rules));
+    tog.append(cb, document.createTextNode(" yoqilgan"));
+    head.append(el("span", "", ""), tog);
+    head.firstChild.append(el("span", "badge", r.app_label), document.createTextNode(` ${r.text}`));
+    const acts = el("div", r.problem ? "error" : "muted small",
+      r.problem || `Har safar: ${r.actions.join("; ")} · versiya ${r.version}`);
+    const btns = el("div", "row wrap");
+    const edit = el("button", "btn small-btn", "Tahrirlash");
+    const vers = el("button", "btn small-btn", "Versiyalar");
+    const del = el("button", "btn small-btn", "O‘chirish");
+    edit.addEventListener("click", async () => {
+      const t = prompt("Qoidaning yangi matni:", r.text);
+      if (t === null) return;
+      const res = await api().teach_update(r.id, t, null);
+      if (!res.ok) { alert(res.error); return; }
+      drawRules(res.rules);
+    });
+    vers.addEventListener("click", async () => {
+      const v = await api().teach_versions(r.id);
+      alert(v.map((x) => `v${x.version} (${when(x.ts)}): ${x.text}`).join("\n"));
+    });
+    del.addEventListener("click", async () => {
+      if (!confirm(`Qoida o‘chirilsinmi?\n${r.text}`)) return;
+      drawRules(await api().teach_delete(r.id));
+    });
+    btns.append(edit, vers, del);
+    row.append(head, acts, btns);
+    box.appendChild(row);
+  });
+}
+
+// ---- files ----
+let fileRows = [];
+const selected = new Set();
+const fmtSize = (n) => n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+
+async function renderFiles() { if (api()) drawFileLog(); }
+
+$("#f-form").addEventListener("submit", async (e) => { e.preventDefault(); await filesSearch(); });
+async function filesSearch() {
+  $("#f-count").textContent = "(qidirilmoqda…)";
+  const r = await api().files_search($("#f-query").value, $("#f-folder").value, $("#f-ext").value);
+  $("#f-error").hidden = r.ok; $("#f-error").textContent = r.ok ? "" : r.error;
+  fileRows = r.ok ? r.files : [];
+  selected.clear();
+  drawFiles();
+}
+$("#f-pick").addEventListener("click", async () => {
+  const f = await api().files_pick_folder();
+  if (f) { $("#f-folder").value = f; filesSearch(); }
+});
+$("#f-clear-folder").addEventListener("click", () => { $("#f-folder").value = ""; });
+
+function drawFiles() {
+  const t = $("#f-table");
+  t.textContent = "";
+  $("#f-count").textContent = fileRows.length ? `(${fileRows.length} ta, tanlangan: ${selected.size})` : "";
+  if (!fileRows.length) return;
+  const head = el("tr");
+  const all = el("input"); all.type = "checkbox";
+  all.checked = selected.size === fileRows.length;
+  all.addEventListener("change", () => {
+    fileRows.forEach((f) => (all.checked ? selected.add(f.path) : selected.delete(f.path)));
+    drawFiles();
+  });
+  const th0 = el("th"); th0.appendChild(all); head.appendChild(th0);
+  ["Nomi", "Papka", "Hajmi", "O‘zgargan"].forEach((h) => head.appendChild(el("th", "", h)));
+  t.appendChild(head);
+  fileRows.forEach((f) => {
+    const tr = el("tr", "clickable");
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = selected.has(f.path);
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", () => { cb.checked ? selected.add(f.path) : selected.delete(f.path); drawFiles(); });
+    const td0 = el("td"); td0.appendChild(cb); tr.appendChild(td0);
+    [f.name, f.folder, fmtSize(f.size), new Date(f.modified * 1000).toLocaleString()].forEach((v) => tr.appendChild(el("td", "", v)));
+    tr.addEventListener("click", () => showFileInfo(f.path));
+    tr.addEventListener("dblclick", () => api().open_file(f.path));
+    t.appendChild(tr);
+  });
+}
+
+async function showFileInfo(path) {
+  const r = await api().files_info(path);
+  const box = $("#f-info");
+  box.hidden = false; box.textContent = "";
+  if (!r.ok) { box.textContent = r.error; return; }
+  const i = r.result;
+  box.append(el("strong", "", i.name), el("div", "mono", [
+    `Joyi: ${i.folder}`, `Hajmi: ${fmtSize(i.size)} (${i.size} bayt)`,
+    `Yaratilgan: ${new Date(i.created * 1000).toLocaleString()}`,
+    `O‘zgargan: ${new Date(i.modified * 1000).toLocaleString()}`,
+    `SHA-256: ${i.sha256}`, i.zip_entries !== undefined ? `Arxivda: ${i.zip_entries} ta element` : "",
+  ].filter(Boolean).join("\n")));
+}
+
+function chosen(min = 1) {
+  const list = [...selected];
+  if (list.length < min) { $("#f-msg").textContent = "Avval jadvaldan fayl(lar)ni belgilang ☑"; return null; }
+  return list;
+}
+const fileResult = (r, okText) => {
+  $("#f-msg").textContent = r.ok ? okText(r.result) : `Xato: ${r.error}`;
+  drawFileLog();
+  return r.ok;
+};
+
+$("#f-actions").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-fa]");
+  if (!b || !api()) return;
+  const act = b.dataset.fa;
+  const list = chosen();
+  if (!list) return;
+  if (act === "open") list.slice(0, 5).forEach((p) => api().open_file(p));
+  if (act === "reveal") api().reveal_file(list[0]);
+  if (act === "copy" || act === "move") {
+    const folder = await api().files_pick_folder();
+    if (!folder) return;
+    if (act === "move" && !confirm(`${list.length} ta fayl ko‘chirilsinmi?\n→ ${folder}`)) return;
+    const r = await (act === "copy" ? api().files_copy(list, folder) : api().files_move(list, folder));
+    if (fileResult(r, (x) => `${x.length} ta fayl ${act === "copy" ? "nusxalandi" : "ko‘chirildi"} → ${folder}`)) filesSearch();
+  }
+  if (act === "rename") {
+    if (list.length === 1) {
+      const name = prompt("Yangi nom (kengaytmasiz ham bo‘ladi):", list[0].split("\\").pop());
+      if (!name) return;
+      if (fileResult(await api().files_rename(list[0], name), (x) => `Yangi nom: ${x}`)) filesSearch();
+    } else {
+      const pattern = prompt(`${list.length} ta fayl uchun nom namunasi ({n} — tartib raqami):`, "Hujjat_{n}");
+      if (!pattern) return;
+      if (fileResult(await api().files_rename_batch(list, pattern), (x) => `${x.length} ta fayl qayta nomlandi`)) filesSearch();
+    }
+  }
+  if (act === "zip") fileResult(await api().files_zip(list), (x) => `Arxiv: ${x}`);
+  if (act === "unzip") {
+    const zips = list.filter((p) => p.toLowerCase().endsWith(".zip"));
+    if (!zips.length) { $("#f-msg").textContent = "ZIP fayl tanlang"; return; }
+    fileResult(await api().files_unzip(zips[0]), (x) => `Chiqarildi: ${x}`);
+  }
+  if (act === "pdf") {
+    const snap = await api().files_to_pdf(list);
+    if (snap.id) { track(snap); $("#f-msg").textContent = "PDF'ga aylantirilmoqda — jarayon o‘ng panelda"; }
+    else $("#f-msg").textContent = snap.error;
+  }
+  if (act === "backup") fileResult(await api().files_backup(list), (x) => `${x.length} ta zaxira nusxa olindi (D:\\NEXVARA\\Zaxira\\Fayllar)`);
+  if (act === "versions") {
+    const vers = await api().files_versions(list[0]);
+    if (!vers.length) { $("#f-msg").textContent = "Bu faylning zaxira nusxasi yo‘q. Avval «Zaxira nusxa»ni bosing."; return; }
+    const pick = prompt(vers.map((v, i) => `${i + 1}) ${new Date(v.modified * 1000).toLocaleString()} — ${fmtSize(v.size)}`).join("\n") +
+      "\n\nQaysi versiyani tiklay? Raqamini yozing (hozirgi fayl ham zaxiraga olinadi):");
+    const v = vers[Number(pick) - 1];
+    if (!v) return;
+    fileResult(await api().files_restore(v.path, list[0]), () => "Tiklandi ✓ (oldingi holati ham zaxirada)");
+  }
+  if (act === "recycle") {
+    if (!confirm(`${list.length} ta fayl Savatga (Recycle Bin) o‘chirilsinmi?\nKerak bo‘lsa Savatdan qaytarish mumkin.`)) return;
+    if (fileResult(await api().files_recycle(list), (n) => `${n} ta fayl Savatga o‘tkazildi`)) filesSearch();
+  }
+});
+
+let tidyFolder = "";
+$("#f-tidy-pick").addEventListener("click", async () => {
+  tidyFolder = await api().files_pick_folder();
+  if (!tidyFolder) return;
+  $("#f-tidy-folder").textContent = tidyFolder;
+  const r = await api().files_tidy_plan(tidyFolder);
+  const t = $("#f-tidy-plan");
+  t.textContent = "";
+  $("#f-tidy-run").disabled = !(r.ok && r.result.length);
+  if (!r.ok) { t.appendChild(el("tr")).appendChild(el("td", "error", r.error)); return; }
+  if (!r.result.length) { t.appendChild(el("tr")).appendChild(el("td", "muted", "Tartiblanadigan fayl yo‘q")); return; }
+  r.result.forEach((x) => { const tr = el("tr"); tr.append(el("td", "", x.name), el("td", "", `→ ${x.to}`)); t.appendChild(tr); });
+});
+$("#f-tidy-run").addEventListener("click", async () => {
+  if (!confirm(`«${tidyFolder}» papkasidagi fayllar ichki papkalarga ajratilsinmi?`)) return;
+  const r = await api().files_tidy(tidyFolder);
+  $("#f-tidy-plan").textContent = "";
+  $("#f-tidy-run").disabled = true;
+  $("#f-tidy-folder").textContent = r.ok ? `Tayyor: ${Object.entries(r.result).map(([k, v]) => `${k}: ${v}`).join(", ")}` : `Xato: ${r.error}`;
+  drawFileLog();
+});
+
+const OPS = { copy: "Nusxa", move: "Ko‘chirish", rename: "Nomlash", zip: "ZIP", unzip: "ZIP ochish",
+  backup: "Zaxira", restore: "Tiklash", recycle: "Savatga", pdf: "PDF" };
+async function drawFileLog() {
+  const rows = await api().files_log();
+  const t = $("#f-log");
+  t.textContent = "";
+  if (!rows.length) { t.appendChild(el("tr")).appendChild(el("td", "muted", "Hali amal bajarilmagan")); return; }
+  rows.slice(0, 40).forEach((x) => {
+    const tr = el("tr");
+    const what = x.dst || (x.files ? x.files.join(", ") : x.src || "");
+    tr.append(el("td", "", new Date(x.ts * 1000).toLocaleString()), el("td", "", OPS[x.action] || x.action), el("td", "", what));
+    t.appendChild(tr);
+  });
+}
+
+// ---- workflows ----
+let wfEditing = { id: 0, steps: [] };
+let wfTimer = null;
+const TRIG = (w) => w.trigger.type === "folder" ? `papka: ${w.trigger.folder} (${w.trigger.ext || "barcha fayllar"})`
+  : w.trigger.type === "daily" ? `har kuni ${w.trigger.time}` : "qo‘lda";
+const RUN_STATUS = { running: "Bajarilmoqda", succeeded: "Bajarildi", failed: "Xato", cancelled: "Bekor qilindi" };
+
+async function renderWorkflows() {
+  if (!api()) return;
+  const tpl = $("#wf-template");
+  if (tpl.options.length === 1) {
+    (await api().wf_templates()).forEach((t, i) => { const o = el("option", "", t.name); o.value = i; tpl.appendChild(o); });
+  }
+  drawWorkflows(await api().wf_list());
+  drawRuns();
+  wfPoll();
+  if (!wfEditing.steps.length) wfReset();
+}
+
+function wfPoll() {
+  clearInterval(wfTimer);
+  wfTimer = setInterval(async () => {
+    if (!$("#page-workflows").classList.contains("active")) { clearInterval(wfTimer); return; }
+    drawActive(await api().wf_active());
+  }, 1200);
+}
+
+function drawActive(list) {
+  $("#wf-active-card").hidden = !list.length;
+  const box = $("#wf-active");
+  box.textContent = "";
+  list.forEach((a) => {
+    const row = el("div", "item-row");
+    row.append(el("span", "grow", `${a.name}${a.paused ? " — pauzada" : ""}${a.waiting_approval ? ` — tasdiq: ${a.waiting_approval}` : ""}`));
+    if (a.waiting_approval) {
+      const ok = el("button", "btn primary small-btn", "Tasdiqlash");
+      ok.addEventListener("click", async () => { await api().wf_approve(a.run_id); });
+      row.appendChild(ok);
+    }
+    const pause = el("button", "btn small-btn", a.paused ? "Davom ettirish" : "Pauza");
+    pause.addEventListener("click", async () => { a.paused ? await api().wf_resume(a.run_id) : await api().wf_pause(a.run_id); });
+    const stop = el("button", "btn small-btn danger", "To‘xtatish");
+    stop.addEventListener("click", async () => { if (confirm("Workflow to‘xtatilsinmi?")) await api().cancel_task(a.task_id); });
+    row.append(pause, stop);
+    box.appendChild(row);
+  });
+}
+
+function drawWorkflows(list) {
+  const box = $("#wf-list");
+  box.textContent = "";
+  if (!list.length) box.appendChild(el("div", "muted", "Hali workflow yo‘q — pastda yarating yoki shablondan boshlang."));
+  list.forEach((w) => {
+    const row = el("div", "ai-prov");
+    const head = el("div", "ai-prov-head");
+    head.append(el("strong", "", w.name), el("span", "badge", TRIG(w)));
+    const last = w.last_run ? `Oxirgi: ${RUN_STATUS[w.last_run.status] || w.last_run.status}, ${when(w.last_run.started)}` : "Hali bajarilmagan";
+    const info = el("div", "muted small", `${w.steps.length} ta qadam · ${last}${w.enabled ? "" : " · o‘chirilgan"}`);
+    const btns = el("div", "row wrap");
+    const run = el("button", "btn primary small-btn", "Ishga tushirish");
+    run.addEventListener("click", async () => {
+      let file = "";
+      if (w.trigger.type === "folder") { file = await api().wf_pick_file(); if (!file) return; }
+      const r = await api().wf_run(w.id, file);
+      if (!r.ok) { alert(r.error); return; }
+      track(r.task);
+      setTimeout(async () => drawActive(await api().wf_active()), 300);
+    });
+    const edit = el("button", "btn small-btn", "Tahrirlash");
+    edit.addEventListener("click", () => wfLoad(w));
+    const tog = el("button", "btn small-btn", w.enabled ? "O‘chirib qo‘yish" : "Yoqish");
+    tog.addEventListener("click", async () => {
+      const r = await api().wf_save({ ...w, enabled: !w.enabled });
+      if (!r.ok) { alert(r.error); return; }
+      drawWorkflows(r.workflows);
+    });
+    const hist = el("button", "btn small-btn", "Tarix");
+    hist.addEventListener("click", () => drawRuns(w.id));
+    const del = el("button", "btn small-btn danger", "O‘chirish");
+    del.addEventListener("click", async () => {
+      if (!confirm(`«${w.name}» o‘chirilsinmi?`)) return;
+      drawWorkflows(await api().wf_delete(w.id));
+    });
+    btns.append(run, edit, tog, hist, del);
+    row.append(head, info, btns);
+    box.appendChild(row);
+  });
+}
+
+async function drawRuns(wfId = 0) {
+  const runs = await api().wf_runs(wfId);
+  const t = $("#wf-runs");
+  t.textContent = "";
+  if (!runs.length) { t.appendChild(el("tr")).appendChild(el("td", "muted", "Hali bajarilmagan")); return; }
+  const names = Object.fromEntries((await api().wf_list()).map((w) => [w.id, w.name]));
+  runs.forEach((r) => {
+    const tr = el("tr");
+    const steps = r.log.map((x) => `${x.ok ? "✓" : "✗"} ${x.step}: ${x.text}`).join("\n");
+    tr.append(el("td", "", when(r.started)), el("td", "", names[r.wf_id] || `#${r.wf_id}`),
+      el("td", "", r.trigger), el("td", "", RUN_STATUS[r.status] || r.status), el("td", "mono", steps));
+    t.appendChild(tr);
+  });
+}
+
+function wfReset() {
+  wfEditing = { id: 0, steps: [{ kind: "command", text: "" }], enabled: true };
+  $("#wf-form-title").textContent = "Yangi workflow";
+  $("#wf-name").value = ""; $("#wf-trigger").value = "manual"; $("#wf-folder").value = "";
+  $("#wf-ext").value = ""; $("#wf-time").value = "08:00"; $("#wf-retries").value = 1; $("#wf-onerror").value = "stop";
+  $("#wf-error").hidden = true; $("#wf-saved").textContent = "";
+  drawSteps(); wfTrigger();
+}
+
+function wfLoad(w) {
+  wfEditing = JSON.parse(JSON.stringify(w));
+  $("#wf-form-title").textContent = w.id ? `Tahrirlash: ${w.name}` : "Yangi workflow (shablondan)";
+  $("#wf-name").value = w.name;
+  $("#wf-trigger").value = w.trigger.type || "manual";
+  $("#wf-folder").value = w.trigger.folder || "";
+  $("#wf-ext").value = w.trigger.ext || "";
+  $("#wf-time").value = w.trigger.time || "08:00";
+  $("#wf-retries").value = w.retries ?? 1;
+  $("#wf-onerror").value = w.on_error || "stop";
+  drawSteps(); wfTrigger();
+  $("#wf-form").scrollIntoView({ block: "start" });
+}
+
+function drawSteps() {
+  const box = $("#wf-steps");
+  box.textContent = "";
+  wfEditing.steps.forEach((s, i) => {
+    const row = el("div", "item-row");
+    const LABEL = { command: "Buyruq", approve: "Tasdiq", wait: "Kutish" };
+    row.appendChild(el("span", "badge", `${i + 1}. ${LABEL[s.kind]}`));
+    const inp = el("input", "grow-input");
+    if (s.kind === "wait") { inp.type = "number"; inp.min = 1; inp.max = 3600; inp.value = s.seconds || 10; inp.placeholder = "soniya"; }
+    else { inp.type = "text"; inp.value = s.text || ""; inp.placeholder = s.kind === "approve" ? "Savol (masalan: Davom etaymi?)" : "masalan: {fayl} ni och, jadvalni formatla, PDF qilib saqla"; }
+    inp.addEventListener("input", () => { if (s.kind === "wait") s.seconds = Number(inp.value); else s.text = inp.value; });
+    row.appendChild(inp);
+    const up = el("button", "btn small-btn", "↑"); up.type = "button";
+    up.addEventListener("click", () => { if (i) { [wfEditing.steps[i - 1], wfEditing.steps[i]] = [wfEditing.steps[i], wfEditing.steps[i - 1]]; drawSteps(); } });
+    const rm = el("button", "btn small-btn", "✕"); rm.type = "button";
+    rm.addEventListener("click", () => { wfEditing.steps.splice(i, 1); drawSteps(); });
+    row.append(up, rm);
+    box.appendChild(row);
+  });
+}
+
+function wfTrigger() {
+  const t = $("#wf-trigger").value;
+  document.querySelectorAll("[data-trig]").forEach((x) => { x.hidden = x.dataset.trig !== t; });
+}
+$("#wf-trigger").addEventListener("change", wfTrigger);
+document.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => {
+  wfEditing.steps.push(b.dataset.add === "wait" ? { kind: "wait", seconds: 10 } : { kind: b.dataset.add, text: "" });
+  drawSteps();
+}));
+$("#wf-folder-pick").addEventListener("click", async () => { const f = await api().files_pick_folder(); if (f) $("#wf-folder").value = f; });
+$("#wf-new").addEventListener("click", wfReset);
+$("#wf-template").addEventListener("change", async () => {
+  const i = $("#wf-template").value;
+  if (i === "") return;
+  const t = (await api().wf_templates())[Number(i)];
+  wfLoad({ ...t, id: 0, retries: 1, on_error: "stop", enabled: true });
+  $("#wf-template").value = "";
+});
+$("#wf-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const t = $("#wf-trigger").value;
+  const trigger = { type: t };
+  if (t === "folder") { trigger.folder = $("#wf-folder").value; trigger.ext = $("#wf-ext").value; }
+  if (t === "daily") trigger.time = $("#wf-time").value;
+  const r = await api().wf_save({
+    ...wfEditing, name: $("#wf-name").value, trigger,
+    retries: Number($("#wf-retries").value), on_error: $("#wf-onerror").value,
+  });
+  $("#wf-error").hidden = r.ok; $("#wf-error").textContent = r.ok ? "" : r.error;
+  if (!r.ok) return;
+  wfEditing.id = r.id;
+  $("#wf-saved").textContent = "Saqlandi ✓";
+  $("#wf-form-title").textContent = `Tahrirlash: ${$("#wf-name").value}`;
+  drawWorkflows(r.workflows);
+});
+
+// ---- devices ----
+let devTimer = null;
+async function renderDevices() {
+  if (!api()) return;
+  drawDevices(await api().devices_status());
+  clearInterval(devTimer);
+  devTimer = setInterval(async () => {
+    if (!$("#page-devices").classList.contains("active")) { clearInterval(devTimer); return; }
+    drawDevices(await api().devices_status());
+  }, 2000);
+}
+
+function drawDevices(st) {
+  $("#dev-pc").textContent = st.pc;
+  $("#dev-os").textContent = st.os;
+  $("#dev-toggle").disabled = !st.available;
+  $("#dev-toggle").textContent = st.running ? "O‘chirish" : "Yoqish";
+  $("#dev-toggle").className = st.running ? "btn" : "btn primary";
+  $("#dev-state").textContent = st.running ? `Yoqilgan: ${st.url}` : "O‘chiq";
+  $("#dev-pair").hidden = !st.running;
+  if (st.running) {
+    $("#dev-url").textContent = st.url;
+    if (st.code) {
+      $("#dev-qr").innerHTML = st.qr_svg; // made by NEXVARA itself (segno), not user input
+      $("#dev-code").textContent = st.code;
+      $("#dev-left").textContent = `${Math.floor(st.code_left / 60)}:${String(st.code_left % 60).padStart(2, "0")} qoldi`;
+    } else {
+      $("#dev-qr").textContent = "";
+      $("#dev-code").textContent = "——————";
+      $("#dev-left").textContent = st.locked ? "Ko‘p noto‘g‘ri urinish — yangi kod oling" : "Kod ishlatildi yoki eskirdi — yangi kod oling";
+    }
+  }
+  const box = $("#dev-list");
+  box.textContent = "";
+  if (!st.devices.length) box.appendChild(el("div", "muted", "Hali qurilma bog‘lanmagan"));
+  st.devices.forEach((d) => {
+    const row = el("div", "item-row");
+    row.append(el("span", "grow", `📱 ${d.name}`),
+      el("span", "muted small", d.last_seen ? `oxirgi: ${when(d.last_seen)} (${d.last_ip})` : "hali ulanmagan"));
+    const rm = el("button", "btn small-btn danger", "Uzish");
+    rm.addEventListener("click", async () => {
+      if (!confirm(`«${d.name}» uzilsinmi? U qayta bog‘lanishi uchun yangi kod kerak bo‘ladi.`)) return;
+      drawDevices(await api().devices_revoke(d.id));
+    });
+    row.appendChild(rm);
+    box.appendChild(row);
+  });
+}
+
+$("#dev-toggle").addEventListener("click", async () => {
+  const st = await api().devices_status();
+  const r = st.running ? await api().devices_stop() : await api().devices_start();
+  $("#dev-error").hidden = r.ok !== false; $("#dev-error").textContent = r.error || "";
+  drawDevices(r.ok === false ? st : r);
+});
+$("#dev-newcode").addEventListener("click", async () => drawDevices(await api().devices_new_code()));
+
 // ---- boot ----
 window.addEventListener("pywebviewready", async () => {
   const info = await api().get_info();
   $("#version").textContent = `NEXVARA v${info.version}`;
   $("#sys-info").textContent = JSON.stringify(info, null, 2);
   refreshAiStatus();
+  // The conversation continues where it stopped last time.
+  (await api().memory_chat(30)).forEach((c) => addMsg(c.text, c.role === "user"));
   settings = await api().get_settings();
   setTheme(settings.theme, false);
   applySettings();

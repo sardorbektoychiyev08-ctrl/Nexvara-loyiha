@@ -24,6 +24,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body {
   display: grid;
@@ -140,4 +141,46 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto
 .ai-prov-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .ai-key { flex: 1; min-width: 220px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
 .confirm-row { margin: 0 0 4px; }
+.grow-input { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
+.plain-list { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.item-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.item-row .grow { flex: 1; }
+.small-btn { padding: 4px 10px; font-size: 12px; }
+.mem-chat { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.mem-line { padding: 4px 8px; border-radius: 8px; background: var(--surface-2); white-space: pre-wrap; }
+.mem-line.me { border-left: 3px solid var(--accent); }
+.clickable { cursor: pointer; }
+.clickable:hover td { color: var(--accent-2); }
+.check-inline { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.btn.danger { border-color: color-mix(in srgb, var(--err) 50%, var(--border)); color: var(--err); }
+.files-table td:nth-child(3) { color: var(--muted); font-size: 12px; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-info { margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--surface-2); }
+.bi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; margin: 16px 0; }
+.bi-widget { min-width: 0; }
+.bi-kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-top: 16px; }
+.bi-kpis .card { margin: 0; }
+.bi-widget.bi-table, .bi-widget.bi-line { grid-column: 1 / -1; }
+.bi-widget-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.bi-tools { display: flex; gap: 2px; opacity: .5; }
+.bi-widget:hover .bi-tools { opacity: 1; }
+.icon-btn { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 6px; }
+.icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.bi-body svg { width: 100%; height: auto; display: block; }
+.bi-body svg text { fill: var(--muted); }
+.bi-hit { cursor: pointer; }
+.bi-hit:hover { opacity: .8; }
+.bi-kpi-value { font-size: 24px; font-weight: 700; margin-top: 8px; }
+.bi-growth { font-size: 13px; margin-top: 4px; }
+.bi-growth.up { color: var(--ok); }
+.bi-growth.down { color: var(--err); }
+.bi-table-wrap { max-height: 360px; overflow: auto; }
+.bi-filters { margin-top: 10px; }
+.chip { margin: 2px 4px 2px 0; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--text); font: inherit; font-size: 12px; cursor: pointer; }
+.bi-tip { position: fixed; z-index: 20; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 18px rgba(0,0,0,.25); font-size: 12px; }
+.bi-steps { padding-left: 0; list-style: none; }
+.dev-pair { display: flex; gap: 24px; margin-top: 16px; flex-wrap: wrap; align-items: flex-start; }
+.dev-qr { background: #fff; padding: 10px; border-radius: 12px; line-height: 0; min-width: 120px; min-height: 120px; }
+.dev-url { font-size: 15px; margin-top: 4px; }
+.dev-code { font-size: 34px; font-weight: 700; letter-spacing: .25em; font-family: Consolas, monospace; }
+.dev-help { padding-left: 18px; margin: 12px 0 0; }
 .check-label { flex-direction: row !important; align-items: center; gap: 8px !important; grid-column: 1 / -1; color: var(--text) !important; font-size: 13px !important; }

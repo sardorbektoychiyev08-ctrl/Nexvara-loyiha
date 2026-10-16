@@ -21,6 +21,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "test_count": 20,
     "test_variants": 1,
     "keep_office_open": True,
+    "remote": {"enabled": False, "port": 8765},  # phone access over the local network
     "ai": {
         "enabled": False,
         "provider": "",  # openai | anthropic | gemini | deepseek
@@ -91,6 +92,8 @@ def _validate(s: dict[str, Any]) -> None:
         raise ValueError("test_count 1–60")
     if not 1 <= int(s["test_variants"]) <= 6:
         raise ValueError("test_variants 1–6")
+    if not 1024 <= int(s["remote"]["port"]) <= 65535:
+        raise ValueError("port 1024–65535")
     ai = s["ai"]
     if ai["provider"] not in ("", "openai", "anthropic", "gemini", "deepseek"):
         raise ValueError("noma’lum AI provayder")
