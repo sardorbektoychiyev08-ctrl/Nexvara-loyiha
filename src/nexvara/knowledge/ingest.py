@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,6 +49,29 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+SOURCE_RANKS = {"rtm": 2, "eduportal": 0}  # anything else (the user's own files) ranks 1
+
+
+def source_rank(path: Path, root: Path) -> int:
+    try:
+        first = path.resolve().relative_to(root.resolve()).parts[0].lower()
+    except (ValueError, IndexError):
+        return 1
+    return SOURCE_RANKS.get(first, 1)
+
+
+def pdf_year(path: Path) -> int | None:
+    """Year the PDF was made (metadata), used when the book text names no year."""
+    from pypdf import PdfReader
+
+    try:
+        created = (PdfReader(str(path)).metadata or {}).get("/CreationDate") or ""
+    except Exception:
+        return None
+    m = re.search(r"(19|20)\d\d", str(created))
+    return int(m.group(0)) if m else None
 
 
 def extract_pages(path: Path) -> list[str]:
@@ -95,6 +119,8 @@ def ingest_folder(root: Path, lib: Library, progress=None) -> IngestReport:
                 continue
             pages = extract_pages(path)
             info = describe(path, "\n".join(pages[:4]), root)
+            year = info.year or pdf_year(path)
+            rank = source_rank(path, root)
             text_pages = [p for p in pages if len(p) >= MIN_CHARS_PER_PAGE]
             status, note = "ok", ""
             if len(text_pages) < max(3, len(pages) // 4):
@@ -111,10 +137,11 @@ def ingest_folder(root: Path, lib: Library, progress=None) -> IngestReport:
                 title=info.title,
                 grade=info.grade,
                 subject=info.subject,
-                year=info.year,
+                year=year,
                 pages=pages,
                 status=status,
                 note=note,
+                rank=rank,
             )
             if status == "ok":
                 report.added.append(path.name)

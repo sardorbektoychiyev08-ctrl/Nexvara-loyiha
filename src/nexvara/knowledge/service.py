@@ -166,7 +166,9 @@ def index_library(task: Task) -> dict[str, Any]:
 
 
 def _pages_for(lib: Library, req: TestRequest) -> tuple[Book, list[tuple[int, str]], str]:
-    books = lib.best_books(req.grade, req.subject)
+    from nexvara.knowledge.topics import candidate_books
+
+    books = candidate_books(lib, req.grade, req.subject)
     if not books:
         what = " ".join(
             x for x in (f"{req.grade}-sinf" if req.grade else "", req.subject or "") if x
@@ -174,12 +176,19 @@ def _pages_for(lib: Library, req: TestRequest) -> tuple[Book, list[tuple[int, st
         raise LookupError(f"Kutubxonada {what or 'mos'} darslik topilmadi")
     book = books[0]
     if req.topic:
-        hits = lib.search(req.topic, book.grade, book.subject, limit=12)
-        pages = [(h.page_no, h.text) for h in hits]
+        # Search every part of the current edition (1-chorak, 2-chorak, ...).
+        hits = []
+        for g, s in dict.fromkeys((b.grade, b.subject) for b in books):
+            hits += lib.search(req.topic, g, s, limit=12)
+        hits.sort(key=lambda h: -h.score)
+        pages = [(h.page_no, h.text) for h in hits[:12]]
         if not pages:
             raise LookupError(f"«{req.topic}» mavzusi {book.label()} darsligida topilmadi")
+        book = hits[0].book
         return book, sorted(pages), req.topic
-    return book, lib.book_pages(book.id), "umumiy"
+    pages = [pg for b in books if (b.grade, b.subject) == (book.grade, book.subject)
+             for pg in lib.book_pages(b.id)]  # fmt: skip
+    return book, pages, "umumiy"
 
 
 def make_quizzes(req: TestRequest) -> tuple[Book, str, list[QuizResult]]:

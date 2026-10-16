@@ -205,19 +205,15 @@ def _strip_running_lines(parts: list[tuple[int, str]]) -> str:
 
 
 def candidate_books(lib: Library, grade: int | None, subject: str | None) -> list[Book]:
-    """Newest book per grade+subject. A generic subject ("Tarix") also matches
-    "O‘zbekiston tarixi" and "Jahon tarixi"."""
-    books = lib.best_books(grade, subject)
+    """Every part of the edition in use per grade+subject (new RTM quarters beat the old
+    portal edition). A generic subject ("Tarix") also matches "O‘zbekiston tarixi"."""
+    books = lib.current_edition(grade, subject)
     if not books and subject:
         key = fold(subject)
-        books = [b for b in lib.best_books(grade, None) if b.subject and key in fold(b.subject)]
-    seen: set[tuple] = set()
-    out = []
-    for b in books:
-        if (b.grade, b.subject) not in seen:
-            seen.add((b.grade, b.subject))
-            out.append(b)
-    return out
+        books = [
+            b for b in lib.current_edition(grade, None) if b.subject and key in fold(b.subject)
+        ]
+    return books
 
 
 def find_topic(lib: Library, grade: int | None, subject: str | None, query: str) -> Topic:

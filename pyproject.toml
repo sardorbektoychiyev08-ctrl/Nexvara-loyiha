@@ -11,6 +11,7 @@ dependencies = [
     "pywin32>=306",
     "pywebview>=5",
     "pypdf>=4",
+    "telethon>=1.36",
 ]
 
 [project.optional-dependencies]
