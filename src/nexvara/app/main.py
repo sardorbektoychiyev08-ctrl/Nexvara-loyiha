@@ -90,7 +90,19 @@ def main(argv: list[str] | None = None) -> int:
                 time.sleep(0.2)
                 version = window.evaluate_js("document.getElementById('version').textContent")
             ok = bool(nav) and nav >= 11 and version == f"NEXVARA v{__version__}"
-            print(f"SMOKE {'PASS' if ok else 'FAIL'}: nav_items={nav} version={version!r}")
+            # Settings page: the AI card lists every provider (reads keys, sends nothing).
+            window.evaluate_js("document.querySelector('.nav-item[data-page=settings]').click()")
+            providers = 0
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline and not providers:
+                time.sleep(0.2)
+                providers = window.evaluate_js("document.querySelectorAll('.ai-prov').length")
+            window.evaluate_js("document.querySelector('.nav-item[data-page=home]').click()")
+            ok = ok and providers == 4
+            print(
+                f"SMOKE {'PASS' if ok else 'FAIL'}: nav_items={nav} version={version!r} "
+                f"ai_providers={providers}"
+            )
             if ok and selftest:
                 ok = excel_button_selftest(window)
             if ok and args.selftest_library is not None:

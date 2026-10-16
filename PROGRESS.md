@@ -4,6 +4,30 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-16 (10) — Claude Code — M7: AI ulanishi (kalit kiritish joyi, xarajat, limit)
+
+**Foydalanuvchi talabi:** NEXVARA'ni to'liq tugatish; API kalit kerak bo'lganda aytish. Codex `codex/model-router` da ish qilmagani uchun M7 ni Claude oldi.
+
+**Qilindi** (`src/nexvara/ai/`):
+- 4 provayder: Anthropic (rasmiy SDK; Opus/Sonnet 5.5 da server tomonidagi zaxira model `fallbacks: "default"`), OpenAI, Gemini, DeepSeek (bitta HTTPS mijoz, 429/5xx da qayta urinish).
+- Darajalar: arzon / o'rtacha / kuchli. Buyruqni tushunish → arzon, savol-javob va test → o'rtacha. Kalit tekshirilganda (bepul model ro'yxati so'rovi) hisobdagi haqiqiy model nomlari tanlanadi.
+- Kalitlar Windows Credential Manager'da; UI'ga faqat niqoblangan ko'rinish (`sk-a…1234`) chiqadi.
+- Xarajat: har chaqiruv `app.db` → `ai_usage`. Kunlik ($1) va oylik ($10) limit; $0.05 dan qimmat so'rov chatda "Ha, davom et / Yo'q" tugmalari bilan so'raladi. Anthropic narxlari rasmiy; boshqalari taxminiy, `settings.json` → `ai.prices` da o'zgartiriladi.
+- Chat: AI'siz tushunilmagan matnni AI sinalgan buyruq tiliga qayta yozadi va odatdagi ijrochi bajaradi; bilim savollariga darslikdan (manba va bet bilan) javob beradi.
+- AI test: "AI bilan 7-sinf fizika kuch 10 ta test" yoki formadagi "AI bilan tuzish" belgisi. Savollar mavzu matnidan, variantlarda tartib va javob o'rni aralashtiriladi, rasmli savollar AI'siz qoladi.
+- Sozlamalar → AI: har provayder uchun kalit kiritish, "Kalit olish ↗" havolasi, limitlar, sarf jadvali.
+- Tuzatildi: "AI" so'zi test mavzusiga qo'shilib ketardi; `Task.wait()` tarix yozilishini kutmasdi (ba'zan yiqiladigan test).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + unit testlar (132 ta; +AI router, byudjet, tasdiq, provayder formatlari, Credential Manager) | PASS |
+| Office: kutubxona testlari 8/8, shu jumladan AI test Word'da (soxta provayder, pulsiz) | PASS |
+| Smoke: 12 menyu + Sozlamalarda 4 provayder | PASS |
+| Haqiqiy kalit bilan AI chaqiruvi | Sinalmagan — foydalanuvchi kalit kiritishi kerak |
+
+---
+
 ## 2026-10-16 (9) — Claude Code — Ilova asoslari: aylantirish, tarix, sozlamalar, belgi
 
 **Foydalanuvchi talabi:** "ilovani pastga sursam oxiri ko'rinmayabdi"; ilovadagi kamchiliklarni tuzatish.

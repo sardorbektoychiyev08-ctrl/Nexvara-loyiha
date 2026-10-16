@@ -11,7 +11,7 @@ Bosqichlar [MASTER_SPEC.md](MASTER_SPEC.md) 26-bo'limidan olingan. Holat belgila
 | M4 | Word va PowerPoint | IN PROGRESS | PASS: Word hisobot (15 tekshiruv), PowerPoint taqdimot (11 tekshiruv), UI tugmalari, ruscha Office. Qolgan: mavjud fayl/shablonni tahrirlash, tarjima/qayta yozish (M7 dan keyin), SmartArt |
 | M5 | File, Vision, Web, Computer Control | TODO | |
 | M6 | Memory, Teach, Workflow | IN PROGRESS | Darsliklar kutubxonasi (SQLite FTS5), AI'siz test tuzish va mavzuni chiqarish (Word + asl sahifalar PDF): PASS (sintetik darslik). Haqiqiy yangi darsliklar bilan: BLOCKED (PDF yo'q). Memory/Teach/Workflow: TODO |
-| M7 | Model Router | TODO | Codex: `codex/model-router` tarmog'ida, avval fake provayder bilan; pullik chaqiruv yo'q |
+| M7 | Model Router | IN PROGRESS | PASS (soxta provayder bilan): 4 provayder (Anthropic SDK; OpenAI, Gemini, DeepSeek — HTTPS), arzon/o'rtacha/kuchli darajalar, kalitlar Credential Manager'da, xarajat hisobi, kunlik/oylik limit, qimmat so'rovda tasdiq. Chatda erkin buyruqni tushunish, darsliklar bo'yicha savol-javob, AI test (Word). Haqiqiy kalit bilan sinov: foydalanuvchi kalit kiritgach |
 | M8 | NEXVARA BI | TODO | Node.js + React/ECharts o'rnatish kerak bo'lishi mumkin |
 | M9 | Google Login va Sync | TODO | |
 | M10 | Windows Release | TODO | PyInstaller + installer (Inno Setup yoki shunga o'xshash) |

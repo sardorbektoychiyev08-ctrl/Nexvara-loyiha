@@ -72,7 +72,7 @@ _FILLER = (
     r"\b(?:test\w*|savol\w*|tuz\w*|ber\w*|yarat\w*|kerak\w*|iltimos|menga|uchun|boyicha|"
     r"mavzu\w*|dan|haqida|darslik\w*|chiqar\w*|korsat\w*|matn\w*|oqib|topib|top|ochib|och|"
     r"bolim\w*|shu|ushbu|qilib|ham|va|bilan|mana|bu|ni|kitob\w*|taqdimot\w*|prezentats\w*|"
-    r"slayd\w*|tayyorla\w*|yasa\w*)\b"
+    r"slayd\w*|tayyorla\w*|yasa\w*|ai|sun\W?iy|intellekt\w*|aqlli|yordamida)\b"
 )
 _PRESENTATION_WORDS = ("taqdimot", "prezentats", "slayd")
 
@@ -242,13 +242,23 @@ def _topic_pages(lib: Library, req: TestRequest, book, hit_pages, topic_label):
     return book, pages, t.title
 
 
-def make_quizzes(req: TestRequest) -> tuple[Book, str, list[QuizResult]]:
+def topic_material(req: TestRequest) -> tuple[Book, list[tuple[int, str]], str]:
+    """The book, the pages a test on `req` is built from, and the topic's title."""
     req.validate()
     lib = open_library()
     try:
         book, pages, topic = _pages_for(lib, req)
         if req.topic:
             book, pages, topic = _topic_pages(lib, req, book, pages, topic)
+        return book, pages, topic
+    finally:
+        lib.close()
+
+
+def make_quizzes(req: TestRequest) -> tuple[Book, str, list[QuizResult]]:
+    book, pages, topic = topic_material(req)
+    lib = open_library()
+    try:
         pool = [d.term for d in extract_definitions(lib.book_pages(book.id))]
         figures, captions = _figures_for(book, [p for p, _t in pages])
         quizzes = [

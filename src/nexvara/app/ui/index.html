@@ -32,7 +32,7 @@
       <p class="muted">Siz buyruq berasiz — NEXVARA ishni bajaradi — natijani ko'rasiz.</p>
       <div class="cards">
         <div class="card"><div class="card-label">Office</div><div class="card-value">Excel · Word · PowerPoint</div><div class="muted">COM orqali, ko'rinadigan rejim</div></div>
-        <div class="card"><div class="card-label">AI provayder</div><div class="card-value" id="ai-status">Ulanmagan</div><div class="muted">M7 bosqichida</div></div>
+        <div class="card"><div class="card-label">AI provayder</div><div class="card-value" id="ai-status">Ulanmagan</div><div class="muted">Sozlamalar → AI (ixtiyoriy)</div></div>
         <div class="card"><div class="card-label">Vazifalar</div><div class="card-value" id="task-count">0</div><div class="muted">shu sessiyada</div></div>
       </div>
       <button class="btn primary" data-goto="office">Excel sinovini boshlash →</button>
@@ -155,14 +155,17 @@
             <input id="t-topic" type="text" placeholder="masalan: Nyuton qonunlari"></label>
           <label>Savollar soni <input id="t-count" type="number" min="1" max="60" value="20"></label>
           <label>Variantlar <input id="t-variants" type="number" min="1" max="6" value="1"></label>
+          <label class="check-label"><input id="t-ai" type="checkbox">
+            AI bilan tuzish (sifatliroq; pullik — narxi oldindan so‘raladi)</label>
         </div>
         <div class="error" id="t-error" hidden></div>
         <div class="row">
           <button class="btn run-task" id="t-topic-show" type="button">Mavzuni chiqarish</button>
           <button class="btn primary run-task" id="t-make" type="submit">Test tuzish</button>
         </div>
-        <p class="muted small">Hozir AI'siz rejim: savollar darslik matnidagi ta'riflar, sanalar va
-          raqamlardan tuziladi. Word'da tahrirlab olishingiz mumkin. AI ulanganda sifat oshadi.
+        <p class="muted small">AI'siz rejimda savollar darslik matnidagi ta'riflar, sanalar va
+          raqamlardan tuziladi. «AI bilan» belgilansa, savollarni AI mavzu matnidan yozadi (kalit
+          kerak). Word'da tahrirlab olishingiz mumkin.
           «Mavzuni chiqarish» mavzu matnini Word'da va darslikning asl sahifalarini PDF'da beradi.</p>
       </form>
 
@@ -205,6 +208,30 @@
           <span class="muted small" id="s-saved"></span></div>
         <div class="error" id="s-error" hidden></div>
       </form>
+      <div class="card wide" id="ai-card">
+        <div class="card-label">AI (ixtiyoriy)</div>
+        <p class="muted small">Kalitsiz ham NEXVARA ishlaydi. Kalit qo‘shsangiz: erkin yozilgan
+          buyruqlarni tushunadi, darsliklar bo‘yicha savollarga javob beradi, sifatliroq test tuzadi.
+          Kalit Windows himoyalangan xotirasida (Credential Manager) saqlanadi va faqat o‘z
+          provayderiga yuboriladi. Bitta provayder yetarli.</p>
+        <div id="ai-providers"></div>
+        <form id="ai-form">
+          <div class="form-grid">
+            <label class="check-label"><input id="ai-enabled" type="checkbox"> AI yoqilgan</label>
+            <label>Asosiy provayder <select id="ai-provider"></select></label>
+            <label>Kunlik limit, $ <input id="ai-daily" type="number" min="0" step="0.1"></label>
+            <label>Oylik limit, $ <input id="ai-monthly" type="number" min="0" step="0.5"></label>
+            <label>Shundan qimmat so‘rovda so‘rasin, $ <input id="ai-confirm" type="number" min="0" step="0.01"></label>
+            <label class="check-label"><input id="ai-send-text" type="checkbox">
+              Savollarga javobda darslik parchalarini AI’ga yuborish</label>
+          </div>
+          <div class="row"><button class="btn primary" type="submit">Saqlash</button>
+            <span class="muted small" id="ai-saved"></span></div>
+          <div class="error" id="ai-error" hidden></div>
+        </form>
+        <div class="muted small" id="ai-spent"></div>
+        <table class="lib-table" id="ai-usage"></table>
+      </div>
       <div class="card wide">
         <div class="card-label">Ma’lumotlar</div>
         <div class="mono" id="s-data"></div>

@@ -33,11 +33,14 @@ def run_make_test(
     visible: bool = True,
     keep_open: bool = True,
     pause: float = 0.3,
+    make: Any = None,
 ) -> dict[str, Any]:
+    """`make(req) -> (book, topic, quizzes)`; the offline generator by default (the AI
+    generator is passed in by the app when the user asks for an AI test)."""
     from nexvara.skills.word.ops import WordSession
 
-    with task.step("Darslikdan mavzuni topish") as s:
-        book, topic, quizzes = make_quizzes(req)
+    with task.step("Darslikdan mavzuni topish" if make is None else "AI savollar tuzmoqda") as s:
+        book, topic, quizzes = (make or make_quizzes)(req)
         n = len(quizzes[0].questions)
         s.detail = f"{book.label()} · «{topic}» · {n} ta savol"
         if n == 0:

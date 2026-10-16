@@ -65,11 +65,32 @@ $("#chat-form").addEventListener("submit", async (e) => {
   if (!text || !api()) return;
   $("#chat-text").value = "";
   addMsg(text, true);
-  const r = await api().chat(text);
-  if (r.reply) addMsg(r.reply, false);
-  if (r.task) track(r.task, true);
+  handleReply(await api().chat(text));
   showContext(await api().get_context_file());
 });
+
+function handleReply(r) {
+  if (r.reply) addMsg(r.reply, false);
+  if (r.confirm) addConfirm(r.confirm);
+  if (r.task) track(r.task, true);
+}
+
+// A paid AI request waits for the user's answer; nothing is sent before "Ha".
+function addConfirm(token) {
+  const box = el("div", "row confirm-row");
+  const yes = el("button", "btn primary", "Ha, davom et");
+  const no = el("button", "btn", "Yo‘q");
+  const answer = async (ok) => {
+    yes.disabled = no.disabled = true;
+    handleReply(await api().confirm_ai(token, ok));
+    refreshAiStatus();
+  };
+  yes.addEventListener("click", () => answer(true));
+  no.addEventListener("click", () => answer(false));
+  box.append(yes, no);
+  $("#chat-log").appendChild(box);
+  box.scrollIntoView({ block: "end" });
+}
 
 function showContext(path) {
   $("#chat-context").hidden = !path;
@@ -308,8 +329,15 @@ $("#test-form").addEventListener("submit", async (e) => {
   if (!api()) return;
   const r = await api().make_test({
     grade: $("#t-grade").value, subject: $("#t-subject").value, topic: $("#t-topic").value,
-    count: $("#t-count").value, variants: $("#t-variants").value,
+    count: $("#t-count").value, variants: $("#t-variants").value, ai: $("#t-ai").checked,
   });
+  if (r.confirm) {
+    const ok = confirm(r.confirm.text);
+    const r2 = await api().confirm_ai(r.confirm.token, ok);
+    if (r2.task) { $("#t-error").hidden = true; track(r2.task); }
+    else if (ok) { $("#t-error").textContent = r2.reply; $("#t-error").hidden = false; }
+    return;
+  }
   if (!r.id) { $("#t-error").textContent = r.error; $("#t-error").hidden = false; return; }
   $("#t-error").hidden = true;
   track(r);
@@ -328,6 +356,101 @@ async function renderSettings() {
   $("#s-keep-open").checked = settings.keep_office_open;
   const info = await api().get_info();
   $("#s-data").textContent = info.data_dir || "";
+  renderAi();
+}
+
+// ---- AI keys, budget, spending ----
+const money = (v) => `$${Number(v || 0).toFixed(3)}`;
+
+async function renderAi(status) {
+  if (!api()) return;
+  const st = status || await api().ai_status();
+  const box = $("#ai-providers");
+  box.textContent = "";
+  Object.entries(st.providers).forEach(([name, p]) => {
+    const row = el("div", "ai-prov");
+    const head = el("div", "ai-prov-head");
+    head.append(el("strong", "", p.label),
+      el("span", p.has_key ? "badge succeeded" : "badge", p.has_key ? `Kalit bor ${p.key_masked}` : "Kalit yo‘q"));
+    const models = el("div", "muted small",
+      Object.entries(p.models).map(([t, m]) => `${st.tier_labels[t]}: ${m}`).join(" · "));
+    const form = el("div", "row wrap");
+    const input = el("input", "ai-key");
+    input.type = "password"; input.placeholder = p.has_key ? "Yangi kalit (almashtirish uchun)" : p.key_hint;
+    input.autocomplete = "off";
+    const save = el("button", "btn primary", "Tekshirish va saqlash");
+    const get = el("button", "btn", "Kalit olish ↗");
+    const msg = el("div", "muted small", "");
+    save.type = get.type = "button";
+    save.addEventListener("click", async () => {
+      if (!input.value.trim()) return;
+      save.disabled = true; msg.textContent = "Tekshirilmoqda (bepul so‘rov)…";
+      const r = await api().ai_save_key(name, input.value);
+      input.value = ""; save.disabled = false;
+      if (!r.ok) { msg.textContent = `Xato: ${r.error}`; return; }
+      msg.textContent = `Saqlandi ✓ Modellar: ${Object.values(r.models).join(", ")}` +
+        (r.missing.length ? ` (hisobda topilmadi: ${r.missing.join(", ")})` : "");
+      renderAi(r.status); refreshAiStatus();
+    });
+    get.addEventListener("click", () => api().open_url(p.key_url));
+    form.append(input, save, get);
+    if (p.has_key) {
+      const del = el("button", "btn", "O‘chirish");
+      del.type = "button";
+      del.addEventListener("click", async () => {
+        if (!confirm(`${p.label} kaliti o‘chirilsinmi?`)) return;
+        renderAi(await api().ai_delete_key(name)); refreshAiStatus();
+      });
+      form.append(del);
+    }
+    row.append(head, models, form, msg);
+    box.appendChild(row);
+  });
+  const sel = $("#ai-provider");
+  sel.textContent = "";
+  Object.entries(st.providers).filter(([, p]) => p.has_key).forEach(([name, p]) => {
+    const o = el("option", "", p.label); o.value = name; sel.appendChild(o);
+  });
+  sel.value = st.provider;
+  $("#ai-enabled").checked = st.enabled;
+  $("#ai-daily").value = st.daily_budget_usd;
+  $("#ai-monthly").value = st.monthly_budget_usd;
+  $("#ai-confirm").value = st.confirm_over_usd;
+  $("#ai-send-text").checked = st.send_textbook_text;
+  $("#ai-spent").textContent =
+    `Sarflandi: bugun ${money(st.spent_today)} / ${money(st.daily_budget_usd)}, shu oy ${money(st.spent_month)} / ${money(st.monthly_budget_usd)}. Narxlar taxminiy (provayder hisobidagi summa asosiy).`;
+  const usage = await api().ai_usage();
+  const t = $("#ai-usage");
+  t.textContent = "";
+  if (usage.length) {
+    const head = el("tr");
+    ["Vaqt", "Ish", "Model", "Token", "Narx"].forEach((h) => head.appendChild(el("th", "", h)));
+    t.appendChild(head);
+    usage.forEach((u) => {
+      const tr = el("tr");
+      [new Date(u.ts * 1000).toLocaleString(), u.purpose, u.model,
+        `${u.input_tokens}+${u.output_tokens}`, money(u.cost)].forEach((v) => tr.appendChild(el("td", "", v)));
+      t.appendChild(tr);
+    });
+  }
+}
+
+$("#ai-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const r = await api().save_settings({ ai: {
+    enabled: $("#ai-enabled").checked, provider: $("#ai-provider").value || "",
+    daily_budget_usd: Number($("#ai-daily").value), monthly_budget_usd: Number($("#ai-monthly").value),
+    confirm_over_usd: Number($("#ai-confirm").value), send_textbook_text: $("#ai-send-text").checked,
+  } });
+  $("#ai-error").hidden = r.ok; $("#ai-error").textContent = r.ok ? "" : r.error;
+  $("#ai-saved").textContent = r.ok ? "Saqlandi ✓" : "";
+  if (r.ok) { renderAi(); refreshAiStatus(); }
+});
+
+async function refreshAiStatus() {
+  const st = await api().ai_status();
+  const p = st.providers[st.provider];
+  $("#ai-status").textContent = st.ready && p ? p.label : (p ? "O‘chirilgan" : "Ulanmagan");
 }
 
 $("#settings-form").addEventListener("submit", async (e) => {
@@ -363,7 +486,7 @@ window.addEventListener("pywebviewready", async () => {
   const info = await api().get_info();
   $("#version").textContent = `NEXVARA v${info.version}`;
   $("#sys-info").textContent = JSON.stringify(info, null, 2);
-  $("#ai-status").textContent = info.ai_connected ? "Ulangan" : "Ulanmagan";
+  refreshAiStatus();
   settings = await api().get_settings();
   setTheme(settings.theme, false);
   applySettings();

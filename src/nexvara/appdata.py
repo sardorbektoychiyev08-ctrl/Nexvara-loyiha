@@ -28,7 +28,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "monthly_budget_usd": 10.0,
         "confirm_over_usd": 0.05,  # ask before a single request that may cost more
         "send_textbook_text": True,
-        "models": {},  # tier -> model id override, e.g. {"cheap": "..."}
+        "models": {},  # provider -> tier -> model id (filled when a key is checked)
+        "prices": {},  # model id -> [input, output] USD per 1M tokens, overrides the table
     },
 }
 

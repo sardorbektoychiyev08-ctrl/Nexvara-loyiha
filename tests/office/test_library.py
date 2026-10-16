@@ -64,6 +64,56 @@ def test_chat_request_builds_a_test(data_dir, tmp_path):
     assert snap["result"]["path"].startswith(str(tmp_path / "out"))
 
 
+def test_ai_test_in_word_with_fake_provider(data_dir, tmp_path):
+    """The whole "AI bilan test" path in real Word; the provider is a fake (no paid call)."""
+    import json
+
+    from nexvara.ai.keys import MemoryKeyStore
+    from nexvara.ai.providers import Provider, Reply
+    from nexvara.ai.router import AiRouter, Ledger
+    from nexvara.app.api import Api
+    from nexvara.appdata import Settings
+    from nexvara.core.task import TaskRunner
+
+    questions = [
+        {"q": f"AI savol {i}: kuch nimaga teng?", "options": [f"F=ma ({i})", "F=m/a", "F=a/m",
+         "F=m+a"], "answer": 0, "page": 1}
+        for i in range(10)
+    ]  # fmt: skip
+
+    class Fake(Provider):
+        calls = 0
+
+        def complete(self, model, system, messages, max_tokens, effort="medium"):
+            Fake.calls += 1
+            return Reply(json.dumps(questions), model, 2000, 1500)
+
+        def list_models(self):
+            return []
+
+    router = AiRouter(
+        Settings(tmp_path / "s.json"), MemoryKeyStore(), Ledger(tmp_path / "a.db"),
+        factory=lambda n, k: Fake(),
+    )  # fmt: skip
+    router.save_key("anthropic", "sk-ant-fake-0123456789")
+    runner = TaskRunner()
+    api = Api(runner, output_dir=tmp_path / "out", keep_office_open=False,
+              overrides={"ai_router": router})  # fmt: skip
+    assert runner.get(api.index_library()["id"]).wait(120)
+
+    reply = api.chat("AI bilan 7-sinf fizika kuch 6 ta test tuz")
+    assert "task" in reply, reply
+    task = runner.get(reply["task"]["id"])
+    assert task.wait(300)
+    snap = task.snapshot()
+    assert snap["status"] == "succeeded", (snap["error"], snap["steps"])
+    assert snap["title"].startswith("AI test")
+    res = snap["result"]
+    assert all(c["ok"] for c in res["checks"]), res["checks"]
+    assert res["questions"] == 6 and Fake.calls == 1
+    assert router.ledger.today() > 0
+
+
 def test_missing_topic_is_reported_honestly(data_dir):
     from nexvara.core.task import TaskRunner
     from nexvara.knowledge.service import TestRequest, index_library
