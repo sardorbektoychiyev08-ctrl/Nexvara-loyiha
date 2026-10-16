@@ -50,6 +50,15 @@ src/nexvara/
     ops.py                # PowerPointSession + slayd amallari
     layout.py             # Matn sig'ishi / ustma-ust / slayddan tashqari tekshiruvlari
     demo.py               # 6 slaydli taqdimot: PPTX + PDF, 11 tekshiruv
+  config.py               # Ma'lumotlar papkasi: D:\NEXVARA (Darsliklar, Testlar, nexvara.db)
+  knowledge/
+    textnorm.py           # PDF matnini tozalash (o‘/g‘, defis, sarlavhalar), gaplarga ajratish
+    catalog.py            # Sinf / fan / yil aniqlash
+    store.py              # SQLite + FTS5: kitoblar, sahifalar, bo'limlar, qidiruv (eng yangi nashr)
+    ingest.py             # Papkani indekslash (yangi/o'zgargan/dublikat/o'chirilgan/skaner)
+    quiz.py               # AI'siz savollar: ta'rif, yil/raqam, bo'sh joy, to'g'ri/noto'g'ri, moslash
+    service.py            # Chat buyrug'ini tushunish, test so'rovi, kutubxona amallari
+    testdoc.py            # Word'da test: variantlar + javoblar kaliti, DOCX/PDF, tekshiruv
   app/
     main.py               # pywebview oynasi; --smoke va --selftest-excel (4 tugma) rejimlari
     api.py                # JS -> Python ko'prigi (window.pywebview.api)

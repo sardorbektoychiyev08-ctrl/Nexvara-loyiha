@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "pywin32>=306",
     "pywebview>=5",
+    "pypdf>=4",
 ]
 
 [project.optional-dependencies]
@@ -26,7 +27,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 markers = [
     "office: drives real Microsoft Office; runs only when NEXVARA_RUN_OFFICE=1",
 ]
@@ -38,3 +39,6 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/textbook_fixture.py" = ["E501"]

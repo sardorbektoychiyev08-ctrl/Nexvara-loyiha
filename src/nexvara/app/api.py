@@ -81,12 +81,128 @@ class Api:
         text = (text or "").strip()
         if not text:
             return {"reply": ""}
+        from nexvara.knowledge.service import parse_test_request
+
+        req = parse_test_request(text)
+        if req is not None:
+            what = " ".join(
+                x for x in (f"{req.grade}-sinf" if req.grade else "", req.subject or "") if x
+            )
+            if not self.library_info()["books"]:
+                return {
+                    "reply": (
+                        "Test tuzish uchun avval darsliklarni qo‘shing: «Darsliklar» bo‘limida "
+                        "papkani oching, PDF darsliklarni tashlang va «Yangilash»ni bosing."
+                    )
+                }
+            snap = self.make_test(
+                {
+                    "grade": req.grade,
+                    "subject": req.subject,
+                    "topic": req.topic,
+                    "count": req.count,
+                    "variants": req.variants,
+                }
+            )
+            if "id" not in snap:  # request rejected before a task was started
+                return {"reply": snap["error"]}
+            topic = f", mavzu: «{req.topic}»" if req.topic else ""
+            return {
+                "reply": (
+                    f"Tushundim: {what or 'darslik'}{topic}, {req.count} ta savol, "
+                    f"{req.variants} ta variant. Word'da tuzyapman — jarayon o‘ng panelda."
+                ),
+                "task": snap,
+            }
         return {
             "reply": (
-                "AI provayder hali ulanmagan (M7 bosqichi). Hozircha Office Agent "
-                "bo'limidagi Excel, Word va PowerPoint vazifalarini ishga tushirishingiz mumkin."
+                "AI provayder hali ulanmagan (M7 bosqichi). Hozir men test tuza olaman, masalan: "
+                "«7-sinf fizika Nyuton qonunlari 20 ta test». Office Agent bo‘limida Excel, Word "
+                "va PowerPoint vazifalari ham bor."
             )
         }
+
+    # ----- textbook library -----
+    def library_info(self) -> dict[str, Any]:
+        from nexvara import config
+        from nexvara.knowledge.service import open_library
+
+        lib = open_library()
+        try:
+            ok = lib.books()
+            other = [b for b in lib.books(status=None) if b.status != "ok"]
+            return {
+                "folder": str(config.textbooks_dir()),
+                "books": [
+                    {
+                        "label": b.label(),
+                        "grade": b.grade,
+                        "subject": b.subject,
+                        "year": b.year,
+                        "pages": b.pages,
+                        "file": Path(b.path).name,
+                    }
+                    for b in ok
+                ],
+                "problems": [{"file": Path(b.path).name, "note": b.note} for b in other],
+                "catalog": {str(g): s for g, s in lib.grades_subjects().items()},
+            }
+        finally:
+            lib.close()
+
+    def open_library_folder(self) -> str:
+        from nexvara import config
+
+        folder = config.textbooks_dir()
+        folder.mkdir(parents=True, exist_ok=True)
+        if os.name == "nt":
+            subprocess.Popen(["explorer", str(folder)])
+        return str(folder)
+
+    def index_library(self) -> dict[str, Any]:
+        from nexvara.knowledge.service import index_library
+
+        fn = self._overrides.get("index_library", index_library)
+        return self._runner.start("Darsliklarni indekslash", fn).snapshot()
+
+    def make_test(self, params: dict[str, Any]) -> dict[str, Any]:
+        from nexvara.knowledge.service import TestRequest
+
+        def as_int(v: Any) -> int | None:
+            return int(v) if v not in (None, "") else None
+
+        try:
+            req = TestRequest(
+                grade=as_int(params.get("grade")),
+                subject=params.get("subject") or None,
+                topic=str(params.get("topic") or "").strip(),
+                count=20 if as_int(params.get("count")) is None else as_int(params.get("count")),
+                variants=1
+                if as_int(params.get("variants")) is None
+                else as_int(params.get("variants")),
+            )
+            req.validate()
+        except (TypeError, ValueError) as e:
+            return {"error": f"Noto‘g‘ri so‘rov: {e}"}
+        if "make_test" in self._overrides:
+            fn = self._overrides["make_test"]
+        else:
+            from nexvara.knowledge.testdoc import run_make_test
+
+            def fn(task: Any) -> dict[str, Any]:
+                out = None
+                if self._output_dir is not None:
+                    from nexvara.knowledge.service import default_test_path, make_quizzes
+
+                    book, topic, _ = make_quizzes(req)
+                    out = self._output_dir / default_test_path(book, topic).name
+                return run_make_test(task, req, out, keep_open=self._keep_office_open)
+
+        what = " ".join(
+            x for x in (f"{req.grade}-sinf" if req.grade else "", req.subject or "") if x
+        )
+        title = f"Test: {what or 'darslik'}" + (f" · {req.topic}" if req.topic else "")
+        return self._runner.start(title, fn).snapshot()
 
     def run_excel_demo(self) -> dict[str, Any]:
         return self._start("excel_demo")

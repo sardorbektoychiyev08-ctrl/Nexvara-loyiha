@@ -5,7 +5,7 @@ const STATUS_LABEL = {
   pending: "Kutilmoqda", running: "Bajarilmoqda", succeeded: "Bajarildi",
   failed: "Xato", cancelled: "Bekor qilindi",
 };
-const PAGES = new Set(["home", "chat", "office", "history", "settings"]);
+const PAGES = new Set(["home", "chat", "office", "library", "history", "settings"]);
 
 let currentTaskId = null;
 let pollTimer = null;
@@ -34,6 +34,7 @@ function show(page) {
     $("#page-placeholder").classList.add("active");
   }
   if (page === "history") renderHistory();
+  if (page === "library") renderLibrary();
 }
 
 $("#nav").addEventListener("click", (e) => {
@@ -64,6 +65,7 @@ $("#chat-form").addEventListener("submit", async (e) => {
   addMsg(text, true);
   const r = await api().chat(text);
   if (r.reply) addMsg(r.reply, false);
+  if (r.task) track(r.task);
 });
 
 // ---- tasks ----
@@ -117,17 +119,22 @@ async function poll() {
     clearInterval(pollTimer);
     pollTimer = null;
     refreshCount();
+    if ($("#page-library").classList.contains("active")) renderLibrary();
   }
 }
 
-document.querySelectorAll(".run-task").forEach((btn) => btn.addEventListener("click", async () => {
-  if (!api()) return;
-  const t = await api()[btn.dataset.api]();
+function track(t) {
   currentTaskId = t.id;
   renderTask(t);
   refreshCount();
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(poll, 300);
+}
+
+document.querySelectorAll(".run-task").forEach((btn) => btn.addEventListener("click", async () => {
+  if (!api()) return;
+  if (!btn.dataset.api) return;
+  track(await api()[btn.dataset.api]());
 }));
 
 $("#task-cancel").addEventListener("click", async () => {
@@ -158,6 +165,60 @@ async function refreshCount() {
   const tasks = await api().list_tasks();
   $("#task-count").textContent = tasks.length;
 }
+
+// ---- textbook library ----
+let catalog = {};
+
+function option(value, label) {
+  const o = el("option", "", label);
+  o.value = value;
+  return o;
+}
+
+function fillSubjects() {
+  const grade = $("#t-grade").value;
+  const subjects = grade ? (catalog[grade] || []) : [...new Set(Object.values(catalog).flat())].sort();
+  $("#t-subject").replaceChildren(option("", "— fan —"), ...subjects.map((s) => option(s, s)));
+}
+
+async function renderLibrary() {
+  if (!api()) return;
+  const info = await api().library_info();
+  $("#lib-folder").textContent = info.folder;
+  catalog = info.catalog;
+  const grades = Object.keys(catalog).map(Number).sort((a, b) => a - b);
+  const keepGrade = $("#t-grade").value;
+  $("#t-grade").replaceChildren(option("", "— sinf —"), ...grades.map((g) => option(String(g), `${g}-sinf`)));
+  if (grades.map(String).includes(keepGrade)) $("#t-grade").value = keepGrade;
+  fillSubjects();
+
+  $("#lib-empty").hidden = info.books.length > 0;
+  $("#test-form").hidden = info.books.length === 0;
+  $("#lib-count").textContent = `${info.books.length} ta darslik`;
+  $("#lib-books").replaceChildren(...info.books.map((b) => {
+    const tr = el("tr");
+    [b.grade ? `${b.grade}` : "?", b.subject || "aniqlanmadi", b.year || "", b.pages, b.file]
+      .forEach((v) => tr.appendChild(el("td", "", String(v))));
+    return tr;
+  }));
+  $("#lib-problems").replaceChildren(...info.problems.map((p) => el("li", "", `${p.file}: ${p.note}`)));
+  $("#lib-problems-box").hidden = info.problems.length === 0;
+}
+
+$("#t-grade").addEventListener("change", fillSubjects);
+$("#lib-open").addEventListener("click", () => api() && api().open_library_folder());
+$("#lib-index").addEventListener("click", async () => { if (api()) track(await api().index_library()); });
+$("#test-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!api()) return;
+  const r = await api().make_test({
+    grade: $("#t-grade").value, subject: $("#t-subject").value, topic: $("#t-topic").value,
+    count: $("#t-count").value, variants: $("#t-variants").value,
+  });
+  if (!r.id) { $("#t-error").textContent = r.error; $("#t-error").hidden = false; return; }
+  $("#t-error").hidden = true;
+  track(r);
+});
 
 // ---- boot ----
 window.addEventListener("pywebviewready", async () => {

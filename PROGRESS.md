@@ -4,6 +4,43 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-16 (4) — Claude Code — Darsliklar kutubxonasi va AI'siz test tuzish
+
+**Foydalanuvchi talabi:** NEXVARA xotirasiga maktab darsliklarini yuklash va "test tuzib ber" deyilganda test tuzish. Qarorlar (foydalanuvchi tanlovi): manba — faqat **yangi** darsliklar (foydalanuvchi o'zi qo'shadi), barcha sinf/fanlar, til — o'zbek (lotin), AI hozircha ulanmaydi (oddiy avtomatik testlar).
+
+**Manbalar tekshiruvi:**
+- `eduportal.uz` (vazirlikning eski rasmiy portali, ©2017): 6–11-sinf, 96 ta o'zbekcha PDF, 1,4 GB, 2017–2019 nashrlari. 1–5-sinf sahifalari server xatosi beradi. Foydalanuvchi eski nashrni **rad etdi**, shuning uchun hech narsa yuklab olinmadi.
+- Yangi (2025–2026) darsliklarni Respublika ta'lim markazi Telegram orqali tarqatadi, ularni avtomatik yuklab bo'lmaydi. Foydalanuvchi PDF'larni o'zi `D:\NEXVARA\Darsliklar` papkasiga tashlaydi.
+- Sifat sinovi uchun eduportal'dan faqat 2 ta PDF (7-sinf fizika, 9-sinf tarix) vaqtinchalik papkaga yuklandi. Ular kutubxonaga ham, Git'ga ham qo'shilmagan.
+
+**Qilindi** (`src/nexvara/knowledge/`, `config.py`):
+- `config.py`: ma'lumotlar `D:\NEXVARA` da (`NEXVARA_DATA` bilan o'zgartiriladi): `Darsliklar\`, `Testlar\`, `nexvara.db`. Repozitoriyadan tashqarida.
+- `textnorm.py`: PDF artefaktlarini tozalash: `o‘`/`g‘`/tutuq (U+FFFD → ‘/’), yumshoq defis, satr oxiridagi bo'g'in ko'chirish; sarlavha qatorlari gaplarga qo'shilmaydi.
+- `catalog.py`: fayl nomi, papka va kitob boshidan sinf, fan (28 ta fan) va nashr yili aniqlanadi.
+- `store.py`: SQLite + FTS5 (o'zbekcha qo'shimchalar uchun prefiks qidiruv), bo'limlar (§, mavzu, bob). Bir fanning bir nechta nashri bo'lsa, eng yangisi ishlatiladi.
+- `ingest.py`: papkani indekslash. Yangi, o'zgargan, dublikat, o'chirilgan fayllar aniqlanadi. Skaner (matnsiz) va kirill yozuvidagi PDF'lar alohida ro'yxatda ko'rsatiladi (OCR keyinroq, M5).
+- `quiz.py`: AI'siz savollar: ta'rif → qaysi atama (A–D, chalg'ituvchilar shu darslikdagi boshqa atamalardan), yil/raqam (formulali gaplarsiz), bo'sh joyni to'ldirish, to'g'ri/noto'g'ri, moslashtirish. Seed bilan deterministik, yetarli matn bo'lmasa ochiq aytadi.
+- `service.py` + `testdoc.py`: chat buyrug'ini tushunish ("7-sinf fizika Nyuton qonunlari 20 ta test 2 variant"). Word'da test yaratiladi: har variant alohida sahifada, F.I.Sh./sinf/sana qatori, oxirida javoblar kaliti (manba sahifasi bilan), DOCX + PDF, qayta ochib 5 ta tekshiruv.
+- UI: "Darsliklar va testlar" bo'limi (papka, yangilash, kitoblar jadvali, muammoli fayllar, test formasi). Chat ham test buyrug'ini qabul qiladi.
+
+**Sifat (haqiqiy darslik bilan sinov, 9-sinf tarix va 7-sinf fizika):** tarixda savollar asosan mantiqli (yillar, atamalar: Kontributsiya, Vassal, Uyezd, Volost, Katorga). Fizikada ham ta'riflar topiladi (Sanoq jism, Kinematika, Moddiy nuqta), lekin ba'zi savollarda shovqin qoladi. Natija "o'qituvchi tahrirlaydigan qoralama"; Word hujjat oxirida bu haqida ogohlantirish bor. Haqiqiy A–D savollar uchun AI rejimi (M7) kerak.
+
+**Topilgan va tuzatilgan xatolar:** `o‘` tiklangandan keyin yana buzilardi; " - " birlashtirish ta'riflarni buzardi (olib tashlandi); chat'da task snapshot'idagi bo'sh `error` maydoni xato deb o'qilardi; `count: 0` jimgina 20 ga aylanardi.
+
+**Testlar** (`.\scripts\test.ps1 -Office`, foydalanuvchi ruxsati bilan):
+| Test | Natija |
+|---|---|
+| ruff check + format | PASS |
+| Unit testlar (64 ta; sintetik darslik + o'zimiz yasagan PDF) | PASS |
+| Office testlari (28 ta; jumladan kutubxona: indekslash → Word test 2 variant, chat orqali test, topilmagan mavzu, UI'da "Yangilash" + "Test tuzish") | PASS |
+| Oyna smoke | PASS |
+| Haqiqiy yangi (2025–2026) darsliklar bilan | BLOCKED: foydalanuvchi hali PDF qo'shmagan |
+| Skaner (matnsiz) PDF'lar | NOT TESTED: aniqlanadi va ro'yxatda ko'rsatiladi, OCR yo'q |
+
+**Keyingi qadam:** foydalanuvchi darsliklarni `D:\NEXVARA\Darsliklar` ga qo'shgach, haqiqiy natijani tekshirish va filtrlarni sozlash; AI rejimi (M7) ulanganda savol sifatini oshirish; OCR (M5).
+
+---
+
 ## 2026-10-16 (3) — Claude Code — GitHub (private), Word va PowerPoint Skills (M4)
 
 **GitHub:**

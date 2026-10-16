@@ -13,6 +13,7 @@
       <button class="nav-item active" data-page="home">Home</button>
       <button class="nav-item" data-page="chat">AI Chat</button>
       <button class="nav-item" data-page="office">Office Agent</button>
+      <button class="nav-item" data-page="library">Darsliklar va testlar</button>
       <button class="nav-item" data-page="files" data-milestone="M5">Files</button>
       <button class="nav-item" data-page="bi" data-milestone="M8">NEXVARA BI</button>
       <button class="nav-item" data-page="workflows" data-milestone="M6">Workflows</button>
@@ -41,7 +42,7 @@
       <h1>AI Chat</h1>
       <div class="chat-log" id="chat-log"></div>
       <form class="chat-input" id="chat-form">
-        <input id="chat-text" type="text" placeholder="Buyruq yozing… masalan: Excel'da jadval yarat" autocomplete="off">
+        <input id="chat-text" type="text" placeholder="Masalan: 7-sinf fizika Nyuton qonunlari 20 ta test" autocomplete="off">
         <button class="btn primary" type="submit">Yuborish</button>
       </form>
     </section>
@@ -72,6 +73,54 @@
         <p>6 slayd (16:9): jadval, haqiqiy grafik, rasm, ma'ruzachi izohlari, o'tishlar va animatsiya.
           Matn sig'ishi va obyektlar ustma-ust tushmasligi tekshiriladi. PPTX va PDF saqlanadi.</p>
         <button class="btn primary run-task" id="run-ppt" data-api="run_presentation">PowerPoint taqdimot yaratish</button>
+      </div>
+    </section>
+
+    <section class="page" id="page-library">
+      <h1>Darsliklar va testlar</h1>
+      <p class="muted">Darsliklar kompyuteringizda saqlanadi va NEXVARA ulardan mavzu bo'yicha test tuzadi.</p>
+      <div class="card wide">
+        <div class="card-label">Darsliklar papkasi</div>
+        <div class="mono" id="lib-folder"></div>
+        <div class="row">
+          <button class="btn" id="lib-open" type="button">Papkani ochish</button>
+          <button class="btn primary run-task" id="lib-index" type="button">Yangilash (indekslash)</button>
+          <span class="muted" id="lib-count"></span>
+        </div>
+        <div id="lib-empty" class="hint">
+          <b>Qanday qo'shiladi:</b> yangi darsliklarni Respublika ta'lim markazining rasmiy Telegram
+          kanalidan PDF ko'rinishida yuklab oling va shu papkaga tashlang. Fayl nomida sinf va fan
+          bo'lsa yaxshi (masalan <span class="mono">7-sinf Fizika.pdf</span>) yoki
+          <span class="mono">7-sinf</span> nomli papkalarga joylang. Keyin «Yangilash»ni bosing.
+        </div>
+      </div>
+
+      <form class="card wide" id="test-form" hidden>
+        <div class="card-label">Test tuzish</div>
+        <div class="form-grid">
+          <label>Sinf <select id="t-grade"></select></label>
+          <label>Fan <select id="t-subject"></select></label>
+          <label class="wide-field">Mavzu (bo'sh qoldirilsa — butun darslik)
+            <input id="t-topic" type="text" placeholder="masalan: Nyuton qonunlari"></label>
+          <label>Savollar soni <input id="t-count" type="number" min="1" max="60" value="20"></label>
+          <label>Variantlar <input id="t-variants" type="number" min="1" max="6" value="1"></label>
+        </div>
+        <div class="error" id="t-error" hidden></div>
+        <div class="row"><button class="btn primary run-task" id="t-make" type="submit">Test tuzish</button></div>
+        <p class="muted small">Hozir AI'siz rejim: savollar darslik matnidagi ta'riflar, sanalar va
+          raqamlardan tuziladi. Word'da tahrirlab olishingiz mumkin. AI ulanganda sifat oshadi.</p>
+      </form>
+
+      <div class="card wide">
+        <div class="card-label">Kutubxona</div>
+        <table class="lib-table">
+          <thead><tr><th>Sinf</th><th>Fan</th><th>Yil</th><th>Bet</th><th>Fayl</th></tr></thead>
+          <tbody id="lib-books"></tbody>
+        </table>
+        <div id="lib-problems-box" hidden>
+          <div class="card-label" style="margin-top:12px">Qo'shilmagan fayllar</div>
+          <ul id="lib-problems" class="small"></ul>
+        </div>
       </div>
     </section>
 
