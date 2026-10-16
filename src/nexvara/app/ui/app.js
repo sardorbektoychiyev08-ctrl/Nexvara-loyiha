@@ -105,7 +105,7 @@ function renderTask(t) {
 
   const running = t.status === "running" || t.status === "pending";
   $("#task-cancel").disabled = !running || t.cancel_requested;
-  $("#run-excel").disabled = running;
+  document.querySelectorAll(".run-task").forEach((b) => { b.disabled = running; });
 }
 
 async function poll() {
@@ -120,15 +120,15 @@ async function poll() {
   }
 }
 
-$("#run-excel").addEventListener("click", async () => {
+document.querySelectorAll(".run-task").forEach((btn) => btn.addEventListener("click", async () => {
   if (!api()) return;
-  const t = await api().run_excel_demo();
+  const t = await api()[btn.dataset.api]();
   currentTaskId = t.id;
   renderTask(t);
   refreshCount();
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(poll, 300);
-});
+}));
 
 $("#task-cancel").addEventListener("click", async () => {
   if (currentTaskId) await api().cancel_task(currentTaskId);

@@ -20,6 +20,7 @@ import win32com.client
 import win32con
 import win32gui
 
+from nexvara.skills.excel.ops import set_number_format
 from nexvara.skills.excel.table import (
     XL_CENTER,
     XL_CONTINUOUS,
@@ -27,6 +28,7 @@ from nexvara.skills.excel.table import (
     XL_OPENXML_WORKBOOK,
     TableSpec,
     excel_color,
+    to_excel_value,
     validate_save_path,
 )
 
@@ -78,8 +80,9 @@ class ExcelSession:
                 if self.keep_open and self.visible:
                     self.app.UserControl = True
                 else:
-                    for wb in list(self.app.Workbooks):
-                        wb.Close(SaveChanges=False)
+                    # Index access keeps no Python reference alive past Quit().
+                    while self.app.Workbooks.Count:
+                        self.app.Workbooks(1).Close(SaveChanges=False)
                     self.app.Quit()
         except Exception:
             log.exception("Error while closing Excel")
@@ -122,7 +125,7 @@ class ExcelSession:
 def write_table(ws: Any, spec: TableSpec, top: int = 1, left: int = 1) -> Any:
     """Write headers + rows in one COM call; returns the written range."""
     spec.validate()
-    values = [list(spec.headers), *[list(r) for r in spec.rows]]
+    values = [list(spec.headers), *[[to_excel_value(v) for v in r] for r in spec.rows]]
     rng = ws.Range(spec.address(top, left))
     rng.Value = values
     return rng
@@ -145,7 +148,7 @@ def format_table(ws: Any, rng: Any, spec: TableSpec, top: int = 1, left: int = 1
     for c in spec.numeric_columns:
         body = ws.Range(ws.Cells(top + 1, left + c - 1), ws.Cells(top + n_rows - 1, left + c - 1))
         body.HorizontalAlignment = XL_CENTER
-        body.NumberFormat = "#,##0"
+        set_number_format(body, "integer")
 
     rng.Rows.RowHeight = 20
     rng.Columns.AutoFit()

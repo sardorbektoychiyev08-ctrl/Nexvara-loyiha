@@ -15,16 +15,39 @@ from nexvara import __version__
 from nexvara.core.task import TaskFn, TaskRunner
 
 
-def _excel_demo(task: Any) -> dict[str, Any]:
-    from nexvara.skills.excel.demo import run_demo
-
-    return run_demo(task)
-
-
 class Api:
-    def __init__(self, runner: TaskRunner | None = None, excel_demo: TaskFn = _excel_demo) -> None:
+    """`output_dir`/`keep_excel_open` exist so the UI self-test can run the real
+    button flow without leaving files in Documents or Excel open."""
+
+    def __init__(
+        self,
+        runner: TaskRunner | None = None,
+        excel_demo: TaskFn | None = None,
+        excel_dashboard: TaskFn | None = None,
+        output_dir: Path | None = None,
+        keep_excel_open: bool = True,
+    ) -> None:
         self._runner = runner or TaskRunner()
-        self._excel_demo = excel_demo
+        self._excel_demo = excel_demo or self._real_excel_demo
+        self._excel_dashboard = excel_dashboard or self._real_excel_dashboard
+        self._output_dir = output_dir
+        self._keep_excel_open = keep_excel_open
+
+    def _real_excel_demo(self, task: Any) -> dict[str, Any]:
+        from nexvara.skills.excel.demo import default_output_path, run_demo
+
+        out = default_output_path()
+        if self._output_dir is not None:
+            out = self._output_dir / out.name
+        return run_demo(task, out, keep_open=self._keep_excel_open)
+
+    def _real_excel_dashboard(self, task: Any) -> dict[str, Any]:
+        from nexvara.skills.excel.dashboard import default_output_path, run_dashboard
+
+        out = default_output_path()
+        if self._output_dir is not None:
+            out = self._output_dir / out.name
+        return run_dashboard(task, out, keep_open=self._keep_excel_open)
 
     def get_info(self) -> dict[str, Any]:
         return {
@@ -47,6 +70,10 @@ class Api:
 
     def run_excel_demo(self) -> dict[str, Any]:
         task = self._runner.start("Excel: 10 qatorli jadval", self._excel_demo)
+        return task.snapshot()
+
+    def run_excel_dashboard(self) -> dict[str, Any]:
+        task = self._runner.start("Excel: savdo dashboardi", self._excel_dashboard)
         return task.snapshot()
 
     def get_task(self, task_id: str) -> dict[str, Any] | None:

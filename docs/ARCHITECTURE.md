@@ -36,6 +36,10 @@ src/nexvara/
     table.py              # COM'siz yordamchilar: col_letter, excel_color, validate_save_path, TableSpec
     bridge.py             # ExcelSession (DispatchEx, visible, maximize, foreground), write/format/save
     demo.py               # Birinchi real test: 10 qatorli jadval -> saqlash -> qayta ochib tekshirish
+    ops.py                # Agent tool'lari: write/read, sort, filter, dublikat, format, shartli format,
+                          #   grafik, pivot, CSV/PDF eksport
+    formulas.py           # SUMIFS/growth/lookup; XLOOKUP yo'q bo'lsa INDEX/MATCH
+    dashboard.py          # Savdo dashboardi: ma'lumot, formulalar, KPI, 3 grafik, pivot, 14 tekshiruv
   app/
     main.py               # pywebview oynasi; --smoke rejimi
     api.py                # JS -> Python ko'prigi (window.pywebview.api)
@@ -52,6 +56,7 @@ Spec'dagi nomlar bilan moslik: `packages/core` -> `nexvara.core`, `skills/excel`
 ## Asosiy qarorlar
 
 - **Live visible execution**: `ExcelSession` `DispatchEx` bilan *alohida* Excel jarayonini ochadi, shuning uchun foydalanuvchining ochiq kitoblariga tegilmaydi. Oyna `Visible=True` qilinadi, maksimal kattalashtiriladi va oldinga chiqariladi. Amallar COM orqali bajariladi va Excel oynasida jonli ko'rinadi.
+- **Raqam formatlari va sanalar**: Excel 2016 + uz-Latn mintaqasida `NumberFormat` inglizcha kodni tarjima qilmaydi. Shuning uchun raqam formatlari Excel'ning o'z ajratgichlari bilan `NumberFormatLocal` orqali yoziladi. pywin32 naive `datetime` ni UTC ga siljitadi, shuning uchun sanalar seriya raqami sifatida yoziladi (`table.to_excel_value`).
 - **Til mustaqilligi**: formulalar `Range.Formula` orqali yoziladi (inglizcha nomlar, lokalga bog'liq emas). Sheet nomi aniq beriladi (`Лист1`/`Sheet1` farqi muhim emas). Ekran koordinatalari ishlatilmaydi.
 - **Xavfsiz saqlash**: `validate_save_path` nisbiy yo'lni, `.xlsx` bo'lmagan faylni va mavjud faylni (`overwrite=True` berilmasa) rad etadi. Overwrite qilishdan oldin `.bak-<vaqt>.xlsx` zaxira nusxasi olinadi.
 - **Task modeli**: har bir vazifa alohida thread'da ishlaydi. Qadamlar (`task.step(...)`) UI'ga jonli ko'rinadi. Bekor qilish kooperativ: har bir qadam boshida tekshiriladi.

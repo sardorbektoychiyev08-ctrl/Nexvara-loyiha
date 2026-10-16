@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as _dt
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -72,3 +73,78 @@ class TableSpec:
         bottom = top + len(self.rows) + extra_rows
         right = left + self.n_cols - 1
         return f"{col_letter(left)}{top}:{col_letter(right)}{bottom}"
+
+
+# ---------- locale-safe number formats ----------
+# On some locales (seen: Excel 2016 + uz-Latn-UZ) Range.NumberFormat is NOT translated
+# from US codes, so "#,##0" renders with ',' as the decimal mark. We therefore always
+# write NumberFormatLocal with the separators Excel itself reports.
+
+_DATE_TOKENS = set("dmyhsDMYHS")
+
+
+def is_date_format(code: str) -> bool:
+    """True if the US format code has date/time tokens outside quotes/escapes/brackets."""
+    in_quote = escaped = in_bracket = False
+    for ch in code:
+        if escaped:
+            escaped = False
+        elif ch == "\\":
+            escaped = True
+        elif ch == '"':
+            in_quote = not in_quote
+        elif in_quote:
+            continue
+        elif ch == "[":
+            in_bracket = True
+        elif ch == "]":
+            in_bracket = False
+        elif not in_bracket and ch in _DATE_TOKENS:
+            return True
+    return False
+
+
+def localize_number_format(code: str, decimal: str, thousands: str) -> str:
+    """Translate a US numeric format code ('#,##0.00') to local separators ('# ##0,00')."""
+    out = []
+    in_quote = escaped = False
+    for ch in code:
+        if escaped:
+            out.append(ch)
+            escaped = False
+        elif ch == "\\":
+            out.append(ch)
+            escaped = True
+        elif ch == '"':
+            out.append(ch)
+            in_quote = not in_quote
+        elif in_quote:
+            out.append(ch)
+        elif ch == ",":
+            out.append(thousands)
+        elif ch == ".":
+            out.append(decimal)
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
+# ---------- dates ----------
+# pywin32 shifts naive datetimes by the local UTC offset and rejects date objects,
+# so dates go in as Excel serial numbers and come back as naive datetimes.
+
+_EXCEL_EPOCH = _dt.datetime(1899, 12, 30)
+
+
+def to_excel_value(v: object) -> object:
+    if isinstance(v, _dt.datetime):
+        return (v.replace(tzinfo=None) - _EXCEL_EPOCH).total_seconds() / 86400
+    if isinstance(v, _dt.date):
+        return float((v - _EXCEL_EPOCH.date()).days)
+    return v
+
+
+def from_excel_value(v: object) -> object:
+    if isinstance(v, _dt.datetime):
+        return _dt.datetime(v.year, v.month, v.day, v.hour, v.minute, v.second)
+    return v
