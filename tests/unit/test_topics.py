@@ -107,3 +107,18 @@ def test_parse_topic_request(text, grade, subject, topic):
 def test_topic_request_needs_grade_or_subject_and_yields_to_tests():
     assert parse_topic_request("menga yordam kerak") is None
     assert parse_topic_request("7-sinf fizika bosim 10 ta test") is None
+
+
+def test_partial_title_word_does_not_win(tmp_path):
+    """Regression: "Amir Temur" matched "§ 6. Buxoro amirligida ..." through "amir"."""
+    lib = Library(tmp_path / "t.db")
+    pages = [
+        "§ 6. Buxoro amirligida islohotlar\nAmirlikda islohotlar boshlandi.",
+        "§ 7. Turkiston\nTurkiston haqida matn.",
+    ]
+    lib.add_book(path="a", sha256="1", title="t", grade=10, subject="O‘zbekiston tarixi",
+                 year=2017, pages=pages)  # fmt: skip
+    with pytest.raises(LookupError):
+        find_topic(lib, 10, "O‘zbekiston tarixi", "Amir Temur")
+    assert find_topic(lib, 10, "Tarix", "Buxoro amirligi").start_page == 1
+    lib.close()

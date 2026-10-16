@@ -191,11 +191,36 @@ def _pages_for(lib: Library, req: TestRequest) -> tuple[Book, list[tuple[int, st
     return book, pages, "umumiy"
 
 
+MAX_EXTRA_PAGES = 18
+
+
+def _topic_pages(lib: Library, req: TestRequest, book, hit_pages, topic_label):
+    """Pages for a topic test: the whole §-section of the topic, widened with the following
+    pages until the text yields enough questions (a short section gives few questions)."""
+    from nexvara.knowledge.topics import find_topic
+
+    try:
+        t = find_topic(lib, req.grade, req.subject, req.topic)
+    except (LookupError, ValueError):
+        return book, hit_pages, topic_label
+    book = t.book
+    start, end = t.start_page, t.end_page
+    pages = [(p, lib.page_text(book.id, p)) for p in range(start, end + 1)]
+    while len(build_quiz(pages, req.count, seed=1000).questions) < req.count and end < min(
+        book.pages, t.end_page + MAX_EXTRA_PAGES
+    ):
+        end += 3
+        pages = [(p, lib.page_text(book.id, p)) for p in range(start, min(end, book.pages) + 1)]
+    return book, pages, t.title
+
+
 def make_quizzes(req: TestRequest) -> tuple[Book, str, list[QuizResult]]:
     req.validate()
     lib = open_library()
     try:
         book, pages, topic = _pages_for(lib, req)
+        if req.topic:
+            book, pages, topic = _topic_pages(lib, req, book, pages, topic)
         pool = [d.term for d in extract_definitions(lib.book_pages(book.id))]
         quizzes = [
             build_quiz(pages, req.count, seed=1000 + v, term_pool=pool) for v in range(req.variants)

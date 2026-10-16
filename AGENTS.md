@@ -23,6 +23,7 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
   - `src/nexvara/skills/` (excel, word, powerpoint, common), `tests/office/` → Claude (`claude/*`)
   - `src/nexvara/knowledge/` (darsliklar, testlar), `config.py` → Claude (`claude/*`)
   - `src/nexvara/agent/` (buyruqlar) → Claude (`claude/*`)
+  - `src/nexvara/sources/` (darslik manbalari) → Claude (`claude/*`)
   - `src/nexvara/models/` (yangi paket), `tests/unit/test_models*.py` → `codex/model-router`
   - Umumiy fayllar (`PROGRESS.md`, `ROADMAP.md`, `pyproject.toml`, `app/`) → kichik, alohida commitlarda o'zgartiring; konflikt bo'lsa ikkala tomonning yozuvlarini saqlang.
 
@@ -52,5 +53,6 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
 - PowerPoint bitta nusxada ishlaydi: foydalanuvchining taqdimotlariga tegmang (`OfficeSession` faqat o'z hujjatlarini yopadi).
 - Formulalarni `Range.Formula` (inglizcha) orqali yozing, `FormulaLocal` orqali emas. Office ruscha bo'lishi ham mumkin.
 - Raqam formatlari: faqat `ops.set_number_format` orqali (Excel 2016 + uz-Latn mintaqasida `NumberFormat` tarjima qilinmaydi, `NumberFormatLocal` + Excel ajratgichlari kerak). Sanalar: faqat `ops.write_rows`/`to_excel_value` orqali (pywin32 naive datetime ni 5 soatga siljitadi).
+- Telegram session va API ma'lumotlari faqat `D:\NEXVARA\telegram` da; Git'ga hech qachon qo'shilmaydi.
 - Darsliklar: haqiqiy darslik PDF'lari Git'ga **hech qachon** qo'shilmaydi (mualliflik huquqi). Testlar `tests/textbook_fixture.py` dagi sintetik matn va PDF bilan ishlaydi. Foydalanuvchi ma'lumotlari `D:\NEXVARA` da.
 - Office testlarida `Windows fatal exception: code 0x80010108` chiqishi zararsiz: Excel yopilgandan keyin COM proxy bo'shatilganda pywin32 ichida ushlanadigan xato. Natija = pytest PASS/FAIL.

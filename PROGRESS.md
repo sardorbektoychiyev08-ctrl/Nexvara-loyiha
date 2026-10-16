@@ -4,6 +4,42 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-16 (7) — Claude Code — Darsliklarni avtomatik yuklash, OCR, Telegram yuklovchi
+
+**Foydalanuvchi talabi:** "kitoblarni o'zing yuklab ol". Tanlov: **ikkalasi**, ya'ni hozir eski rasmiy nashr, yangilari esa Telegram orqali.
+
+**Manbalar tekshiruvi:**
+- `dr.rtm.uz` (RTM rasmiy sayti): DNS'da yo'q (Google/Cloudflare DNS ham topmaydi). `kitob.uz`: 502.
+- `infoedu.uz` "2026-yilgi rasmiy nashr" deb e'lon qilgan `fizika_7_uzb.pdf` eski eduportal fayli bilan **SHA-256 bo'yicha bir xil** (2017-08-31 da yaratilgan). Bunday saytlar ishlatilmaydi.
+- Yangi darsliklar faqat RTM'ning rasmiy Telegram kanalida (`t.me/rtm_metodik_xizmat`) Telegram hujjati sifatida bor (masalan `Algebra_7-sinf_2-CH_uzb.pdf`).
+
+**Qilindi:**
+- `sources/eduportal.py`: portal sahifalari (id ≠ sinf; sinf fayl yo'lidan olinadi) → **205 ta o'zbekcha darslik (1–11-sinf)**. Yuklash to'xtab qolsa davom ettiriladi, PDF tekshiriladi. **203 tasi yuklandi (3,3 GB)**; 2 tasi serverning o'zida yo'q (404): `algebra_8_afidum`, `geometriya_10`.
+- `sources/telegram_rtm.py`: foydalanuvchi o'z Telegram hisobi bilan bir marta kiradi (my.telegram.org dan bepul API ID/hash + telefon kodi). Kanaldan faqat o'zbek maktablari uchun PDF'lar olinadi (qardosh, rus va boshqa tillar, dastur va reja fayllari o'tkazib yuboriladi), `rtm/<sinf>-sinf/` ga joylanadi. Session faqat `D:\NEXVARA\telegram` da saqlanadi.
+- Kutubxona: manba ustuvorligi **rtm > foydalanuvchi > eduportal**. Bir fanning chorak/qismlari birga qidiriladi. Yil matndan topilmasa PDF yaratilgan sanadan olinadi (sxema v4).
+- `knowledge/ocr.py`: **Windows'ning o'zidagi OCR** (en-US o'zbek lotin uchun, ru kirill uchun), sahifalar PyMuPDF bilan rasmga aylantiriladi. API ham, qo'shimcha dastur ham kerak emas, sahifasiga ~0,2 s.
+- `cryptography`: AES bilan shifrlangan 5 ta rasmiy PDF endi ochiladi. Yangi fanlar qo'shildi: Odobnoma, Nutq o'stirish, Milliy istiqlol g'oyasi, Tadbirkorlik va boshqalar.
+- Mavzu topish tuzatildi: qisman sarlavha mosligi ("amir" ~ "Amirligida") endi qabul qilinmaydi. O'zbekcha qo'shimchalar uchun o'zak 4 harfgacha qisqartiriladi. OCR shovqini ("01") testga tushmaydi.
+
+**Kutubxona natijasi** (`D:\NEXVARA\Darsliklar`, 203 PDF): **194 tasi tayyor** (52 tasi OCR orqali), 5 tasi kirill (rus tili darsliklari), 3 tasi matnsiz (1-sinf yozuv/matematika daftari, nemis tili 1), 0 xato, 0 noma'lum fan. To'liq indekslash OCR bilan ~80 daqiqa.
+
+**Haqiqiy darsliklarda sinov:** 7-sinf fizika "Nyuton qonunlari" → 19-§ (65–70); "Nyutonning ikkinchi qonuni" → 21-§; 8-sinf fizika (OCR) "Om qonuni" → 57–58-betlar; 9-sinf tarix "Toshkentning bosib olinishi" → 7-§; "tarixdan jadidlar" → 26-§; 10-sinf tarix "Amir Temur" → "topilmadi" (to'g'ri, bu sinfda yo'q).
+
+**Ma'lum cheklovlar:** OCR qilingan kitoblarda § sarlavhalar har doim tanilmaydi (mavzu matn bo'yicha topiladi). Formulalarda OCR xatolari bo'ladi. Eski nashr hozirgi o'quv dasturidan farq qilishi mumkin; yangi darsliklar Telegram orqali qo'shilgach ular ustun turadi.
+
+Test tuzish ham tuzatildi: endi mavzuning to'liq §-bo'limi olinadi va savol yetmasa keyingi betlar qo'shiladi. Natija: 7-sinf fizika "Nyuton qonunlari" 3/15 dan **15/15** ga; 9-sinf tarix 15/15; 8-sinf fizika (OCR) 10/10; 6-sinf biologiya "fotosintez" (OCR, § sarlavhasi topilmagan) 4/10, bu ochiq aytiladi.
+
+**Testlar** (`.\scripts\test.ps1 -Office`, foydalanuvchi ruxsati bilan):
+| Test | Natija |
+|---|---|
+| ruff + unit testlar (111 ta: manbalar 12, OCR 2, nashr ustuvorligi, qisman sarlavha regressiyasi) | PASS |
+| Office testlari (40 ta) | PASS (to'liq regressiya: 151/151; tuzatishdan keyin kutubxona va buyruq testlari 16/16) |
+| Oyna smoke | PASS |
+| Haqiqiy kutubxonada chat orqali: test (2 variant), mavzu (OCR kitob), taqdimot | PASS (5/5, 4/4, 3/3 tekshiruv) |
+| Telegram orqali haqiqiy kirish va yuklash | NOT TESTED: foydalanuvchining Telegram hisobi kerak (soxta mijoz bilan PASS) |
+
+---
+
 ## 2026-10-16 (6) — Claude Code — Office buyruqlari (AI'siz), chat, vaqt chegarasi
 
 **Foydalanuvchi talabi:** darsliklar kelguncha qolgan ishlarni qilish; hammasi **API kalitsiz** ishlashi; Office buyruq berilganda mukammal bajarishi.
