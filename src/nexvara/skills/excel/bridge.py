@@ -78,8 +78,9 @@ class ExcelSession:
                 if self.keep_open and self.visible:
                     self.app.UserControl = True
                 else:
-                    for wb in list(self.app.Workbooks):
-                        wb.Close(SaveChanges=False)
+                    # Index access keeps no Python reference alive past Quit().
+                    while self.app.Workbooks.Count:
+                        self.app.Workbooks(1).Close(SaveChanges=False)
                     self.app.Quit()
         except Exception:
             log.exception("Error while closing Excel")
