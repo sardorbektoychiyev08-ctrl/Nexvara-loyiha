@@ -94,3 +94,13 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto
 .check.bad::before { content: "✗ "; color: var(--err); }
 .history { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .history .card { display: flex; justify-content: space-between; align-items: center; }
+
+.hint { margin-top: 12px; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); line-height: 1.6; }
+.small { font-size: 12px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-top: 10px; }
+.form-grid label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+.form-grid .wide-field { grid-column: 1 / -1; }
+.form-grid input, .form-grid select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
+.lib-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.lib-table th, .lib-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.lib-table th { color: var(--muted); font-weight: 600; }

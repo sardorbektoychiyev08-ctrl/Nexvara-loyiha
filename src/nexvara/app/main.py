@@ -30,6 +30,12 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="smoke test, then press the real Excel button (drives Excel on screen)",
     )
+    parser.add_argument(
+        "--selftest-library",
+        metavar="DIR",
+        type=Path,
+        help="smoke test, then index the textbook folder and make a test from the UI form",
+    )
     parser.add_argument("--debug", action="store_true", help="enable WebView dev tools")
     args = parser.parse_args(argv)
 
@@ -38,10 +44,11 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     selftest = args.selftest_excel is not None
-    if selftest:
+    selftest_dir = args.selftest_excel or args.selftest_library
+    if selftest_dir is not None:
         args.smoke = True
-        args.selftest_excel.mkdir(parents=True, exist_ok=True)
-        api = Api(output_dir=args.selftest_excel.resolve(), keep_office_open=False)
+        selftest_dir.mkdir(parents=True, exist_ok=True)
+        api = Api(output_dir=selftest_dir.resolve(), keep_office_open=False)
     else:
         api = Api()
     window = webview.create_window(
@@ -75,12 +82,36 @@ def main(argv: list[str] | None = None) -> int:
             print(f"SMOKE {'PASS' if ok else 'FAIL'}: nav_items={nav} version={version!r}")
             if ok and selftest:
                 ok = excel_button_selftest(window)
+            if ok and args.selftest_library is not None:
+                ok = library_selftest(window)
             result["ok"] = ok
         finally:
             window.destroy()
 
     webview.start(smoke if args.smoke else None, debug=args.debug)
     return 0 if result["ok"] else 1
+
+
+def library_selftest(window: webview.Window) -> bool:
+    """Index the textbook folder and build a test through the real "Darsliklar" page."""
+    js = window.evaluate_js
+    js("document.querySelector('.nav-item[data-page=library]').click()")
+    time.sleep(1)
+    ok = _click_and_watch(window, "lib-index", "Darsliklarni indekslash", steps=2, checks=0)
+    time.sleep(1.5)  # the page re-renders the catalog after the task
+    first_grade = js(
+        "(document.querySelector('#t-grade option[value]:not([value=\"\"])')||{}).value"
+    )
+    js(f"document.getElementById('t-grade').value = '{first_grade}'")
+    js("document.getElementById('t-grade').dispatchEvent(new Event('change'))")
+    subject = js("(document.querySelector('#t-subject option[value]:not([value=\"\"])')||{}).value")
+    js(f"document.getElementById('t-subject').value = {subject!r}")
+    js("document.getElementById('t-topic').value = 'kuch massa bosim'")
+    js("document.getElementById('t-count').value = '6'")
+    title = f"Test: {first_grade}-sinf {subject} · kuch massa bosim"
+    made = _click_and_watch(window, "t-make", title, steps=6, checks=5)
+    print(f"SELFTEST library: grade={first_grade!r} subject={subject!r}")
+    return ok and made
 
 
 def excel_button_selftest(window: webview.Window) -> bool:
