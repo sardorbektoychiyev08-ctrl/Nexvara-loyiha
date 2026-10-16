@@ -134,28 +134,40 @@ def _qa_messages(text: str, hits, send_text: bool) -> list[dict[str, str]]:
     ]
 
 
+def _with_facts(system: str, facts) -> str:
+    """Only the remembered facts that match the request are sent (spec: short context)."""
+    if not facts:
+        return system
+    return (
+        system
+        + "\n\nFoydalanuvchi haqida eslab qolinganlar:\n"
+        + "\n".join(f"- {x}" for x in facts)
+    )
+
+
 def answer_question(
-    router: AiRouter, text: str, approved: bool = False, grade=None, subject=None
+    router: AiRouter, text: str, approved: bool = False, grade=None, subject=None, facts=()
 ) -> Answer:
     send = bool(router.config().get("send_textbook_text", True))
     hits = find_passages(text, grade, subject) if send else []
     r = router.complete(
-        "qa", QA_SYSTEM, _qa_messages(text, hits, send), max_tokens=6000, expected_out=900,
+        "qa", _with_facts(QA_SYSTEM, facts), _qa_messages(text, hits, send), max_tokens=6000,
+        expected_out=900,
         approved=approved,
     )  # fmt: skip
     sources = [{"book": h.book.label(), "page": h.page_no, "path": h.book.path} for h in hits]
     return Answer(r.text.strip(), sources, r.cost)
 
 
-def chat_reply(router: AiRouter, text: str, approved: bool = False) -> Answer:
+def chat_reply(router: AiRouter, text: str, approved: bool = False, facts=()) -> Answer:
     system = (
         "Sen NEXVARA — Windows uchun shaxsiy AI yordamchisan: Excel, Word, PowerPoint "
         "fayllari bilan ishlaysan, maktab darsliklaridan mavzu chiqarasan, test va taqdimot "
         "tuzasan. O‘zbek tilida (lotin) qisqa va do‘stona javob ber."
     )
     r = router.complete(
-        "classify", system, [{"role": "user", "content": text}], max_tokens=2000,
-        expected_out=300, approved=approved, effort="low",
+        "classify", _with_facts(system, facts), [{"role": "user", "content": text}],
+        max_tokens=2000, expected_out=300, approved=approved, effort="low",
     )  # fmt: skip
     return Answer(r.text.strip(), [], r.cost)
 

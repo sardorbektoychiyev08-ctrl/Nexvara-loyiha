@@ -8,11 +8,13 @@ from __future__ import annotations
 import importlib
 import os
 import platform
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
 
 from nexvara import __version__, config
+from nexvara.app.api_memory import MemoryApi
 from nexvara.core.task import TaskFn, TaskRunner
 
 # kind -> (task title, module, runner function). Every runner takes (task, out, keep_open=...)
@@ -38,7 +40,7 @@ def _wants_ai(text: str) -> bool:
     return bool(re.search(r"\b(ai|sun.?iy intellekt\w*|aqlli)\b", fold(text)))
 
 
-class Api:
+class Api(MemoryApi):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
 
@@ -106,12 +108,25 @@ class Api:
             "data_dir": str(config.data_dir()),
         }
 
-    def chat(self, text: str, _use_ai: bool = True) -> dict[str, Any]:
+    def chat(self, text: str) -> dict[str, Any]:
         text = (text or "").strip()
         if not text:
             return {"reply": ""}
+        mem = self._mem()
+        if mem is not None:
+            mem.log_chat("user", text)
+        out = self._chat_inner(text)
+        if mem is not None:
+            mem.log_chat("nexvara", out.get("reply", ""))
+        return out
+
+    def _chat_inner(self, text: str, _use_ai: bool = True) -> dict[str, Any]:
         from nexvara.agent.parse import find_file
         from nexvara.knowledge.service import parse_test_request
+
+        teach = self._chat_teach(text)
+        if teach is not None:
+            return teach
 
         # A named file means an Office command, whatever words its path contains
         # ("D:\Testlar\hisobot.xlsx" is not a request for a test).
@@ -139,6 +154,7 @@ class Api:
                 "variants": req.variants,
                 "ai": _wants_ai(text),
             }
+            self._apply_test_rules(text, params)
             snap = self.make_test(params)
             if "confirm" in snap:
                 return {"reply": snap["confirm"]["text"], "confirm": snap["confirm"]["token"]}
@@ -177,6 +193,61 @@ class Api:
             )
         }
 
+    # ----- Teach NEXVARA in chat ("eslab qol ...", "har doim ...") -----
+    def _chat_teach(self, text: str) -> dict[str, Any] | None:
+        from nexvara.knowledge.textnorm import fold
+        from nexvara.memory.teach import parse_teach
+
+        f = fold(text)
+        if re.search(r"\b(nimalarni|nima) (eslab qolding|eslab qolgansan|bilasan)", f):
+            facts = self.memory_facts()
+            rules = self.teach_rules()
+            if not facts and not rules:
+                return {"reply": "Hozircha hech narsa eslab qolmaganman."}
+            lines = [f"• {x['text']}" for x in facts[:20]]
+            lines += [f"• Qoida ({r['app_label']}): {r['text']}" for r in rules if r["enabled"]]
+            return {"reply": "Eslab qolganlarim:\n" + "\n".join(lines)}
+        req = parse_teach(text)
+        if req is None:
+            return None
+        if self._mem() is None:
+            return {"reply": "Xotira bu rejimda o‘chirilgan."}
+        if req.error:
+            return {"reply": req.error}
+        import uuid
+
+        token = uuid.uuid4().hex[:12]
+        self._pending[token] = ("teach", req)
+        return {"reply": req.describe() + "\n\nSaqlaymi?", "confirm": token}
+
+    def _save_teach(self, req: Any) -> dict[str, Any]:
+        mem = self._mem()
+        if req.kind == "fact":
+            mem.add_fact(req.text)
+            return {"reply": "Eslab qoldim ✓ (Memory bo‘limida tahrirlash mumkin)"}
+        mem.add_rule(req.app, req.text)
+        return {"reply": "Qoida saqlandi ✓ Endi har safar qo‘llayman (Teach NEXVARA bo‘limida "
+                "o‘chirib qo‘yish yoki tahrirlash mumkin)."}  # fmt: skip
+
+    def _apply_test_rules(self, text: str, params: dict[str, Any]) -> None:
+        """Taught test defaults ("testlar doim 2 variant") fill what the request left out."""
+        from nexvara.knowledge.service import _COUNT, _VARIANTS
+        from nexvara.knowledge.textnorm import fold
+
+        mem = self._mem()
+        if mem is None:
+            return
+        from nexvara.memory.teach import defaults_for_tests
+
+        rules = defaults_for_tests(mem)
+        f = fold(text)
+        if "count" in rules and not _COUNT.search(f):
+            params["count"] = rules["count"]
+        if "variants" in rules and not _VARIANTS.search(f):
+            params["variants"] = rules["variants"]
+        if rules.get("ai") and self._ai_ready():
+            params["ai"] = True
+
     # ----- AI (optional; nothing is sent without a key and the user's budget) -----
     def _router(self):
         if self._ai is None:
@@ -213,16 +284,18 @@ class Api:
         try:
             intent = features.classify(router, text, approved)
             if intent.kind in ("test", "topic", "presentation", "command") and intent.command:
-                out = self.chat(intent.command, _use_ai=False)
+                out = self._chat_inner(intent.command, _use_ai=False)
                 if not out.get("unhandled"):
                     out["reply"] = f"Tushundim: «{intent.command}»\n\n" + out["reply"]
                     return out
+            mem = self._mem()
+            facts = mem.relevant_facts(text) if mem is not None else []
             if intent.kind == "question":
                 ans = features.answer_question(
-                    router, text, approved, intent.grade, intent.subject or None
+                    router, text, approved, intent.grade, intent.subject or None, facts=facts
                 )
             else:
-                ans = features.chat_reply(router, text, approved)
+                ans = features.chat_reply(router, text, approved, facts=facts)
         except NeedsConfirmation as e:
             ask = self._ask("chat", text, e.estimate)
             return {"reply": ask["text"], "confirm": ask["token"]}
@@ -235,12 +308,23 @@ class Api:
         return {"reply": reply, "sources": ans.sources}
 
     def confirm_ai(self, token: str, yes: bool = True) -> dict[str, Any]:
+        """The user's "Ha"/"Yo‘q" on a pending request (paid AI call or a new rule)."""
+        out = self._confirm(token, yes)
+        mem = self._mem()
+        if mem is not None:
+            mem.log_chat("user", "Ha" if yes else "Yo‘q")
+            mem.log_chat("nexvara", out.get("reply", ""))
+        return out
+
+    def _confirm(self, token: str, yes: bool) -> dict[str, Any]:
         item = self._pending.pop(token, None)
         if item is None:
             return {"reply": "Bu so‘rov eskirgan; qaytadan yozing."}
         if not yes:
             return {"reply": "Bekor qilindi, hech narsa sarflanmadi."}
         kind, payload = item
+        if kind == "teach":
+            return self._save_teach(payload)
         if kind == "chat":
             return self._chat_ai(payload, approved=True)
         snap = self.make_test({**payload, "approved": True})
@@ -277,6 +361,12 @@ class Api:
         plan = parse_command(text, self._context_file)
         if plan is None:
             return None
+        taught = []
+        mem = self._mem()
+        if mem is not None and plan.file:
+            from nexvara.memory.teach import apply_rules
+
+            plan, taught = apply_rules(plan, mem)
         if not plan.file:
             what = {"excel": "Excel", "word": "Word", "powerpoint": "PowerPoint"}.get(
                 plan.app or "", "Office"
@@ -297,6 +387,8 @@ class Api:
         snap = self.run_command_plan(plan, str(source))
         steps = "\n".join(f"• {d}" for d in plan.describe())
         reply = f"Fayl: {source}\nBajaraman:\n{steps}"
+        if taught:
+            reply += "\n\nO‘rgatilgan qoidalar qo‘shildi: " + "; ".join(r.text for r in taught)
         if plan.unknown:
             reply += "\n\nTushunmadim (bajarilmaydi): " + "; ".join(f"«{u}»" for u in plan.unknown)
         return {"reply": reply, "task": snap, "plan": plan.describe()}

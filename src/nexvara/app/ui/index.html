@@ -245,6 +245,75 @@
       <div class="card wide"><div class="card-label">Tizim</div><pre id="sys-info" class="mono"></pre></div>
     </section>
 
+    <section class="page" id="page-memory">
+      <h1>Xotira</h1>
+      <p class="muted">NEXVARA eslab qolgan narsalar, suhbatlar va fayllar. Hammasi faqat shu
+        kompyuterda (D:\NEXVARA\app.db) saqlanadi. Chatda «Eslab qol: ...» deb yozsangiz ham bo‘ladi.</p>
+      <div class="card wide">
+        <div class="card-label">Qidiruv</div>
+        <form class="row" id="mem-search-form">
+          <input class="grow-input" id="mem-search" type="text" placeholder="masalan: maktab, hisobot, fizika">
+          <button class="btn primary" type="submit">Qidirish</button>
+        </form>
+        <ul class="plain-list" id="mem-search-results"></ul>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Eslab qolinganlar</div>
+        <form class="row" id="mem-fact-form">
+          <input class="grow-input" id="mem-fact" type="text" placeholder="masalan: Men 12-maktabda fizika o‘qituvchisiman">
+          <button class="btn primary" type="submit">Qo‘shish</button>
+        </form>
+        <ul class="plain-list" id="mem-facts"></ul>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Suhbatlar tarixi</div>
+        <div class="mem-chat" id="mem-chat"></div>
+        <div class="row"><button class="btn" id="mem-clear-chat" type="button">Suhbatlarni tozalash</button></div>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Oxirgi fayllar</div>
+        <table class="lib-table" id="mem-files"></table>
+      </div>
+      <div class="card wide">
+        <div class="card-label">Zaxira va tiklash</div>
+        <div class="row wrap">
+          <button class="btn" id="mem-export" type="button">Zaxira nusxa olish</button>
+          <button class="btn" id="mem-import" type="button">Zaxiradan tiklash</button>
+        </div>
+        <div class="muted small" id="mem-backup-msg"></div>
+      </div>
+    </section>
+
+    <section class="page" id="page-teach">
+      <h1>Teach NEXVARA</h1>
+      <p class="muted">Bir marta o‘rgating — NEXVARA keyingi har bir ishda qo‘llaydi. Masalan:
+        «Har doim Excel raqamlarini markazga joyla», «Word hujjatlarida doim sahifa raqamini qo‘y»,
+        «testlar doim 2 variant bo‘lsin». Chatda ham shunday yozsangiz bo‘ladi.</p>
+      <form class="card wide" id="teach-form">
+        <div class="card-label">Yangi qoida</div>
+        <div class="form-grid">
+          <label>Qaysi ish uchun <select id="teach-app">
+            <option value="excel">Excel</option><option value="word">Word</option>
+            <option value="powerpoint">PowerPoint</option><option value="test">Testlar</option>
+          </select></label>
+          <label class="wide-field">Qoida <input id="teach-text" type="text"
+            placeholder="masalan: jadvalni formatla va sarlavhani qotir"></label>
+        </div>
+        <div class="row">
+          <button class="btn" id="teach-check" type="button">Tekshirish</button>
+          <button class="btn primary" type="submit">Saqlash</button>
+        </div>
+        <div class="muted small" id="teach-preview"></div>
+        <div class="error" id="teach-error" hidden></div>
+        <p class="muted small">Word shablon: «shablon: D:\Shablonlar\maktab.dotx» deb yozing —
+          yangi Word hujjatlar (testlar, mavzular) shu shablondan yaratiladi.</p>
+      </form>
+      <div class="card wide">
+        <div class="card-label">O‘rgatilgan qoidalar</div>
+        <div id="teach-rules"></div>
+      </div>
+    </section>
+
     <section class="page" id="page-placeholder">
       <h1 id="placeholder-title"></h1>
       <p class="muted" id="placeholder-text"></p>

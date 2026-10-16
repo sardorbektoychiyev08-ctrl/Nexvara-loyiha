@@ -1,11 +1,16 @@
 "use strict";
 
+// Script errors are collected so the smoke test can fail on them.
+window.__errors = [];
+window.addEventListener("error", (e) => window.__errors.push(String(e.message)));
+window.addEventListener("unhandledrejection", (e) => window.__errors.push(String(e.reason)));
+
 const $ = (sel) => document.querySelector(sel);
 const STATUS_LABEL = {
   pending: "Kutilmoqda", running: "Bajarilmoqda", succeeded: "Bajarildi",
   failed: "Xato", cancelled: "Bekor qilindi",
 };
-const PAGES = new Set(["home", "chat", "office", "library", "history", "settings"]);
+const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach"]);
 
 let currentTaskId = null;
 let pollTimer = null;
@@ -36,6 +41,8 @@ function show(page) {
   if (page === "history") renderHistory();
   if (page === "library") renderLibrary();
   if (page === "settings") renderSettings();
+  if (page === "memory") renderMemory();
+  if (page === "teach") renderTeach();
 }
 
 $("#nav").addEventListener("click", (e) => {
@@ -481,12 +488,162 @@ function applySettings() {
 }
 ["t-count", "t-variants"].forEach((id) => $("#" + id).addEventListener("input", (e) => { e.target.dataset.touched = "1"; }));
 
+// ---- memory ----
+const when = (ts) => (ts ? new Date(ts * 1000).toLocaleString() : "");
+
+async function renderMemory() {
+  if (!api()) return;
+  const facts = await api().memory_facts();
+  const list = $("#mem-facts");
+  list.textContent = "";
+  if (!facts.length) list.appendChild(el("li", "muted", "Hozircha bo‘sh"));
+  facts.forEach((f) => {
+    const li = el("li", "item-row");
+    li.append(el("span", "grow", f.text));
+    const edit = el("button", "btn small-btn", "Tahrirlash");
+    const del = el("button", "btn small-btn", "O‘chirish");
+    edit.addEventListener("click", async () => {
+      const t = prompt("Yangi matn:", f.text);
+      if (t === null) return;
+      const r = await api().memory_update_fact(f.id, t);
+      if (!r.ok) alert(r.error);
+      renderMemory();
+    });
+    del.addEventListener("click", async () => {
+      if (!confirm(`O‘chirilsinmi?\n${f.text}`)) return;
+      await api().memory_delete_fact(f.id);
+      renderMemory();
+    });
+    li.append(edit, del);
+    list.appendChild(li);
+  });
+  const chat = await api().memory_chat(300);
+  const box = $("#mem-chat");
+  box.textContent = "";
+  if (!chat.length) box.appendChild(el("div", "muted", "Suhbatlar yo‘q"));
+  chat.forEach((c) => {
+    const row = el("div", c.role === "user" ? "mem-line me" : "mem-line");
+    row.append(el("span", "muted small", when(c.ts) + " "), el("span", "", c.text));
+    box.appendChild(row);
+  });
+  box.scrollTop = box.scrollHeight;
+  const files = await api().recent_files();
+  const t = $("#mem-files");
+  t.textContent = "";
+  if (!files.length) { t.appendChild(el("tr")).appendChild(el("td", "muted", "Hozircha fayl yo‘q")); }
+  files.forEach((f) => {
+    const tr = el("tr", "clickable");
+    [f.name, f.task, when(f.ts)].forEach((v) => tr.appendChild(el("td", "", v)));
+    tr.title = f.path;
+    tr.addEventListener("click", () => api().reveal_file(f.path));
+    t.appendChild(tr);
+  });
+}
+
+$("#mem-fact-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const r = await api().memory_add_fact($("#mem-fact").value);
+  if (!r.ok) { alert(r.error); return; }
+  $("#mem-fact").value = "";
+  renderMemory();
+});
+$("#mem-search-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const found = await api().memory_search($("#mem-search").value);
+  const ul = $("#mem-search-results");
+  ul.textContent = "";
+  const KIND = { fact: "Eslab qolingan", chat: "Suhbat", rule: "Qoida", task: "Vazifa" };
+  if (!found.length) ul.appendChild(el("li", "muted", "Hech narsa topilmadi"));
+  found.forEach((x) => {
+    const li = el("li", "item-row");
+    li.append(el("span", "badge", KIND[x.kind] || x.kind), el("span", "grow", x.text),
+      el("span", "muted small", when(x.ts)));
+    ul.appendChild(li);
+  });
+});
+$("#mem-clear-chat").addEventListener("click", async () => {
+  if (!confirm("Barcha suhbatlar tarixi o‘chirilsinmi? Eslab qolinganlar va qoidalar qoladi.")) return;
+  await api().memory_clear_chat();
+  renderMemory();
+});
+$("#mem-export").addEventListener("click", async () => {
+  const r = await api().memory_export();
+  $("#mem-backup-msg").textContent = r.ok ? `Saqlandi: ${r.path}` : `Xato: ${r.error}`;
+});
+$("#mem-import").addEventListener("click", async () => {
+  const r = await api().memory_import("");
+  if (!r.ok && !r.error) return;
+  $("#mem-backup-msg").textContent = r.ok
+    ? `Tiklandi: ${r.facts} ta eslatma, ${r.rules} ta qoida (borlari takrorlanmadi)` : `Xato: ${r.error}`;
+  renderMemory();
+});
+
+// ---- Teach NEXVARA ----
+async function teachCheck() {
+  const r = await api().teach_preview($("#teach-app").value, $("#teach-text").value);
+  $("#teach-preview").textContent = r.actions && r.actions.length ? `Har safar: ${r.actions.join("; ")}` : "";
+  $("#teach-error").hidden = !r.error; $("#teach-error").textContent = r.error || "";
+  return r;
+}
+$("#teach-check").addEventListener("click", teachCheck);
+$("#teach-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const r = await api().teach_add($("#teach-app").value, $("#teach-text").value);
+  if (!r.ok) { $("#teach-error").hidden = false; $("#teach-error").textContent = r.error; return; }
+  $("#teach-text").value = ""; $("#teach-preview").textContent = "Saqlandi ✓"; $("#teach-error").hidden = true;
+  drawRules(r.rules);
+});
+
+async function renderTeach() { if (api()) drawRules(await api().teach_rules()); }
+
+function drawRules(rules) {
+  const box = $("#teach-rules");
+  box.textContent = "";
+  if (!rules.length) box.appendChild(el("div", "muted", "Hali qoida yo‘q"));
+  rules.forEach((r) => {
+    const row = el("div", "ai-prov");
+    const head = el("div", "ai-prov-head");
+    const tog = el("label", "check-inline");
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = r.enabled;
+    cb.addEventListener("change", async () => drawRules((await api().teach_update(r.id, null, cb.checked)).rules));
+    tog.append(cb, document.createTextNode(" yoqilgan"));
+    head.append(el("span", "", ""), tog);
+    head.firstChild.append(el("span", "badge", r.app_label), document.createTextNode(` ${r.text}`));
+    const acts = el("div", r.problem ? "error" : "muted small",
+      r.problem || `Har safar: ${r.actions.join("; ")} · versiya ${r.version}`);
+    const btns = el("div", "row wrap");
+    const edit = el("button", "btn small-btn", "Tahrirlash");
+    const vers = el("button", "btn small-btn", "Versiyalar");
+    const del = el("button", "btn small-btn", "O‘chirish");
+    edit.addEventListener("click", async () => {
+      const t = prompt("Qoidaning yangi matni:", r.text);
+      if (t === null) return;
+      const res = await api().teach_update(r.id, t, null);
+      if (!res.ok) { alert(res.error); return; }
+      drawRules(res.rules);
+    });
+    vers.addEventListener("click", async () => {
+      const v = await api().teach_versions(r.id);
+      alert(v.map((x) => `v${x.version} (${when(x.ts)}): ${x.text}`).join("\n"));
+    });
+    del.addEventListener("click", async () => {
+      if (!confirm(`Qoida o‘chirilsinmi?\n${r.text}`)) return;
+      drawRules(await api().teach_delete(r.id));
+    });
+    btns.append(edit, vers, del);
+    row.append(head, acts, btns);
+    box.appendChild(row);
+  });
+}
+
 // ---- boot ----
 window.addEventListener("pywebviewready", async () => {
   const info = await api().get_info();
   $("#version").textContent = `NEXVARA v${info.version}`;
   $("#sys-info").textContent = JSON.stringify(info, null, 2);
   refreshAiStatus();
+  // The conversation continues where it stopped last time.
+  (await api().memory_chat(30)).forEach((c) => addMsg(c.text, c.role === "user"));
   settings = await api().get_settings();
   setTheme(settings.theme, false);
   applySettings();

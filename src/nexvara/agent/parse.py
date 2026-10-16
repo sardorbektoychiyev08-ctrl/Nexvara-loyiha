@@ -292,7 +292,8 @@ def _classify(clause: str, app: str | None) -> Action | None:
         return _spacing(clause, f)
     if _has(f, "xatboshi", "abzats", "otstup"):
         return _indent(clause, f)
-    if _has(f, "sahifa raqam", "bet raqam", "raqamla"):
+    # "raqamlab chiq" numbers pages; "raqamlarini markazga" is about the numbers in a table.
+    if _has(f, "sahifa raqam", "bet raqam", r"raqamla(?!r)"):
         return Action("page_numbers", {}, clause)
     if _has(f, "mundarija", "oglavlen"):
         return Action("toc", {}, clause)

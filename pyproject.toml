@@ -52,3 +52,4 @@ select = ["E", "F", "W", "I", "B", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/textbook_fixture.py" = ["E501"]
+"tests/ui_scripts/*" = ["E501", "E402"]  # long JS selectors; env is set before imports

@@ -130,11 +130,26 @@ def main(argv: list[str] | None = None) -> int:
             while time.monotonic() < deadline and not providers:
                 time.sleep(0.2)
                 providers = window.evaluate_js("document.querySelectorAll('.ai-prov').length")
+            # Every page opens, none is a placeholder, and no script error happened.
+            pages = json.loads(window.evaluate_js(
+                "JSON.stringify([...document.querySelectorAll('.nav-item')]"
+                ".map(b => b.dataset.page))"
+            ))  # fmt: skip
+            placeholders = []
+            for page in pages:
+                window.evaluate_js(f"document.querySelector('.nav-item[data-page={page}]').click()")
+                time.sleep(0.4)
+                if window.evaluate_js(
+                    "document.querySelector('#page-placeholder.active') !== null"
+                ):
+                    placeholders.append(page)
             window.evaluate_js("document.querySelector('.nav-item[data-page=home]').click()")
-            ok = ok and providers == 4
+            time.sleep(0.5)
+            errors = json.loads(window.evaluate_js("JSON.stringify(window.__errors)"))
+            ok = ok and providers == 4 and not errors
             print(
                 f"SMOKE {'PASS' if ok else 'FAIL'}: nav_items={nav} version={version!r} "
-                f"ai_providers={providers}"
+                f"ai_providers={providers} not_ready={placeholders} js_errors={errors}"
             )
             if ok and selftest:
                 ok = excel_button_selftest(window)
