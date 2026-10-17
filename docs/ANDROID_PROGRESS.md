@@ -7,10 +7,12 @@
 - Chat buyruqlari Windows javob bermasa Android Keystore bilan shifrlangan navbatda qoladi; qayta yuborishda avvalgi `X-Request-Id` ishlatiladi. Kamera orqali rasm olish va yuborish qo‘shildi. Release signing muhit qiymatlari bilan tayyorlandi; haqiqiy keystore kiritilmadi.
 - Android `:app:assembleDebug :app:testDebugUnitTest` — PASS, 3/3 QR unit test. APK SHA-256: `0fb936e716d501bc6259e01d0cd4f4d87cf758c8e8c728a8ad8a3079384532bc`.
 - Android 16 haqiqiy telefonga ADB orqali APK o‘rnatish va ishga tushirish — PASS. QR orqali demo Windows API bilan pairing va `salom` chat so‘roviga server javobining telefonda ko‘rinishi — PASS. Klaviatura xabar maydonini berkitishi topildi, `imePadding` bilan tuzatildi va telefonda qayta tekshirildi — PASS.
+- Chatning oxirgi 200 xabari har bir PC uchun shifrlangan xotirada saqlanadigan qilindi. Ilova majburan to‘xtatilib qayta ochilganda `tarix_sinov` xabari va server javobi ko‘rindi — PASS. 41 baytli sun’iy matn fayli Android fayl tanlash oynasidan demo serverga yuborildi — PASS.
+- Android 16 da kamera oynasi NEXVARA'dan ochildi va ilovaga qaytildi — PASS; suratga olish/yuborish NOT TESTED. Yangilangan APK SHA-256: `f313d6e31ec8c9b18604ae03b5273dccdbd4ad6e6a97d1d0a4d911e3f50a71f1`.
 - Windows `scripts/test.ps1` — FAIL/BLOCKED: Android worktree'da `.venv` yo‘q. Windows kodi va Claude ishchi papkasi tegilmagan.
-- Kamera, fayl almashinuvi, haqiqiy Windows ish stoli agenti bilan E2E va fon bildirishnomalari — NOT TESTED. Google OAuth — BLOCKED (Google Cloud Android client ID/SHA kerak); pause/resume — BLOCKED (API yo‘q).
+- Kamerada suratga olish/yuborish, faylni qayta yuklab olish, haqiqiy Windows ish stoli agenti bilan E2E va fon bildirishnomalari — NOT TESTED. Google OAuth — BLOCKED (Google Cloud Android client ID/SHA kerak); pause/resume — BLOCKED (API yo‘q).
 
-Keyingi qadam: kamera va fayl almashinuvini, haqiqiy Windows agenti bilan vazifalarni E2E sinash; fon sinxronizatsiyasi va bildirishnomalar.
+Keyingi qadam: kamera va faylni qayta yuklab olishni, haqiqiy Windows agenti bilan vazifalarni E2E sinash; fon sinxronizatsiyasi va bildirishnomalar.
 
 ## 2026-10-17 — Codex — Android V1 boshlanishi
 

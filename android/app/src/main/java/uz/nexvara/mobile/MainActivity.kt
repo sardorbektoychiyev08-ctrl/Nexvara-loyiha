@@ -59,6 +59,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         secure = SecureSession(this)
         profile = secure.read()
+        loadHistory()
         setContent { NexvaraUi() }
         if (profile != null) refresh()
     }
@@ -115,6 +116,7 @@ class MainActivity : ComponentActivity() {
         secure.save(raw, result.getString("token"), result.optString("pc_name"))
         runOnUiThread {
             profile = secure.read()
+            loadHistory()
             taskEtag = ""
             tasks.clear()
             pairing = false
@@ -159,8 +161,20 @@ class MainActivity : ComponentActivity() {
         if (text.length > 4_000) { notice = "Buyruq 4000 belgidan oshmasin"; return }
         val qr = profile?.optString("qr") ?: return
         secure.queueChat(PairCode.parse(qr).serverId, UUID.randomUUID().toString(), text)
-        messages.add(Message(text, true))
+        recordMessage(text, true)
         flushPending()
+    }
+
+    private fun loadHistory() {
+        messages.clear()
+        val sid = profile?.optString("qr")?.takeIf { it.isNotBlank() }?.let { PairCode.parse(it).serverId } ?: return
+        messages.addAll(secure.history(sid).map { Message(it.optString("text"), it.optBoolean("mine")) })
+    }
+
+    private fun recordMessage(text: String, mine: Boolean) {
+        val sid = profile?.optString("qr")?.takeIf { it.isNotBlank() }?.let { PairCode.parse(it).serverId } ?: return
+        secure.appendHistory(sid, text, mine)
+        messages.add(Message(text, mine))
     }
 
     private fun flushPending() {
@@ -184,7 +198,7 @@ class MainActivity : ComponentActivity() {
                             break
                         }
                         secure.removeQueued(item.getString("id"))
-                        runOnUiThread { messages.add(Message(e.message ?: "Buyruq bajarilmadi", false)) }
+                        runOnUiThread { recordMessage(e.message ?: "Buyruq bajarilmadi", false) }
                     } catch (_: Exception) {
                         runOnUiThread { connected = false; notice = "Kompyuter javob bermayapti — buyruq navbatda" }
                         break
@@ -195,7 +209,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showChatReply(result: JSONObject) {
-        result.optString("reply").takeIf { it.isNotBlank() }?.let { messages.add(Message(it, false)) }
+        result.optString("reply").takeIf { it.isNotBlank() }?.let { recordMessage(it, false) }
         confirmToken = result.optJSONObject("confirm")?.optString("token")?.takeIf { it.isNotBlank() }
         if (!result.isNull("task")) { tab = 2; refresh() }
         if (result.optBoolean("open_bi")) notice = "Dashboard kompyuter oynasida ochildi"
@@ -221,7 +235,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         val result = api().upload(contentResolver, uri, name, size.takeIf { it >= 0 } ?: 50_000_000)
-        runOnUiThread { messages.add(Message("${result.optString("name")} kompyuterga yuborildi", false)); tab = 1 }
+        runOnUiThread { recordMessage("${result.optString("name")} kompyuterga yuborildi", false); tab = 1 }
     }
 
     @Composable
@@ -377,7 +391,7 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         Button(onClick = {
                                             secure.select(PairCode.parse(pc.getString("qr")).serverId)
-                                            profile = secure.read(); taskEtag = ""; tasks.clear(); confirmToken = null; connected = false
+                                            profile = secure.read(); loadHistory(); taskEtag = ""; tasks.clear(); confirmToken = null; connected = false
                                             refresh()
                                         }) { Text("Shu kompyuterni tanlash") }
                                     }

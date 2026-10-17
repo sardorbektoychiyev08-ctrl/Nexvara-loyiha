@@ -4,6 +4,13 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 — Codex — Android chat tarixi va fayl sinovi
+
+- `codex/android-mobile` worktree'da har bir PC uchun so‘nggi 200 chat xabari shifrlangan xotiraga yoziladigan qilindi. Ilova qayta ochilganda tarix tiklanadi.
+- **PASS:** Android APK build, 3/3 QR unit test; Android 16 telefonda ilova majburan to‘xtatilib qayta ochilgach chat tarixi ko‘rindi; 41 baytli sun’iy fayl demo Windows API'ga yuborildi; kamera oynasi ochildi va ilovaga qaytildi.
+- **FAIL/BLOCKED:** `scripts/test.ps1` bu worktree'da `.venv` bo‘lmagani uchun ishlamadi. **NOT TESTED:** suratga olish/yuborish, faylni olish, haqiqiy Windows agenti vazifalari, fon bildirishnomalari. Office testlari ruxsatsiz ishga tushirilmadi.
+- Keyingi qadam: Windows agenti bilan vazifalar va faylni olish sinovi; qolgan mobil bo‘limlar va fon ishlashi.
+
 ## 2026-10-17 — Codex — Android V1 telefon sinovi
 
 - Ish faqat alohida `.worktrees/android` worktree va `codex/android-mobile` tarmog‘ida bajarildi. `main` dagi telefon API v1 shu tarmoqqa merge qilindi; Claude ishchi papkasi va tarmog‘i almashtirilmadi.

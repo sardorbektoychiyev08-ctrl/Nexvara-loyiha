@@ -17,9 +17,10 @@ Windows tomondan kerak bo‘ladigan keyingi endpointlar: `pause/resume`, chat ta
 ## Ma’lum cheklovlar
 
 - Bir nechta PC sessiyasi shifrlangan holda saqlanadi; Devices sahifasida tanlanadi.
+- Chatning oxirgi 200 xabari har bir PC uchun Android Keystore bilan shifrlanib saqlanadi va ilova qayta ochilganda ko‘rsatiladi.
 - Chatdagi tasdiq `POST /api/v1/confirm` orqali beriladi.
 - Vazifa holati ilova ekranda bo‘lganida `tasks/watch` bilan yangilanadi. Fon bildirishnomalari keyingi bosqichda.
 - `session` tavsiya qilsa token avtomatik almashtiriladi.
 - Kompyuter vaqtincha javob bermasa chat buyrug‘i shifrlangan navbatda qoladi va ekrandagi aloqa tiklanganda o‘sha `X-Request-Id` bilan qayta yuboriladi. Windows serveri idempotency javobini 10 daqiqa saqlaydi; undan uzoq uzilishdan keyingi noma’lum natijani foydalanuvchi vazifalar tarixida tekshirishi kerak.
-- Kamera rasmi Android `TakePicture` orqali olinadi. Haqiqiy qurilmada sinov NOT TESTED.
+- Kamera rasmi Android `TakePicture` orqali olinadi. Android 16 da kamera oynasini ochish PASS; suratga olish va yuborish NOT TESTED. Oddiy fayl yuborish demo server bilan PASS.
 - Release signing va Google login haqiqiy konfiguratsiyasiz BLOCKED.

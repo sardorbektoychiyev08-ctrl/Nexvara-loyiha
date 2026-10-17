@@ -91,6 +91,7 @@ class SecureSession(context: Context) {
         val pcs = state.getJSONObject("pcs")
         val removed = state.optString("active")
         pcs.remove(removed)
+        state.optJSONObject("history")?.remove(removed)
         val old = state.optJSONArray("queue")
         if (old != null) {
             val kept = JSONArray()
@@ -108,6 +109,22 @@ class SecureSession(context: Context) {
         val state = state()
         val queue = state.optJSONArray("queue") ?: JSONArray().also { state.put("queue", it) }
         queue.put(JSONObject().put("sid", serverId).put("id", requestId).put("text", text))
+        saveState(state)
+    }
+
+    @Synchronized fun history(serverId: String): List<JSONObject> {
+        val entries = state().optJSONObject("history")?.optJSONArray(serverId) ?: return emptyList()
+        return (0 until entries.length()).mapNotNull { entries.optJSONObject(it) }
+    }
+
+    @Synchronized fun appendHistory(serverId: String, text: String, mine: Boolean) {
+        val state = state()
+        val histories = state.optJSONObject("history") ?: JSONObject().also { state.put("history", it) }
+        val old = histories.optJSONArray(serverId) ?: JSONArray()
+        val entries = JSONArray()
+        for (i in (old.length() - 199).coerceAtLeast(0) until old.length()) entries.put(old.get(i))
+        entries.put(JSONObject().put("text", text).put("mine", mine))
+        histories.put(serverId, entries)
         saveState(state)
     }
 
