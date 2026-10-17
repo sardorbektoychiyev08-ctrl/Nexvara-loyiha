@@ -117,9 +117,15 @@ def describe_rule(app: str, text: str) -> tuple[list[str], str]:
 
 def parse_teach(text: str) -> TeachRequest | None:
     """'Eslab qol: maktabim 12-maktab' -> fact; 'Har doim Excel ... formatla' -> rule."""
-    if find_file(text) and not _TEMPLATE.search(text):
-        return None  # a command about a file, even if it says "doim"
     f = fold(text)
+    starts_as_fact = re.match(
+        r"^\s*(eslab\s+qol|yodda\s+tut|xotiraga\s+yoz|shu\s+faylni\s+eslab)", f
+    )
+    if find_file(text) and not _TEMPLATE.search(text) and not starts_as_fact:
+        return None  # a command about a file, even if it says "doim"
+    if starts_as_fact and find_file(text):  # "Eslab qol: oylik hisobotim D:\...\Oylik.xlsx"
+        body = re.sub(r"^[\s:,.-]+", "", _strip_trigger(text)).strip()
+        return TeachRequest("fact", text=body) if body else None
     tpl = _TEMPLATE.search(text)
     if tpl and "shablon" in f:  # "Mana shu Word shablonini ishlat: D:\...\maktab.dotx"
         body = f"shablon: {tpl.group(0)}"

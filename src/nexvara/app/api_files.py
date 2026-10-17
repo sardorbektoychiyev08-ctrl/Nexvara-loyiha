@@ -153,5 +153,8 @@ class FilesApi:
             return {"reply": f"«{words}» nomli fayl topilmadi. Fayllar bo‘limida boshqa papkani "
                     "tanlab qidirib ko‘ring."}  # fmt: skip
         lines = [f"• {x.name} — {x.folder}" for x in found]
+        ctx = getattr(self, "_ctx", None)
+        if ctx is not None:
+            ctx.set_files([x.path for x in found])  # "topilgan fayllarni ZIP qil"
         return {"reply": f"«{words}» bo‘yicha topildi ({len(found)}):\n" + "\n".join(lines),
                 "files": [x.path for x in found]}  # fmt: skip

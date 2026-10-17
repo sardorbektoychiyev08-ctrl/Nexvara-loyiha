@@ -20,7 +20,7 @@ class UpdateApi:
         from nexvara.appdata import Settings
         from nexvara.updater import Updater
 
-        channel = Settings().load()["update"]["channel"] if self._history is not None else ""
+        channel = Settings().load()["update"]["channel"]  # reading only
         return Updater(channel)
 
     def update_after_start(self) -> dict[str, Any]:

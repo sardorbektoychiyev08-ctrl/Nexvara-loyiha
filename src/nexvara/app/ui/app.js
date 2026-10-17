@@ -86,6 +86,7 @@ function handleReply(r) {
   if (r.task) track(r.task, true);
   if (r.open_bi) biOpenSource(r.open_bi);
   if (r.theme) setTheme(r.theme, false);
+  if (r.bi_ui) biFromChat(r.bi_ui);
 }
 
 // A paid AI request waits for the user's answer; nothing is sent before "Ha".
@@ -372,7 +373,41 @@ async function renderSettings() {
   renderAi();
   renderAccount();
   renderUpdate();
+  renderSync();
 }
+
+// ---- sync between devices ----
+async function renderSync(status) {
+  if (!api()) return;
+  const st = status || await api().sync_status();
+  if (document.activeElement !== $("#sync-folder")) $("#sync-folder").value = st.folder || "";
+  $("#sync-drive").checked = !!st.google_drive;
+  $("#sync-pass").placeholder = st.has_passphrase ? "saqlangan ✓ (almashtirish uchun yozing)" : "parol kiriting";
+  const last = st.last ? new Date(st.last * 1000).toLocaleString() : "hali yo‘q";
+  if (!$("#sync-msg").dataset.keep) $("#sync-msg").textContent = `Oxirgi sinxron: ${last}`;
+}
+
+$("#sync-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const err = $("#sync-error");
+  const pw = $("#sync-pass").value;
+  if (pw) {
+    const r = await api().sync_set_passphrase(pw);
+    $("#sync-pass").value = "";
+    if (!r.ok) { err.hidden = false; err.textContent = r.error; return; }
+  }
+  const r = await api().save_settings({ sync: { folder: $("#sync-folder").value.trim(), google_drive: $("#sync-drive").checked } });
+  err.hidden = r.ok; err.textContent = r.ok ? "" : r.error;
+  renderSync();
+});
+$("#sync-now").addEventListener("click", async () => {
+  $("#sync-msg").textContent = "Sinxronlanmoqda…";
+  const r = await api().sync_now();
+  $("#sync-error").hidden = r.ok; $("#sync-error").textContent = r.ok ? "" : r.error;
+  $("#sync-msg").dataset.keep = r.ok ? "1" : "";
+  $("#sync-msg").textContent = r.ok ? r.summary : "";
+  if (r.ok) renderSync(r);
+});
 
 // ---- version and updates ----
 async function renderUpdate(status) {
@@ -427,7 +462,7 @@ async function renderAccount(status) {
   } else if (st.login.state === "waiting") {
     info.textContent = "Brauzerda Google hisobingizni tanlang…";
   } else {
-    info.textContent = "Kirilmagan";
+    info.textContent = `Sozlangan (${st.client_id || ""}), kirilmagan`;
   }
   if (st.login.state === "error") { err.hidden = false; err.textContent = st.login.error; }
   login.hidden = st.signed_in;
@@ -437,6 +472,11 @@ async function renderAccount(status) {
   if (st.login.state === "waiting") accountTimer = setTimeout(() => renderAccount(), 1500);
 }
 
+$("#account-import").addEventListener("click", async () => {
+  const r = await api().account_import_client();
+  renderAccount(r);
+  if (!r.ok && r.error !== "Fayl tanlanmadi") { $("#account-error").hidden = false; $("#account-error").textContent = r.error; }
+});
 $("#account-login").addEventListener("click", async () => {
   const r = await api().account_login();
   if (!r.ok) { $("#account-error").hidden = false; $("#account-error").textContent = r.error; return; }
