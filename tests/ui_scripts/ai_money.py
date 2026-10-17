@@ -83,7 +83,7 @@ def run():
             "document.getElementById('ai-card').textContent.includes('API krediti bilan bir xil emas')"
         )
         js(
-            "[...document.querySelectorAll('.ai-prov')].find(r => r.textContent.includes('OpenAI')).querySelectorAll('button')[2].click()"
+            "[...[...document.querySelectorAll('.ai-prov')].find(r => r.textContent.includes('OpenAI')).querySelectorAll('button')].find(b => b.textContent.startsWith('To‘lov / Balans')).click()"
         )
         time.sleep(0.5)
         res["errors"] = json.loads(js("JSON.stringify(window.__errors)"))

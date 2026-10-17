@@ -4,6 +4,45 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (20) — Claude Code — Windows V1: to'liq o'rnatish va yangilanish (1.0.1 o'rnatildi)
+
+**Foydalanuvchi talabi:** barcha bo'limlarni bitta Windows installerga yig'ish; mavjud o'rnatishni aniqlab xavfsiz yangilash; Google, OneDrive NEXVARA-SYNC, Memory/Teach, darsliklar, dashboardlar, API sozlamalari, imzo kaliti va rollback yo'qolmasin — avval zaxira va tiklash sinovi; o'zbekcha UI, yorliq, Start menyu; AI ulanishi qulay (rasmiy OAuth bo'lsa), kalitlar faqat Windows himoyalangan xotirasida; yangilanish xabari va «Yangilash»; o'rnatilgan dasturni haqiqatda ochib tekshirish; Codex Android'ga tegmaslik; private push.
+
+**Aniqlangan holat:** o'rnatilgan NEXVARA yo'q edi — ish stoli yorlig'i repodagi dev versiyani (`.venv\pythonw -m nexvara.app.main`) ochardi. Dev nusxasi (ishlab turgan) to'xtatilmadi.
+
+**Qilindi** (tarmoq `claude/windows-v1-install`):
+- `scripts/backup_userdata.py`: D:\NEXVARA to'liq zaxirasi (SQLite — backup API orqali, har fayl SHA-256, ish stoli yorlig'i; Credential Manager sirlari eksport qilinmaydi, faqat nomlari), `verify`, `restore` (bo'sh bo'lmagan papkaga faqat `--i-approve` va eski fayllar chetga ko'chiriladi). Zaxira: `D:\NEXVARA-zaxira\20261017-160705` (292 fayl, 7.34 GB, xato 0). Tiklash sinovi vaqtinchalik papkaga: 292/292 mos, himoya ishladi, sinov nusxasi o'chirildi.
+- Versiya 1.0.1 (1.0.0 → 1.0.1 haqiqiy yangilash sinovi uchun).
+- Ishga tushganda yangilanish xabari (Bosh sahifa ustida): «Yangi versiya bor: X» + «Yangilash» / «Keyinroq»; yangilangandan keyin «NEXVARA yangilandi ✓», muvaffaqiyatsizda rollback ko'rsatmasi. Faqat imzoli manifest o'qiladi, bosilmaguncha hech narsa yuklanmaydi (`update_auto`).
+- Installer o'zining nusxasini `%LOCALAPPDATA%\NEXVARA\installers\<ver>` ga qoldiradi — qo'lda o'rnatilgan versiyaga ham rollback mumkin; updater yangilanish papkasi yo'q bo'lsa yiqilardi (tuzatildi).
+- Installer oynasi o'zbekcha ([Messages]); o'chirishda «ma'lumotlaringiz o'chirilmaydi».
+- AI ulanishi: «Buferdan kalitni saqlash» — saytda nusxalangan kalit sahifadan o'tmaydi, bepul tekshiriladi, Credential Manager'ga yoziladi, bufer tozalanadi, AI o'zi yoqilmaydi; qadamma-qadam ko'rsatma. Rasmiy OAuth: OpenAI/Claude/DeepSeek'da uchinchi tomon API uchun yo'q; Gemini'da bor, lekin Google Cloud loyihasi va keng `cloud-platform` ruxsati kerak, Google o'zi API kalitni eng oddiy yo'l deydi → hammasi uchun bir martalik kalit.
+- `NEXVARA.exe --selftest-installed <papka>`: haqiqiy ma'lumotlarni faqat o'qib 12 sahifa, Google, sinxron fayli shifrini ochish, AI sozlamalari, yangilanish holati; Excel/Word/PowerPoint/BI namunalari faqat shu papkaga; `report.json` (faqat ha/yo'q va sonlar).
+- Tuzatildi: `DeviceStore` jadval migratsiyasi ikki oqim bir vaqtda ochsa «duplicate column» bilan yiqilardi (Qurilmalar sahifasi UI testida topildi).
+- Mahalliy yangilanish kanali: `D:\NEXVARA\releases` (settings.json `update.channel`) — bu **mahalliy**, internet yangilanishi emas.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| `.\scripts\test.ps1 -Office` | 354/356 — 2 UI testi: `ai_money` (tugma tartibi o'zgargan, test tugma nomi bo'yicha qidiradigan qilindi), `devices_page` (yuqoridagi migratsiya xatosi). Ikkalasi tuzatilib qayta: 2/2 PASS |
+| `.\scripts\test.ps1` (tuzatishlardan keyin) | 300 passed (56 Office testi o'tkazib yuborildi), smoke PASS |
+| Vaqtinchalik papkada (vaqtinchalik ma'lumotlar, ish stoli yorlig'isiz): 0.1.0 o'rnatish → smoke → haqiqiy updater bilan 1.0.0 → rollback 0.1.0 → yana 1.0.0 → smoke → buzilgan manifest rad etildi → o'chirish (registr yozuvi va fayllar yo'q) → ma'lumotlar har bosqichda o'zgarmagan | 14/14 PASS |
+| Haqiqiy o'rnatish 1.0.0 (`%LOCALAPPDATA%\Programs\NEXVARA`, Start menyu, ish stoli yorlig'i → o'rnatilgan exe) | PASS |
+| Haqiqiy yangilash 1.0.0 → 1.0.1 mahalliy kanal orqali (imzo, SHA-256, jim o'rnatish, dastur o'zi qayta ochildi, pending yo'q, rollback uchun 1.0.1 va 1.0.0 saqlangan) | PASS |
+| O'rnatilgan 1.0.1 `--selftest-installed`: 12 sahifa, Google (sozlangan, kirgan, egasi belgilangan), OneDrive NEXVARA-SYNC (papka bor, parol bor, 1/1 fayl shifri ochildi), AI 4 provayder (AI o'chiq, kalit 0), Excel, Excel dashboard, Word, PowerPoint — succeeded, BI 8 vidjet | PASS |
+| Ma'lumotlar zaxira bilan solishtirildi: 289 fayl bir xil, 277/277 PDF joyida, google_client.json va imzo kaliti o'zgarmagan, Credential Manager nomlari bir xil; o'zgargan yagona narsa `update.channel` | PASS |
+| Internet (https) yangilanishi | BLOCKED — server yo'q, sotib olinmadi |
+| Authenticode imzo | BLOCKED — sertifikat yo'q |
+| Haqiqiy pullik AI | NOT TESTED — ruxsat kutilmoqda |
+| Ikkinchi qurilma (Nilufar) sinxroni | NOT TESTED — hozircha faqat shu kompyuter fayli bor |
+
+**Eslatma:** fon jarayonlarida eski yashirin Excel/PowerPoint (avtomatlashtirish) jarayonlari qolgan bo'lishi mumkin — ruxsatsiz majburan to'xtatilmagan.
+
+**Keyingi qadam:** https yangilanish serveri kerakmi — egasi qaror qiladi; AI kalitini kiritib, ruxsat bilan `scripts/ai_live_test.py`.
+
+---
+
 ## 2026-10-17 (19) — Claude Code — Shaxsiy ma'lumotlarni himoyalash, OpenAI/Gemini haqiqiy sinovga tayyorgarlik
 
 **Foydalanuvchi talabi:** haqiqiy AI sinovidan OLDIN o'quvchilar va boshqa shaxslarning ma'lumotlarini (ism-familiya, JSHSHIR, telefon, pasport, manzil…) tashqi AI'ga yuborishdan oldin mahalliy yashirish, javobda mahalliy tiklash; ishonchsizda bloklash; Gemini, OpenAI va fallback holatlarida test; OpenAI uchun kunlik $0.25 va bitta vazifa $0.05 ichki limiti; pullik fallback avtomatik boshlanmasin; birinchi sinovlar faqat sun'iy matnlar; pullik chaqiruv yo'q, ruxsatni kutish; Codex Android'ga tegmaslik.
