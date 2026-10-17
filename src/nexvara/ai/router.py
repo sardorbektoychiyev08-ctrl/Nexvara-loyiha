@@ -25,6 +25,7 @@ from typing import Any
 from nexvara import config
 from nexvara.ai import models
 from nexvara.ai.keys import KeyStore, mask
+from nexvara.ai.privacy import Guard
 from nexvara.ai.providers import AiError, Provider, Reply, fetch_balance, make_provider
 from nexvara.core.task import UserError
 
@@ -188,6 +189,7 @@ class AiRouter:
         self.factory = factory or make_provider
         self.balance_fetch = balance_fetch or fetch_balance
         self._balances: dict[str, dict] = {}  # provider -> last real balance (memory only)
+        self.last_masked = 0  # personal items hidden in the last request (count only)
 
     # ----- configuration -----
     def config(self) -> dict[str, Any]:
@@ -215,7 +217,7 @@ class AiRouter:
         return models.PROVIDERS[provider]["tiers"][tier]
 
     def _limits(self, provider: str) -> tuple[float | None, float | None]:
-        lim = (self.config().get("limits") or {}).get(provider) or {}
+        lim = (self.config().get("limits") or {}).get(provider) or {}  # daily/monthly/task
         d, m = lim.get("daily_usd"), lim.get("monthly_usd")
         return (float(d) if d not in (None, "") else None,
                 float(m) if m not in (None, "") else None)  # fmt: skip
@@ -256,6 +258,12 @@ class AiRouter:
             raise BudgetExceeded(f"{label} uchun kunlik limit (${p_day:.2f}) tugaydi.")
         if p_month is not None and self.ledger.month(est.provider) + est.cost > p_month:
             raise BudgetExceeded(f"{label} uchun oylik limit (${p_month:.2f}) tugaydi.")
+        p_task = ((cfg.get("limits") or {}).get(est.provider) or {}).get("task_usd")
+        if p_task not in (None, "") and est.cost > float(p_task):
+            raise BudgetExceeded(
+                f"{label} uchun bitta topshiriq limiti (${float(p_task):.2f}) dan oshadi: bu "
+                f"so‘rov ≈${est.cost:.3f}."
+            )
         task = cfg.get("task_limit_usd")
         if task not in (None, "") and est.cost > float(task):
             raise BudgetExceeded(
@@ -280,12 +288,19 @@ class AiRouter:
         cfg = self.config()
         if not cfg.get("enabled"):
             raise AiUnavailable("AI o‘chirilgan (Sozlamalar → AI).")
+        # Personal data is replaced locally before anything leaves this PC, for every
+        # provider including a fallback one; unreliable detection blocks the request.
+        guard = Guard()
+        system = guard.mask(system)
+        messages = [{**m, "content": guard.mask(m["content"])} for m in messages]
+        self.last_masked = guard.count
+        self.masked_total = getattr(self, "masked_total", 0) + guard.count
         tier = tier or TIER_FOR.get(purpose, "balanced")
         first = self.provider_name()
         if first is None:
             raise AiUnavailable("AI kaliti kiritilmagan (Sozlamalar → AI).")
         chain = [first]
-        if cfg.get("fallback", True):
+        if cfg.get("fallback", False):  # off by default: a paid fallback never starts by itself
             chain += [p for p in self.connected() if p != first]
         est = self.estimate(tier, system, messages, expected_out or max_tokens // 2, first)
         self.check_budget(est, approved)  # confirmation is asked for the main provider
@@ -312,6 +327,8 @@ class AiRouter:
                 last_error = e
                 continue
             reply.provider = provider
+            reply.text = guard.restore(reply.text)  # real values back, on this PC only
+            reply.masked = guard.count  # type: ignore[attr-defined]
             reply.cost = models.cost(reply.model or est.model, provider, reply.input_tokens,
                                      reply.output_tokens, cfg.get("prices"))  # fmt: skip
             self.ledger.record(provider, reply.model or est.model, purpose, reply.input_tokens,
@@ -341,8 +358,6 @@ class AiRouter:
         changes: dict[str, Any] = {"models": chosen, "checked": checked}
         if not cfg.get("provider") or not self.keys.load(cfg["provider"]):
             changes["provider"] = provider
-        if not cfg.get("enabled"):
-            changes["enabled"] = True
         self.settings.update({"ai": changes})
         missing = [models.TIER_LABELS[t] for t, m in tiers.items() if m is None]
         shown = {t: m for t, m in tiers.items() if m}
@@ -394,7 +409,11 @@ class AiRouter:
             "spent_month": round(month, 4),
             "daily_limit": day_lim,
             "monthly_limit": month_lim,
-            "own_limits": {"daily_usd": p_day, "monthly_usd": p_month},
+            "own_limits": {
+                "daily_usd": p_day,
+                "monthly_usd": p_month,
+                "task_usd": ((cfg.get("limits") or {}).get(name) or {}).get("task_usd"),
+            },
             "left_today": round(max(0.0, day_lim - today), 4),
             "left_month": round(max(0.0, month_lim - month), 4),
         }
@@ -423,7 +442,7 @@ class AiRouter:
             "task_limit_usd": cfg.get("task_limit_usd"),
             "confirm_over_usd": cfg["confirm_over_usd"],
             "send_textbook_text": cfg["send_textbook_text"],
-            "fallback": bool(cfg.get("fallback", True)),
+            "fallback": bool(cfg.get("fallback", False)),
             "warnings": warnings,
             "blocked": today >= daily or month >= monthly,
         }

@@ -35,7 +35,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "confirm_over_usd": 0.05,  # ask before a single request that may cost more
         "task_limit_usd": 0.50,  # a single request estimated above this is refused
         "limits": {},  # provider -> {"daily_usd": x, "monthly_usd": y} (optional, own caps)
-        "fallback": True,  # busy/down provider -> another connected one (same budget rules)
+        "fallback": False,  # busy/down provider -> another one; off: no paid call by itself
         "send_textbook_text": True,
         "models": {},  # provider -> tier -> model id (filled when a key is checked)
         "checked": {},  # provider -> {"at": time, "models": n} of the last key check

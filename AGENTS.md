@@ -36,6 +36,7 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
 ## Hozirgi vazifalar taqsimoti
 - **Claude**: Office skill'lari, darsliklar, buyruqlar va M7 (AI). Codex `codex/model-router` da hech narsa commit qilmagani uchun M7 ni Claude o'z zimmasiga oldi (2026-10-16): `src/nexvara/ai/`.
 - **Codex**: limit tugaganda Claude'ning so'nggi `claude/*` tarmog'ini davom ettiradi (PROGRESS.md dagi oxirgi yozuvdan boshlab). Asosiy alohida vazifa: Android APK (`android/`, [docs/ANDROID_HANDOFF.md](docs/ANDROID_HANDOFF.md)).
+- **Maxfiylik**: tashqi AI'ga har so'rov `ai/privacy.py` orqali mahalliy yashiriladi va javob mahalliy tiklanadi; aniqlash ishonchsiz bo'lsa so'rov bloklanadi. Boshqa yo'l bilan foydalanuvchi matnini provayderga yubormang.
 - **AI qoidalari**: API kalitlar faqat Windows Credential Manager'da (`NEXVARA/ai/<provayder>`), hech qachon faylda yoki Git'da emas. Testlarda faqat soxta provayder; haqiqiy pullik chaqiruv faqat foydalanuvchi kalit kiritib, AI'ni o'zi yoqqanda. Har chaqiruv `app.db` dagi `ai_usage` jadvaliga yoziladi, kunlik/oylik limit va "qimmat so'rovda so'rash" chegarasi `settings.json` da.
 
 ## Foydalanuvchi haqida

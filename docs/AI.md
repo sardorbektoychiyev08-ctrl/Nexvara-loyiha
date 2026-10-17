@@ -40,12 +40,23 @@ Outdated ids found in the check: `gemini-3.5-flash` (no longer listed), `deepsee
 - Limits: overall daily / monthly, per provider daily / monthly (optional), one task
   (`task_limit_usd`, default $0.50), and "ask above" (`confirm_over_usd`, default $0.05).
   The special tier always asks. At 80% a warning is shown; at 100% new paid calls are blocked.
-- Fallback (`ai.fallback`, on): a busy/down/unreachable provider (429, 5xx, network) hands the
-  same request to another connected provider at the same tier, with the same limits and never
+- Fallback (`ai.fallback`, **off by default** — a paid fallback never starts by itself): when
+  the user turns it on, a busy/down/unreachable provider (429, 5xx, network) hands the same
+  request to another connected provider at the same tier, with the same limits and never
   above what the user agreed to. A wrong key or missing credit never switches silently.
+- Saving a key only checks it (free model list); it does **not** switch paid AI on — the user
+  ticks "AI yoqilgan" in Settings → AI.
+- Per-provider limits also have a one-task cap (`limits.<provider>.task_usd`). Set for the
+  first real OpenAI test: daily $0.25, one task $0.05. These are NEXVARA's own limits, not the
+  provider's real spending cap — set that on the provider's site too.
 - Home → "AI balans va xarajatlar": per provider spent today / month, limits, "left of
   limit" and — separately — the real provider balance (DeepSeek only; others say
   "Haqiqiy balansni avtomatik olish imkoni yo‘q").
+
+## Personal data
+
+Every request is masked locally first and restored locally after — see [PRIVACY.md](PRIVACY.md).
+Unreliable detection blocks the request. Applies to all providers and to a fallback provider.
 
 ## Security
 
@@ -64,6 +75,11 @@ Estimated with NEXVARA's own estimator: one planner call ≈ 2,000 input + 400 o
 | Gemini | $0.0016 | $0.0060 | $0.0088 |
 | DeepSeek | $0.0011 | $0.0011 | $0.0042 |
 
-Proposed test per connected provider: key check (free) + 3 chat commands + 1 textbook question
-≈ **under $0.05 per provider, under $0.20 for all four**; run with a temporary daily limit of
-$0.25 so it cannot exceed that.
+Prepared script, synthetic texts only (the privacy guard must find nothing in them):
+
+    .venv\Scripts\python.exe scripts\ai_live_test.py openai      # dry run: estimate, sends nothing
+    .venv\Scripts\python.exe scripts\ai_live_test.py gemini
+    .venv\Scripts\python.exe scripts\ai_live_test.py openai --run --i-approve   # real, after OK
+
+Dry-run estimate (4 requests: chat, 2 plans, 1 question): OpenAI ≈ $0.021, Gemini ≈ $0.017.
+A real run refuses without a key saved in Settings, without "AI yoqilgan", or with fallback on.

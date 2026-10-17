@@ -35,7 +35,7 @@ Read first: [AGENTS.md](AGENTS.md) (rules), the newest entry of [PROGRESS.md](PR
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | Real AI test with the user's key(s) | Only with the user's explicit OK (paid). Plan and cost in docs/AI.md (< $0.05 per provider). Router v2: 4 tiers, fallback, limits |
+| 1 | Real AI test with the user's key(s) | Only with the owner's explicit OK (paid). `scripts/ai_live_test.py <provider>` (dry run first; `--run --i-approve` only after OK). OpenAI own limits: $0.25/day, $0.05/task |
 | 2 | Real Google login + Drive sync | User creates a *Desktop app* OAuth client, imports JSON in Settings, signs in **themselves**. Never sign in for them. Steps: docs/GOOGLE_LOGIN.md |
 | 2b | Second device for OneDrive sync | Nilufar's PC must sync once into `OneDrive\NEXVARA-SYNC` with the same passphrase; then verify both ways |
 | 3 | Task history sync | `sync.py` syncs facts, rules, safe settings. History rows hold PC paths; sync titles/status only, mark files as "on <pc>" |
@@ -47,6 +47,10 @@ Read first: [AGENTS.md](AGENTS.md) (rules), the newest entry of [PROGRESS.md](PR
 
 ## Safety rules that tests enforce — do not weaken
 
+- Personal data is masked locally before any AI request and restored after (`ai/privacy.py`,
+  applied in `AiRouter.complete`); unreliable detection blocks the request. Never send user
+  text to a provider by another path. Paid fallback is off by default; saving a key does not
+  switch AI on.
 - API keys only in Windows Credential Manager; a key pasted into chat is refused and never
   logged (`looks_like_secret`).
 - Plans proposed by the AI that change anything are shown and need the user's "Ha";

@@ -4,6 +4,34 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (19) — Claude Code — Shaxsiy ma'lumotlarni himoyalash, OpenAI/Gemini haqiqiy sinovga tayyorgarlik
+
+**Foydalanuvchi talabi:** haqiqiy AI sinovidan OLDIN o'quvchilar va boshqa shaxslarning ma'lumotlarini (ism-familiya, JSHSHIR, telefon, pasport, manzil…) tashqi AI'ga yuborishdan oldin mahalliy yashirish, javobda mahalliy tiklash; ishonchsizda bloklash; Gemini, OpenAI va fallback holatlarida test; OpenAI uchun kunlik $0.25 va bitta vazifa $0.05 ichki limiti; pullik fallback avtomatik boshlanmasin; birinchi sinovlar faqat sun'iy matnlar; pullik chaqiruv yo'q, ruxsatni kutish; Codex Android'ga tegmaslik.
+
+**Audit:** himoya YO'Q edi — AI yoqilsa chatdagi va eslatmalardagi shaxsiy ma'lumotlar, fayl yo'llari ochiq ketardi (faqat API kalitlari yashirilardi).
+
+**Qilindi** (tarmoq `claude/maxfiylik`; [docs/PRIVACY.md](docs/PRIVACY.md)):
+- `ai/privacy.py`: ISM (familiya/otasining ismi shakllari, keng tarqalgan ismlar, «F.I.Sh.:», «ismi», «familiyasi», «o'quvchi», «ota-onasi» dan keyingi so'zlar), JSHSHIR/PINFL, pasport/ID-karta, telefon, e-mail, bank kartasi (Luhn), manzil, tug'ilgan sana, STIR → `⟦ISM_1⟧` kabi belgilar; bir xil qiymat — bir xil belgi; javobda tiklash (model `[ISM_1]`, `«ISM_1»` deb yozsa ham). Ishonchsiz holat (kalit so'z yonida tanilmagan qiymat, 8+ xonali noma'lum raqam) → so'rov yuborilmaydi, pul sarflanmaydi. Ommaviy shaxslar (Alisher Navoiy, Amir Temur…), joy nomlari, so'mdagi summalar yashirilmaydi.
+- Yagona eshik: `AiRouter.complete` — barcha 4 provayder, barcha maqsadlar va fallback provayder ham faqat yashirilgan matnni oladi. NEXVARA ko'rsatmalari va darslik parchalari `public()` bilan belgilangan (tarixiy ismlar kerak). Javob oxirida: «🔒 N ta shaxsiy ma'lumot AI'ga yuborilmadi…».
+- Pullik fallback **sukut bo'yicha o'chiq**; kalit saqlash AI'ni **o'zi yoqmaydi** (faqat tekshiradi, bepul).
+- Provayderga alohida «bitta topshiriq» limiti (`limits.<provider>.task_usd`), Sozlamalar → AI da maydon va «bu NEXVARA ichki limiti, provayderdagi haqiqiy chegara emas» izohi. Haqiqiy `D:\NEXVARA\settings.json` ga yozildi: OpenAI kunlik $0.25, bitta topshiriq $0.05, fallback o'chiq, AI o'chiq (avvalgi nusxa scratchpad'da saqlandi). Kalitlar: hech biri kiritilmagan.
+- `scripts/ai_live_test.py`: faqat sun'iy matnlar (maxfiylik qoravuli ularda hech narsa topmasligi tekshiriladi); sukut bo'yicha quruq rejim — hech narsa yubormaydi; haqiqiy chaqiruv faqat `--run --i-approve`, saqlangan kalit, «AI yoqilgan» va o'chiq fallback bilan. Quruq taxmin: OpenAI ≈ $0.021, Gemini ≈ $0.017 (4 so'rov).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| `tests/unit/test_privacy.py` — 28 ta: har tur, tiklash, bloklash, oddiy so'rovlar o'zgarmasligi, ommaviy matn, OpenAI va Gemini HTTP qatlami (tarmoqqa chiqadigan baytlar tekshirildi), fallback OpenAI→Gemini, fallback sukutda o'chiq, bloklangan so'rov yubormaydi va sarflamaydi, eslatma/tarix/fayl yo'li/AI reja argumentlari | PASS |
+| OpenAI ichki limitlari (kunlik $0.25, bitta topshiriq $0.05) testi | PASS |
+| `.\scripts\test.ps1 -Office` 1-yugurish | 352/353 — Word'dagi soxta-AI testi kalit saqlanganda AI yoqiladi deb kutgan; test yangi qoidaga moslandi, fayl qayta 8/8 PASS |
+| `.\scripts\test.ps1 -Office` yakuniy | **353/353 PASS**, smoke PASS |
+| UI: `ai_money`, `uzbek_ui` (100%), `settings_integrations` | PASS |
+| Haqiqiy OpenAI/Gemini chaqiruvi | NOT TESTED — egasining alohida ruxsati kutilmoqda |
+
+**Keyingi qadam:** egasi kalitni Sozlamalar → AI orqali kiritadi, «AI yoqilgan» ni o'zi yoqadi, ruxsat beradi → `scripts/ai_live_test.py openai --run --i-approve` (keyin gemini).
+
+---
+
 ## 2026-10-17 (18) — Claude Code — Windows V1 integratsiya: to'liq o'zbekcha UI, AI provayderlar (Router v2), to'lov tugmalari, AI xarajat paneli
 
 **Foydalanuvchi talabi:** shaxsiy foydalanish (egasi va Nilufar); 12 bo'lim to'liq o'zbekcha; 4 AI provayder rasmiy hujjatlar bo'yicha; Tejamkor/Muvozanatli/Kuchli/Maxsus; fallback, limitlar; har provayderga To'lov/Balans tugmasi; Bosh sahifada «AI balans va xarajatlar»; xavfsizlik; pullik AI chaqiruvi yo'q; Codex Android ishiga tegmaslik.

@@ -36,6 +36,8 @@ muhitda sinalmagan.
 | To'lov/Balans tugmalari (rasmiy sahifalar) | REAL IMPLEMENTED | brauzerda ochiladi; to'lov NEXVARA ichida yo'q |
 | Bosh sahifa: AI balans va xarajatlar | REAL IMPLEMENTED | taxminiy sarf; haqiqiy balans faqat DeepSeek (rasmiy API) |
 | DeepSeek haqiqiy balansi | REAL IMPLEMENTED (soxta javob bilan) | haqiqiy kalit bilan NOT TESTED |
+| Shaxsiy ma'lumotlarni mahalliy yashirish/tiklash, ishonchsizda bloklash (barcha provayderlar, fallback) | REAL IMPLEMENTED | 28 test: OpenAI va Gemini HTTP qatlami, fallback; [PRIVACY.md](PRIVACY.md) |
+| OpenAI/Gemini haqiqiy sinov skripti (sun'iy matnlar, quruq rejim) | REAL IMPLEMENTED | haqiqiy chaqiruv — egasining ruxsatini kutmoqda |
 
 ## Core Agent
 

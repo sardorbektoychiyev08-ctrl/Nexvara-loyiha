@@ -113,6 +113,7 @@ def test_found_files_and_repeat_last_command(env, monkeypatch):
 def test_ai_planner_runs_tool_calls_in_order(env):
     api, work = env, env.work
     api.router.save_key("anthropic", "sk-ant-test-1234567890")
+    api.router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     arxiv = work / "Arxiv"
     api.fake.replies = ['{"kind": "chat"}', "Salom!"]
     api.chat("salom")  # an earlier turn the planner must see
@@ -138,6 +139,7 @@ def test_ai_planner_runs_tool_calls_in_order(env):
 def test_ai_planner_risky_and_unknown_tools(env):
     api, work = env, env.work
     api.router.save_key("anthropic", "sk-ant-test-1234567890")
+    api.router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     api.fake.replies = [json.dumps({"kind": "tools", "calls": [
         {"tool": "files.recycle", "args": {"paths": [str(work / "Oylik.xlsx")]}}]})]  # fmt: skip
     r = api.chat("eski oylik faylidan qutulaylik")
@@ -178,6 +180,7 @@ def test_memory_alias_teach_rule_and_office(env):
 def test_planner_gets_rules_and_facts(env):
     api = env
     api.router.save_key("anthropic", "sk-ant-test-1234567890")
+    api.router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     api.memory_add_fact("maktabim 21-maktab")
     r = api.chat("Har doim Excel raqamlarini markazga joyla")
     api.confirm_ai(r["confirm"])

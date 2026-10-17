@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from nexvara.ai.privacy import public
 from nexvara.ai.providers import AiError
 from nexvara.ai.router import AiRouter, Estimate
 
@@ -65,7 +66,7 @@ def _json_from(text: str) -> Any:
 def classify(router: AiRouter, text: str, approved: bool = False) -> Intent:
     r = router.complete(
         "classify",
-        CLASSIFY_SYSTEM,
+        public(CLASSIFY_SYSTEM),
         [{"role": "user", "content": text}],
         max_tokens=2000,
         expected_out=300,
@@ -159,7 +160,9 @@ def plan(
     approved: bool = False,
 ) -> Plan:
     purpose = plan_purpose(text)
-    system = PLAN_SYSTEM + "\n\nASBOBLAR (* — majburiy):\n" + _tool_lines(catalog)
+    # NEXVARA's own instructions are public; the context, rules, facts and the chat history
+    # added below are the user's and are masked by the router before anything is sent.
+    system = public(PLAN_SYSTEM + "\n\nASBOBLAR (* — majburiy):\n" + _tool_lines(catalog))
     ctx = {k: v for k, v in context.items() if v}
     if ctx:
         system += "\n\nKontekst: " + json.dumps(ctx, ensure_ascii=False)
@@ -236,7 +239,9 @@ def find_passages(text: str, grade: int | None = None, subject: str | None = Non
 def _qa_messages(text: str, hits, send_text: bool) -> list[dict[str, str]]:
     if not hits or not send_text:
         return [{"role": "user", "content": text}]
-    parts = [f"[{h.book.label()}, {h.page_no}-bet]\n{h.text[:PASSAGE_CHARS]}" for h in hits]
+    # Textbook passages are public text (they need their historical names); the question
+    # itself is the user's and is masked by the router.
+    parts = [public(f"[{h.book.label()}, {h.page_no}-bet]\n{h.text[:PASSAGE_CHARS]}") for h in hits]
     return [
         {
             "role": "user",
@@ -262,7 +267,8 @@ def answer_question(
     send = bool(router.config().get("send_textbook_text", True))
     hits = find_passages(text, grade, subject) if send else []
     r = router.complete(
-        "qa", _with_facts(QA_SYSTEM, facts), _qa_messages(text, hits, send), max_tokens=6000,
+        "qa", _with_facts(public(QA_SYSTEM), facts), _qa_messages(text, hits, send),
+        max_tokens=6000,
         expected_out=900,
         approved=approved,
     )  # fmt: skip
@@ -277,7 +283,7 @@ def chat_reply(router: AiRouter, text: str, approved: bool = False, facts=()) ->
         "tuzasan. O‘zbek tilida (lotin) qisqa va do‘stona javob ber."
     )
     r = router.complete(
-        "chat", _with_facts(system, facts), [{"role": "user", "content": text}],
+        "chat", _with_facts(public(system), facts), [{"role": "user", "content": text}],
         max_tokens=2000, expected_out=300, approved=approved, effort="low",
     )  # fmt: skip
     return Answer(r.text.strip(), [], r.cost)
@@ -317,7 +323,9 @@ def _material(pages: list[tuple[int, str]]) -> str:
 
 def _test_request(req, material: str) -> tuple[list[dict[str, str]], int, int]:
     wanted = min(req.count * req.variants, 120)
-    msg = f"Darslik matni:\n\n{material}\n\nShu matn bo‘yicha {wanted} ta turli test savoli tuz."
+    msg = public(
+        f"Darslik matni:\n\n{material}\n\nShu matn bo‘yicha {wanted} ta turli test savoli tuz."
+    )
     max_tokens = min(32000, 2000 + wanted * OUT_TOKENS_PER_QUESTION * 2)
     return [{"role": "user", "content": msg}], wanted, max_tokens
 
@@ -327,7 +335,9 @@ def estimate_test(router: AiRouter, req) -> Estimate:
 
     _book, pages, _topic = topic_material(req)
     messages, wanted, _max = _test_request(req, _material(pages))
-    return router.estimate("balanced", TEST_SYSTEM, messages, wanted * OUT_TOKENS_PER_QUESTION)
+    return router.estimate(
+        "balanced", public(TEST_SYSTEM), messages, wanted * OUT_TOKENS_PER_QUESTION
+    )
 
 
 def parse_questions(data: Any) -> list:
@@ -374,7 +384,7 @@ def make_ai_quizzes(router: AiRouter, req, approved: bool = False):
     book, pages, topic = topic_material(req)
     messages, wanted, max_tokens = _test_request(req, _material(pages))
     r = router.complete(
-        "test", TEST_SYSTEM, messages, max_tokens=max_tokens,
+        "test", public(TEST_SYSTEM), messages, max_tokens=max_tokens,
         expected_out=wanted * OUT_TOKENS_PER_QUESTION, approved=approved,
     )  # fmt: skip
     pool = parse_questions(_json_from(r.text))
