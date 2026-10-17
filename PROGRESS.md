@@ -4,6 +4,37 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (14) — Claude Code — Core Agent: tool-calling, kontekst, ketma-ket topshiriqlar, bo'limlar chatdan, Memory↔Teach↔Office, sinxronlash, Google tayyorgarlik
+
+**Foydalanuvchi talabi:** EXE, updater va 214 PASS testni saqlab: Files/BI/Workflows/Settings chatdan to'liq; Core Agent oddiy gaplar, oldingi suhbat va ketma-ket topshiriqlarni tushunsin (AI tool-calling); Memory, Teach va Office bog'langan; qurilmalararo sinxron; Google login haqiqiy konfiguratsiyaga tayyor (hisobga o'zi kirmasin); Codex'ning Android ishiga tegmaslik; pullik AI chaqirmaslik.
+
+**Qilindi** (tarmoq `claude/chat-agent`; arxitektura: [docs/AGENT.md](docs/AGENT.md)):
+- **Tool reyestri** (`agent/tools.py`): 36 asbob — Files 14, BI 7, Workflows 10, Settings/yangilanish/sinxron 4, `nexvara.command` (Office, test, mavzu, taqdimot, xotira, Teach). Har birida turli parametrlar, tekshiruv (noma'lum asbob/parametr rad etiladi), xavfli amallarga (o'chirish, tartiblash, tiklash, dashboard/workflow o'chirish) «Davom etaymi?».
+- **AI'siz o'zbekcha qoidalar** (`agent/nlu.py`): yo'llar («...», D:\..., fayl nomlari, «ish stoli/hujjatlar/yuklanmalar»), nusxa/ko'chirish, nomlash va ommaviy nomlash, ZIP, zaxira/versiya/tiklash, tartiblash, Savat, ommaviy PDF, papka/tur bo'yicha qidiruv; BI: yaratib saqlash, ro'yxat, ochish, «faqat Toshkent» filtri, KPI javobi chatda, vidjet qo'shish, Excel/CSV/PDF/PNG eksport, o'chirish; Workflows: yaratish (qadamlar, «N soniya kut», «har kuni soat 08:30 da», «papkaga yangi fayl tushganda», xatoda davom), ishga tushirish, pauza/davom/tasdiq/to'xtatish, yoqish/o'chirish, tarix, o'chirish; Settings: barcha xavfsiz sozlamalar, yangilanish tekshiruvi, sinxron.
+- **Kontekst** (`agent/context.py`): «uni/natijani» = oxirgi natija, «shu fayl», «topilgan fayllar», «shu papka», ishlatilgan papkalar, oxirgi 12 gap; «xuddi shunday Savdo.xlsx bilan ham qil».
+- **Ketma-ket topshiriqlar**: «A.xlsx ni PDF qil, keyin uni D:\Arxiv ga ko'chir» → bitta zanjir vazifa, har qadam oldingisining natijasini ko'radi; bitta fayl haqidagi Office klauzalari bitta buyruq bo'lib qoladi; xavfli qadam bo'lsa butun ro'yxat oldindan tasdiqlanadi.
+- **AI tool-calling planner** (`ai/features.plan`): asboblar katalogi + kontekst + oxirgi gaplar + mos eslatmalar + Teach qoidalari → JSON chaqiruvlar; ijro har doim bir xil tekshiruvdan o'tadi; eski bitta-buyruq formati ham ishlaydi. Faqat soxta provayder bilan sinaldi.
+- **Memory ↔ Teach ↔ Office**: yo'lli eslatmalar nom sifatida ishlaydi («hisobot papkamdagi fayllarni PDF qil», «oylik hisobotimni och»); «Shu faylni eslab qol» haqiqiy yo'lni saqlaydi; Teach qoidalari Office buyrug'i, zanjir va workflow'da qo'llanadi; AI planner'ga qoidalar va mos eslatmalar beriladi. Chatga yozilgan API kalit rad etiladi va hech qayerda saqlanmaydi.
+- **Sinxronlash** (`sync.py`, Sozlamalar → Sinxronlash, chatda «sinxronla»): eslatmalar, Teach qoidalari va xavfsiz sozlamalar; har yozuvga uid, «oxirgi o'zgarish yutadi», o'chirish belgisi; umumiy papka (OneDrive va h.k.) — scrypt + AES-256-GCM, parol Credential Manager'da; telefon uchun `GET/POST /api/v1/sync` (openapi + MOBILE_API §10); Google Drive appDataFolder transporti. AI yoqilishi, kalitlar, kompyuterga xos yo'llar hech qachon uzatilmaydi.
+- **Google tayyorgarlik**: Sozlamalar → «Client JSON faylini tanlash» (faqat Desktop app turi qabul qilinadi, eski fayl .bak), status client_id'ni niqoblab ko'rsatadi, sinxron uchun ixtiyoriy `drive.appdata` ruxsati, berilgan ruxsatlar profilda. NEXVARA hisobga o'zi kirmaydi, men ham kirmadim.
+- Codex'ning `.worktrees/android` (`codex/android-mobile`) ishiga tegilmadi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 240 ta (oldingi 214 + bo'limlar chatdan 10, agent yadrosi 8, sinxron 6, Google 2) | PASS |
+| Oyna smoke | PASS |
+| UI haqiqiy oynada: `agent_chat.py` (chatdan nusxa, BI yaratish/sahifa/KPI, workflow yaratish, sozlama, sinxron kartasi) va `settings_integrations.py` | PASS |
+| Office testlari (`-Office`) | NOT TESTED — Office kodi o'zgarmadi, ruxsatsiz Office ochilmadi |
+| Haqiqiy AI planner | NOT TESTED — pullik chaqiruv qilinmadi |
+| Haqiqiy Google login va Drive sinxron | BLOCKED — foydalanuvchining Google Cloud client'i kerak |
+| Ikki haqiqiy kompyuter / telefon o'rtasida sinxron | NOT TESTED |
+
+**Keyingi qadam:** foydalanuvchi — Google client JSON import va o'zi kirishi; Codex — Android'da `/api/v1/sync`; Claude — BI ETL chatdan, tarix sinxroni.
+
+---
+
 ## 2026-10-17 (13) — Claude Code — Windows Agent integratsiyalari: telefon API v1, Google login, installer/updater, bo'limlar auditi
 
 **Foydalanuvchi talabi:** 179 PASS testni saqlab, Android uchun xavfsiz API, Google OAuth/OIDC, installer/updater tekshiruvi, 12 bo'lim ↔ Core Agent holati, Codex uchun Android hujjatlari, PROGRESS va private GitHub'ga push. Pullik AI chaqirilmadi.

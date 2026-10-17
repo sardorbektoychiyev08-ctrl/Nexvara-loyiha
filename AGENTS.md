@@ -26,6 +26,7 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
   - `src/nexvara/sources/` (darslik manbalari) → Claude (`claude/*`)
   - `src/nexvara/ai/` (provayderlar, router, xarajat, AI imkoniyatlari), `tests/unit/test_ai.py` → Claude (`claude/*`)
   - `src/nexvara/memory/`, `fileagent.py`, `workflows.py`, `bi/`, `remote.py`, `app/api_*.py`, `app/ui/bi.js`, `app/ui/mobile.html`, `tests/ui_scripts/` → Claude (`claude/*`)
+  - `src/nexvara/agent/` (tools, nlu, context), `app/api_agent.py`, `app/api_sync.py`, `sync.py`, `docs/AGENT.md` → Claude (`claude/*`)
   - `src/nexvara/remote.py`, `remote_v1.py`, `protocol.py`, `devserver.py`, `docs/api/` (telefon API shartnomasi), `account.py`, `updater.py`, `installer/`, `scripts/build.ps1` → Claude (`claude/*`)
   - `android/` (native Android ilova, Kotlin + Compose) → Codex (`codex/android-mobile`). Topshiriq: [docs/ANDROID_HANDOFF.md](docs/ANDROID_HANDOFF.md). API o'zgarishi kerak bo'lsa PROGRESS.md da Claude'ga yozing
   - Umumiy fayllar (`PROGRESS.md`, `ROADMAP.md`, `pyproject.toml`, `app/`) → kichik, alohida commitlarda o'zgartiring; konflikt bo'lsa ikkala tomonning yozuvlarini saqlang.

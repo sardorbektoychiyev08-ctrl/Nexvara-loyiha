@@ -78,7 +78,7 @@ Unit tests: OkHttp MockWebServer with recorded envelopes from MOBILE_API.md.
 | Google login on Android | BLOCKED | Needs a Google Cloud project with an **Android** OAuth client (package name + SHA-1 of the signing key). Use Credential Manager + "Sign in with Google". See [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md). The app must work fully without it |
 | Push notifications (FCM) | BLOCKED | Needs a Firebase project and an internet relay; v1 uses long-poll + WorkManager |
 | Access outside home Wi-Fi | BLOCKED | Needs a relay/VPN (e.g. Tailscale) chosen by the user; the protocol does not change |
-| Memory / Teach sync | TODO (Windows side) | No sync endpoint yet; v1 shows Memory through chat ("nimalarni eslab qolgansan?") |
+| Memory / Teach / settings sync | Windows side READY | `GET/POST /api/v1/sync` (MOBILE_API.md §10). Optional for the app v1 |
 
 ## 7. Rules (same as AGENTS.md)
 
