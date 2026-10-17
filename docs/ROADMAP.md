@@ -15,8 +15,8 @@ Bosqichlar [MASTER_SPEC.md](MASTER_SPEC.md) 26-bo'limidan olingan. Holat belgila
 | M8 | NEXVARA BI | PASS | Node'siz: Python ETL + ilova ichida SVG grafiklar. XLSX/CSV/JSON/XML/TXT/papka, tur aniqlash, tozalash, formula, birlashtirish, avtomatik dashboard (sof foyda, oylik o'sish), KPI/ustunli/chiziqli/doiraviy/nuqtali/jadval, filtr, sana, drill-down, sahifalar, saqlash, PNG/PDF/Excel/CSV eksport. Ma'lumot bazasiga ulanish: TODO |
 | M9 | Google Login va Sync | TODO | |
 | M10 | Windows Release | TODO | PyInstaller + installer (Inno Setup yoki shunga o'xshash) |
-| M11 | Android Mobile | TODO | JDK + Android SDK o'rnatish kerak |
-| M12 | Windows-Mobile E2E | IN PROGRESS | Telefon brauzeri orqali boshqarish PASS (QR + bir martalik kod, HTTPS, tokenlar xeshlangan va haftalik almashadi, uzish, idempotent so'rovlar, navbat, fayl yuborish/yuklab olish). Native Android ilova (M11) va Google login (M9): TODO |
+| M11 | Android Mobile | IN PROGRESS | Native Kotlin/Compose Home, Chat, Tasks, Devices, QR pairing, TLS pin, fayl/rasm yuborish va fayl olish; debug APK va 3 unit test PASS. Haqiqiy telefon/UI sinovi NOT TESTED. Tafsilot: [ANDROID_PROGRESS.md](ANDROID_PROGRESS.md) |
+| M12 | Windows-Mobile E2E | IN PROGRESS | Telefon brauzeri orqali boshqarish PASS. Native Android adapter `/api/v1` asosida yozildi, lekin haqiqiy telefon bilan Windows E2E NOT TESTED. Google login (M9) va pause/resume API BLOCKED |
 | M13 | Final Personal Release | TODO | |
 
 ## Yaqin navbat
