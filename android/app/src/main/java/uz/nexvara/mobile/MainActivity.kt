@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
     private var profile by mutableStateOf<JSONObject?>(null)
     private var pairing by mutableStateOf(false)
     private var busy by mutableStateOf(false)
+    private var connected by mutableStateOf(false)
     private var notice by mutableStateOf("")
     private var tab by mutableStateOf(0)
     private val messages = mutableStateListOf<Message>()
@@ -61,7 +62,7 @@ class MainActivity : ComponentActivity() {
         busy = true
         Thread {
             try { action() }
-            catch (e: Exception) { runOnUiThread { notice = e.message ?: "Aloqa xatosi" } }
+            catch (e: Exception) { runOnUiThread { connected = false; notice = e.message ?: "Aloqa xatosi" } }
             finally { runOnUiThread { busy = false } }
         }.start()
     }
@@ -89,6 +90,7 @@ class MainActivity : ComponentActivity() {
         }
         runOnUiThread {
             tasks.clear(); tasks.addAll(fresh)
+            connected = true
             notice = "${session.optString("pc_name")} • ulangan"
         }
     }
@@ -191,7 +193,7 @@ class MainActivity : ComponentActivity() {
                             Spacer(Modifier.height(12.dp))
                             ElevatedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp)) {
                                 Text(profile?.optString("pc") ?: "Kompyuter", style = MaterialTheme.typography.titleLarge)
-                                Text("Vazifalar Windows NEXVARA orqali bajariladi", color = Cyan)
+                                Text(if (connected) "Kompyuter ulangan" else "Kompyuter bilan aloqa tekshirilmagan", color = if (connected) Cyan else MaterialTheme.colorScheme.error)
                                 Spacer(Modifier.height(14.dp))
                                 Button(onClick = { tab = 1 }) { Text("Yangi topshiriq") }
                             } }
@@ -245,8 +247,10 @@ class MainActivity : ComponentActivity() {
                             } }
                             TextButton(onClick = { pairing = true }) { Text("Yana bir kompyuter bog‘lash") }
                             TextButton(onClick = { work {
-                                api().json("/api/v1/session/logout", "POST", JSONObject(), UUID.randomUUID().toString())
-                                secure.clear(); runOnUiThread { profile = null; pairing = false; tasks.clear(); messages.clear() }
+                                try { api().json("/api/v1/session/logout", "POST", JSONObject(), UUID.randomUUID().toString()) }
+                                catch (_: Exception) { /* Local logout must work even when the PC is offline. */ }
+                                secure.clear()
+                                runOnUiThread { profile = null; connected = false; pairing = false; tasks.clear(); messages.clear(); notice = "Qurilmadan chiqildi" }
                             } }) { Text("Chiqish") }
                         }
                     }
