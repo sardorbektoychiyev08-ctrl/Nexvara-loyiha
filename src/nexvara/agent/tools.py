@@ -851,6 +851,64 @@ def bi_add_page(api, a):
     }
 
 
+def _find_page(cfg: dict[str, Any], ref: str) -> int:
+    """'2' (1-based) or a page title (exact, then a fragment) -> index."""
+    pages = cfg["pages"]
+    r = str(ref).strip()
+    if r.isdigit():
+        n = int(r)
+        if not 1 <= n <= len(pages):
+            raise ToolError(f"{n}-sahifa yo‘q (jami {len(pages)})")
+        return n - 1
+    key = fold(r)
+    for exact in (True, False):
+        for i, p in enumerate(pages):
+            t = fold(str(p.get("title") or ""))
+            if key and (t == key if exact else key in t):
+                return i
+    names = ", ".join(f"{i}. {p.get('title') or 'Sahifa'}" for i, p in enumerate(pages, 1))
+    raise ToolError(f"«{ref}» sahifasi topilmadi. Sahifalar: {names}")
+
+
+@tool("bi.move_widget", "Vidjetni boshqa sahifaga ko‘chirish", name=("string", False, "dashboard"),
+      widget=("string", True, "vidjet raqami yoki sarlavhasi"),
+      page=("string", True, "qaysi sahifaga: raqami yoki nomi"))  # fmt: skip
+def bi_move_widget(api, a):
+    d = _dashboard(api, a.get("name", ""))
+    cfg = _bi_cfg(api, d)
+    p, i = _find_widget(cfg, a["widget"])
+    to = _find_page(cfg, a["page"])
+    w = cfg["pages"][p]["widgets"][i]
+    title = w.get("title") or _TYPE_UZ.get(w["type"], w["type"])
+    target = cfg["pages"][to].get("title") or f"{to + 1}-sahifa"
+    if to == p:
+        return {"reply": f"«{title}» allaqachon «{target}» sahifasida."}
+    cfg["pages"][to]["widgets"].append(cfg["pages"][p]["widgets"].pop(i))
+    file = _bi_save(api, cfg)
+    return {"reply": f"«{title}» → «{target}» sahifasiga ko‘chirildi.",
+            "bi_ui": {"open": file, "state": {"page": to}}}  # fmt: skip
+
+
+@tool(
+    "bi.delete_page",
+    "Dashboard sahifasini o‘chirish",
+    risky=True,
+    name=("string", False, "dashboard"),
+    page=("string", True, "sahifa raqami yoki nomi"),
+)
+def bi_delete_page(api, a):
+    d = _dashboard(api, a.get("name", ""))
+    cfg = _bi_cfg(api, d)
+    if len(cfg["pages"]) < 2:
+        raise ToolError("Bu dashboardning yagona sahifasi — uni o‘chirib bo‘lmaydi.")
+    i = _find_page(cfg, a["page"])
+    gone = cfg["pages"].pop(i)
+    file = _bi_save(api, cfg)
+    n = len(gone.get("widgets") or [])
+    return {"reply": f"«{gone.get('title') or f'{i + 1}-sahifa'}» sahifasi o‘chirildi"
+            + (f" ({n} ta vidjeti bilan)." if n else "."), "bi_ui": {"open": file}}  # fmt: skip
+
+
 @tool("bi.rename", "Dashboard nomini o‘zgartirish", name=("string", False, "dashboard"),
       new_name=("string", True, "yangi nom"))  # fmt: skip
 def bi_rename(api, a):
