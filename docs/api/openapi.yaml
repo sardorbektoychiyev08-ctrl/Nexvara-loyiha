@@ -1,0 +1,274 @@
+openapi: 3.1.0
+info:
+  title: NEXVARA Windows Agent - Phone API
+  version: "1"
+  description: |
+    The contract between the NEXVARA Android app and the Windows Agent (src/nexvara/remote_v1.py).
+    Transport: HTTPS on the local network, self-signed certificate pinned by SHA-256 from the
+    pairing QR code. Every JSON reply is an Envelope. Human-readable guide: MOBILE_API.md.
+    The unit test tests/unit/test_remote_v1.py::test_openapi_matches_routes keeps the path list
+    below identical to the server's ROUTES table.
+servers:
+  - url: https://{pc_ip}:{port}
+    variables:
+      pc_ip: {default: 192.168.1.10}
+      port: {default: "8765"}
+security:
+  - deviceToken: []
+paths:
+  /api/v1/info:
+    get:
+      summary: Server identity and protocol version (no token)
+      security: []
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/InfoEnvelope"}}}}
+        "426": {$ref: "#/components/responses/Error"}
+  /api/v1/pair:
+    post:
+      summary: Exchange the one-time 6-digit code for a device token (no token)
+      security: []
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: "#/components/schemas/PairRequest"}}}
+      responses:
+        "200": {description: Paired, content: {application/json: {schema: {$ref: "#/components/schemas/PairEnvelope"}}}}
+        "403": {$ref: "#/components/responses/Error"}
+        "429": {$ref: "#/components/responses/Error"}
+  /api/v1/session:
+    get:
+      summary: Who am I; whether the token should be rotated
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/SessionEnvelope"}}}}
+        "401": {$ref: "#/components/responses/Error"}
+  /api/v1/session/rotate:
+    post:
+      summary: Get a new token. The old token keeps working until the new one is first used.
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/RotateEnvelope"}}}}
+        "401": {$ref: "#/components/responses/Error"}
+  /api/v1/session/logout:
+    post:
+      summary: Unpair this phone (the token is deleted on the PC)
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/LogoutEnvelope"}}}}
+        "401": {$ref: "#/components/responses/Error"}
+  /api/v1/chat:
+    post:
+      summary: Send a natural-language command to the Core Agent (same pipeline as the PC chat)
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [text], properties: {text: {type: string, maxLength: 4000}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/ChatEnvelope"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "401": {$ref: "#/components/responses/Error"}
+  /api/v1/confirm:
+    post:
+      summary: Answer a confirmation question (for example an expensive AI request)
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [token, yes], properties: {token: {type: string}, yes: {type: boolean}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/ChatEnvelope"}}}}
+        "401": {$ref: "#/components/responses/Error"}
+  /api/v1/tasks:
+    get:
+      summary: Recent tasks, newest first
+      parameters:
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/TaskListEnvelope"}}}}
+        "401": {$ref: "#/components/responses/Error"}
+  /api/v1/tasks/watch:
+    get:
+      summary: Long-poll. Returns as soon as any of the last 20 tasks changes, or after `wait` seconds.
+      parameters:
+        - {name: etag, in: query, schema: {type: string}, description: etag from the previous tasks/watch reply}
+        - {name: wait, in: query, schema: {type: number, minimum: 0, maximum: 25, default: 25}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/WatchEnvelope"}}}}
+        "401": {$ref: "#/components/responses/Error"}
+  /api/v1/tasks/{id}:
+    get:
+      summary: One task with its steps and result files
+      parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/TaskEnvelope"}}}}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/tasks/{id}/cancel:
+    post:
+      summary: Ask a running task to stop (cooperative). cancelled=false when it already finished.
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/CancelEnvelope"}}}}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/files:
+    post:
+      summary: Upload a file or photo to the PC (raw body, max 50 MB). It becomes the chat's "shu fayl".
+      parameters:
+        - {name: X-Filename, in: header, required: true, schema: {type: string}, description: URL-encoded file name}
+        - {name: X-Content-SHA256, in: header, schema: {type: string}, description: hex SHA-256 of the body; mismatch -> BAD_REQUEST}
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        required: true
+        content: {application/octet-stream: {schema: {type: string, format: binary}}}
+      responses:
+        "200": {description: Saved, content: {application/json: {schema: {$ref: "#/components/schemas/FileEnvelope"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "413": {$ref: "#/components/responses/Error"}
+    get:
+      summary: Download a result file. Only files listed in some task's `files` are served.
+      parameters:
+        - {name: path, in: query, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: File bytes; header X-Content-SHA256 carries the hex SHA-256
+          content: {application/octet-stream: {schema: {type: string, format: binary}}}
+        "404": {$ref: "#/components/responses/Error"}
+components:
+  securitySchemes:
+    deviceToken: {type: http, scheme: bearer, description: Token from /api/v1/pair. Store it in Android Keystore-backed storage.}
+  parameters:
+    RequestId:
+      name: X-Request-Id
+      in: header
+      schema: {type: string, maxLength: 64}
+      description: Random id per user action. A retried POST with the same id returns the first reply and is not executed twice (kept 10 minutes).
+  responses:
+    Error:
+      description: Error envelope
+      content: {application/json: {schema: {$ref: "#/components/schemas/ErrorEnvelope"}}}
+  schemas:
+    ErrorCode:
+      type: string
+      enum: [BAD_REQUEST, AUTH_REQUIRED, TOKEN_EXPIRED, PAIRING_CODE_INVALID, PAIRING_CODE_EXPIRED, PAIRING_LOCKED, NOT_FOUND, PAYLOAD_TOO_LARGE, UNSUPPORTED_PROTOCOL, RATE_LIMITED, INTERNAL]
+    ErrorEnvelope:
+      type: object
+      required: [v, ok, error]
+      properties:
+        v: {type: integer, const: 1}
+        ok: {type: boolean, const: false}
+        error:
+          type: object
+          required: [code, message, retry]
+          properties:
+            code: {$ref: "#/components/schemas/ErrorCode"}
+            message: {type: string, description: Uzbek text that can be shown to the user}
+            retry: {type: boolean, description: true when retrying later may succeed}
+    Info:
+      type: object
+      required: [protocol, min_client_protocol, app, app_version, pc_name, server_id, pairing_open, max_upload_bytes]
+      properties:
+        protocol: {type: integer}
+        min_client_protocol: {type: integer}
+        app: {type: string}
+        app_version: {type: string}
+        pc_name: {type: string}
+        server_id: {type: string, description: stable random id of this PC (Work PC / Home PC)}
+        pairing_open: {type: boolean}
+        max_upload_bytes: {type: integer}
+    PairRequest:
+      type: object
+      required: [code, device_name]
+      properties:
+        code: {type: string, pattern: "^[0-9]{6}$"}
+        device_name: {type: string, maxLength: 60}
+        platform: {type: string, default: android}
+        app_version: {type: string}
+        install_id: {type: string, maxLength: 64, description: random id created on first app start; pairing again replaces the old entry}
+    Pair:
+      type: object
+      required: [token, device_id, server_id, pc_name, token_expires_at]
+      properties:
+        token: {type: string}
+        device_id: {type: integer}
+        server_id: {type: string}
+        pc_name: {type: string}
+        token_expires_at: {type: number, description: unix seconds}
+    Session:
+      type: object
+      required: [device_id, device_name, pc_name, server_id, token_expires_at, rotate_recommended]
+      properties:
+        device_id: {type: integer}
+        device_name: {type: string}
+        pc_name: {type: string}
+        server_id: {type: string}
+        token_expires_at: {type: number}
+        rotate_recommended: {type: boolean}
+    Rotate:
+      type: object
+      required: [token, token_expires_at]
+      properties:
+        token: {type: string}
+        token_expires_at: {type: number}
+    Step:
+      type: object
+      required: [name, status, detail]
+      properties:
+        name: {type: string}
+        status: {$ref: "#/components/schemas/TaskStatus"}
+        detail: {type: string}
+    TaskStatus:
+      type: string
+      enum: [pending, running, succeeded, failed, cancelled]
+    Task:
+      type: object
+      required: [id, title, status, error, created_at, finished_at, steps, files, report]
+      properties:
+        id: {type: string}
+        title: {type: string}
+        status: {$ref: "#/components/schemas/TaskStatus"}
+        error: {type: string}
+        created_at: {type: number}
+        finished_at: {type: [number, "null"]}
+        steps: {type: array, items: {$ref: "#/components/schemas/Step"}}
+        files: {type: array, items: {type: string}, description: PC paths; download with GET /api/v1/files?path=}
+        report: {type: array, items: {}}
+    ChatReply:
+      type: object
+      required: [reply, confirm, task]
+      properties:
+        reply: {type: string}
+        confirm:
+          oneOf:
+            - {type: "null"}
+            - {type: object, required: [token, text], properties: {token: {type: string}, text: {type: string}}}
+        task:
+          oneOf: [{type: "null"}, {$ref: "#/components/schemas/Task"}]
+        open_bi: {type: boolean, description: a dashboard was opened on the PC screen}
+    FileInfo:
+      type: object
+      required: [path, name, size, sha256]
+      properties:
+        path: {type: string}
+        name: {type: string}
+        size: {type: integer}
+        sha256: {type: string}
+    InfoEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {$ref: "#/components/schemas/Info"}}}]}
+    PairEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {$ref: "#/components/schemas/Pair"}}}]}
+    SessionEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {$ref: "#/components/schemas/Session"}}}]}
+    RotateEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {$ref: "#/components/schemas/Rotate"}}}]}
+    LogoutEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {type: object, properties: {logged_out: {type: boolean}}}}}]}
+    ChatEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {$ref: "#/components/schemas/ChatReply"}}}]}
+    TaskEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {$ref: "#/components/schemas/Task"}}}]}
+    TaskListEnvelope:
+      allOf:
+        - {$ref: "#/components/schemas/Ok"}
+        - properties: {data: {type: object, properties: {tasks: {type: array, items: {$ref: "#/components/schemas/Task"}}, etag: {type: string}}}}
+    WatchEnvelope:
+      allOf:
+        - {$ref: "#/components/schemas/Ok"}
+        - properties: {data: {type: object, properties: {changed: {type: boolean}, etag: {type: string}, tasks: {type: array, items: {$ref: "#/components/schemas/Task"}}}}}
+    CancelEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {type: object, properties: {cancelled: {type: boolean}}}}}]}
+    FileEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {$ref: "#/components/schemas/FileInfo"}}}]}
+    Ok:
+      type: object
+      required: [v, ok, data]
+      properties:
+        v: {type: integer, const: 1}
+        ok: {type: boolean, const: true}

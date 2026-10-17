@@ -196,6 +196,17 @@
           <button class="btn" data-theme-set="light" type="button">Yorug‘</button>
         </div>
       </div>
+      <div class="card wide" id="account-card">
+        <div class="card-label">Google hisobi (ixtiyoriy)</div>
+        <p class="muted small">Kirmasangiz ham NEXVARA to‘liq ishlaydi. Kirish xavfsiz brauzer
+          oynasida bo‘ladi; parol NEXVARA’ga kelmaydi, kirish kaliti Windows Credential Manager’da saqlanadi.</p>
+        <div id="account-info" class="muted small"></div>
+        <div class="row">
+          <button class="btn primary" id="account-login" type="button">Google bilan kirish</button>
+          <button class="btn" id="account-logout" type="button" hidden>Chiqish</button>
+        </div>
+        <div class="error" id="account-error" hidden></div>
+      </div>
       <form class="card wide" id="settings-form">
         <div class="card-label">Testlar va Office</div>
         <div class="form-grid">
@@ -241,6 +252,19 @@
           <button class="btn" id="s-clear-history" type="button">Vazifalar tarixini tozalash</button>
         </div>
         <div class="muted small" id="s-msg"></div>
+      </div>
+      <div class="card wide" id="update-card">
+        <div class="card-label">Versiya va yangilanish</div>
+        <div id="upd-info" class="muted small"></div>
+        <form class="row wrap" id="upd-form">
+          <input class="grow-input" id="upd-channel" type="text"
+            placeholder="Yangilanish papkasi yoki https:// manzil (masalan D:\NEXVARA\releases)">
+          <button class="btn" type="submit">Saqlash</button>
+          <button class="btn primary" id="upd-check" type="button">Yangilanishni tekshirish</button>
+          <button class="btn" id="upd-install" type="button" hidden>O‘rnatish</button>
+        </form>
+        <div class="muted small" id="upd-msg"></div>
+        <div class="error" id="upd-error" hidden></div>
       </div>
       <div class="card wide"><div class="card-label">Tizim</div><pre id="sys-info" class="mono"></pre></div>
     </section>
@@ -500,6 +524,7 @@
             <div class="muted small" style="margin-top:10px">Bog‘lash kodi</div>
             <div class="dev-code" id="dev-code">——————</div>
             <div class="muted small" id="dev-left"></div>
+            <div class="muted small mono" id="dev-fp" title="Android ilovasida qo‘lda ulanganda shu bilan solishtiring"></div>
             <div class="row"><button class="btn small-btn" id="dev-newcode" type="button">Yangi kod</button></div>
             <ol class="muted small dev-help">
               <li>Telefonda «Xavfsiz emas / Not private» chiqsa: «Qo‘shimcha» → «Davom etish» (bu sertifikat sizning kompyuteringizda yaratilgan).</li>

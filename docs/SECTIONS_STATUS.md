@@ -1,0 +1,42 @@
+# 12 bo'lim va Core Agent: holat (2026-10-17)
+
+"Bo'lim ochiladi" ≠ "bo'lim chatdagi tabiiy til buyrug'ini bajaradi". Bu jadvalda faqat
+**chatga yozilgan gap** orqali haqiqatan bajariladigan narsa hisobga olingan. Har bo'lim uchun
+[tests/unit/test_sections_chat.py](../tests/unit/test_sections_chat.py) gapni `Api.chat` ga
+yuboradi va natijani (vazifa, saqlangan yozuv, sozlama) tekshiradi. Telefon (`/api/v1/chat`)
+xuddi shu yo'ldan o'tadi.
+
+Belgilar: **REAL IMPLEMENTED** — chatdan ishlaydi va sinalgan; **PARTIAL** — bir qismi chatdan,
+qolgani faqat tugmalar orqali; **BLOCKED** — tashqi narsa kerak; **NOT TESTED** — haqiqiy
+muhitda sinalmagan.
+
+| # | Bo'lim | Chatdan nima ishlaydi (misol) | Faqat tugma orqali | Holat |
+|---|---|---|---|---|
+| 1 | Home | — (umumiy ko'rinish sahifasi, buyruq qabul qilmaydi) | — | REAL IMPLEMENTED (sahifa) · chat N/A |
+| 2 | AI Chat | AI'siz yo'naltiruvchi barcha bo'limlarga yuboradi; tushunilmasa aniq aytadi | — | REAL IMPLEMENTED (AI'siz) · haqiqiy AI kaliti bilan NOT TESTED |
+| 3 | Office Agent | «Hisobot.xlsx ni och, B ustun bo'yicha saralab, PDF qilib saqla» (Excel/Word/PowerPoint) | demo tugmalari | REAL IMPLEMENTED (haqiqiy Office testlari avval PASS) |
+| 4 | Darsliklar va testlar | «7-sinf fizika Nyuton qonunlari 20 ta test», «... mavzusini chiqarib ber», taqdimot | darslik yuklash, Telegram kirish | REAL IMPLEMENTED · Telegram haqiqiy hisob bilan NOT TESTED |
+| 5 | Files | «hisobot fayllarini top» | nusxa/ko'chirish, nomlash, ZIP, zaxira, tartiblash, PDF | PARTIAL |
+| 6 | NEXVARA BI | «Savdo.xlsx dan dashboard yarat» (BI ochiladi, avtomatik dashboard) | filtr, vidjet, eksport | PARTIAL |
+| 7 | Workflows | «workflowlarni ko'rsat», ««Kunlik hisobot» workflowini ishga tushir» (yangi) | yaratish/tahrirlash, pauza, tasdiq | PARTIAL |
+| 8 | Teach NEXVARA | «Har doim Excel raqamlarini markazga joyla» → tasdiq → qoida | versiyalar, yoqish/o'chirish | REAL IMPLEMENTED |
+| 9 | Memory | «Eslab qol: ...», «nimalarni eslab qolgansan?», «xotiradan maktab haqida top» (yangi) | tahrir, o'chirish, zaxira/tiklash | REAL IMPLEMENTED (saqlash, eslash, qidiruv) |
+| 10 | Tasks / History | «oxirgi vazifalarni ko'rsat» (yangi) | bekor qilish (tugma yoki telefon) | REAL IMPLEMENTED (ko'rish) |
+| 11 | Devices | «telefon ulanishini yoq / o'chir», «telefon ulanganmi» (yangi) | QR skanerlash, qurilmani uzish | REAL IMPLEMENTED · haqiqiy telefon bilan NOT TESTED |
+| 12 | Settings | «yorug' mavzuga o't», «qorong'i mavzu» (yangi) | AI kalitlari va limitlar (ataylab chatdan emas), Google, yangilanish | PARTIAL |
+
+## Integratsiyalar
+
+| Modul | Holat | Izoh |
+|---|---|---|
+| Telefon API v1 (`remote_v1.py`, `protocol.py`) | REAL IMPLEMENTED | 13 marshrut, envelope + xato kodlari, sertifikat pin (QR'da `fp`), token almashtirish (yumshoq), 30 kunlik muddat, chiqish, long-poll, SHA-256 bilan fayl, tezlik cheklovi, eski baza migratsiyasi. HTTPS bilan 10 unit test PASS |
+| Haqiqiy telefon bilan ulanish | NOT TESTED | Foydalanuvchi telefoni kerak |
+| Native Android ilova | BLOCKED → Codex | JDK/Android SDK o'rnatilmagan; shartnoma va topshiriq tayyor: [ANDROID_HANDOFF.md](ANDROID_HANDOFF.md), [api/](api/) |
+| Google login (Windows, OAuth/OIDC + PKCE) | REAL IMPLEMENTED (soxta Google bilan) | 8 unit test PASS: PKCE, state, nonce, RS256 imzo, aud, refresh, invalid_grant, revoke |
+| Google login haqiqiy hisob bilan | BLOCKED | Google Cloud loyihasi va Desktop OAuth client kerak: [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md) |
+| Profil/Teach/tarix sinxronlash | TODO | Saqlash joyi tanlanmagan (masalan Drive appDataFolder) |
+| Windows installer (PyInstaller + Inno Setup) | REAL IMPLEMENTED | Build, jim o'rnatish, o'rnatilgan exe smoke PASS, o'chirish PASS, `D:\NEXVARA` tegilmadi |
+| Updater (imzoli manifest, SHA-256, tiklash, rollback) | REAL IMPLEMENTED | 6 unit test PASS; haqiqiy kalit + haqiqiy installer bilan papka kanali orqali qayta o'rnatish PASS |
+| Updater https kanali | NOT TESTED | https server yo'q (kod bor) |
+| .exe raqamli imzosi (Authenticode) | BLOCKED | Kod imzolash sertifikati kerak |
+| Push bildirishnoma (FCM) | BLOCKED | Firebase loyihasi kerak; v1 long-poll ishlatadi |

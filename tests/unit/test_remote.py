@@ -131,8 +131,10 @@ def test_revoke_and_rotate(env):
         db.execute("UPDATE devices SET token_created = ?", (time.time() - 8 * 86400,))
     st, body = req(srv, "/api/hello", token=token)
     new = json.loads(body)["new_token"]
-    assert req(srv, "/api/hello", token=token)[0] == 401  # the old one stops working
+    # The old token works until the new one is used (a lost reply must not lock out)...
+    assert req(srv, "/api/hello", token=token)[0] == 200
     assert req(srv, "/api/hello", token=new)[0] == 200
+    assert req(srv, "/api/hello", token=token)[0] == 401  # ...then it stops working
     api.devices_revoke(dev["id"])
     assert req(srv, "/api/hello", token=new)[0] == 401
 

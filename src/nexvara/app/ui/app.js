@@ -85,6 +85,7 @@ function handleReply(r) {
   if (r.confirm) addConfirm(r.confirm);
   if (r.task) track(r.task, true);
   if (r.open_bi) biOpenSource(r.open_bi);
+  if (r.theme) setTheme(r.theme, false);
 }
 
 // A paid AI request waits for the user's answer; nothing is sent before "Ha".
@@ -369,7 +370,82 @@ async function renderSettings() {
   const info = await api().get_info();
   $("#s-data").textContent = info.data_dir || "";
   renderAi();
+  renderAccount();
+  renderUpdate();
 }
+
+// ---- version and updates ----
+async function renderUpdate(status) {
+  if (!api()) return;
+  const st = status || await api().update_status();
+  $("#upd-info").textContent = `O‘rnatilgan versiya: ${st.current}` +
+    (st.kept.length ? ` · orqaga qaytarish uchun saqlangan: ${st.kept.join(", ")}` : "");
+  if (document.activeElement !== $("#upd-channel")) $("#upd-channel").value = st.channel || "";
+  const msg = $("#upd-msg"), err = $("#upd-error");
+  err.hidden = !st.error; err.textContent = st.error || "";
+  const ls = st.last_start || {};
+  if (ls.state === "updated") msg.textContent = `Yangilandi: ${ls.from} → ${ls.to} ✓`;
+  else if (ls.state === "failed") {
+    msg.textContent = `${ls.to} versiyaga yangilash tugamadi, hozir ${ls.running} ishlayapti.`;
+  } else msg.textContent = "";
+  const c = st.check;
+  if (c) msg.textContent = c.available ? `Yangi versiya bor: ${c.version}. ${c.notes || ""}` : "Eng so‘nggi versiya o‘rnatilgan ✓";
+  $("#upd-install").hidden = !(c && c.available);
+}
+
+$("#upd-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const r = await api().save_settings({ update: { channel: $("#upd-channel").value.trim() } });
+  $("#upd-error").hidden = r.ok; $("#upd-error").textContent = r.ok ? "" : r.error;
+  if (r.ok) renderUpdate();
+});
+$("#upd-check").addEventListener("click", async () => {
+  $("#upd-msg").textContent = "Tekshirilmoqda…";
+  renderUpdate(await api().update_check());
+});
+$("#upd-install").addEventListener("click", async () => {
+  if (!confirm("Yangilanish o‘rnatilsinmi? NEXVARA yopiladi va o‘zi qayta ochiladi. Ma’lumotlaringiz saqlanadi.")) return;
+  $("#upd-msg").textContent = "Yuklanmoqda va tekshirilmoqda…";
+  const r = await api().update_install();
+  if (r.ok) $("#upd-msg").textContent = `${r.installing} o‘rnatilmoqda, NEXVARA hozir yopiladi…`;
+  else renderUpdate(r);
+});
+
+// ---- Google account ----
+let accountTimer = null;
+
+async function renderAccount(status) {
+  if (!api()) return;
+  const st = status || await api().account_status();
+  const info = $("#account-info"), err = $("#account-error");
+  const login = $("#account-login"), logout = $("#account-logout");
+  err.hidden = true;
+  if (st.signed_in) {
+    info.textContent = `Kirilgan: ${st.profile.name || ""} ${st.profile.email}`.trim();
+  } else if (!st.configured) {
+    info.textContent = `Hozircha mavjud emas (BLOCKED): ${st.blocked}`;
+  } else if (st.login.state === "waiting") {
+    info.textContent = "Brauzerda Google hisobingizni tanlang…";
+  } else {
+    info.textContent = "Kirilmagan";
+  }
+  if (st.login.state === "error") { err.hidden = false; err.textContent = st.login.error; }
+  login.hidden = st.signed_in;
+  login.disabled = !st.configured || st.login.state === "waiting";
+  logout.hidden = !st.signed_in;
+  clearTimeout(accountTimer);
+  if (st.login.state === "waiting") accountTimer = setTimeout(() => renderAccount(), 1500);
+}
+
+$("#account-login").addEventListener("click", async () => {
+  const r = await api().account_login();
+  if (!r.ok) { $("#account-error").hidden = false; $("#account-error").textContent = r.error; return; }
+  renderAccount(r);
+});
+$("#account-logout").addEventListener("click", async () => {
+  if (!confirm("Google hisobidan chiqilsinmi?")) return;
+  renderAccount(await api().account_logout());
+});
 
 // ---- AI keys, budget, spending ----
 const money = (v) => `$${Number(v || 0).toFixed(3)}`;
@@ -1012,6 +1088,7 @@ function drawDevices(st) {
   $("#dev-pair").hidden = !st.running;
   if (st.running) {
     $("#dev-url").textContent = st.url;
+    $("#dev-fp").textContent = st.fingerprint ? `Sertifikat: ${st.fingerprint.slice(0, 16)}…${st.fingerprint.slice(-8)}` : "";
     if (st.code) {
       $("#dev-qr").innerHTML = st.qr_svg; // made by NEXVARA itself (segno), not user input
       $("#dev-code").textContent = st.code;
