@@ -43,10 +43,14 @@ def wait_for(js, timeout=15):
 def chat(text, expect):
     js = win.evaluate_js
     js("document.querySelector('.nav-item[data-page=chat]').click()")
+    before = js("document.querySelectorAll('.msg').length")
     js(f"document.getElementById('chat-text').value={json.dumps(text)}")
     js("document.querySelector('#chat-form button[type=submit]').click()")
+    # Only messages that appeared after this one was sent count (an earlier reply may
+    # contain the same word).
     return wait_for(
-        f"[...document.querySelectorAll('.msg')].some(m => m.textContent.includes({json.dumps(expect)}))"
+        f"[...document.querySelectorAll('.msg')].slice({before})"
+        f".some(m => m.textContent.includes({json.dumps(expect)}))"
     )
 
 
