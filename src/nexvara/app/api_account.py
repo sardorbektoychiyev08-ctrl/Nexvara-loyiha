@@ -26,7 +26,30 @@ class AccountApi:
         acc = self._google()
         if acc.client is None:
             return {"ok": False, "error": acc.status()["blocked"], **acc.status()}
-        return {"ok": True, **acc.login_async()}
+        drive = bool(self.get_settings()["sync"].get("google_drive"))
+        return {"ok": True, **acc.login_async(drive=drive)}
+
+    def account_import_client(self, path: str = "") -> dict[str, Any]:
+        """Settings → «Client JSON faylini tanlash»: validate and copy, never log in."""
+        from pathlib import Path
+
+        from nexvara.account import AuthError, import_client
+
+        if not path:
+            import webview
+
+            if not webview.windows:
+                return {"ok": False, "error": "Fayl tanlanmadi"}
+            chosen = webview.windows[0].create_file_dialog(
+                webview.OPEN_DIALOG, file_types=("Google client JSON (*.json)",))  # fmt: skip
+            if not chosen:
+                return {"ok": False, "error": "Fayl tanlanmadi"}
+            path = str(chosen[0])
+        try:
+            info = import_client(Path(path))
+        except AuthError as e:
+            return {"ok": False, "error": str(e), **self.account_status()}
+        return {"ok": True, "project": info["project_id"], **self.account_status()}
 
     def account_logout(self) -> dict[str, Any]:
         return self._google().logout()

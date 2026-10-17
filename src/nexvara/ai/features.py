@@ -88,6 +88,97 @@ def classify(router: AiRouter, text: str, approved: bool = False) -> Intent:
     )
 
 
+# ---------------- the tool-calling planner ----------------
+
+PLAN_SYSTEM = """Sen NEXVARA Core Agent'ining rejalashtiruvchisisan. Foydalanuvchi o‘zbekcha \
+(ba’zan ruscha yoki xato bilan, ba’zan bir xabarda bir nechta ish) yozadi. Oldingi suhbat va \
+hozirgi kontekst quyida. Vazifang: so‘rovni quyidagi ASBOBLAR chaqiruvlariga aylantirish. \
+Asboblarni o‘zing bajarmaysan — faqat JSON reja qaytarasan, ilova uni tekshirib bajaradi.
+
+Qoidalar:
+- Faqat ro‘yxatdagi asbob nomlari va parametrlaridan foydalan. Yo‘l (path) to‘qib chiqarma: \
+foydalanuvchi aytgan nom, kontekstdagi fayl yoki "@prev" (oldingi qadam natijasi) ishlatiladi.
+- Office fayl ichidagi ishlar, darslikdan test/mavzu/taqdimot, xotira va Teach uchun \
+"nexvara.command" asbobiga ilova tushunadigan o‘zbekcha buyruq ber, masalan \
+"Hisobot.xlsx ni och, B ustun bo‘yicha saralab, PDF qilib saqla", \
+"7-sinf fizika Nyuton qonunlari 20 ta test 2 variant", "Eslab qol: ...".
+- Bir nechta ish bo‘lsa, calls ro‘yxatida tartib bilan yoz.
+- API kalit, parol yoki tokenni hech qachon parametrga yozma.
+- Bilim savoli bo‘lsa {"kind": "question"}, oddiy suhbat bo‘lsa {"kind": "chat"} qaytar.
+
+Faqat JSON qaytar:
+{"kind": "tools", "calls": [{"tool": "nom", "args": {...}}], "say": "foydalanuvchiga qisqa izoh"}
+yoki {"kind": "question", "grade": sinf yoki null, "subject": "fan"} yoki {"kind": "chat"}"""
+
+
+@dataclass
+class Plan:
+    kind: str
+    calls: list[dict[str, Any]] = field(default_factory=list)
+    say: str = ""
+    intent: Intent | None = None
+
+
+def _tool_lines(catalog: list[dict[str, Any]]) -> str:
+    lines = []
+    for t in catalog:
+        props = t["parameters"]["properties"]
+        req = set(t["parameters"]["required"])
+        args = ", ".join(f"{k}{'*' if k in req else ''}: {v['type']}" for k, v in props.items())
+        lines.append(f"- {t['name']}({args}) — {t['description']}")
+    return "\n".join(lines)
+
+
+def plan(
+    router: AiRouter,
+    text: str,
+    catalog: list[dict[str, Any]],
+    context: dict[str, Any],
+    turns: list[dict[str, str]],
+    facts=(),
+    rules=(),
+    approved: bool = False,
+) -> Plan:
+    system = PLAN_SYSTEM + "\n\nASBOBLAR (* — majburiy):\n" + _tool_lines(catalog)
+    ctx = {k: v for k, v in context.items() if v}
+    if ctx:
+        system += "\n\nKontekst: " + json.dumps(ctx, ensure_ascii=False)
+    if rules:
+        system += "\n\nFoydalanuvchi o‘rgatgan qoidalar (ilova o‘zi qo‘llaydi):\n" + "\n".join(
+            f"- {r}" for r in rules)  # fmt: skip
+    system = _with_facts(system, facts)
+    history = "\n".join(f"{'Foydalanuvchi' if t['role'] == 'user' else 'NEXVARA'}: {t['text']}"
+                        for t in turns[-8:])  # fmt: skip
+    content = f"Oldingi suhbat:\n{history}\n\nYangi xabar: {text}" if history else text
+    r = router.complete(
+        "classify",
+        system,
+        [{"role": "user", "content": content}],
+        max_tokens=3000,
+        expected_out=500,
+        approved=approved,
+        effort="low",
+    )
+    data = _json_from(r.text)
+    if not isinstance(data, dict):
+        raise AiError("AI javobini tushunib bo‘lmadi.")
+    kind = str(data.get("kind") or "chat")
+    if kind == "tools":
+        calls = [c for c in data.get("calls") or [] if isinstance(c, dict) and c.get("tool")]
+        return Plan("tools", calls, str(data.get("say") or ""))
+    # The older one-command format is still accepted.
+    grade = data.get("grade")
+    try:
+        grade = int(grade) if grade not in (None, "") else None
+    except (TypeError, ValueError):
+        grade = None
+    if kind not in ("test", "topic", "presentation", "command", "question", "chat"):
+        kind = "chat"
+    intent = Intent(kind, str(data.get("command") or "").strip(), grade,
+                    str(data.get("subject") or ""))  # fmt: skip
+    return Plan(kind, [], "", intent)
+
+
 # ---------------- questions answered from the textbooks ----------------
 
 QA_SYSTEM = """Sen NEXVARA — o‘qituvchi va o‘quvchilar uchun yordamchisan. Javobni o‘zbek \

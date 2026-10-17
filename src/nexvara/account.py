@@ -35,6 +35,7 @@ from nexvara import config
 from nexvara.ai.keys import KeyStore
 
 SCOPES = "openid email profile"
+DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata"  # sync files, hidden app folder
 CLIENT_FILE = "google_client.json"
 ISSUERS = ("https://accounts.google.com", "accounts.google.com")
 LOGIN_TIMEOUT = 300.0
@@ -66,21 +67,48 @@ def pkce_pair() -> tuple[str, str]:
     return verifier, _b64url(hashlib.sha256(verifier.encode("ascii")).digest())
 
 
+def check_client_json(raw: Any) -> dict[str, str]:
+    """The Google Cloud client file must be a "Desktop app" client (loopback redirect)."""
+    if not isinstance(raw, dict):
+        raise AuthError("Bu Google client JSON fayli emas")
+    if "web" in raw and "installed" not in raw:
+        raise AuthError("Bu «Web application» client. Google Cloud → Clients → Create client → "
+                        "turi «Desktop app» bo‘lsin va o‘sha JSON faylni tanlang.")  # fmt: skip
+    c = raw.get("installed") or {}
+    cid = str(c.get("client_id", ""))
+    if not cid.endswith(".apps.googleusercontent.com"):
+        raise AuthError(
+            "JSON ichida client_id topilmadi (Google Cloud’dan yuklangan faylni tanlang)"
+        )
+    return {"client_id": cid, "client_secret": str(c.get("client_secret", "")),
+            "project_id": str(c.get("project_id", ""))}  # fmt: skip
+
+
+def import_client(src: Path, dest: Path | None = None) -> dict[str, str]:
+    """Validate the downloaded JSON and copy it to D:\\NEXVARA (the old one is kept as .bak)."""
+    try:
+        raw = json.loads(Path(src).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise AuthError(f"Faylni o‘qib bo‘lmadi: {e}") from e
+    info = check_client_json(raw)
+    dest = dest or (config.data_dir() / CLIENT_FILE)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if dest.exists():
+        dest.replace(dest.with_suffix(".json.bak"))
+    dest.write_text(json.dumps(raw, indent=2), encoding="utf-8")
+    return info
+
+
 def load_client(path: Path | None = None) -> dict[str, str] | None:
     """client_id/client_secret from the Google Cloud "Desktop app" JSON, or None."""
     p = path or (config.data_dir() / CLIENT_FILE)
     try:
-        raw = json.loads(p.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    c = raw.get("installed") or raw.get("web") or raw if isinstance(raw, dict) else {}
-    if not isinstance(c, dict) or not str(c.get("client_id", "")).endswith(
-        ".apps.googleusercontent.com"
-    ):
+        c = check_client_json(json.loads(p.read_text(encoding="utf-8")))
+    except (OSError, ValueError, AuthError):
         return None
     # For installed apps Google's "client secret" is not confidential (RFC 8252 §8.5), but
     # we still keep the file outside the repo.
-    return {"client_id": c["client_id"], "client_secret": str(c.get("client_secret", ""))}
+    return {"client_id": c["client_id"], "client_secret": c["client_secret"]}
 
 
 def verify_id_token(id_token: str, jwks: dict[str, Any], client_id: str, nonce: str,
@@ -186,6 +214,9 @@ class GoogleAccount:
             "login": dict(self._login),
             "client_file": str(config.data_dir() / CLIENT_FILE),
         }
+        if out["configured"]:
+            cid = self.client["client_id"]
+            out["client_id"] = cid[:8] + "…" + cid[cid.find(".apps") :]
         if not out["configured"]:
             out["blocked"] = (
                 "Google Cloud loyihasi kerak: OAuth client (Desktop app) yarating va JSON "
@@ -220,8 +251,9 @@ class GoogleAccount:
             raise AuthError(f"Google kalitlarini olib bo‘lmadi: {e}") from e
 
     # ----- login -----
-    def login(self, timeout: float = LOGIN_TIMEOUT) -> dict[str, Any]:
-        """Blocking: opens the browser, waits for the redirect, verifies, saves."""
+    def login(self, timeout: float = LOGIN_TIMEOUT, drive: bool = False) -> dict[str, Any]:
+        """Blocking: opens the browser, waits for the redirect, verifies, saves.
+        `drive` also asks for the hidden app folder in Drive (used only for sync)."""
         client = self.client
         if client is None:
             raise AuthError(self.status()["blocked"])
@@ -237,7 +269,8 @@ class GoogleAccount:
         try:
             url = self.ep.auth + "?" + urllib.parse.urlencode({
                 "client_id": client["client_id"], "redirect_uri": redirect,
-                "response_type": "code", "scope": SCOPES, "state": state, "nonce": nonce,
+                "response_type": "code", "scope": SCOPES + (" " + DRIVE_SCOPE if drive else ""),
+                "include_granted_scopes": "true", "state": state, "nonce": nonce,
                 "code_challenge": challenge, "code_challenge_method": "S256",
                 "access_type": "offline", "prompt": "consent select_account",
             })  # fmt: skip
@@ -272,13 +305,14 @@ class GoogleAccount:
             "email_verified": bool(claims.get("email_verified")),
             "name": claims.get("name", ""),
             "picture": claims.get("picture", ""),
+            "scopes": str(tok.get("scope") or SCOPES).split(),
             "signed_in_at": time.time(),
         }
         self.profile_path.parent.mkdir(parents=True, exist_ok=True)
         self.profile_path.write_text(json.dumps(prof, ensure_ascii=False, indent=2), "utf-8")
         return prof
 
-    def login_async(self) -> dict[str, Any]:
+    def login_async(self, drive: bool = False) -> dict[str, Any]:
         """For the UI: runs login() in the background; the page polls status()."""
         with self._lock:
             if self._login.get("state") == "waiting":
@@ -287,7 +321,7 @@ class GoogleAccount:
 
         def run() -> None:
             try:
-                prof = self.login()
+                prof = self.login(drive=drive)
                 self._login = {"state": "done", "email": prof["email"]}
             except AuthError as e:
                 self._login = {"state": "error", "error": str(e)}

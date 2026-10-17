@@ -202,10 +202,29 @@
           oynasida bo‘ladi; parol NEXVARA’ga kelmaydi, kirish kaliti Windows Credential Manager’da saqlanadi.</p>
         <div id="account-info" class="muted small"></div>
         <div class="row">
+          <button class="btn" id="account-import" type="button">Client JSON faylini tanlash</button>
           <button class="btn primary" id="account-login" type="button">Google bilan kirish</button>
           <button class="btn" id="account-logout" type="button" hidden>Chiqish</button>
         </div>
+        <p class="muted small">JSON fayl Google Cloud → Clients → «Desktop app» dan yuklanadi
+          (docs/GOOGLE_LOGIN.md). NEXVARA hisobingizga o‘zi kirmaydi: kirishni faqat siz brauzerda tasdiqlaysiz.</p>
         <div class="error" id="account-error" hidden></div>
+      </div>
+      <div class="card wide" id="sync-card">
+        <div class="card-label">Sinxronlash (ixtiyoriy)</div>
+        <p class="muted small">Sozlamalar, eslatmalar va Teach qoidalari boshqa kompyuter va telefon bilan
+          almashadi. Fayllar parol bilan shifrlanadi; API kalitlar va AI yoqilishi hech qachon uzatilmaydi.</p>
+        <form id="sync-form" class="form-grid">
+          <label>Umumiy papka (OneDrive, Google Drive papkasi, tarmoq)
+            <input id="sync-folder" type="text" placeholder="masalan C:\Users\Siz\OneDrive"></label>
+          <label>Sinxron paroli (barcha qurilmalarda bir xil, 8+ belgi)
+            <input id="sync-pass" type="password" autocomplete="new-password" placeholder="saqlangan bo‘lsa bo‘sh qoldiring"></label>
+          <label class="check-label"><input id="sync-drive" type="checkbox"> Google Drive orqali ham (Google hisobi kerak)</label>
+          <div class="row"><button class="btn" type="submit">Saqlash</button>
+            <button class="btn primary" id="sync-now" type="button">Hozir sinxronlash</button></div>
+        </form>
+        <div class="muted small" id="sync-msg"></div>
+        <div class="error" id="sync-error" hidden></div>
       </div>
       <form class="card wide" id="settings-form">
         <div class="card-label">Testlar va Office</div>

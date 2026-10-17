@@ -24,6 +24,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "remote": {"enabled": False, "port": 8765},  # phone access over the local network
     # Private release channel: a folder or an https:// URL with a signed latest.json.
     "update": {"channel": "", "auto_check": True},
+    # Settings, memory and Teach rules between devices (sync.py). The passphrase is in
+    # Credential Manager (NEXVARA/sync/passphrase), never here.
+    "sync": {"enabled": False, "folder": "", "google_drive": False, "last": 0.0},
     "ai": {
         "enabled": False,
         "provider": "",  # openai | anthropic | gemini | deepseek

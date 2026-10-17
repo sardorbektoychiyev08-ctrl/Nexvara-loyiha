@@ -534,6 +534,19 @@ $("#bi-sheet").addEventListener("change", async () => {
   const src = bi.cfg && bi.cfg.source;
   if (src) await biLoad(await api().bi_auto(src, $("#bi-sheet").value));
 });
+// The chat asked for a saved dashboard (optionally filtered, optionally exported).
+async function biFromChat(ui) {
+  show("bi");
+  if (ui.open) {
+    await biLoad(await api().bi_open(ui.open));
+    bi.file = ui.open;
+  }
+  if (!bi.cfg) return;
+  if (ui.state) { bi.state = { ...bi.state, ...ui.state }; await biRefresh(); }
+  $("#bi-msg").textContent = `Ochildi: ${bi.cfg.name}`;
+  if (ui.export) await biExport(ui.export);
+}
+
 $("#bi-open").addEventListener("click", async () => {
   const f = $("#bi-saved").value;
   if (!f) return;

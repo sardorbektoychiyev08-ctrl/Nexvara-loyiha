@@ -85,7 +85,8 @@ class FakeGoogle:
                 if fake.tamper == "aud":
                     claims["aud"] = "boshqa.apps.googleusercontent.com"
                 self._json({"access_token": "at-1", "refresh_token": "rt-1",
-                            "id_token": fake.sign(claims), "expires_in": 3599})  # fmt: skip
+                            "id_token": fake.sign(claims), "expires_in": 3599,
+                            "scope": req["scope"]})  # fmt: skip
 
         self.httpd = ThreadingHTTPServer(("127.0.0.1", 0), H)
         self.base = f"http://127.0.0.1:{self.httpd.server_address[1]}"
@@ -106,7 +107,10 @@ class FakeGoogle:
             q = {
                 k: v[0] for k, v in urllib.parse.parse_qs(urllib.parse.urlparse(url).query).items()
             }
-            assert q["code_challenge_method"] == "S256" and q["scope"] == "openid email profile"
+            assert q["code_challenge_method"] == "S256" and q["scope"].startswith(
+                "openid email profile"
+            )
+            self.last_query = q
             assert q["redirect_uri"].startswith("http://127.0.0.1:")
             code = "c-" + q["state"][:6]
             self.codes[code] = q
@@ -221,3 +225,36 @@ def test_not_configured_is_blocked(tmp_path, monkeypatch):
     assert load_client() == CLIENT and acc.status()["configured"] is True
     (tmp_path / "google_client.json").write_text('{"installed": {"client_id": "x"}}')
     assert load_client() is None
+
+
+def test_drive_scope_for_sync(google):
+    fake, make, keys = google
+    from nexvara.account import DRIVE_SCOPE
+
+    prof = make().login(timeout=10, drive=True)
+    assert DRIVE_SCOPE in fake.last_query["scope"].split()
+    assert fake.last_query["include_granted_scopes"] == "true"
+    assert DRIVE_SCOPE in prof["scopes"]
+
+
+def test_import_client_json(tmp_path, monkeypatch):
+    monkeypatch.setenv("NEXVARA_DATA", str(tmp_path / "data"))
+    from nexvara.account import AuthError, GoogleAccount, import_client
+    from nexvara.ai.keys import MemoryKeyStore
+
+    web = tmp_path / "web.json"
+    web.write_text(json.dumps({"web": CLIENT}))
+    with pytest.raises(AuthError, match="Desktop app"):
+        import_client(web)
+    bad = tmp_path / "bad.json"
+    bad.write_text("{}")
+    with pytest.raises(AuthError, match="client_id"):
+        import_client(bad)
+    good = tmp_path / "client_secret_123.json"
+    good.write_text(json.dumps({"installed": {**CLIENT, "project_id": "nexvara-1"}}))
+    assert import_client(good)["project_id"] == "nexvara-1"
+    import_client(good)  # again: the previous file is kept as .bak
+    assert (tmp_path / "data" / "google_client.json.bak").is_file()
+    st = GoogleAccount(keys=MemoryKeyStore()).status()
+    assert st["configured"] and not st["signed_in"]  # imported, but nobody logged in
+    assert "…" in st["client_id"] and st["client_id"].endswith(".apps.googleusercontent.com")

@@ -15,11 +15,13 @@ from typing import Any
 
 from nexvara import __version__, config
 from nexvara.app.api_account import AccountApi
+from nexvara.app.api_agent import AgentApi, looks_like_secret
 from nexvara.app.api_bi import BiApi
 from nexvara.app.api_devices import DevicesApi
 from nexvara.app.api_files import FilesApi
 from nexvara.app.api_memory import MemoryApi
 from nexvara.app.api_sections import SectionsChatApi
+from nexvara.app.api_sync import SyncApi
 from nexvara.app.api_update import UpdateApi
 from nexvara.app.api_workflows import WorkflowsApi
 from nexvara.core.task import TaskFn, TaskRunner
@@ -48,7 +50,16 @@ def _wants_ai(text: str) -> bool:
 
 
 class Api(
-    MemoryApi, FilesApi, WorkflowsApi, BiApi, DevicesApi, AccountApi, UpdateApi, SectionsChatApi
+    AgentApi,
+    MemoryApi,
+    FilesApi,
+    WorkflowsApi,
+    BiApi,
+    DevicesApi,
+    AccountApi,
+    UpdateApi,
+    SectionsChatApi,
+    SyncApi,
 ):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
@@ -67,7 +78,9 @@ class Api(
         self._output_dir = output_dir
         self._keep_office_open = keep_office_open
         self._overrides = dict(overrides or {})
-        self._context_file: str | None = None  # "shu fayl": the last file worked on
+        from nexvara.agent.context import Context
+
+        self._ctx = Context()  # conversation state: "shu fayl", "uni", last folder/dashboard...
         self._pending: dict[str, tuple[str, Any]] = {}  # AI requests waiting for "Ha"
         self._ai = None
         # The desktop app keeps history and settings in D:\NEXVARA; tests run without.
@@ -76,11 +89,32 @@ class Api(
             from nexvara.appdata import History
 
             self._history = History()
-            self._runner.on_finish = lambda t: self._history.save(t.snapshot())
+        prev_hook = self._runner.on_finish
+
+        def on_finish(t: Any) -> None:
+            snap = t.snapshot()
+            if self._history is not None:
+                self._history.save(snap)
+            elif prev_hook is not None:
+                prev_hook(t)
+            self._ctx.task_done(snap)  # its output becomes "uni" / "natija"
+
+        self._runner.on_finish = on_finish
         if excel_demo:
             self._overrides["excel_demo"] = excel_demo
         if excel_dashboard:
             self._overrides["excel_dashboard"] = excel_dashboard
+
+    @property
+    def _context_file(self) -> str | None:
+        """ "shu fayl": the file the conversation is about."""
+        return self._ctx.file or None
+
+    @_context_file.setter
+    def _context_file(self, value: str | None) -> None:
+        self._ctx.file = value or ""
+        if value:
+            self._ctx.remember_dir(value)
 
     def _keep_open(self) -> bool:
         """Leave Office open after a task? The desktop app follows the user's setting."""
@@ -121,12 +155,18 @@ class Api(
         text = (text or "").strip()
         if not text:
             return {"reply": ""}
+        if looks_like_secret(text):  # never store or forward a pasted API key
+            return {"reply": "Bu API kalitga o‘xshaydi. Kalitni chatga yozmang: u Sozlamalar → AI "
+                    "bo‘limida kiritiladi va Windows Credential Manager’da saqlanadi. Bu xabar "
+                    "saqlanmadi."}  # fmt: skip
         mem = self._mem()
         if mem is not None:
             mem.log_chat("user", text)
-        out = self._chat_inner(text)
+        self._ctx.add_turn("user", text)
+        out = self._chat_inner(self._expand_aliases(text))
         if mem is not None:
             mem.log_chat("nexvara", out.get("reply", ""))
+        self._ctx.add_turn("nexvara", out.get("reply", ""))
         return out
 
     def _chat_inner(self, text: str, _use_ai: bool = True) -> dict[str, Any]:
@@ -139,6 +179,10 @@ class Api(
         teach = self._chat_teach(text)
         if teach is not None:
             return teach
+        text = self._bind_refs(text)  # "uni PDF qil" -> the file the last step produced
+        agent = self._chat_agent(text, _use_ai)  # several tasks; Files/BI/Workflows/Settings
+        if agent is not None:
+            return agent
         bi = self._chat_bi(text)
         if bi is not None:
             return bi
@@ -233,6 +277,12 @@ class Api(
             return {"reply": "Xotira bu rejimda o‘chirilgan."}
         if req.error:
             return {"reply": req.error}
+        cur = self._ctx.current_file(req.text)
+        if req.kind == "fact" and cur and self._ctx.refers_to_file(req.text):
+            # "Shu faylni eslab qol: oylik hisobot" -> the fact keeps the real path, so later
+            # "oylik hisobotni och" finds it (memory aliases).
+            pat = r"(?i)\b(shu|bu|ushbu|o[‘’']?sha)\s+fayl\w*|\buni\b"
+            req.text = re.sub(pat, lambda _m: cur, req.text, count=1)
         import uuid
 
         token = uuid.uuid4().hex[:12]
@@ -295,20 +345,31 @@ class Api(
         return {"token": token, "text": text}
 
     def _chat_ai(self, text: str, approved: bool = False) -> dict[str, Any]:
+        from nexvara.agent import tools as agent_tools
         from nexvara.ai import features
         from nexvara.ai.router import NeedsConfirmation
         from nexvara.core.task import UserError
 
         router = self._router()
+        mem = self._mem()
         try:
-            intent = features.classify(router, text, approved)
+            facts = mem.relevant_facts(text) if mem is not None else []
+            rules = [f"{r.label()}: {r.text}" for r in mem.rules(enabled_only=True)] if mem else []
+            p = features.plan(router, text, agent_tools.catalog(), self._ctx.snapshot(),
+                              list(self._ctx.turns)[:-1], facts, rules, approved)  # fmt: skip
+            if p.kind == "tools":
+                calls = [agent_tools.ToolCall(str(c["tool"]), dict(c.get("args") or {}))
+                         for c in p.calls]  # fmt: skip
+                if not calls:
+                    return {"reply": p.say or "Nima qilishni tushunmadim, aniqroq yozing."}
+                intro = f"Tushundim: {p.say}\n\n" if p.say else ""
+                return self._run_calls(calls, intro=intro)
+            intent = p.intent
             if intent.kind in ("test", "topic", "presentation", "command") and intent.command:
                 out = self._chat_inner(intent.command, _use_ai=False)
                 if not out.get("unhandled"):
                     out["reply"] = f"Tushundim: «{intent.command}»\n\n" + out["reply"]
                     return out
-            mem = self._mem()
-            facts = mem.relevant_facts(text) if mem is not None else []
             if intent.kind == "question":
                 ans = features.answer_question(
                     router, text, approved, intent.grade, intent.subject or None, facts=facts
@@ -344,6 +405,10 @@ class Api(
         kind, payload = item
         if kind == "teach":
             return self._save_teach(payload)
+        if kind == "tools":
+            return self._run_calls(payload, approved=True)
+        if kind == "chain":
+            return self._start_chain(payload, approved=True)
         if kind == "chat":
             return self._chat_ai(payload, approved=True)
         snap = self.make_test({**payload, "approved": True})
@@ -403,6 +468,7 @@ class Api(
         except LookupError as e:
             return {"reply": str(e)}
         self._context_file = str(source)
+        self._ctx.command = text
         snap = self.run_command_plan(plan, str(source))
         steps = "\n".join(f"• {d}" for d in plan.describe())
         reply = f"Fayl: {source}\nBajaraman:\n{steps}"
