@@ -289,3 +289,20 @@ def test_credential_manager_roundtrip():
     finally:
         store.delete("openai")
     assert store.load("openai") is None
+
+
+def test_key_from_clipboard_is_checked_saved_and_cleared(router, tmp_path, monkeypatch):
+    monkeypatch.setenv("NEXVARA_DATA", str(tmp_path / "data"))
+    from nexvara.app.api import Api
+
+    board = {"text": "  sk-ant-test-1234567890\n"}
+    api = Api(overrides={"ai_router": router, "clipboard": lambda: board["text"],
+                         "clipboard_clear": lambda: board.update(text="")})  # fmt: skip
+    r = api.ai_save_key_from_clipboard("anthropic")
+    assert r["ok"] and r["clipboard_cleared"] and board["text"] == ""
+    assert router.keys.load("anthropic") == "sk-ant-test-1234567890"
+    assert "1234567890" not in json.dumps(r)  # the key never goes back to the page
+    assert not router.ready()  # saving a key does not switch paid AI on
+    assert api.ai_save_key_from_clipboard("anthropic")["ok"] is False  # empty clipboard
+    board["text"] = "short"
+    assert api.ai_save_key_from_clipboard("openai")["ok"] is False and board["text"] == "short"

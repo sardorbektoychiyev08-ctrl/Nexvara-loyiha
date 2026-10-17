@@ -562,6 +562,35 @@ $("#upd-install").addEventListener("click", async () => {
   else renderUpdate(r);
 });
 
+// Start-up notice: a signed newer version is on the channel (nothing is downloaded yet).
+async function checkUpdateBanner() {
+  let r;
+  try { r = await api().update_auto(); } catch (e) { return; }
+  const ls = r.last_start || {};
+  const box = $("#update-banner"), text = $("#update-banner-text");
+  if (ls.state === "updated") {
+    text.textContent = `NEXVARA yangilandi: ${ls.from} → ${ls.to} ✓ Ma’lumotlaringiz joyida.`;
+    $("#update-banner-go").hidden = true; box.hidden = false;
+  } else if (ls.state === "failed") {
+    text.textContent = `${ls.to} versiyaga yangilash tugamadi — ${ls.running} ishlayapti. ` +
+      "Sozlamalar → Yangilanish bo‘limida qayta urinish yoki orqaga qaytarish mumkin.";
+    $("#update-banner-go").hidden = true; box.hidden = false;
+  } else if (r.available) {
+    text.textContent = `Yangi versiya bor: ${r.version}. ${r.notes || ""}`;
+    $("#update-banner-go").hidden = false; box.hidden = false;
+  }
+}
+$("#update-banner-later").addEventListener("click", () => { $("#update-banner").hidden = true; });
+$("#update-banner-go").addEventListener("click", async () => {
+  if (!confirm("Yangilanish o‘rnatilsinmi? NEXVARA yopiladi va o‘zi qayta ochiladi. Ma’lumotlaringiz saqlanadi.")) return;
+  $("#update-banner-go").disabled = true;
+  $("#update-banner-text").textContent = "Yuklanmoqda va imzosi tekshirilmoqda…";
+  const r = await api().update_install();
+  $("#update-banner-text").textContent = r.ok ? `${r.installing} o‘rnatilmoqda, NEXVARA hozir yopiladi…`
+    : `Xatolik yuz berdi: ${r.error}`;
+  $("#update-banner-go").disabled = r.ok;
+});
+
 // ---- Google account ----
 let accountTimer = null;
 
@@ -642,6 +671,18 @@ async function renderAi(status) {
     input.type = "password"; input.placeholder = p.has_key ? "Yangi kalit (almashtirish uchun)" : p.key_hint;
     input.autocomplete = "off";
     const save = el("button", "btn primary", i18n("ai.check_save"));
+    const paste = el("button", "btn primary", i18n("ai.from_clipboard"));
+    paste.type = "button";
+    paste.title = "Saytda nusxalangan kalit ekranga chiqmasdan saqlanadi, bufer tozalanadi";
+    paste.addEventListener("click", async () => {
+      paste.disabled = true; msg.textContent = "Tekshirilmoqda (bepul so‘rov)…";
+      const r = await api().ai_save_key_from_clipboard(name);
+      paste.disabled = false;
+      if (!r.ok) { msg.textContent = `Xatolik yuz berdi: ${r.error}`; return; }
+      msg.textContent = `Saqlandi ✓ Bufer tozalandi. Modellar: ${Object.values(r.models).join(", ")}` +
+        (r.missing.length ? ` (bu hisobda mavjud bo‘lmagan darajalar: ${r.missing.join(", ")})` : "");
+      renderAi(r.status); refreshAiStatus();
+    });
     const get = el("button", "btn", `${i18n("ai.get_key")} ↗`);
     const pay = el("button", "btn", `${i18n("ai.pay")} ↗`);
     const usage = el("button", "btn", `${i18n("ai.usage_site")} ↗`);
@@ -660,7 +701,7 @@ async function renderAi(status) {
       renderAi(r.status); refreshAiStatus();
     });
     get.addEventListener("click", () => api().open_url(p.key_url));
-    form.append(input, save, get, pay, usage);
+    form.append(get, paste, input, save, pay, usage);
     if (p.has_key) {
       const del = el("button", "btn", "O‘chirish");
       del.type = "button";
@@ -1337,6 +1378,7 @@ window.addEventListener("pywebviewready", async () => {
   ].join("\n");
   refreshAiStatus();
   renderAiMoney();
+  checkUpdateBanner();
   // The conversation continues where it stopped last time.
   (await api().memory_chat(30)).forEach((c) => addMsg(c.text, c.role === "user"));
   settings = await api().get_settings();

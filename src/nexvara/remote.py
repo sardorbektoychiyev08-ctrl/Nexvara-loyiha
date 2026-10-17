@@ -85,7 +85,11 @@ class DeviceStore:
             have = {r[1] for r in db.execute("PRAGMA table_info(devices)")}
             for col, decl in _MIGRATIONS.items():
                 if col not in have:
-                    db.execute(f"ALTER TABLE devices ADD COLUMN {col} {decl}")
+                    try:
+                        db.execute(f"ALTER TABLE devices ADD COLUMN {col} {decl}")
+                    except sqlite3.OperationalError as e:  # another thread added it first
+                        if "duplicate column" not in str(e):
+                            raise
 
     def _db(self) -> sqlite3.Connection:
         return sqlite3.connect(str(self.path), timeout=10)

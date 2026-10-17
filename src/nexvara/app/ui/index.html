@@ -27,6 +27,11 @@
   </aside>
 
   <main class="content">
+    <div class="update-banner" id="update-banner" role="status" hidden>
+      <span id="update-banner-text"></span>
+      <button class="btn primary" id="update-banner-go" type="button">Yangilash</button>
+      <button class="btn" id="update-banner-later" type="button">Keyinroq</button>
+    </div>
     <section class="page active" id="page-home">
       <h1>Xush kelibsiz</h1>
       <p class="muted">Siz buyruq berasiz — NEXVARA ishni bajaradi — natijani ko'rasiz.</p>
@@ -283,6 +288,23 @@
           saytida alohida API kalit va API krediti (balans) kerak. To‘lov NEXVARA ichida
           qilinmaydi: «To‘lov / Balans» tugmasi provayderning rasmiy sahifasini brauzerda ochadi.
           Karta raqami, CVV yoki bank parolini NEXVARA’ga hech qachon kiritmang.</p>
+        <details class="ai-howto">
+          <summary>AI’ni qanday ulash mumkin (bir martalik, 2 daqiqa)</summary>
+          <ol class="muted small">
+            <li>Provayder qatorida «API kalitini olish ↗» ni bosing — rasmiy sayt brauzerda ochiladi.
+              U yerda o‘z hisobingiz bilan kiring va yangi API kalit yarating.</li>
+            <li>Kalitni saytdagi nusxalash tugmasi bilan nusxalang.</li>
+            <li>NEXVARA’da «Buferdan kalitni saqlash» ni bosing. Kalit ekranga chiqmaydi: bepul
+              tekshiriladi, Windows himoyalangan xotirasiga (Credential Manager) yoziladi va
+              bufer tozalanadi.</li>
+            <li>AI o‘zidan yoqilmaydi: pastdagi «AI yoqilgan» ni o‘zingiz belgilaysiz.</li>
+          </ol>
+          <p class="muted small">Nega «Google/ChatGPT bilan kirish» emas: OpenAI, Claude va DeepSeek
+            boshqa dasturlarga API uchun rasmiy kirish (OAuth) bermaydi — faqat API kalit. Gemini’da
+            OAuth bor, lekin u Google Cloud loyihasi va keng ruxsat talab qiladi; Google o‘zi ham
+            API kalitni eng oddiy yo‘l deb tavsiya qiladi. Obuna (ChatGPT Plus, Gemini Advanced…)
+            API krediti emas.</p>
+        </details>
         <div id="ai-providers"></div>
         <form id="ai-form">
           <div class="form-grid">

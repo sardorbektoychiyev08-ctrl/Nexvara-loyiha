@@ -124,3 +124,34 @@ def test_api_update_flow(channel):
     assert st["ok"] and st["check"]["version"] == "0.2.0"
     r = api.update_install()
     assert r["ok"] and r["installing"] == "0.2.0" and started
+
+
+def test_installer_copy_is_a_rollback_target(channel, tmp_path):
+    """A version installed by hand left its installer copy (installer/nexvara.iss)."""
+    release, make, ch = channel
+    from nexvara import updater
+
+    kept = tmp_path / "installers"
+    (kept / "1.0.0").mkdir(parents=True)
+    (kept / "1.0.0" / "NEXVARA-Setup-1.0.0.exe").write_bytes(b"MZ old")
+    upd = updater.Updater(str(ch), current="1.0.0", folder=tmp_path / "upd", kept=kept)
+    assert upd.installed_versions() == ["1.0.0"]
+    started = []
+    exe = upd.rollback("1.0.0", run=started.append)
+    assert exe.parent == kept / "1.0.0" and started
+
+
+def test_start_banner_checks_only_when_allowed(channel):
+    release, make, ch = channel
+    from nexvara.app.api import Api
+
+    started = []
+    off = Api(overrides={"updater": make(), "update_run": started.append,
+                         "update_settings": {"auto_check": False, "channel": str(ch)}})  # fmt: skip
+    release("0.2.0")
+    assert off.update_auto()["checked"] is False
+    on = Api(overrides={"updater": make(), "update_run": started.append,
+                        "update_settings": {"auto_check": True, "channel": str(ch)}})  # fmt: skip
+    r = on.update_auto()
+    assert r["checked"] and r["available"] and r["version"] == "0.2.0"
+    assert not started and not (make().folder / "0.2.0").exists()  # nothing downloaded
