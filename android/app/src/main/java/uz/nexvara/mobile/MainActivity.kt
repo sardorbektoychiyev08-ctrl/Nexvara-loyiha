@@ -118,11 +118,14 @@ class MainActivity : FragmentActivity() {
                 stopSpeaking = ::stopSpeaking,
                 unlock = ::unlock,
             )
-            if (Build.VERSION.SDK_INT >= 33 && model.profile != null &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
-                !model.secure.flag("asked_notifications")) {
-                model.secure.setFlag("asked_notifications")
-                notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            // Asked once, after the first pairing; a launcher may only be used after composition.
+            androidx.compose.runtime.LaunchedEffect(model.profile != null) {
+                if (Build.VERSION.SDK_INT >= 33 && model.profile != null &&
+                    ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
+                    !model.secure.flag("asked_notifications")) {
+                    model.secure.setFlag("asked_notifications")
+                    notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
             androidx.compose.runtime.LaunchedEffect(model.secureScreen) {
                 if (model.secureScreen) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)

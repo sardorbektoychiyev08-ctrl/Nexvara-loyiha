@@ -341,6 +341,17 @@ def ensure_certificate(folder: Path, ip: str) -> tuple[Path, Path]:
     return cert_p, key_p
 
 
+class _QuietServer(ThreadingHTTPServer):
+    """A phone that goes away mid-request (app closed, Wi-Fi lost) is normal: no traceback."""
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        import sys
+
+        if isinstance(sys.exc_info()[1], ConnectionError | ssl.SSLError | TimeoutError):
+            return
+        super().handle_error(request, client_address)
+
+
 class RemoteServer:
     """HTTPS server for paired phones; `api` is the app's Api (chat, tasks...)."""
 
@@ -371,7 +382,7 @@ class RemoteServer:
         if self.httpd is not None:
             return
         handler = type("Handler", (_Handler,), {"server_ref": self})
-        httpd = ThreadingHTTPServer((self.host, self.port), handler)
+        httpd = _QuietServer((self.host, self.port), handler)
         httpd.daemon_threads = True
         if self.use_tls:
             cert, key = ensure_certificate(config.data_dir() / "remote", lan_ip())

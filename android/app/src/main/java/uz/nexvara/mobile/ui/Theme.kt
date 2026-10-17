@@ -101,6 +101,15 @@ fun NexvaraTheme(mode: ThemeMode, content: @Composable () -> Unit) {
         info = Color(0xFF0891B2), card = Color.White, cardBorder = Color(0xFFE3E6F3),
         muted = Color(0xFF68708F), dark = false,
     )
+    // Status and navigation bar icons follow the app theme (dark icons on the light theme).
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (!view.isInEditMode) androidx.compose.runtime.SideEffect {
+        val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+        androidx.core.view.WindowCompat.getInsetsController(window, view).run {
+            isAppearanceLightStatusBars = !dark
+            isAppearanceLightNavigationBars = !dark
+        }
+    }
     CompositionLocalProvider(LocalExtra provides extra) {
         MaterialTheme(colorScheme = if (dark) DarkColors else LightColors, typography = AppTypography,
             shapes = AppShapes, content = content)

@@ -115,6 +115,8 @@ def handle(h: Any, method: str) -> None:
         err = ApiError("BAD_REQUEST", f"So‘rov noto‘g‘ri: {e}")
         h._send(err.status, json.dumps(err.body(), ensure_ascii=False).encode("utf-8"),
                 "application/json; charset=utf-8")  # fmt: skip
+    except (ConnectionError, TimeoutError):
+        return  # the phone went away (app closed, Wi-Fi lost): nothing to answer
     except Exception:  # never drop the connection: the phone gets a retryable INTERNAL
         log.exception("phone API %s %s failed", method, h.path.split("?")[0])
         err = ApiError("INTERNAL")

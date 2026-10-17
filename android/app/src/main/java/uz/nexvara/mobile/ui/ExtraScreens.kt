@@ -105,7 +105,7 @@ private val READY: List<Triple<String, androidx.compose.ui.graphics.vector.Image
     Triple("Xotira va boshqalar", Icons.Default.Bookmarks, listOf(
         Ready("Eslab qolish", "Eslab qol: "),
         Ready("Nimalarni bilasan", "Nimalarni eslab qolding?"),
-        Ready("Teach qoidasi", "Har doim Excel’da sarlavhani qalin qil"),
+        Ready("Teach qoidasi", "Har doim Excel jadvalini formatla va jami qo‘sh"),
         Ready("Sinxronlash", "sinxronla"),
         Ready("Ish jarayonlari", "Ish jarayonlarini ko‘rsat"),
     )),
@@ -165,7 +165,7 @@ fun PcFilesPanel(m: AppModel, act: PhoneActions) {
                 TextButton(onClick = { m.shareToPhone(f) { act.saveResult(it) } }) {
                     Icon(Icons.Default.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Telefonga")
                 }
-                TextButton(onClick = { m.compose("${f.path} ni och, ") }) { Text("Buyruq") }
+                TextButton(onClick = { m.compose("«${f.path}» ni och, ") }) { Text("Buyruq") }
             }
         }
     }

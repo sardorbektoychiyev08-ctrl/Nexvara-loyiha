@@ -520,7 +520,7 @@ fun TeachScreen(m: AppModel) {
                 ChipRow(m.ruleApps.toList(), app) { app = it; preview = null }
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(text, { text = it; preview = null }, modifier = Modifier.fillMaxWidth(), minLines = 2,
-                    placeholder = { Text(if (app == "test") "har doim 2 variant, 25 ta savol" else "sarlavha qalin, raqamlar 2 xonali") })
+                    placeholder = { Text(when (app) { "test" -> "2 variant, 25 ta savol"; "word" -> "sahifa raqamini qo‘y"; "powerpoint" -> "PDF qilib saqla"; else -> "jadvalni formatla va jami qo‘sh" }) })
                 preview?.let { (ok, info) ->
                     Text(info, color = if (ok) x.success else x.danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
                 }
@@ -532,7 +532,7 @@ fun TeachScreen(m: AppModel) {
                     modifier = Modifier.padding(top = 4.dp))
             }
         }
-        if (m.rules.isEmpty()) item { EmptyState(Icons.Default.Psychology, "Qoida yo‘q", "Masalan Excel uchun: «sarlavha qalin, ustunlar avtomatik kenglik».") }
+        if (m.rules.isEmpty()) item { EmptyState(Icons.Default.Psychology, "Qoida yo‘q", "Masalan Excel uchun: «jadvalni formatla va jami qo‘sh», Word uchun: «sahifa raqamini qo‘y», testlar uchun: «2 variant, 25 ta savol».") }
         items(m.rules) { r ->
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {

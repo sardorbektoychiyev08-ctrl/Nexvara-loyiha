@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -256,7 +257,7 @@ fun HomeScreen(m: AppModel, act: PhoneActions) {
                 }
             }
             SectionTitle("AI balans va xarajatlar", "Batafsil") { m.open(Screen.Ai) }
-            AiSummary(ov?.ai, onOpen = { m.open(Screen.Ai) })
+            AiSummary(ov?.ai, onOpen = { m.open(Screen.Ai) }, offline = m.connected == false)
             SectionTitle("Oxirgi vazifalar", "Hammasi") { m.open(Screen.Tasks) }
         }
         val recent = m.tasks.take(3)
@@ -295,10 +296,13 @@ private fun Stat(label: String, value: Int?, modifier: Modifier, onClick: () -> 
 fun Modifier.clickableSafe(onClick: () -> Unit): Modifier = this.then(Modifier.clickable(onClick = onClick))
 
 @Composable
-fun AiSummary(ai: AiPanel?, onOpen: () -> Unit) {
+fun AiSummary(ai: AiPanel?, onOpen: () -> Unit, offline: Boolean = false) {
     val x = LocalExtra.current
     Panel(onClick = onOpen) {
-        if (ai == null) { Text("Yuklanmoqda…", color = x.muted); return@Panel }
+        if (ai == null) {
+            Text(if (offline) "Kompyuter bilan aloqa yo‘q — ulangach sarf va limitlar shu yerda ko‘rinadi" else "Yuklanmoqda…", color = x.muted)
+            return@Panel
+        }
         Row(verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
                 Text("Bu oy", style = MaterialTheme.typography.labelMedium, color = x.muted)
@@ -314,18 +318,22 @@ fun AiSummary(ai: AiPanel?, onOpen: () -> Unit) {
         Text("Oylik limit ${Fmt.usd(ai.monthlyBudget)} · AI ${if (ai.enabled) "yoqilgan" else "o‘chiq"}",
             style = MaterialTheme.typography.bodySmall, color = x.muted, modifier = Modifier.padding(top = 4.dp))
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ai.providers.forEach { p ->
-                Column(Modifier.weight(1f).clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
-                    .padding(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Dot(if (p.hasKey) x.success else x.muted, 7.dp); Spacer(Modifier.width(4.dp))
-                        Text(shortName(p), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        ai.providers.chunked(2).forEachIndexed { row, pair ->
+            if (row > 0) Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                pair.forEach { p ->
+                    Row(Modifier.weight(1f).clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Dot(if (p.hasKey) x.success else x.muted, 8.dp); Spacer(Modifier.width(8.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(shortName(p), style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                            Text(if (p.leftMonth != null) "qoldi ${Fmt.usd(p.leftMonth)}" else if (p.hasKey) "ulangan" else "kalit yo‘q",
+                                style = MaterialTheme.typography.labelSmall, color = x.muted, maxLines = 1)
+                        }
+                        Text(Fmt.usdFine(p.spentMonth), style = MaterialTheme.typography.titleSmall)
                     }
-                    Text(Fmt.usdFine(p.spentMonth), style = MaterialTheme.typography.titleSmall)
-                    Text(if (p.leftMonth != null) "qoldi ${Fmt.usd(p.leftMonth)}" else "—", style = MaterialTheme.typography.labelSmall,
-                        color = x.muted, maxLines = 1)
                 }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
         ai.warnings.forEach { Text("⚠ $it", color = x.warning, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp)) }
@@ -338,14 +346,20 @@ fun shortName(p: AiProvider) = when (p.id) { "anthropic" -> "Claude"; "gemini" -
 @Composable
 fun ChatScreen(m: AppModel, act: PhoneActions) {
     val x = LocalExtra.current
-    var input by rememberSaveable { mutableStateOf("") }
+    var input by rememberSaveable(stateSaver = androidx.compose.ui.text.input.TextFieldValue.Saver) {
+        mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(""))
+    }
+    fun setInput(s: String) { input = androidx.compose.ui.text.input.TextFieldValue(s, androidx.compose.ui.text.TextRange(s.length)) }
     var bg by rememberSaveable { mutableStateOf(false) }
     var attach by remember { mutableStateOf(false) }
-    LaunchedEffect(m.draft) { m.draft?.let { input = it; m.draft = null } }
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(m.draft) {
+        m.draft?.let { setInput(it); m.draft = null; kotlinx.coroutines.delay(150); runCatching { focus.requestFocus() } }
+    }
     LaunchedEffect(m.dictated) {
         m.dictated?.let { said ->
             m.dictated = null
-            if (m.speakReplies) m.send(said, bg) else input = (input + " " + said).trim()
+            if (m.speakReplies) m.send(said, bg) else setInput((input.text + " " + said).trim())
         }
     }
     val list = rememberLazyListState()
@@ -368,7 +382,7 @@ fun ChatScreen(m: AppModel, act: PhoneActions) {
                     EmptyState(Icons.Default.AutoAwesome, "Nima qilay?", "Masalan quyidagilardan birini tanlang yoki o‘zingiz yozing.")
                     listOf("Hisobot.xlsx ni och, jadvalni formatla va PDF qilib saqla", "7-sinf fizika 20 ta test 2 variant",
                         "Savdo dashboardini ko‘rsat", "Eslab qol: maktabim 21-maktab").forEach { s ->
-                        SuggestionChip(onClick = { input = s }, label = { Text(s, maxLines = 2) }, modifier = Modifier.fillMaxWidth())
+                        SuggestionChip(onClick = { setInput(s) }, label = { Text(s, maxLines = 2) }, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }
@@ -410,11 +424,11 @@ fun ChatScreen(m: AppModel, act: PhoneActions) {
                 }
                 Row(verticalAlignment = Alignment.Bottom) {
                     IconButton(onClick = { attach = !attach }) { Icon(if (attach) Icons.Default.Close else Icons.Default.Add, "Biriktirish") }
-                    OutlinedTextField(input, { input = it }, modifier = Modifier.weight(1f), placeholder = { Text("Buyruq yozing…") },
+                    OutlinedTextField(input, { input = it }, modifier = Modifier.weight(1f).focusRequester(focus), placeholder = { Text("Buyruq yozing…") },
                         maxLines = 5, shape = RoundedCornerShape(22.dp))
                     Spacer(Modifier.width(6.dp))
-                    if (input.isBlank()) FilledIconButton(onClick = act.listen, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Mic, "Ovozli buyruq") }
-                    else FilledIconButton(onClick = { m.send(input, bg); input = "" }, modifier = Modifier.size(48.dp)) {
+                    if (input.text.isBlank()) FilledIconButton(onClick = act.listen, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Mic, "Ovozli buyruq") }
+                    else FilledIconButton(onClick = { m.send(input.text, bg); setInput("") }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.AutoMirrored.Filled.Send, "Yuborish")
                     }
                 }
