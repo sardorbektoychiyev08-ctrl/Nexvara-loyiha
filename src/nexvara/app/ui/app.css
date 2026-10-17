@@ -211,3 +211,11 @@ nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto
 .dev-code { font-size: 34px; font-weight: 700; letter-spacing: .25em; font-family: Consolas, monospace; }
 .dev-help { padding-left: 18px; margin: 12px 0 0; }
 .check-label { flex-direction: row !important; align-items: center; gap: 8px !important; grid-column: 1 / -1; color: var(--text) !important; font-size: 13px !important; }
+
+.update-banner { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  margin: 0 0 14px; padding: 10px 14px; border-radius: 10px;
+  background: var(--accent-soft, rgba(80, 120, 255, .12)); border: 1px solid var(--border, #334); }
+.update-banner[hidden] { display: none; }
+.update-banner span { flex: 1 1 260px; }
+.ai-howto { margin: 6px 0 12px; }
+.ai-howto summary { cursor: pointer; font-weight: 600; }

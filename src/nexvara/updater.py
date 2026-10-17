@@ -71,12 +71,21 @@ def verify_manifest(raw: bytes, sig_b64: bytes, public_key_b64: str = RELEASE_PU
 
 
 class Updater:
-    def __init__(self, channel: str, current: str = __version__, folder: Path | None = None,
-                 public_key: str = RELEASE_PUBLIC_KEY) -> None:  # fmt: skip
+    def __init__(
+        self,
+        channel: str,
+        current: str = __version__,
+        folder: Path | None = None,
+        public_key: str = RELEASE_PUBLIC_KEY,
+        kept: Path | None = None,
+    ) -> None:
         self.channel = channel.strip()
         self.current = current
         self.folder = folder or (config.data_dir() / "updates")
         self.public_key = public_key
+        # The installer leaves a copy of itself there (installer\nexvara.iss), so even a
+        # version installed by hand can be rolled back to.
+        self.kept = kept if kept is not None or folder is not None else installer_copies()
 
     # ----- channel access -----
     def _read(self, name: str, limit: int = 1 << 20) -> bytes:
@@ -125,15 +134,20 @@ class Updater:
     def _pending(self) -> Path:
         return self.folder / "pending.json"
 
+    def _kept_dirs(self, version: str | None = None) -> list[Path]:
+        roots = [r for r in (self.folder, self.kept) if r is not None and r.is_dir()]
+        if version is not None:
+            return [r / version for r in roots if (r / version).is_dir()]
+        return [d for r in roots for d in r.glob("*") if d.is_dir() and any(d.glob("*.exe"))]
+
     def installed_versions(self) -> list[str]:
         """Versions whose verified installer is kept (newest first) — rollback targets."""
-        out = []
-        for d in self.folder.glob("*") if self.folder.is_dir() else []:
-            if d.is_dir() and any(d.glob("*.exe")):
-                try:
-                    out.append((parse_version(d.name), d.name))
-                except UpdateError:
-                    continue
+        out = set()
+        for d in self._kept_dirs():
+            try:
+                out.add((parse_version(d.name), d.name))
+            except UpdateError:
+                continue
         return [v for _k, v in sorted(out, reverse=True)]
 
     def install(self, installer: Path, version: str, run: Any = subprocess.Popen) -> None:
@@ -141,6 +155,7 @@ class Updater:
         relaunches it)."""
         previous = next((v for v in self.installed_versions()
                          if parse_version(v) < parse_version(version)), "")  # fmt: skip
+        self.folder.mkdir(parents=True, exist_ok=True)
         self._pending().write_text(json.dumps({
             "from": self.current, "to": version, "installer": str(installer),
             "previous": previous, "started": time.time(),
@@ -170,8 +185,7 @@ class Updater:
 
     def rollback(self, version: str, run: Any = subprocess.Popen) -> Path:
         """Reinstall a kept (already verified) older installer."""
-        d = self.folder / version
-        exes = sorted(d.glob("*.exe")) if d.is_dir() else []
+        exes = [e for d in self._kept_dirs(version) for e in sorted(d.glob("*.exe"))]
         if not exes:
             raise UpdateError(f"{version} versiyasining o‘rnatuvchisi saqlanmagan")
         self.install(exes[0], version, run)
@@ -179,7 +193,16 @@ class Updater:
 
     def _prune(self) -> None:
         for v in self.installed_versions()[KEEP_INSTALLERS:]:
-            shutil.rmtree(self.folder / v, ignore_errors=True)
+            for d in self._kept_dirs(v):
+                shutil.rmtree(d, ignore_errors=True)
+
+
+def installer_copies() -> Path | None:
+    """%LOCALAPPDATA%\\NEXVARA\\installers\\<version>\\ — written by the installer."""
+    import os
+
+    base = os.environ.get("LOCALAPPDATA")
+    return Path(base) / "NEXVARA" / "installers" if base else None
 
 
 # ----- release side -----

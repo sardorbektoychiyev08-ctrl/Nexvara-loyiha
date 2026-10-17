@@ -45,6 +45,7 @@ const I18N = {
     "ai.usage_site": "Sarfni saytda ko‘rish",
     "ai.get_key": "API kalitini olish",
     "ai.check_save": "Kalitni tekshirish va saqlash",
+    "ai.from_clipboard": "Buferdan kalitni saqlash",
     "ai.connected": "Ulangan",
     "ai.not_connected": "Ulanmagan",
     "ai.estimated": "Taxminiy sarf",

@@ -58,7 +58,8 @@ def main() -> int:
     lim = (cfg.get("limits") or {}).get(a.provider) or {}
     print(f"Jami taxmin: ≈ ${total:.4f}. NEXVARA limitlari: kunlik "
           f"${lim.get('daily_usd') or cfg['daily_budget_usd']}, bitta topshiriq "
-          f"${lim.get('task_usd') or cfg['task_limit_usd']} (provayderdagi haqiqiy chegara emas).")  # fmt: skip
+          f"${lim.get('task_usd') or cfg['task_limit_usd']} "
+          "(provayderdagi haqiqiy chegara emas).")  # fmt: skip
     if not a.run:
         print("Quruq rejim: hech narsa yuborilmadi.")
         return 0

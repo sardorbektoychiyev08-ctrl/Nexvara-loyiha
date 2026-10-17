@@ -28,6 +28,24 @@ class UpdateApi:
         self._last_start = self._updater().after_start()
         return self._last_start
 
+    def update_auto(self) -> dict[str, Any]:
+        """At start (Home banner): check the channel once if "auto_check" is on. Only reads
+        the signed manifest — nothing is downloaded or installed without the user's click."""
+        from nexvara.appdata import Settings
+        from nexvara.updater import UpdateError
+
+        cfg = self._overrides.get("update_settings") or Settings().load()["update"]
+        if not cfg.get("auto_check") or not str(cfg.get("channel") or "").strip():
+            return {"available": False, "checked": False, "last_start": self._last_start}
+        try:
+            r = self._updater().check()
+        except UpdateError as e:
+            return {"available": False, "checked": False, "error": str(e),
+                    "last_start": self._last_start}  # fmt: skip
+        r.pop("manifest")
+        self._update_state = {"check": r}
+        return {**r, "checked": True, "last_start": self._last_start}
+
     def update_status(self) -> dict[str, Any]:
         upd = self._updater()
         return {"current": __version__, "channel": upd.channel,

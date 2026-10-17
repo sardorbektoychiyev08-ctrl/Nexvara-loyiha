@@ -448,6 +448,22 @@ class Api(
             return {"ok": False, "error": f"Kalitni tekshirib bo‘lmadi: {e}"}
         return {"ok": True, **info, "status": self._router().status()}
 
+    def ai_save_key_from_clipboard(self, provider: str) -> dict[str, Any]:
+        """One-time connection without typing: the key copied on the provider's site is read
+        from the clipboard here (it never passes through the page), checked with the free
+        model list, stored in Credential Manager, and the clipboard is cleared. AI stays off."""
+        text = self._overrides["clipboard"]() if "clipboard" in self._overrides else _clipboard()
+        if not text or not text.strip():
+            return {"ok": False, "error": "Buferda kalit yo‘q: provayder saytida kalitni nusxalang"}
+        r = self.ai_save_key(provider, text.strip().splitlines()[0])
+        if r.get("ok"):
+            if "clipboard_clear" in self._overrides:
+                self._overrides["clipboard_clear"]()
+            else:
+                _clipboard(clear=True)
+            r["clipboard_cleared"] = True
+        return r
+
     def ai_delete_key(self, provider: str) -> dict[str, Any]:
         self._router().delete_key(provider)
         return self._router().status()
@@ -953,3 +969,19 @@ class Api(
         if os.name == "nt":
             subprocess.Popen(["explorer", "/select,", str(p)])
         return True
+
+
+def _clipboard(clear: bool = False) -> str:
+    """Windows clipboard text (or empty it). Used only for the one-time API key paste."""
+    import win32clipboard
+
+    win32clipboard.OpenClipboard()
+    try:
+        if clear:
+            win32clipboard.EmptyClipboard()
+            return ""
+        if not win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_UNICODETEXT):
+            return ""
+        return str(win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT))
+    finally:
+        win32clipboard.CloseClipboard()
