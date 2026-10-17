@@ -1,5 +1,22 @@
 # Android app — handoff for Codex
 
+## 2026-10-17 — vaqtinchalik to‘xtash
+
+Foydalanuvchi ko‘rsatmasi: Windows NEXVARA PERSONAL to‘liq tugamaguncha Android ishlab chiqilishi davom ettirilmaydi. Claude Windows versiyasini yakunlaydi; Codex uning ishchi papkasi va fayllariga tegmaydi. Android kodi faqat `D:\Nexvara loyiha\.worktrees\android` va `codex/android-mobile` tarmog‘ida.
+
+Hozirgi holat: Kotlin/Compose ilova, QR pairing, TLS pin, token saqlash, Home/Chat/Tasks/Devices, foreground task watcher, cancel, fayl yuborish/olish kodi, kamera va shifrlangan chat tarixi. Debug APK build va 8/8 Android unit test **PASS**. Oldingi APK bilan Android 16 telefonda pairing, chat, chat tarixi, oddiy fayl yuborish va kamera oynasini ochish **PASS**. Oxirgi kodli APK qurilmada sinovdan o‘tmagan: ADB avtomatik ruxsati rad etildi. Windows oynasini avtomatik boshqarish ham rad etildi. `scripts/test.ps1` uchun alohida worktree'da `.venv` yo‘q.
+
+Windows versiyasi yakunlanib, foydalanuvchi Android ishini qayta boshlashni aytgach qolgan vazifalar:
+
+1. Oxirgi APK’ni Android 16 telefonga o‘rnatish; kamera bilan rasm olib Windows Agent’ga yuborish va SHA-256 natijasini tekshirish.
+2. Windows NEXVARA Devices QR kodi bilan **haqiqiy** Agent’ga pairing; demo server natijasini haqiqiy Agent natijasi deb belgilamaslik.
+3. Telefondan deterministik Excel, Word, PowerPoint vazifalarini yuborish; task ID, progress/qadamlar, cancel va tayyor faylni telefonga yuklab olishni E2E tekshirish. Office oynalari ochilishi kerak; haqiqiy foydalanuvchi hujjatlariga tegmaslik.
+4. Chat tarixi va Memory sinxronlashuvini Windows API paydo bo‘lgach amalga oshirish. Pause/resume ham Windows `TaskRunner` va `/api/v1` endpointlari tayyor bo‘lgach qo‘shiladi. Aniq server talabi: [ANDROID_WINDOWS_API_GAPS.md](ANDROID_WINDOWS_API_GAPS.md).
+5. Android 16 real sinovini yakunlash: kamera, mikrofon, fayl download, reconnect/offline queue, cancel, bir nechta PC va UI. Fon bildirishnomalari, biometrik qulf, Google OAuth va qolgan mobil bo‘limlar hali tugallanmagan. Google uchun Android OAuth client ID va signing SHA kerak.
+6. Build, unit/UI/API contract testlari, `scripts/test.ps1`, xavfsizlik tekshiruvi; PASS/PARTIAL/NOT TESTED/BLOCKED holatlarini yangilash. Pushdan oldin PRIVATE GitHub va maxfiy ma’lumot yo‘qligini qayta tasdiqlash.
+
+Oxirgi build fayli: `android/app/build/outputs/apk/debug/app-debug.apk` (Git’ga kiritilmaydi), SHA-256 `8c02e7d8a346d43e6a3b9f46e273f464a3ca2b6894ead7d58646afdb4ea81f9c`. Ish jurnali: [ANDROID_PROGRESS.md](ANDROID_PROGRESS.md).
+
 Goal: a native Android app (MASTER_SPEC §18) that controls the NEXVARA Windows Agent over the
 local network. The Windows side is done and tested; this document is everything needed to
 build the APK against it. Owner: **Codex**, branch `codex/android-mobile`, folder `android/`.

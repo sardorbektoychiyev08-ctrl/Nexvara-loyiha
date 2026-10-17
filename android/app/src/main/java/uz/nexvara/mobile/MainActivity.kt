@@ -18,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -52,7 +53,7 @@ class MainActivity : ComponentActivity() {
     private var pendingDownload by mutableStateOf<String?>(null)
     private var confirmToken by mutableStateOf<String?>(null)
     private var flushing by mutableStateOf(false)
-    private var watchActive = false
+    @Volatile private var watchGeneration = 0
     private var taskEtag = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,9 +67,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        watchActive = true
+        val generation = ++watchGeneration
         Thread {
-            while (watchActive) {
+            while (watchGeneration == generation) {
                 val current = profile
                 if (current == null || pairing) { Thread.sleep(2_000); continue }
                 try {
@@ -77,14 +78,14 @@ class MainActivity : ComponentActivity() {
                     val sid = PairCode.parse(current.getString("qr")).serverId
                     val fresh = if (result.optBoolean("changed")) parseTasks(result.getJSONArray("tasks")) else null
                     runOnUiThread {
-                        if (watchActive && profile?.optString("qr") == current.optString("qr")) {
+                        if (watchGeneration == generation && profile?.optString("qr") == current.optString("qr")) {
                             taskEtag = result.optString("etag")
                             if (fresh != null) { tasks.clear(); tasks.addAll(fresh); connected = true }
                             if (secure.pending(sid).isNotEmpty()) flushPending()
                         }
                     }
                 } catch (_: Exception) {
-                    runOnUiThread { if (watchActive) connected = false }
+                    runOnUiThread { if (watchGeneration == generation) connected = false }
                     Thread.sleep(5_000)
                 }
             }
@@ -92,7 +93,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        watchActive = false
+        watchGeneration++
         super.onStop()
     }
 
@@ -243,20 +244,23 @@ class MainActivity : ComponentActivity() {
         var dark by remember { mutableStateOf(true) }
         var input by remember { mutableStateOf("") }
         var manualQr by remember { mutableStateOf("") }
-        var cameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
+        var cameraUriText by rememberSaveable { mutableStateOf<String?>(null) }
         val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
             result.contents?.let { connect(it) }
         }
         val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { upload(it) } }
         val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { upload(it) } }
         val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-            if (ok) cameraUri?.let { upload(it) }
+            val photo = cameraUriText
+            cameraUriText = null
+            if (ok && photo != null) upload(android.net.Uri.parse(photo))
         }
         fun launchCamera() {
             val folder = java.io.File(cacheDir, "camera").apply { mkdirs() }
             val file = java.io.File(folder, "photo-${UUID.randomUUID()}.jpg")
-            cameraUri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", file)
-            takePicture.launch(cameraUri!!)
+            val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", file)
+            cameraUriText = uri.toString()
+            takePicture.launch(uri)
         }
         val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) launchCamera() else notice = "Kamera ruxsati berilmadi"
@@ -331,7 +335,7 @@ class MainActivity : ComponentActivity() {
                             } }
                             Spacer(Modifier.height(16.dp))
                             Text("Oxirgi vazifalar", style = MaterialTheme.typography.titleMedium)
-                            tasks.take(3).forEach { TaskCard(it) { path -> pendingDownload = path; saveFile.launch(path.substringAfterLast('\\')) } }
+                            tasks.take(3).forEach { TaskCard(it) { path -> pendingDownload = path; saveFile.launch(TransferChecks.resultFileName(path)) } }
                         }
                         1 -> {
                             Text("AI Chat", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -374,7 +378,7 @@ class MainActivity : ComponentActivity() {
                                 Spacer(Modifier.weight(1f)); IconButton(onClick = { refresh() }) { Icon(Icons.Default.Refresh, "Yangilash") }
                             }
                             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) { items(tasks) { task ->
-                                TaskCard(task) { path -> pendingDownload = path; saveFile.launch(path.substringAfterLast('\\')) }
+                                TaskCard(task) { path -> pendingDownload = path; saveFile.launch(TransferChecks.resultFileName(path)) }
                             } }
                         }
                         3 -> {

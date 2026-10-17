@@ -25,4 +25,22 @@ class PairCodeTest {
             PairCode.parse("http://192.168.1.10:8765/#p=123456&sid=0123456789abcdef&fp=$fingerprint")
         }
     }
+
+    @Test fun rejectsTamperedServerIdAndShortFingerprint() {
+        assertThrows(IllegalArgumentException::class.java) {
+            PairCode.parse("https://192.168.1.10:8765/#p=123456&sid=wrong&fp=$fingerprint")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            PairCode.parse("https://192.168.1.10:8765/#p=123456&sid=0123456789abcdef&fp=abcd")
+        }
+    }
+
+    @Test fun rejectsUnexpectedQueryAndCredentials() {
+        assertThrows(IllegalArgumentException::class.java) {
+            PairCode.parse("https://192.168.1.10:8765/?x=1#p=123456&sid=0123456789abcdef&fp=$fingerprint")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            PairCode.parse("https://user@192.168.1.10:8765/#p=123456&sid=0123456789abcdef&fp=$fingerprint")
+        }
+    }
 }

@@ -105,7 +105,7 @@ class WindowsApi(private val pair: PairCode, private val token: String? = null) 
             }
             output.toByteArray()
         } ?: error("Faylni o‘qib bo‘lmadi")
-        val sha = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        val sha = TransferChecks.sha256(bytes)
         val c = connection("/api/v1/files", "POST", java.util.UUID.randomUUID().toString())
         try {
             c.doOutput = true
@@ -116,7 +116,9 @@ class WindowsApi(private val pair: PairCode, private val token: String? = null) 
             c.outputStream.use { it.write(bytes) }
             val result = JSONObject((if (c.responseCode in 200..299) c.inputStream else c.errorStream).bufferedReader().use { it.readText() })
             if (!result.optBoolean("ok")) throw ApiFailure(result.optJSONObject("error")?.optString("code").orEmpty(), result.optJSONObject("error")?.optString("message") ?: "Yuklash xatosi")
-            return result.getJSONObject("data")
+            return result.getJSONObject("data").also {
+                require(it.optString("sha256").equals(sha, ignoreCase = true)) { "Yuborilgan fayl tekshiruvdan o‘tmadi" }
+            }
         } finally { c.disconnect() }
     }
 
@@ -139,8 +141,7 @@ class WindowsApi(private val pair: PairCode, private val token: String? = null) 
                 }
                 result.toByteArray()
             }
-            val actual = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-            require(actual.equals(c.getHeaderField("X-Content-SHA256"), ignoreCase = true)) { "Yuklangan fayl tekshiruvdan o‘tmadi" }
+            require(TransferChecks.matches(bytes, c.getHeaderField("X-Content-SHA256"))) { "Yuklangan fayl tekshiruvdan o‘tmadi" }
             output.write(bytes)
         } finally { c.disconnect() }
     }

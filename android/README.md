@@ -23,4 +23,6 @@ Windows tomondan kerak bo‘ladigan keyingi endpointlar: `pause/resume`, chat ta
 - `session` tavsiya qilsa token avtomatik almashtiriladi.
 - Kompyuter vaqtincha javob bermasa chat buyrug‘i shifrlangan navbatda qoladi va ekrandagi aloqa tiklanganda o‘sha `X-Request-Id` bilan qayta yuboriladi. Windows serveri idempotency javobini 10 daqiqa saqlaydi; undan uzoq uzilishdan keyingi noma’lum natijani foydalanuvchi vazifalar tarixida tekshirishi kerak.
 - Kamera rasmi Android `TakePicture` orqali olinadi. Android 16 da kamera oynasini ochish PASS; suratga olish va yuborish NOT TESTED. Oddiy fayl yuborish demo server bilan PASS.
+- Kamera oynasi qayta yaratilsa ham rasm URI saqlanadi; rasm tayyor bo‘lgach odatdagi SHA-256 tekshiruvli fayl yuborish yo‘lidan o‘tadi. Windows natija fayli SHA-256 mos kelmaguncha telefondagi hujjatga yozilmaydi. Bu yangi kodning qurilmadagi sinovi avtomatik ADB ruxsati rad etilgani uchun NOT TESTED.
 - Release signing va Google login haqiqiy konfiguratsiyasiz BLOCKED.
+- Pause/resume, Windows chat tarixi va Memory sinxronlashuvi uchun Windows API talabi: [`docs/ANDROID_WINDOWS_API_GAPS.md`](../docs/ANDROID_WINDOWS_API_GAPS.md).

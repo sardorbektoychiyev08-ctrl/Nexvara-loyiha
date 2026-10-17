@@ -1,5 +1,16 @@
 # Android ish jurnali
 
+## 2026-10-17 — Codex — kamera/fayl ishonchliligi va haqiqiy Agentga tayyorgarlik
+
+- Kamera natijasi uchun URI activity qayta yaratilganda saqlanadigan qilindi. Telefon rasmni odatdagi fayl upload yo‘li orqali yuboradi. Yuklashdan keyin server qaytargan SHA-256 tekshiriladi; natija fayli ham SHA-256 mos kelgandan keyin telefonga yoziladi. Windows va Unix natija fayli nomlari to‘g‘ri olinadi; vazifa watcherining takror ishga tushishi tuzatildi.
+- Android `assembleDebug` va `testDebugUnitTest` — **PASS**, 8/8 test (QR 5, fayl tekshiruvlari 3). APK SHA-256: `8c02e7d8a346d43e6a3b9f46e273f464a3ca2b6894ead7d58646afdb4ea81f9c`.
+- Android 16 telefonga yangi APK o‘rnatish, suratni yuborish, natija faylini olish, haqiqiy Windows Agent QR pairing, Excel/Word/PowerPoint, progress va cancel — **NOT TESTED/BLOCKED**. Avtomatik ruxsat tekshiruvi ADB o‘rnatishni va Windows ilova oynasini boshqarishni rad etdi. Oldingi telefon PASS natijalari oldingi APK uchun amal qiladi.
+- Windows ruff check/format — **PASS** (Android worktree manbasida). Windows `scripts/test.ps1` — **BLOCKED** (`.venv` worktree'da yo‘q); boshqa `.venv` bilan pytest ishga tushirish ham sandbox tomonidan rad etildi. Windows Office fayllari o‘zgartirilmadi.
+- Maxfiy kalit/token namunalariga `git diff` tekshiruvi — **PASS**, APK, `local.properties` va `.tools` `.gitignore` orqali chetlangan. PRIVATE GitHub'ga push — **BLOCKED**: `github.com:443` sandboxda ulanmaydi, qayta urinish avtomatik ruxsat tekshiruvida rad etildi; repozitoriy private ekanini masofadan tasdiqlashning ham imkoni bo‘lmadi.
+- Chat tarixi telefonda shifrlangan holda saqlanishi oldingi qurilma sinovida **PASS**; Windows bilan chat tarixi va Memory sinxronlashuvi **BLOCKED** (API endpointlar yo‘q). Pause/resume ham **BLOCKED**. Talablar: [ANDROID_WINDOWS_API_GAPS.md](ANDROID_WINDOWS_API_GAPS.md).
+
+Keyingi qadam: haqiqiy Windows QR pairing va yangi APK qurilma ruxsati ochilgach Office, kamera, download va cancel E2E sinovi.
+
 ## 2026-10-17 — Codex — Android V1 integratsiya davom etdi
 
 - `main` dagi telefon API v1 hujjatlari va demo serveri faqat `codex/android-mobile` worktree'iga merge qilindi; ROADMAP konflikti ikkala tomon yozuvlarini saqlab hal qilindi. Claude papkasi va tarmog‘i o‘zgartirilmadi.

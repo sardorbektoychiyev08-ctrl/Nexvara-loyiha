@@ -4,6 +4,20 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 — Codex — Android vaqtincha to‘xtatildi
+
+- Foydalanuvchi ko‘rsatmasiga ko‘ra Windows NEXVARA PERSONAL to‘liq tugamaguncha Android ishlab chiqilishi to‘xtaydi. Qolgan ishlar `docs/ANDROID_HANDOFF.md` ga yozildi. Claude Windows ishchi papkasi va fayllariga tegilmadi.
+- Oxirgi Android build va 8/8 unit test **PASS**; yangi APK telefonda **NOT TESTED** (ADB ruxsati rad etildi). Haqiqiy Windows Agent E2E **NOT TESTED**; pause/resume hamda chat/Memory sync **BLOCKED** (API yo‘q).
+- `codex/android-mobile` tarmog‘ida mahalliy commit va PRIVATE GitHub push so‘raldi; natija quyidagi yakuniy ish holatida aniqlanadi.
+
+## 2026-10-17 — Codex — Android V1 fayl va kamera tekshiruvlari
+
+- Ish faqat `codex/android-mobile` worktree'da. Kamera URI qayta yaratilganda saqlanadi; upload javobi va download fayli SHA-256 bilan tekshiriladi; vazifa watcherining takrorlanishi tuzatildi. Pause/resume, chat tarixi va Memory API talablari `docs/ANDROID_WINDOWS_API_GAPS.md` ga yozildi.
+- **PASS:** Android debug APK build, 8/8 unit test; Windows ruff check va format. Oldingi APK bilan Android 16 pairing, chat, chat tarixi, oddiy fayl upload va kamera oynasini ochish PASS holatida.
+- **BLOCKED/NOT TESTED:** yangi APK’ni telefonga o‘rnatish ADB avtomatik ruxsatida rad etildi; Windows NEXVARA oynasini avtomatik boshqarish ham rad etildi. Shu sabab haqiqiy Agent pairing, Office vazifalari/progress/cancel, kamera suratini yuborish va natija faylini olish tasdiqlanmadi. `scripts/test.ps1` uchun worktree'da `.venv` yo‘q; boshqa venv bilan pytest ham sandboxda rad etildi. Windows chat/Memory sync va pause/resume uchun API yo‘q.
+- **Push BLOCKED:** diff maxfiy ma’lumot naqshlariga tekshirildi, APK va lokal sozlamalar ignore qilingan. GitHub tarmoq ulanishi sandboxda ishlamadi, eskalatsiya avtomatik rad etildi. PRIVATE holat masofadan tasdiqlanmadi; lokal commit saqlanadi.
+- Keyingi qadam: qurilma/UI ruxsati mavjud bo‘lganda haqiqiy Agent bilan E2E; Office kodi o‘zgartirilmadi.
+
 ## 2026-10-17 — Codex — Android chat tarixi va fayl sinovi
 
 - `codex/android-mobile` worktree'da har bir PC uchun so‘nggi 200 chat xabari shifrlangan xotiraga yoziladigan qilindi. Ilova qayta ochilganda tarix tiklanadi.
