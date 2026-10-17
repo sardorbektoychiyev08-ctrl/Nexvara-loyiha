@@ -2,6 +2,8 @@ package uz.nexvara.mobile
 
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,6 +24,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import org.json.JSONObject
@@ -31,7 +35,9 @@ private val Indigo = Color(0xFF6366F1)
 private val Cyan = Color(0xFF06B6D4)
 private val Dark = Color(0xFF0B1020)
 private data class Message(val text: String, val mine: Boolean)
-private data class TaskView(val id: String, val title: String, val status: String, val error: String, val files: List<String>)
+private data class StepView(val name: String, val status: String, val detail: String)
+private data class TaskView(val id: String, val title: String, val status: String, val error: String,
+    val files: List<String>, val steps: List<StepView>)
 
 class MainActivity : ComponentActivity() {
     private lateinit var secure: SecureSession
@@ -44,6 +50,10 @@ class MainActivity : ComponentActivity() {
     private val messages = mutableStateListOf<Message>()
     private val tasks = mutableStateListOf<TaskView>()
     private var pendingDownload by mutableStateOf<String?>(null)
+    private var confirmToken by mutableStateOf<String?>(null)
+    private var flushing by mutableStateOf(false)
+    private var watchActive = false
+    private var taskEtag = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,6 +61,38 @@ class MainActivity : ComponentActivity() {
         profile = secure.read()
         setContent { NexvaraUi() }
         if (profile != null) refresh()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        watchActive = true
+        Thread {
+            while (watchActive) {
+                val current = profile
+                if (current == null || pairing) { Thread.sleep(2_000); continue }
+                try {
+                    val path = "/api/v1/tasks/watch?etag=$taskEtag&wait=25"
+                    val result = api().json(path)
+                    val sid = PairCode.parse(current.getString("qr")).serverId
+                    val fresh = if (result.optBoolean("changed")) parseTasks(result.getJSONArray("tasks")) else null
+                    runOnUiThread {
+                        if (watchActive && profile?.optString("qr") == current.optString("qr")) {
+                            taskEtag = result.optString("etag")
+                            if (fresh != null) { tasks.clear(); tasks.addAll(fresh); connected = true }
+                            if (secure.pending(sid).isNotEmpty()) flushPending()
+                        }
+                    }
+                } catch (_: Exception) {
+                    runOnUiThread { if (watchActive) connected = false }
+                    Thread.sleep(5_000)
+                }
+            }
+        }.start()
+    }
+
+    override fun onStop() {
+        watchActive = false
+        super.onStop()
     }
 
     private fun api(): WindowsApi {
@@ -73,21 +115,27 @@ class MainActivity : ComponentActivity() {
         secure.save(raw, result.getString("token"), result.optString("pc_name"))
         runOnUiThread {
             profile = secure.read()
+            taskEtag = ""
+            tasks.clear()
             pairing = false
             notice = "Kompyuter ulandi"
         }
         refresh()
+        runOnUiThread { flushPending() }
     }
 
     private fun refresh() = work {
+        val qr = profile?.getString("qr") ?: error("Kompyuter ulanmagan")
         val session = api().json("/api/v1/session")
-        val data = api().json("/api/v1/tasks?limit=30").getJSONArray("tasks")
-        val fresh = (0 until data.length()).map { i ->
-            val t = data.getJSONObject(i)
-            val files = t.optJSONArray("files")
-            TaskView(t.optString("id"), t.optString("title"), t.optString("status"), t.optString("error"),
-                if (files == null) emptyList() else (0 until files.length()).map { files.getString(it) })
-        }
+        val rotated = if (session.optBoolean("rotate_recommended")) {
+            val freshToken = api().json("/api/v1/session/rotate", "POST", JSONObject(), UUID.randomUUID().toString()).getString("token")
+            secure.updateToken(freshToken)
+            runOnUiThread { profile = secure.read() }
+            freshToken
+        } else null
+        val client = if (rotated == null) api() else WindowsApi(PairCode.parse(qr), rotated)
+        val data = client.json("/api/v1/tasks?limit=30").getJSONArray("tasks")
+        val fresh = parseTasks(data)
         runOnUiThread {
             tasks.clear(); tasks.addAll(fresh)
             connected = true
@@ -95,16 +143,71 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun parseTasks(data: org.json.JSONArray): List<TaskView> = (0 until data.length()).map { i ->
+            val t = data.getJSONObject(i)
+            val files = t.optJSONArray("files")
+            val steps = t.optJSONArray("steps")
+            TaskView(t.optString("id"), t.optString("title"), t.optString("status"), t.optString("error"),
+                if (files == null) emptyList() else (0 until files.length()).map { files.getString(it) },
+                if (steps == null) emptyList() else (0 until steps.length()).map { j ->
+                    steps.getJSONObject(j).let { StepView(it.optString("name"), it.optString("status"), it.optString("detail")) }
+                })
+    }
+
     private fun send(text: String) {
         if (text.isBlank()) return
+        if (text.length > 4_000) { notice = "Buyruq 4000 belgidan oshmasin"; return }
+        val qr = profile?.optString("qr") ?: return
+        secure.queueChat(PairCode.parse(qr).serverId, UUID.randomUUID().toString(), text)
         messages.add(Message(text, true))
+        flushPending()
+    }
+
+    private fun flushPending() {
+        if (flushing || profile == null) return
+        flushing = true
         work {
-            val result = api().json("/api/v1/chat", "POST", JSONObject().put("text", text), UUID.randomUUID().toString())
-            runOnUiThread {
-                messages.add(Message(result.optString("reply", "Javob olindi"), false))
-                if (!result.isNull("task")) { tab = 2; refresh() }
-                if (!result.isNull("confirm")) notice = "Tasdiq talab qilinadi. Hozircha Windows oynasida tasdiqlang."
-            }
+            try {
+                val sid = PairCode.parse(profile!!.getString("qr")).serverId
+                for (item in secure.pending(sid)) {
+                    try {
+                        val result = api().json("/api/v1/chat", "POST", JSONObject().put("text", item.getString("text")), item.getString("id"))
+                        secure.removeQueued(item.getString("id"))
+                        runOnUiThread { connected = true; showChatReply(result) }
+                    } catch (e: ApiFailure) {
+                        if (e.errorCode in setOf("RATE_LIMITED", "INTERNAL", "AUTH_REQUIRED", "TOKEN_EXPIRED")) {
+                            runOnUiThread {
+                                notice = if (e.errorCode == "AUTH_REQUIRED" || e.errorCode == "TOKEN_EXPIRED")
+                                    "Kompyuter bilan qaytadan bog‘laning. Buyruq navbatda." else "Kompyuter hozir band. Buyruq navbatda."
+                                if (e.errorCode == "AUTH_REQUIRED" || e.errorCode == "TOKEN_EXPIRED") pairing = true
+                            }
+                            break
+                        }
+                        secure.removeQueued(item.getString("id"))
+                        runOnUiThread { messages.add(Message(e.message ?: "Buyruq bajarilmadi", false)) }
+                    } catch (_: Exception) {
+                        runOnUiThread { connected = false; notice = "Kompyuter javob bermayapti — buyruq navbatda" }
+                        break
+                    }
+                }
+            } finally { runOnUiThread { flushing = false } }
+        }
+    }
+
+    private fun showChatReply(result: JSONObject) {
+        result.optString("reply").takeIf { it.isNotBlank() }?.let { messages.add(Message(it, false)) }
+        confirmToken = result.optJSONObject("confirm")?.optString("token")?.takeIf { it.isNotBlank() }
+        if (!result.isNull("task")) { tab = 2; refresh() }
+        if (result.optBoolean("open_bi")) notice = "Dashboard kompyuter oynasida ochildi"
+    }
+
+    private fun answerConfirmation(yes: Boolean) {
+        val token = confirmToken ?: return
+        confirmToken = null
+        work {
+            val result = api().json("/api/v1/confirm", "POST", JSONObject().put("token", token)
+                .put("yes", yes), UUID.randomUUID().toString())
+            runOnUiThread { showChatReply(result) }
         }
     }
 
@@ -126,11 +229,24 @@ class MainActivity : ComponentActivity() {
         var dark by remember { mutableStateOf(true) }
         var input by remember { mutableStateOf("") }
         var manualQr by remember { mutableStateOf("") }
+        var cameraUri by remember { mutableStateOf<android.net.Uri?>(null) }
         val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
             result.contents?.let { connect(it) }
         }
         val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { upload(it) } }
         val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { upload(it) } }
+        val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+            if (ok) cameraUri?.let { upload(it) }
+        }
+        fun launchCamera() {
+            val folder = java.io.File(cacheDir, "camera").apply { mkdirs() }
+            val file = java.io.File(folder, "photo-${UUID.randomUUID()}.jpg")
+            cameraUri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", file)
+            takePicture.launch(cameraUri!!)
+        }
+        val cameraPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) launchCamera() else notice = "Kamera ruxsati berilmadi"
+        }
         val saveFile = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
             val path = pendingDownload
             if (uri != null && path != null) work {
@@ -143,10 +259,12 @@ class MainActivity : ComponentActivity() {
             val said = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (said != null) input = said
         }
-        val scheme = if (dark) darkColorScheme(primary = Indigo, secondary = Cyan, background = Dark, surface = Color(0xFF121933))
-            else lightColorScheme(primary = Indigo, secondary = Cyan)
+        val scheme = if (dark) darkColorScheme(primary = Indigo, onPrimary = Color.White, secondary = Cyan,
+            background = Dark, surface = Color(0xFF121933))
+            else lightColorScheme(primary = Indigo, onPrimary = Color.White, secondary = Cyan)
         MaterialTheme(colorScheme = scheme) {
             Scaffold(
+                modifier = Modifier.imePadding(),
                 bottomBar = {
                     if (profile != null && !pairing) NavigationBar {
                         listOf(Triple("Home", Icons.Default.Home, 0), Triple("Chat", Icons.Default.Chat, 1),
@@ -212,9 +330,18 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
+                            if (confirmToken != null) Row {
+                                Button(onClick = { answerConfirmation(true) }, enabled = !busy) { Text("Ha, davom et") }
+                                Spacer(Modifier.width(10.dp))
+                                OutlinedButton(onClick = { answerConfirmation(false) }, enabled = !busy) { Text("Yo‘q") }
+                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(onClick = { filePicker.launch("*/*") }) { Icon(Icons.Default.AttachFile, "Fayl tanlash") }
                                 IconButton(onClick = { imagePicker.launch("image/*") }) { Icon(Icons.Default.Image, "Rasm tanlash") }
+                                IconButton(onClick = {
+                                    if (ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
+                                        launchCamera() else cameraPermission.launch(Manifest.permission.CAMERA)
+                                }) { Icon(Icons.Default.PhotoCamera, "Kamera bilan rasm olish") }
                                 IconButton(onClick = {
                                     val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                                         .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -239,19 +366,30 @@ class MainActivity : ComponentActivity() {
                         3 -> {
                             Text("Qurilmalar", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(14.dp))
-                            ElevatedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp)) {
-                                Text(profile?.optString("pc") ?: "Windows PC", style = MaterialTheme.typography.titleLarge)
-                                Text("Sertifikat QR orqali tekshiriladi", color = Cyan)
-                                Spacer(Modifier.height(12.dp))
-                                Button(onClick = { refresh() }) { Text("Holatni tekshirish") }
-                            } }
+                            secure.all().forEach { pc ->
+                                ElevatedCard(Modifier.fillMaxWidth().padding(bottom = 10.dp)) { Column(Modifier.padding(20.dp)) {
+                                    Text(pc.optString("pc", "Windows PC"), style = MaterialTheme.typography.titleLarge)
+                                    Text(if (profile?.optString("qr") == pc.optString("qr"))
+                                        (if (connected) "Ulangan" else "Tanlangan • aloqa tekshirilmagan") else "Saqlangan kompyuter", color = Cyan)
+                                    Spacer(Modifier.height(12.dp))
+                                    if (profile?.optString("qr") == pc.optString("qr")) {
+                                        Button(onClick = { refresh() }) { Text("Holatni tekshirish") }
+                                    } else {
+                                        Button(onClick = {
+                                            secure.select(PairCode.parse(pc.getString("qr")).serverId)
+                                            profile = secure.read(); taskEtag = ""; tasks.clear(); confirmToken = null; connected = false
+                                            refresh()
+                                        }) { Text("Shu kompyuterni tanlash") }
+                                    }
+                                } }
+                            }
                             TextButton(onClick = { pairing = true }) { Text("Yana bir kompyuter bog‘lash") }
                             TextButton(onClick = { work {
                                 try { api().json("/api/v1/session/logout", "POST", JSONObject(), UUID.randomUUID().toString()) }
                                 catch (_: Exception) { /* Local logout must work even when the PC is offline. */ }
-                                secure.clear()
-                                runOnUiThread { profile = null; connected = false; pairing = false; tasks.clear(); messages.clear(); notice = "Qurilmadan chiqildi" }
-                            } }) { Text("Chiqish") }
+                                secure.removeActive()
+                                runOnUiThread { profile = secure.read(); connected = false; pairing = false; taskEtag = ""; tasks.clear(); messages.clear(); confirmToken = null; notice = "Qurilmadan chiqildi" }
+                            } }) { Text("Tanlangan kompyuterdan chiqish") }
                         }
                     }
                 }
@@ -270,6 +408,10 @@ class MainActivity : ComponentActivity() {
                     else -> Cyan
                 })
                 if (task.error.isNotBlank()) Text(task.error, color = MaterialTheme.colorScheme.error)
+                task.steps.forEach { step ->
+                    Text("${step.name} • ${step.status}${if (step.detail.isBlank()) "" else ": ${step.detail}"}",
+                        style = MaterialTheme.typography.bodySmall)
+                }
                 task.files.forEach { path -> TextButton(onClick = { onDownload(path) }) { Text("Faylni olish: ${path.substringAfterLast('\\')}") } }
                 if (task.status == "running" || task.status == "pending") {
                     TextButton(onClick = { work {

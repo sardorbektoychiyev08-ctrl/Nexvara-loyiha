@@ -4,6 +4,7 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import org.json.JSONObject
+import org.json.JSONArray
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -24,20 +25,109 @@ class SecureSession(context: Context) {
         }.generateKey()
     }
 
-    fun save(qr: String, token: String, pcName: String) {
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-        cipher.init(Cipher.ENCRYPT_MODE, key())
-        val plain = JSONObject().put("qr", qr).put("token", token).put("pc", pcName).toString().toByteArray()
-        val bytes = cipher.iv + cipher.doFinal(plain)
-        prefs.edit().putString("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)).apply()
-    }
-
-    fun read(): JSONObject? = try {
+    private fun decrypt(): JSONObject? = try {
         val bytes = android.util.Base64.decode(prefs.getString("data", null), android.util.Base64.NO_WRAP)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
         JSONObject(String(cipher.doFinal(bytes.copyOfRange(12, bytes.size))))
     } catch (_: Exception) { null }
 
-    fun clear() { prefs.edit().clear().apply() }
+    private fun state(): JSONObject {
+        val old = decrypt() ?: JSONObject()
+        if (old.has("pcs")) return old
+        val pcs = JSONObject()
+        val qr = old.optString("qr")
+        if (qr.isNotBlank()) {
+            val sid = runCatching { PairCode.parse(qr).serverId }.getOrNull()
+            if (sid != null) {
+                pcs.put(sid, old)
+                return JSONObject().put("pcs", pcs).put("active", sid)
+            }
+        }
+        return JSONObject().put("pcs", pcs)
+    }
+
+    private fun saveState(state: JSONObject) {
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(Cipher.ENCRYPT_MODE, key())
+        val bytes = cipher.iv + cipher.doFinal(state.toString().toByteArray(Charsets.UTF_8))
+        prefs.edit().putString("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)).commit()
+    }
+
+    @Synchronized fun save(qr: String, token: String, pcName: String) {
+        val state = state()
+        val sid = PairCode.parse(qr).serverId
+        state.getJSONObject("pcs").put(sid, JSONObject().put("qr", qr).put("token", token).put("pc", pcName).put("sid", sid))
+        state.put("active", sid)
+        saveState(state)
+    }
+
+    @Synchronized fun read(): JSONObject? {
+        val state = state()
+        return state.getJSONObject("pcs").optJSONObject(state.optString("active"))
+    }
+
+    @Synchronized fun all(): List<JSONObject> {
+        val pcs = state().getJSONObject("pcs")
+        return pcs.keys().asSequence().mapNotNull { pcs.optJSONObject(it) }.toList()
+    }
+
+    @Synchronized fun select(serverId: String) {
+        val state = state()
+        require(state.getJSONObject("pcs").has(serverId)) { "Kompyuter topilmadi" }
+        state.put("active", serverId)
+        saveState(state)
+    }
+
+    @Synchronized fun updateToken(token: String) {
+        val state = state()
+        val active = state.getJSONObject("pcs").optJSONObject(state.optString("active")) ?: return
+        active.put("token", token)
+        saveState(state)
+    }
+
+    @Synchronized fun removeActive() {
+        val state = state()
+        val pcs = state.getJSONObject("pcs")
+        val removed = state.optString("active")
+        pcs.remove(removed)
+        val old = state.optJSONArray("queue")
+        if (old != null) {
+            val kept = JSONArray()
+            for (i in 0 until old.length()) {
+                val item = old.optJSONObject(i) ?: continue
+                if (item.optString("sid") != removed) kept.put(item)
+            }
+            state.put("queue", kept)
+        }
+        state.put("active", pcs.keys().asSequence().firstOrNull() ?: "")
+        saveState(state)
+    }
+
+    @Synchronized fun queueChat(serverId: String, requestId: String, text: String) {
+        val state = state()
+        val queue = state.optJSONArray("queue") ?: JSONArray().also { state.put("queue", it) }
+        queue.put(JSONObject().put("sid", serverId).put("id", requestId).put("text", text))
+        saveState(state)
+    }
+
+    @Synchronized fun pending(serverId: String): List<JSONObject> {
+        val queue = state().optJSONArray("queue") ?: return emptyList()
+        return (0 until queue.length()).mapNotNull { queue.optJSONObject(it) }
+            .filter { it.optString("sid") == serverId }
+    }
+
+    @Synchronized fun removeQueued(requestId: String) {
+        val state = state()
+        val old = state.optJSONArray("queue") ?: return
+        val kept = JSONArray()
+        for (i in 0 until old.length()) {
+            val item = old.optJSONObject(i) ?: continue
+            if (item.optString("id") != requestId) kept.put(item)
+        }
+        state.put("queue", kept)
+        saveState(state)
+    }
+
+    @Synchronized fun clear() { prefs.edit().clear().commit() }
 }

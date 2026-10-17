@@ -86,6 +86,7 @@ class WindowsApi(private val pair: PairCode, private val token: String? = null) 
 
     fun pair(deviceName: String): JSONObject {
         val info = json("/api/v1/info")
+        require(info.optInt("protocol") >= 1 && info.optInt("min_client_protocol") <= 1) { "Windows NEXVARA versiyasi mos emas" }
         require(info.optString("server_id") == pair.serverId) { "Boshqa kompyuter javob berdi" }
         return json("/api/v1/pair", "POST", JSONObject().put("code", pair.code)
             .put("device_name", deviceName).put("platform", "android").put("app_version", "0.1.0"))

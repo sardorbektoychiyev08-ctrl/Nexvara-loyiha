@@ -4,6 +4,14 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 — Codex — Android V1 telefon sinovi
+
+- Ish faqat alohida `.worktrees/android` worktree va `codex/android-mobile` tarmog‘ida bajarildi. `main` dagi telefon API v1 shu tarmoqqa merge qilindi; Claude ishchi papkasi va tarmog‘i almashtirilmadi.
+- Android chat tasdig‘i, vazifalar long-poll, ko‘p PC, shifrlangan offline navbat, kamera va release signing sozlamalari qo‘shildi. Klaviatura chat maydonini berkitishi haqiqiy telefonda topilib tuzatildi.
+- **PASS:** Android APK build, 3/3 QR unit test, Android 16 telefonga o‘rnatish va ishga tushirish, QR pairing, demo Windows API bilan chat so‘rovi va javobi, klaviatura tuzatishining qurilmadagi sinovi.
+- **FAIL/BLOCKED:** `scripts/test.ps1` Android worktree'da `.venv` yo‘qligi sababli ishga tushmadi. **NOT TESTED:** kamera, fayl almashinuvi, haqiqiy Windows agenti vazifalari, Office testlari, fon bildirishnomalari. Google Android OAuth va pause/resume uchun tashqi sozlama/API kerak.
+- Keyingi qadam: haqiqiy Windows agenti bilan vazifa, kamera va fayl almashinuvini sinash; fon sinxronizatsiyasi va bildirishnomalar.
+
 ## 2026-10-17 (13) — Claude Code — Windows Agent integratsiyalari: telefon API v1, Google login, installer/updater, bo'limlar auditi
 
 **Foydalanuvchi talabi:** 179 PASS testni saqlab, Android uchun xavfsiz API, Google OAuth/OIDC, installer/updater tekshiruvi, 12 bo'lim ↔ Core Agent holati, Codex uchun Android hujjatlari, PROGRESS va private GitHub'ga push. Pullik AI chaqirilmadi.

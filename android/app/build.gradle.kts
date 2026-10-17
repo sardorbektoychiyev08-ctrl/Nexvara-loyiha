@@ -4,6 +4,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val releaseStore = providers.environmentVariable("NEXVARA_RELEASE_STORE_FILE").orNull
+val releaseStorePassword = providers.environmentVariable("NEXVARA_RELEASE_STORE_PASSWORD").orNull
+val releaseAlias = providers.environmentVariable("NEXVARA_RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("NEXVARA_RELEASE_KEY_PASSWORD").orNull
+val releaseInputs = listOf(releaseStore, releaseStorePassword, releaseAlias, releaseKeyPassword)
+if (releaseInputs.any { it != null } && releaseInputs.any { it.isNullOrBlank() }) {
+    throw GradleException("Release signing uchun 4 ta NEXVARA_RELEASE_* muhit qiymati kerak")
+}
+
 android {
     namespace = "uz.nexvara.mobile"
     compileSdk = 36
@@ -14,9 +23,18 @@ android {
         versionCode = 1
         versionName = "0.1.0"
     }
+    signingConfigs {
+        if (releaseStore != null) create("nexvaraRelease") {
+            storeFile = file(releaseStore)
+            storePassword = releaseStorePassword
+            keyAlias = releaseAlias
+            keyPassword = releaseKeyPassword
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.findByName("nexvaraRelease")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
