@@ -169,26 +169,195 @@ def _filter(text: str) -> str:
     return (m.group(1) or m.group(2)).strip() if m else ""
 
 
+_DASH = r"(?:dashboard|dashbord)\w*"
+_Q = r"[«\"“]([^«»\"“”]+)[»\"”]"
+_WTYPES = (r"(ustun\w*|gistogramm\w*|doira\w*|pirog\w*|chiziq\w*|grafik\w*|nuqta\w*|kpi|"
+           r"ko[‘’']?rsatkich\w*|jadval\w*)")  # fmt: skip
+_DATE = r"(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[./]\d{1,2}[./]\d{4})"
+
+
+def _dash_name(text: str) -> str:
+    """«Savdo 2026» dashboardi... / Savdo dashboardida ... ('' = the one we talked about)."""
+    m = re.search(_Q + r"\s+" + _DASH, text, re.I)
+    if m:
+        return m.group(1).strip()
+    m = re.search(r"((?:[\w‘’'-]+\s+){1,3})" + _DASH, text, re.I)
+    if not m:
+        return ""
+    stop = {"shu", "bu", "ushbu", "osha", "oxirgi", "mening", "va", "keyin", "ni", "yangi", "bir"}
+    words = [w for w in m.group(1).split() if fold(w) not in stop and not _NAME.fullmatch(w)]
+    return " ".join(words[-3:])
+
+
+def _column_ref(text: str, quotes: list[str]) -> str:
+    m = re.search(r"(?:" + _Q + r"|([\w‘’'-]+))\s+ustun\w*", text, re.I)
+    if m:
+        return (m.group(1) or m.group(2)).strip()
+    return quotes[0] if quotes else ""
+
+
+def _dates(text: str) -> dict[str, str]:
+    out = {}
+    m = re.search(_DATE + r"\s*(?:dan|-dan|’dan|'dan)\b", text)
+    if m:
+        out["date_from"] = m.group(1)
+    m = re.search(_DATE + r"\s*(?:gacha|-gacha|’gacha|'gacha)\b", text)
+    if m:
+        out["date_to"] = m.group(1)
+    return out
+
+
+def _formula_words(expr: str) -> str:
+    rep = [
+        (r"\bminus\b|\bayir\w*", "-"),
+        (r"\bplyus\b|\bqo[‘’']?shuv\b", "+"),
+        (r"\bkarra\b|\bko[‘’']?paytir\w*", "*"),
+        (r"\bbo[‘’']?ling\w*|\bbo[‘’']?lin\w*", "/"),
+    ]
+    for pat, op in rep:
+        expr = re.sub(pat, f" {op} ", expr, flags=re.I)
+    return re.sub(r"\s+", " ", expr).strip()
+
+
 def _bi(text: str, f: str) -> list[ToolCall] | None:
-    if not _has(f, r"\b(dashboard|dashbord)\w*"):
+    if not re.search(r"\b" + _DASH, f):
         return None
-    name = _quoted_or_before(text, r"(dashboard|dashbord)")
-    data_file = next((v for v in locations(text) if v.lower().endswith(_DATA_EXT)), "")
-    if data_file and _has(f, r"\bsaqla\w*|\bnom\w*"):
-        q = [v for v in _QUOTED.findall(text) if v != data_file]
-        return [
-            ToolCall("bi.create", {"file": data_file, "name": q[0] if q else Path(data_file).stem})
-        ]
-    if data_file:
+    name = _dash_name(text)
+    quotes = [q for q in _QUOTED.findall(text) if q != name]
+    data_files = [v for v in locations(text) if v.lower().endswith(_DATA_EXT) and v != name]
+    view = {"filter": _filter(text), **_dates(text)}
+    page = re.search(r"(\d+)\s*-?\s*sahifa", f)
+    if page:
+        view["page"] = int(page.group(1))
+
+    def call(tool: str, **args) -> list[ToolCall]:
+        return [ToolCall(tool, {"name": name, **args})]
+
+    # ----- other files: rows below (append) or columns by a key (join) -----
+    if data_files and _has(f, r"\b(birlashtir|ulab|ula\b|bogla|qo\w*sh|ostiga|davomiga)\w*"):
+        if _has(f, r"\b(yarat|tuz)\w*") and not _has(f, r"\bbirlashtir"):
+            pass  # "X.xlsx dan dashboard yarat" below
+        else:
+            key = re.search(r"([\w‘’'-]+)\s+bo[‘’']?yicha", text, re.I)
+            if _has(f, r"\bbirlashtir|\bula|\bbogla") and key:
+                return call("bi.add_step", op="join", file=data_files[-1], on=key.group(1))
+            return call("bi.add_step", op="append", file=data_files[-1])
+    if data_files:
+        if _has(f, r"\bsaqla\w*|\bnom\w*"):
+            return [
+                ToolCall(
+                    "bi.create",
+                    {
+                        "file": data_files[0],
+                        "name": quotes[0] if quotes else Path(data_files[0]).stem,
+                    },
+                )
+            ]
         return None  # "Savdo.xlsx dan dashboard yarat": the page builds it (existing handler)
-    if _has(f, r"\b(royxat|qaysi)\w*|dashboard\w*\s+(ni\s+)?korsat\w*$|dashboardlar"):
-        if not _QUOTED.search(text) and _has(f, r"dashboardlar|royxat|qaysi"):
+
+    if _has(f, r"\bdashboardlar|\b(royxat|qaysi)\w*") and not _QUOTED.search(text):
+        if not _has(f, r"\b(vidjet|diagramm|qadam|bosqich)\w*"):
             return [ToolCall("bi.list")]
-    kind = re.search(
-        r"\b(ustun\w*|gistogramm\w*|doira\w*|pirog\w*|chiziq\w*|grafik\w*|"
-        r"nuqta\w*|kpi|korsatkich\w*|jadval\w*)\s+(diagramm\w*|vidjet\w*|qosh\w*)",
-        f,
+
+    # ----- data steps -----
+    n = re.search(r"(\d+)\s*-?\s*(qadam|bosqich)", f)
+    if n and _has(f, r"\b(ochir|olib\s+tashla|bekor\s+qil)\w*"):
+        return call("bi.remove_step", number=int(n.group(1)))
+    if _has(f, r"\b(qadam|bosqich|etl)\w*") and _has(f, r"\b(korsat|royxat|qanday|qaysi)\w*"):
+        return call("bi.steps")
+    if (
+        "=" in text
+        and _has(f, r"\b(ustun|formula|hisobla|qosh)\w*")
+        and not _has(f, r"\bqoldir|\bqolsin|\bfiltr")
+    ):
+        left, right = text.split("=", 1)
+        lq = _QUOTED.findall(left)
+        new = lq[-1] if lq else (re.findall(r"[\w‘’'-]+", left) or [""])[-1]
+        expr = right
+        for cut in re.finditer(r"\s+(?:ustun\w*|formula\w*|qo[‘’']?sh\w*|deb)\b", right):
+            before = right[: cut.start()]
+            if before.count("[") == before.count("]"):  # not inside a [column name]
+                expr = before
+                break
+        return call(
+            "bi.add_step", op="calc", new_name=new.strip(), formula=_formula_words(expr.strip(" ."))
+        )
+    cmp = re.search(
+        r"(?:" + _Q + r"|([\w‘’'-]+))\s*(>=|<=|!=|>|<|=)\s*([\w.,‘’' -]+?)\s+(?:bo[‘’']?lgan\s+)?"
+        r"(?:qator\w*\s+)?(?:qolsin|qoldir|filtrla)",
+        text,
+        re.I,
     )
+    if cmp:
+        return call("bi.add_step", op="filter", column=cmp.group(1) or cmp.group(2),
+                    cmp=cmp.group(3), value=cmp.group(4).strip())  # fmt: skip
+    m = re.search(
+        r"(?:" + _Q + r"|([\w‘’'-]+))\s+(\d+(?:[.,]\d+)?)\s*dan\s+(katta|kichik|ko[‘’']?p|kam)"
+        r"\w*\s+(?:bo[‘’']?lgan\s+)?(?:qator\w*\s+)?(?:qolsin|qoldir)",
+        text,
+        re.I,
+    )
+    if m:
+        op = ">" if fold(m.group(4)).startswith(("katta", "kop")) else "<"
+        return call("bi.add_step", op="filter", column=m.group(1) or m.group(2), cmp=op,
+                    value=m.group(3))  # fmt: skip
+    col = _column_ref(text, quotes)
+    if _has(f, r"\bustun\w*") and _has(f, r"\bdeb\s+(qayta\s+)?nomla|\bnomini\b"):
+        new = quotes[-1] if len(quotes) >= 2 else ""
+        return call("bi.add_step", op="rename", column=col, new_name=new)
+    if (
+        _has(f, r"\bustun\w*")
+        and _has(f, r"\b(olib\s+tashla|ochir)\w*")
+        and not _has(f, r"\bbosh\b")
+    ):
+        return call("bi.add_step", op="drop_col", column=col)
+    if _has(f, r"\bbosh\b") and _has(f, r"\btoldir\w*"):
+        v = re.search(r"(\d+(?:[.,]\d+)?)\s+bilan", f)
+        value = "o‘rtacha" if _has(f, r"\bortacha") else (v.group(1) if v else "0")
+        return call("bi.add_step", op="fill_null", column=col, value=value)
+    if _has(f, r"\b(takror\w*|dublikat\w*)") and _has(f, r"\b(ochir|olib\s+tashla)\w*"):
+        return call("bi.add_step", op="dedupe")
+    if _has(f, r"\bbosh\s+qator\w*") and _has(f, r"\b(ochir|olib\s+tashla)\w*"):
+        if _has(f, r"\bustun\w*"):
+            return call("bi.add_step", op="drop_null", column=col)
+        return call("bi.add_step", op="drop_empty")
+    t = re.search(r"\b(son|raqam|sana|matn)\s+tur\w*", f)
+    if t and _has(f, r"\bustun\w*"):
+        return call("bi.add_step", op="set_type", column=col, type=t.group(1))
+
+    # ----- widgets -----
+    wref = re.search(r"(\d+)\s*-?\s*(vidjet|diagramm|grafik|korsatkich)\w*", f)
+    wq = re.search(_Q + r"\s+(?:vidjet|diagramm|grafig|grafik|ko[‘’']?rsatkich)\w*", text, re.I)
+    widget = wref.group(1) if wref else (wq.group(1) if wq else "")
+    if _has(f, r"\b(vidjet|diagramm)\w*lar\w*") and _has(f, r"\b(korsat|royxat|qanday|qaysi)\w*"):
+        return call("bi.widgets")
+    if widget and _has(f, r"\b(ochir|olib\s+tashla)\w*"):
+        return call("bi.remove_widget", widget=widget)
+    if widget and not _has(f, r"\bqosh\w*\s*$"):
+        args: dict = {"widget": widget}
+        typ = re.search(_WTYPES + r"\s+(qil|bolsin|ga\s+ozgartir|korinish)", f)
+        if typ:
+            args["type"] = typ.group(1)
+        ttl = re.search(r"sarlavha\w*\s+" + _Q, text, re.I)
+        if ttl:
+            args["title"] = ttl.group(1)
+        agg = re.search(r"\b(ortacha|yigindi|soni|eng katta|eng kichik)\b", f)
+        if agg:
+            args["agg"] = agg.group(1)
+        x = re.search(r"([\w‘’'-]+)\s+bo[‘’']?yicha", text, re.I)
+        if x:
+            args["x"] = x.group(1)
+        y = re.search(
+            r"(?:qiymat\w*\s+" + _Q + r"|" + _Q + r"\s+(?:ni\s+)?ko[‘’']?rsatsin)", text, re.I
+        )
+        if y:
+            args["y"] = y.group(1) or y.group(2)
+        top = re.search(r"eng\s+katta\s+(\d+)|(\d+)\s+tasi", f)
+        if top:
+            args["top"] = int(top.group(1) or top.group(2))
+        if len(args) > 1:
+            return call("bi.edit_widget", **args)
+    kind = re.search(_WTYPES + r"\s+(diagramm\w*|vidjet\w*|qosh\w*)", f)
     if kind and _has(f, r"\bqosh\w*"):
         m = re.search(
             r"([\w‘’'-]+)\s+bo[‘’']?yicha\s+(.+?)\s+(?:ustun|gistogramm|doira|pirog|chiziq|"
@@ -196,25 +365,33 @@ def _bi(text: str, f: str) -> list[ToolCall] | None:
             text,
             re.I,
         )
-        q = re.search(r"[«“\"]([^«»“”\"]+)[»”\"]", text)
-        y = m.group(2).strip() if m else ""
+        y = m.group(2).strip() if m else (quotes[0] if quotes else "")
         agg = re.search(r"\b(ortacha|soni)\b", fold(y))
         if agg:
             y = re.sub(r"(?i)\b(o[‘’']?rtacha|soni)\b", "", y).strip()
-        return [ToolCall("bi.add_widget", {
-            "name": q.group(1) if q else name, "type": kind.group(1), "x": m.group(1) if m else "",
-            "y": y, "agg": agg.group(1) if agg else ""})]  # fmt: skip
-    flt = _filter(text)
+        return call(
+            "bi.add_widget",
+            type=kind.group(1),
+            x=m.group(1) if m else "",
+            y=y,
+            agg=agg.group(1) if agg else "",
+            **({"page": view["page"]} if page else {}),
+        )
+    if _has(f, r"\bsahifa\w*") and _has(f, r"\bqosh\w*") and quotes:
+        return call("bi.add_page", title=quotes[-1])
+
+    # ----- the dashboard itself -----
+    if _has(f, r"\bdeb\s+(qayta\s+)?nomla|\bnomini\b") and quotes:
+        return call("bi.rename", new_name=quotes[-1])
     if _has(f, r"\b(eksport|export|pdf|png|rasm|excel|csv|xlsx)\w*"):
         fmt = re.search(r"\b(pdf|png|rasm|excel|xlsx|csv)\b", f)
-        return [ToolCall("bi.export", {"name": name, "format": fmt.group(1) if fmt else "pdf",
-                                       "filter": flt})]  # fmt: skip
+        return call("bi.export", format=fmt.group(1) if fmt else "pdf", **view)
     if _has(f, r"\bochir\w*"):
-        return [ToolCall("bi.delete", {"name": name})]
+        return call("bi.delete")
     if _has(f, r"\b(korsatkich|kpi|natija|qancha|jami|xulosa|tahlil)\w*"):
-        return [ToolCall("bi.summary", {"name": name, "filter": flt})]
+        return call("bi.summary", **view)
     if _has(f, r"\b(och|korsat|chiqar)\w*"):
-        return [ToolCall("bi.open", {"name": name, "filter": flt})]
+        return call("bi.open", **view)
     return None
 
 

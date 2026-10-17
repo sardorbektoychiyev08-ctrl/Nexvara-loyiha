@@ -1,4 +1,4 @@
-# 12 bo'lim va Core Agent: holat (2026-10-17, 2-tekshiruv)
+# 12 bo'lim va Core Agent: holat (2026-10-17, 3-tekshiruv)
 
 "Bo'lim ochiladi" ≠ "bo'lim chatdagi tabiiy til buyrug'ini bajaradi". Bu jadvalda faqat
 **chatga yozilgan gap** orqali haqiqatan bajariladigan narsa hisobga olingan. Har bo'lim uchun
@@ -17,7 +17,7 @@ muhitda sinalmagan.
 | 3 | Office Agent | «Hisobot.xlsx ni och, B ustun bo'yicha saralab, PDF qilib saqla» (Excel/Word/PowerPoint) | demo tugmalari | REAL IMPLEMENTED (haqiqiy Office testlari avval PASS) |
 | 4 | Darsliklar va testlar | «7-sinf fizika Nyuton qonunlari 20 ta test», «... mavzusini chiqarib ber», taqdimot | darslik yuklash, Telegram kirish | REAL IMPLEMENTED · Telegram haqiqiy hisob bilan NOT TESTED |
 | 5 | Files | qidiruv (papka, tur), ma'lumot, nusxa, ko'chirish, nomlash, ommaviy nomlash, ZIP/ochish, zaxira, versiyalar, tiklash⚠, tartiblash⚠, Savatga⚠, ommaviy PDF; «topilgan fayllar», «uni» | — | REAL IMPLEMENTED |
-| 6 | NEXVARA BI | yaratish va saqlash, ro'yxat, ochish, filtr («faqat Toshkent»), ko'rsatkichlar (KPI javobi chatda), vidjet qo'shish, Excel/CSV/PDF/PNG eksport, o'chirish⚠ | ETL qadamlari (formula ustun, birlashtirish), vidjetni tahrirlash | PARTIAL (asosiy amallar chatdan) |
+| 6 | NEXVARA BI | yaratish/saqlash, ro'yxat, ochish, filtr, sana oralig'i, sahifa, KPI javobi; formula ustun («Foyda = Daromad - Xarajat»), boshqa fayl bilan kalit bo'yicha birlashtirish, boshqa fayl qatorlarini qo'shish, filtr qadami, nomlash, ustunni olib tashlash, bo'sh qiymatlarni to'ldirish, takrorlarni o'chirish, tur o'zgartirish, qadamlar ro'yxati va bekor qilish; vidjetlar ro'yxati, qo'shish, tahrirlash (tur, sarlavha, ustunlar, hisob, eng kattasi N), olib tashlash, sahifa qo'shish, nomini o'zgartirish, eksport, o'chirish⚠ | vidjetni boshqa sahifaga ko'chirish, sahifani o'chirish | REAL IMPLEMENTED |
 | 7 | Workflows | yaratish (qadamlar, kutish, tasdiq, har kuni SS:DD, papka kuzatish, xatoda davom), qayta yaratib tahrirlash, ro'yxat, ishga tushirish, pauza, davom, tasdiqlash, to'xtatish, yoqish/o'chirish, tarix, o'chirish⚠ | — | REAL IMPLEMENTED |
 | 8 | Teach NEXVARA | «Har doim Excel raqamlarini markazga joyla» → tasdiq → qoida | versiyalar, yoqish/o'chirish | REAL IMPLEMENTED |
 | 9 | Memory | «Eslab qol: ...», «nimalarni eslab qolgansan?», «xotiradan maktab haqida top» (yangi) | tahrir, o'chirish, zaxira/tiklash | REAL IMPLEMENTED (saqlash, eslash, qidiruv) |
@@ -31,10 +31,11 @@ muhitda sinalmagan.
 
 | Modul | Holat | Izoh |
 |---|---|---|
-| Tool reyestri (36 asbob, tur tekshiruvi, xavfli amallarga tasdiq) | REAL IMPLEMENTED | [AGENT.md](AGENT.md); unit testlar PASS |
+| Tool reyestri (44 asbob, tur tekshiruvi, xavfli amallarga tasdiq) | REAL IMPLEMENTED | [AGENT.md](AGENT.md); unit testlar PASS |
 | Suhbat konteksti («uni», «shu fayl», «topilgan fayllar», «shu papka», «xuddi shunday … bilan ham») | REAL IMPLEMENTED | unit + UI testlar PASS |
 | Bir xabarda bir nechta topshiriq (zanjir, natija keyingi qadamga o'tadi) | REAL IMPLEMENTED | Office klauzalari bitta buyruq bo'lib qoladi |
-| AI tool-calling planner (JSON, 4 provayder uchun bir xil) | REAL IMPLEMENTED (soxta provayder bilan) | haqiqiy kalit bilan NOT TESTED (pullik chaqiruv qilinmadi) |
+| AI tool-calling planner (JSON, 4 provayder uchun bir xil) | REAL IMPLEMENTED (soxta provayder bilan) | AI taklif qilgan o'zgartiruvchi reja avval ko'rsatiladi va «Ha»dan keyin bajariladi; haqiqiy kalit bilan NOT TESTED (pullik chaqiruv qilinmadi) |
+| Haqiqiy Office bilan yakuniy integratsiya (chat → Memory + Teach + zanjir + Files + BI; Workflow Word'da; 3 formatni ommaviy PDF) | REAL IMPLEMENTED | `tests/office/test_agent_office.py`, ko'rinadigan Office, faqat sinov fayllari |
 | Memory ↔ Teach ↔ Office | REAL IMPLEMENTED | yo'lli eslatmalar buyruqlarda nom sifatida ishlaydi; Teach qoidalari Office/zanjir/workflow'da; AI'ga mos eslatma va qoidalar |
 | Sinxronlash: papka (shifrlangan), telefon `/api/v1/sync` | REAL IMPLEMENTED | 2 qurilma, ziddiyat, o'chirish, xavfsizlik testlari PASS |
 | Sinxronlash: Google Drive appDataFolder | PARTIAL | soxta Drive bilan PASS; haqiqiy Drive BLOCKED (Google Cloud client + Drive API yoqilishi kerak) |

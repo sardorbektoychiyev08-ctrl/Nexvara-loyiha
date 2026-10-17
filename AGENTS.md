@@ -3,6 +3,7 @@
 Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birining limiti tugasa, ikkinchisi davom ettiradi. Bir-biringizning xotirangizni ko'rmaysiz, shuning uchun **yagona haqiqat manbai shu repozitoriy**.
 
 ## Ishni boshlashdan oldin (majburiy)
+0. Codex Windows ishini davom ettirsa: [HANDOFF_CODEX.md](HANDOFF_CODEX.md).
 1. [PROGRESS.md](PROGRESS.md) ni o'qing: oxirgi holat, nima qilindi, keyingi qadam.
 2. Kerak bo'lsa [docs/MASTER_SPEC.md](docs/MASTER_SPEC.md) (to'liq talablar), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/ROADMAP.md](docs/ROADMAP.md).
 3. `git status` va `git log --oneline -10`: commit qilinmagan ish qolgan bo'lishi mumkin.

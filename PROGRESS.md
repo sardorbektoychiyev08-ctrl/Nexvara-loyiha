@@ -4,6 +4,38 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (15) — Claude Code — BI chatdan to'liq, haqiqiy Office integratsiyasi, xavfsizlik, Codex handoff
+
+**Foydalanuvchi talabi:** 240 PASS testni saqlab: BI'ning qolgan qismlari (formula ustun, fayllarni birlashtirish, diagramma tahrirlash, barcha amallar chatdan); haqiqiy Office sinovlari (ruxsat berildi, faqat sinov fayllarida, oynalar ko'rinadigan); yakuniy integratsiya; barcha testlar; xavfsizlik; push; Codex Android tarmog'iga tegmaslik; pullik AI yo'q; HANDOFF_CODEX.md.
+
+**Qilindi** (tarmoq `claude/bi-yakun`):
+- **BI dvigateli**: yangi `append` qadami (boshqa fayl qatorlari ostiga, ustunlar mos keladi, «Manba» ustuni); brauzer UI'sidagi ETL formasiga ham qo'shildi.
+- **BI chatdan** (9 ta yangi/yangilangan asbob, `agent/tools.py` + `agent/nlu.py`): formula ustun (««Foyda» = Daromad - Xarajat», «minus/ko'paytir» so'zlari, `[ustun]` avtomatik), kalit bo'yicha birlashtirish («narxlar.csv bilan Mahsulot bo'yicha birlashtir»), qatorlarni qo'shish, filtr qadami («Daromad 1000000 dan katta qatorlar qolsin», «Daromad > 1000000 qolsin»), nomlash, olib tashlash, bo'shlarni to'ldirish (0/son/o'rtacha), takrorlarni o'chirish, tur o'zgartirish, qadamlar ro'yxati va N-qadamni bekor qilish (bog'liq qadam bo'lsa rad etiladi); vidjetlar ro'yxati, tahrirlash (tur, sarlavha, «X bo'yicha», qiymat ustuni, o'rtacha/soni/…, eng kattasi N), olib tashlash, sahifa qo'shish va N-sahifaga vidjet, sana oralig'i («01.02.2026 dan 31.03.2026 gacha»), dashboard nomini o'zgartirish. Har o'zgarish saqlashdan oldin hisoblab ko'riladi; xato bo'lsa saqlanmaydi.
+- **Xavfsizlik**: AI planner taklif qilgan va biror narsani o'zgartiradigan reja endi doim avval ko'rsatiladi («AI shunday tushundi — to'g'rimi?») va faqat «Ha»dan keyin bajariladi; faqat o'qiydigan so'rovlar darhol. Tekshirildi: kuzatilayotgan fayllar va Git tarixida kalit/token yo'q, `.gitignore` maxfiy fayllarni qamraydi, UI'da foydalanuvchi matni `esc()`/`textContent` bilan chiqadi, `pip-audit`: ma'lum zaiflik yo'q.
+- **Haqiqiy Office integratsiya testi** (`tests/office/test_agent_office.py`, ko'rinadigan Office, faqat pytest vaqtinchalik papkasi): Excel — xotira taxallusi + Teach qoidasi + 2 qadamli zanjir (Office → Files ko'chirish) + natijadan BI dashboard va KPI javobi, asl fayl bayt-bayt o'zgarmagan; Word — chat orqali workflow yaratish, ishga tushirish, tarix; Excel+Word+PowerPoint papkasini chat orqali ommaviy PDF, manbalar o'zgarmagan.
+- `test_ui_button_runs_real_excel` vaqt chegarasi 300 → 600 s (4 ta Office demo ketma-ket; 1-yugurishda band kompyuterda 300 s yetmadi, alohida 81 s da PASS).
+- [HANDOFF_CODEX.md](HANDOFF_CODEX.md): Codex Windows ishini davom ettirishi uchun holat, yangi imkoniyat qo'shish andozasi, ochiq ishlar, buzilmasligi kerak bo'lgan xavfsizlik qoidalari. AGENTS.md dan havola.
+- Codex'ning `codex/android-mobile` tarmog'i va `.worktrees/android` ga tegilmadi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 245 ta (oldingi 240 + BI chatdan 5; AI tasdiq testi yangilandi) | PASS |
+| `.\scripts\test.ps1 -Office` 1-yugurish | 298/299 — `test_ui_button_runs_real_excel` 300 s vaqt chegarasi; alohida qayta: PASS (81 s) |
+| `.\scripts\test.ps1 -Office` yakuniy (barcha o'zgarishlardan keyin) | **299/299 PASS** (11 daq 25 s), smoke PASS |
+| Shu ichida UI skriptlari haqiqiy oynada (7 ta, `agent_chat` va `settings_integrations` bilan) | PASS |
+| Haqiqiy Office integratsiyasi (3 test) | PASS |
+| pip-audit | PASS (zaiflik yo'q) |
+| Haqiqiy AI planner | NOT TESTED — pullik chaqiruv qilinmadi |
+| Haqiqiy Google login / Drive sinxron | BLOCKED — foydalanuvchining Google Cloud client'i kerak |
+
+**Kuzatuv:** testlardan oldin (10:29–10:30) ochilgan 3 ta yashirin Excel va 1 ta yashirin PowerPoint jarayoni (oynasiz) ochiq qoldi; foydalanuvchi ruxsatisiz yopilmadi. Yakuniy yugurish yangi jarayon qoldirmadi.
+
+**Keyingi qadam:** HANDOFF_CODEX.md dagi ochiq ishlar (haqiqiy AI/Google sinovi foydalanuvchi bilan, tarix sinxroni, BI'da vidjetni sahifalararo ko'chirish).
+
+---
+
 ## 2026-10-17 (14) — Claude Code — Core Agent: tool-calling, kontekst, ketma-ket topshiriqlar, bo'limlar chatdan, Memory↔Teach↔Office, sinxronlash, Google tayyorgarlik
 
 **Foydalanuvchi talabi:** EXE, updater va 214 PASS testni saqlab: Files/BI/Workflows/Settings chatdan to'liq; Core Agent oddiy gaplar, oldingi suhbat va ketma-ket topshiriqlarni tushunsin (AI tool-calling); Memory, Teach va Office bog'langan; qurilmalararo sinxron; Google login haqiqiy konfiguratsiyaga tayyor (hisobga o'zi kirmasin); Codex'ning Android ishiga tegmaslik; pullik AI chaqirmaslik.
