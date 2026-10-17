@@ -7,8 +7,8 @@ window.addEventListener("unhandledrejection", (e) => window.__errors.push(String
 
 const $ = (sel) => document.querySelector(sel);
 const STATUS_LABEL = {
-  pending: "Kutilmoqda", running: "Bajarilmoqda", succeeded: "Bajarildi",
-  failed: "Xato", cancelled: "Bekor qilindi",
+  pending: i18n("status.pending"), running: i18n("status.running"), succeeded: i18n("status.succeeded"),
+  failed: i18n("status.failed"), cancelled: i18n("status.cancelled"),
 };
 const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows", "bi", "devices"]);
 
@@ -38,6 +38,7 @@ function show(page) {
     $("#placeholder-text").textContent = `Bu bo'lim ${btn.dataset.milestone || "keyingi"} bosqichida qo'shiladi.`;
     $("#page-placeholder").classList.add("active");
   }
+  if (page === "home") renderAiMoney();
   if (page === "history") renderHistory();
   if (page === "library") renderLibrary();
   if (page === "settings") renderSettings();
@@ -359,6 +360,121 @@ $("#test-form").addEventListener("submit", async (e) => {
 
 $("#panel-close").addEventListener("click", () => document.body.classList.remove("show-panel"));
 
+// ---- Bosh sahifa: AI balans va xarajatlar ----
+const usd = (v) => `$${Number(v || 0).toFixed(2)}`;
+const usd4 = (v) => `$${Number(v || 0).toFixed(4)}`;
+
+function balanceText(p) {
+  if (!p.balance_api) return i18n("ai.no_balance_api");
+  const b = p.balance;
+  if (!b) return p.has_key ? "«Balansni yangilash»ni bosing" : "Kalit kiritilmagan";
+  if (b.error) return `Xatolik yuz berdi: ${b.error}`;
+  const parts = (b.balances || []).map((x) => `${x.total.toFixed(2)} ${x.currency}` +
+    (x.granted ? ` (berilgan: ${x.granted.toFixed(2)})` : ""));
+  return (parts.join(" · ") || "—") + (b.available ? "" : " · API uchun yetarli emas");
+}
+
+function limitBar(spent, limit) {
+  const bar = el("div", "ai-bar");
+  const share = limit > 0 ? Math.min(1, spent / limit) : 0;
+  if (share >= 1) bar.classList.add("over"); else if (share >= 0.8) bar.classList.add("warn");
+  const fill = document.createElement("i");
+  fill.style.width = `${Math.round(share * 100)}%`;
+  bar.appendChild(fill);
+  return bar;
+}
+
+function aiRow(label, value) {
+  const r = el("div", "ai-row");
+  r.append(el("span", "", label), el("span", "", value));
+  return r;
+}
+
+function drawSpendChart(series) {
+  const box = $("#ai-money-chart");
+  const W = 600, H = 140, pad = 18;
+  const max = Math.max(0.01, ...series.map((d) => d.total));
+  const bw = (W - pad * 2) / series.length;
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="So‘nggi 30 kunlik taxminiy sarf">`;
+  s += `<line class="axis" x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}"/>`;
+  series.forEach((d, i) => {
+    const h = (d.total / max) * (H - pad * 2);
+    const x = pad + i * bw + 1;
+    s += `<rect class="bar" x="${x.toFixed(1)}" y="${(H - pad - h).toFixed(1)}" width="${Math.max(1, bw - 2).toFixed(1)}" height="${h.toFixed(1)}" rx="2"><title>${esc(d.day)}: ${esc(usd4(d.total))}</title></rect>`;
+  });
+  s += `<text x="${pad}" y="12">${esc(usd(max))}</text><text x="${W - pad}" y="${H - 4}" text-anchor="end">${esc(series.at(-1)?.day || "")}</text></svg>`;
+  box.innerHTML = s; // only numbers and dates we computed ourselves, escaped
+}
+
+async function renderAiMoney() {
+  if (!api()) return;
+  const d = await api().ai_dashboard();
+  const warn = $("#ai-money-warn");
+  warn.hidden = !d.warnings.length;
+  warn.className = d.blocked ? "ai-warn over" : "ai-warn";
+  warn.textContent = d.warnings.join(" ");
+  const totals = $("#ai-money-totals");
+  totals.textContent = "";
+  [["Bugun (taxminiy)", usd4(d.spent_today)], ["Shu oy (taxminiy)", usd4(d.spent_month)],
+    [i18n("ai.daily_limit"), usd(d.daily_budget_usd)], [i18n("ai.monthly_limit"), usd(d.monthly_budget_usd)],
+    [i18n("ai.task_limit"), d.task_limit_usd == null ? "—" : usd(d.task_limit_usd)]].forEach(([k, v]) => {
+    const c = el("div", "ai-total"); c.append(el("span", "muted small", k), el("b", "", v)); totals.appendChild(c);
+  });
+  const cards = $("#ai-money-cards");
+  cards.textContent = "";
+  Object.entries(d.providers).forEach(([name, p]) => {
+    const c = el("div", "ai-card");
+    const h = el("h3", "", p.label);
+    h.appendChild(el("span", p.has_key ? "badge succeeded" : "badge", p.has_key ? i18n("ai.connected") : i18n("ai.not_connected")));
+    c.append(h,
+      aiRow("Bugun sarflangan", usd4(p.spent_today)), limitBar(p.spent_today, p.daily_limit),
+      aiRow("Shu oy sarflangan", usd4(p.spent_month)), limitBar(p.spent_month, p.monthly_limit),
+      aiRow(i18n("ai.daily_limit"), usd(p.daily_limit)), aiRow(i18n("ai.monthly_limit"), usd(p.monthly_limit)),
+      aiRow(`${i18n("ai.left")} (oy)`, usd(p.left_month)));
+    // Real money on the provider's account — not the same as "left of your own limit".
+    c.appendChild(el("div", "ai-balance", p.balance_api
+      ? `${i18n("ai.real_balance")}: ${balanceText(p)}`
+      : `${i18n("ai.no_balance_api")} — «${i18n("ai.pay")}» sahifasida ko‘ring.`));
+    const row = el("div", "row wrap");
+    const pay = el("button", "btn small-btn", i18n("ai.pay"));
+    pay.type = "button";
+    pay.addEventListener("click", () => api().open_url(p.billing_url));
+    row.appendChild(pay);
+    if (p.balance_api && p.has_key) {
+      const rb = el("button", "btn small-btn", i18n("ai.refresh_balance"));
+      rb.type = "button";
+      rb.addEventListener("click", async () => { rb.disabled = true; await api().ai_balance(name); renderAiMoney(); });
+      row.appendChild(rb);
+    }
+    c.appendChild(row);
+    cards.appendChild(c);
+  });
+  const split = $("#ai-money-split");
+  split.textContent = "";
+  d.split.forEach((x) => {
+    const r = el("div", "ai-split-row");
+    r.append(el("span", "", x.label), limitBar(x.share, 1), el("span", "", usd4(x.spent_month)));
+    split.appendChild(r);
+  });
+  drawSpendChart(d.series);
+  const tb = $("#ai-money-history");
+  tb.textContent = "";
+  if (!d.history.length) {
+    const tr = el("tr"); tr.appendChild(el("td", "muted", "Hali pullik AI so‘rovi bo‘lmagan.")); tb.appendChild(tr);
+    return;
+  }
+  const head = el("tr");
+  ["Vaqt", i18n("ai.provider"), "Model", "Ish", "Token", "Narx (taxminiy)"].forEach((x) => head.appendChild(el("th", "", x)));
+  tb.appendChild(head);
+  d.history.forEach((u) => {
+    const tr = el("tr");
+    [new Date(u.ts * 1000).toLocaleString(), (d.providers[u.provider] || {}).label || u.provider, u.model,
+      u.purpose, `${u.input_tokens}+${u.output_tokens}`, usd4(u.cost)].forEach((v) => tr.appendChild(el("td", "", v)));
+    tb.appendChild(tr);
+  });
+}
+$("#ai-money-refresh").addEventListener("click", () => renderAiMoney());
+
 // ---- settings ----
 let settings = null;
 
@@ -516,29 +632,35 @@ async function renderAi(status) {
     const row = el("div", "ai-prov");
     const head = el("div", "ai-prov-head");
     head.append(el("strong", "", p.label),
-      el("span", p.has_key ? "badge succeeded" : "badge", p.has_key ? `Kalit bor ${p.key_masked}` : "Kalit yo‘q"));
+      el("span", p.has_key ? "badge succeeded" : "badge", p.has_key ? `${i18n("ai.connected")} · ${p.key_masked}` : i18n("ai.not_connected")));
+    const checked = p.checked ? ` · tekshirilgan: ${new Date(p.checked.at * 1000).toLocaleDateString()}` : " · hali tekshirilmagan";
     const models = el("div", "muted small",
-      Object.entries(p.models).map(([t, m]) => `${st.tier_labels[t]}: ${m}`).join(" · "));
+      Object.entries(p.models).map(([tier, m]) => `${st.tier_labels[tier]}: ${m || "bu hisobda mavjud emas"}`).join(" · ") + checked);
+    const notes = el("div", "muted small", `${p.free_tier} ${p.subscription_note}`);
     const form = el("div", "row wrap");
     const input = el("input", "ai-key");
     input.type = "password"; input.placeholder = p.has_key ? "Yangi kalit (almashtirish uchun)" : p.key_hint;
     input.autocomplete = "off";
-    const save = el("button", "btn primary", "Tekshirish va saqlash");
-    const get = el("button", "btn", "Kalit olish ↗");
+    const save = el("button", "btn primary", i18n("ai.check_save"));
+    const get = el("button", "btn", `${i18n("ai.get_key")} ↗`);
+    const pay = el("button", "btn", `${i18n("ai.pay")} ↗`);
+    const usage = el("button", "btn", `${i18n("ai.usage_site")} ↗`);
     const msg = el("div", "muted small", "");
-    save.type = get.type = "button";
+    save.type = get.type = pay.type = usage.type = "button";
+    pay.addEventListener("click", () => api().open_url(p.billing_url));
+    usage.addEventListener("click", () => api().open_url(p.usage_url));
     save.addEventListener("click", async () => {
       if (!input.value.trim()) return;
       save.disabled = true; msg.textContent = "Tekshirilmoqda (bepul so‘rov)…";
       const r = await api().ai_save_key(name, input.value);
       input.value = ""; save.disabled = false;
-      if (!r.ok) { msg.textContent = `Xato: ${r.error}`; return; }
+      if (!r.ok) { msg.textContent = `Xatolik yuz berdi: ${r.error}`; return; }
       msg.textContent = `Saqlandi ✓ Modellar: ${Object.values(r.models).join(", ")}` +
-        (r.missing.length ? ` (hisobda topilmadi: ${r.missing.join(", ")})` : "");
+        (r.missing.length ? ` (bu hisobda mavjud bo‘lmagan darajalar: ${r.missing.join(", ")})` : "");
       renderAi(r.status); refreshAiStatus();
     });
     get.addEventListener("click", () => api().open_url(p.key_url));
-    form.append(input, save, get);
+    form.append(input, save, get, pay, usage);
     if (p.has_key) {
       const del = el("button", "btn", "O‘chirish");
       del.type = "button";
@@ -548,7 +670,20 @@ async function renderAi(status) {
       });
       form.append(del);
     }
-    row.append(head, models, form, msg);
+    const lim = el("div", "row wrap");
+    const ld = el("input"); ld.type = "number"; ld.min = "0"; ld.step = "0.1";
+    const lm = el("input"); lm.type = "number"; lm.min = "0"; lm.step = "0.5";
+    ld.placeholder = `umumiy (${st.daily_budget_usd})`; lm.placeholder = `umumiy (${st.monthly_budget_usd})`;
+    ld.value = p.own_limits.daily_usd ?? ""; lm.value = p.own_limits.monthly_usd ?? "";
+    ld.title = `${p.label}: ${i18n("ai.daily_limit")}, $`; lm.title = `${p.label}: ${i18n("ai.monthly_limit")}, $`;
+    const lsave = el("button", "btn small-btn", `${i18n("btn.save")} (limitlar)`); lsave.type = "button";
+    lsave.addEventListener("click", async () => {
+      const r = await api().ai_save_limits(name, ld.value, lm.value);
+      msg.textContent = r.ok ? i18n("msg.saved") : `Xatolik yuz berdi: ${r.error}`;
+      if (r.ok) renderAi(r.status);
+    });
+    lim.append(el("span", "muted small", `${i18n("ai.daily_limit")}, $`), ld, el("span", "muted small", `${i18n("ai.monthly_limit")}, $`), lm, lsave);
+    row.append(head, models, notes, form, lim, msg);
     box.appendChild(row);
   });
   const sel = $("#ai-provider");
@@ -561,15 +696,18 @@ async function renderAi(status) {
   $("#ai-daily").value = st.daily_budget_usd;
   $("#ai-monthly").value = st.monthly_budget_usd;
   $("#ai-confirm").value = st.confirm_over_usd;
+  $("#ai-task").value = st.task_limit_usd ?? "";
+  $("#ai-fallback").checked = st.fallback;
   $("#ai-send-text").checked = st.send_textbook_text;
   $("#ai-spent").textContent =
-    `Sarflandi: bugun ${money(st.spent_today)} / ${money(st.daily_budget_usd)}, shu oy ${money(st.spent_month)} / ${money(st.monthly_budget_usd)}. Narxlar taxminiy (provayder hisobidagi summa asosiy).`;
+    `${i18n("ai.estimated")}: bugun ${money(st.spent_today)} / ${money(st.daily_budget_usd)}, shu oy ${money(st.spent_month)} / ${money(st.monthly_budget_usd)}. Narxlar taxminiy — provayder hisobidagi summa asosiy.` +
+    (st.warnings.length ? ` ${st.warnings.join(" ")}` : "");
   const usage = await api().ai_usage();
   const t = $("#ai-usage");
   t.textContent = "";
   if (usage.length) {
     const head = el("tr");
-    ["Vaqt", "Ish", "Model", "Token", "Narx"].forEach((h) => head.appendChild(el("th", "", h)));
+    ["Vaqt", "Ish", "Model", "Token", "Narx (taxminiy)"].forEach((h) => head.appendChild(el("th", "", h)));
     t.appendChild(head);
     usage.forEach((u) => {
       const tr = el("tr");
@@ -586,6 +724,8 @@ $("#ai-form").addEventListener("submit", async (e) => {
     enabled: $("#ai-enabled").checked, provider: $("#ai-provider").value || "",
     daily_budget_usd: Number($("#ai-daily").value), monthly_budget_usd: Number($("#ai-monthly").value),
     confirm_over_usd: Number($("#ai-confirm").value), send_textbook_text: $("#ai-send-text").checked,
+    task_limit_usd: $("#ai-task").value === "" ? null : Number($("#ai-task").value),
+    fallback: $("#ai-fallback").checked,
   } });
   $("#ai-error").hidden = r.ok; $("#ai-error").textContent = r.ok ? "" : r.error;
   $("#ai-saved").textContent = r.ok ? "Saqlandi ✓" : "";
@@ -944,7 +1084,7 @@ let wfEditing = { id: 0, steps: [] };
 let wfTimer = null;
 const TRIG = (w) => w.trigger.type === "folder" ? `papka: ${w.trigger.folder} (${w.trigger.ext || "barcha fayllar"})`
   : w.trigger.type === "daily" ? `har kuni ${w.trigger.time}` : "qo‘lda";
-const RUN_STATUS = { running: "Bajarilmoqda", succeeded: "Bajarildi", failed: "Xato", cancelled: "Bekor qilindi" };
+const RUN_STATUS = STATUS_LABEL;
 
 async function renderWorkflows() {
   if (!api()) return;
@@ -981,7 +1121,7 @@ function drawActive(list) {
     const pause = el("button", "btn small-btn", a.paused ? "Davom ettirish" : "Pauza");
     pause.addEventListener("click", async () => { a.paused ? await api().wf_resume(a.run_id) : await api().wf_pause(a.run_id); });
     const stop = el("button", "btn small-btn danger", "To‘xtatish");
-    stop.addEventListener("click", async () => { if (confirm("Workflow to‘xtatilsinmi?")) await api().cancel_task(a.task_id); });
+    stop.addEventListener("click", async () => { if (confirm("Ish jarayoni to‘xtatilsinmi?")) await api().cancel_task(a.task_id); });
     row.append(pause, stop);
     box.appendChild(row);
   });
@@ -990,7 +1130,7 @@ function drawActive(list) {
 function drawWorkflows(list) {
   const box = $("#wf-list");
   box.textContent = "";
-  if (!list.length) box.appendChild(el("div", "muted", "Hali workflow yo‘q — pastda yarating yoki shablondan boshlang."));
+  if (!list.length) box.appendChild(el("div", "muted", "Hali ish jarayoni yo‘q — pastda yarating yoki shablondan boshlang."));
   list.forEach((w) => {
     const row = el("div", "ai-prov");
     const head = el("div", "ai-prov-head");
@@ -1045,7 +1185,7 @@ async function drawRuns(wfId = 0) {
 
 function wfReset() {
   wfEditing = { id: 0, steps: [{ kind: "command", text: "" }], enabled: true };
-  $("#wf-form-title").textContent = "Yangi workflow";
+  $("#wf-form-title").textContent = "Yangi ish jarayoni";
   $("#wf-name").value = ""; $("#wf-trigger").value = "manual"; $("#wf-folder").value = "";
   $("#wf-ext").value = ""; $("#wf-time").value = "08:00"; $("#wf-retries").value = 1; $("#wf-onerror").value = "stop";
   $("#wf-error").hidden = true; $("#wf-saved").textContent = "";
@@ -1054,7 +1194,7 @@ function wfReset() {
 
 function wfLoad(w) {
   wfEditing = JSON.parse(JSON.stringify(w));
-  $("#wf-form-title").textContent = w.id ? `Tahrirlash: ${w.name}` : "Yangi workflow (shablondan)";
+  $("#wf-form-title").textContent = w.id ? `Tahrirlash: ${w.name}` : "Yangi ish jarayoni (shablondan)";
   $("#wf-name").value = w.name;
   $("#wf-trigger").value = w.trigger.type || "manual";
   $("#wf-folder").value = w.trigger.folder || "";
@@ -1185,8 +1325,12 @@ $("#dev-newcode").addEventListener("click", async () => drawDevices(await api().
 window.addEventListener("pywebviewready", async () => {
   const info = await api().get_info();
   $("#version").textContent = `NEXVARA v${info.version}`;
-  $("#sys-info").textContent = JSON.stringify(info, null, 2);
+  $("#sys-info").textContent = [
+    `Versiya: ${info.version}`, `Operatsion tizim: ${info.os}`, `Python: ${info.python}`,
+    `AI ulangan: ${info.ai_connected ? "ha" : "yo‘q"}`, `Ma’lumotlar papkasi: ${info.data_dir}`,
+  ].join("\n");
   refreshAiStatus();
+  renderAiMoney();
   // The conversation continues where it stopped last time.
   (await api().memory_chat(30)).forEach((c) => addMsg(c.text, c.role === "user"));
   settings = await api().get_settings();

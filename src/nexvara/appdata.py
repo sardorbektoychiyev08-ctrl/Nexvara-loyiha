@@ -33,8 +33,12 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "daily_budget_usd": 1.0,
         "monthly_budget_usd": 10.0,
         "confirm_over_usd": 0.05,  # ask before a single request that may cost more
+        "task_limit_usd": 0.50,  # a single request estimated above this is refused
+        "limits": {},  # provider -> {"daily_usd": x, "monthly_usd": y} (optional, own caps)
+        "fallback": True,  # busy/down provider -> another connected one (same budget rules)
         "send_textbook_text": True,
         "models": {},  # provider -> tier -> model id (filled when a key is checked)
+        "checked": {},  # provider -> {"at": time, "models": n} of the last key check
         "prices": {},  # model id -> [input, output] USD per 1M tokens, overrides the table
     },
 }
@@ -108,6 +112,14 @@ def _validate(s: dict[str, Any]) -> None:
     for k in ("daily_budget_usd", "monthly_budget_usd", "confirm_over_usd"):
         if float(ai[k]) < 0:
             raise ValueError(f"{k} manfiy bo‘lmasin")
+    if ai.get("task_limit_usd") not in (None, "") and float(ai["task_limit_usd"]) < 0:
+        raise ValueError("task_limit_usd manfiy bo‘lmasin")
+    for prov, lim in (ai.get("limits") or {}).items():
+        if prov not in ("openai", "anthropic", "gemini", "deepseek") or not isinstance(lim, dict):
+            raise ValueError("noma’lum provayder limiti")
+        for v in lim.values():
+            if v not in (None, "") and float(v) < 0:
+                raise ValueError("limit manfiy bo‘lmasin")
 
 
 class History:

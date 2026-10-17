@@ -10,18 +10,18 @@
   <aside class="sidebar">
     <div class="brand"><span class="logo">N</span><span>NEXVARA</span></div>
     <nav id="nav">
-      <button class="nav-item active" data-page="home">Home</button>
-      <button class="nav-item" data-page="chat">AI Chat</button>
-      <button class="nav-item" data-page="office">Office Agent</button>
-      <button class="nav-item" data-page="library">Darsliklar va testlar</button>
-      <button class="nav-item" data-page="files" data-milestone="M5">Files</button>
-      <button class="nav-item" data-page="bi" data-milestone="M8">NEXVARA BI</button>
-      <button class="nav-item" data-page="workflows" data-milestone="M6">Workflows</button>
-      <button class="nav-item" data-page="teach" data-milestone="M6">Teach NEXVARA</button>
-      <button class="nav-item" data-page="memory" data-milestone="M6">Memory</button>
-      <button class="nav-item" data-page="history">Tasks / History</button>
-      <button class="nav-item" data-page="devices" data-milestone="M12">Devices</button>
-      <button class="nav-item" data-page="settings">Settings</button>
+      <button class="nav-item active" data-page="home" data-i18n="nav.home">Bosh sahifa</button>
+      <button class="nav-item" data-page="chat" data-i18n="nav.chat">AI suhbat</button>
+      <button class="nav-item" data-page="office" data-i18n="nav.office">Office yordamchisi</button>
+      <button class="nav-item" data-page="library" data-i18n="nav.library">Darsliklar va testlar</button>
+      <button class="nav-item" data-page="files" data-milestone="M5" data-i18n="nav.files">Fayllar</button>
+      <button class="nav-item" data-page="bi" data-milestone="M8" data-i18n="nav.bi">NEXVARA BI</button>
+      <button class="nav-item" data-page="workflows" data-milestone="M6" data-i18n="nav.workflows">Ish jarayonlari</button>
+      <button class="nav-item" data-page="teach" data-milestone="M6" data-i18n="nav.teach">NEXVARA’ga o‘rgatish</button>
+      <button class="nav-item" data-page="memory" data-milestone="M6" data-i18n="nav.memory">Xotira</button>
+      <button class="nav-item" data-page="history" data-i18n="nav.history">Vazifalar va tarix</button>
+      <button class="nav-item" data-page="devices" data-milestone="M12" data-i18n="nav.devices">Qurilmalar</button>
+      <button class="nav-item" data-page="settings" data-i18n="nav.settings">Sozlamalar</button>
     </nav>
     <div class="sidebar-foot" id="version">v—</div>
   </aside>
@@ -36,10 +36,38 @@
         <div class="card"><div class="card-label">Vazifalar</div><div class="card-value" id="task-count">0</div><div class="muted">shu sessiyada</div></div>
       </div>
       <button class="btn primary" data-goto="office">Excel sinovini boshlash →</button>
+
+      <section class="ai-money" id="ai-money" aria-labelledby="ai-money-title">
+        <div class="ai-money-head">
+          <h2 id="ai-money-title">AI balans va xarajatlar</h2>
+          <button class="btn small-btn" id="ai-money-refresh" type="button">Yangilash</button>
+        </div>
+        <p class="muted small">Sarf — NEXVARA hisoblagan <b>taxminiy sarf</b> (provayderning
+          token hisobi × narx). U provayderdagi haqiqiy to‘lovni kafolatlamaydi: aniq summa
+          provayderning to‘lov sahifasida. «Limitdan qolgan» — siz qo‘ygan limitdan qolgan qism;
+          «Provayderdagi haqiqiy balans» — hisobingizdagi pul, bu boshqa narsa.</p>
+        <div class="ai-warn" id="ai-money-warn" hidden></div>
+        <div class="ai-totals" id="ai-money-totals"></div>
+        <div class="ai-cards" id="ai-money-cards"></div>
+        <div class="ai-money-grid">
+          <div class="card">
+            <div class="card-label">Provayderlar bo‘yicha sarf (shu oy)</div>
+            <div id="ai-money-split"></div>
+          </div>
+          <div class="card">
+            <div class="card-label">So‘nggi 30 kun (taxminiy, $)</div>
+            <div id="ai-money-chart" class="ai-chart"></div>
+          </div>
+        </div>
+        <div class="card wide">
+          <div class="card-label">Xarajatlar tarixi</div>
+          <table class="lib-table" id="ai-money-history"></table>
+        </div>
+      </section>
     </section>
 
     <section class="page" id="page-chat">
-      <h1>AI Chat</h1>
+      <h1 data-i18n="nav.chat">AI suhbat</h1>
       <p class="muted small">Masalan: «Hisobot.xlsx ni och, dublikatlarni o‘chir, Summa bo‘yicha
         kamayish tartibida sarala, jami qo‘sh, diagramma qo‘sh va saqla» ·
         «ariza.docx ni rasmiy formatla va PDF ga saqla» ·
@@ -56,19 +84,19 @@
     </section>
 
     <section class="page" id="page-office">
-      <h1>Office Agent</h1>
+      <h1 data-i18n="nav.office">Office yordamchisi</h1>
       <div class="card wide">
         <div class="card-label">Excel — birinchi real sinov</div>
-        <p>Excel ochiladi, yangi workbook yaratiladi, 10 qatorli jadval kiritiladi, hisob-kitob qilinadi,
+        <p>Excel ochiladi, yangi ish kitobi yaratiladi, 10 qatorli jadval kiritiladi, hisob-kitob qilinadi,
           formatlanadi, <b>Documents\NEXVARA</b> papkasiga saqlanadi va qayta ochib tekshiriladi.
           Hammasi sizning ko'z oldingizda bajariladi.</p>
         <button class="btn primary run-task" id="run-excel" data-api="run_excel_demo">Excel'da jadval yaratish</button>
       </div>
       <div class="card wide">
-        <div class="card-label">Excel — savdo dashboardi</div>
+        <div class="card-label">Excel — savdo boshqaruv paneli</div>
         <p>144 qatorli savdo ma'lumoti, SUMIFS/IF/COUNTIF formulalari, KPI ko'rsatkichlari,
-          3 ta grafik, PivotTable va shartli formatlash. Har bir raqam qayta ochib tekshiriladi.</p>
-        <button class="btn primary run-task" id="run-dashboard" data-api="run_excel_dashboard">Excel dashboard yaratish</button>
+          3 ta grafik, yig‘ma jadval (PivotTable) va shartli formatlash. Har bir raqam qayta ochib tekshiriladi.</p>
+        <button class="btn primary run-task" id="run-dashboard" data-api="run_excel_dashboard">Excel’da boshqaruv paneli yaratish</button>
       </div>
       <div class="card wide">
         <div class="card-label">Word — rasmiy hisobot</div>
@@ -183,7 +211,7 @@
     </section>
 
     <section class="page" id="page-history">
-      <h1>Tasks / History</h1>
+      <h1 data-i18n="nav.history">Vazifalar va tarix</h1>
       <div id="history-list" class="history"></div>
     </section>
 
@@ -218,7 +246,7 @@
       </div>
       <div class="card wide" id="sync-card">
         <div class="card-label">Sinxronlash (ixtiyoriy)</div>
-        <p class="muted small">Sozlamalar, eslatmalar va Teach qoidalari boshqa kompyuter va telefon bilan
+        <p class="muted small">Sozlamalar, eslatmalar va o‘rgatilgan qoidalar boshqa kompyuter va telefon bilan
           almashadi. Fayllar parol bilan shifrlanadi; API kalitlar va AI yoqilishi hech qachon uzatilmaydi.</p>
         <form id="sync-form" class="form-grid">
           <label>Umumiy papka (OneDrive, Google Drive papkasi, tarmoq)
@@ -250,6 +278,11 @@
           buyruqlarni tushunadi, darsliklar bo‘yicha savollarga javob beradi, sifatliroq test tuzadi.
           Kalit Windows himoyalangan xotirasida (Credential Manager) saqlanadi va faqat o‘z
           provayderiga yuboriladi. Bitta provayder yetarli.</p>
+        <p class="muted small"><b>Muhim:</b> ChatGPT, Claude yoki Gemini obunasi (Plus, Pro, Max,
+          Advanced) API krediti bilan bir xil emas. NEXVARA API orqali ishlaydi — har bir provayder
+          saytida alohida API kalit va API krediti (balans) kerak. To‘lov NEXVARA ichida
+          qilinmaydi: «To‘lov / Balans» tugmasi provayderning rasmiy sahifasini brauzerda ochadi.
+          Karta raqami, CVV yoki bank parolini NEXVARA’ga hech qachon kiritmang.</p>
         <div id="ai-providers"></div>
         <form id="ai-form">
           <div class="form-grid">
@@ -258,6 +291,9 @@
             <label>Kunlik limit, $ <input id="ai-daily" type="number" min="0" step="0.1"></label>
             <label>Oylik limit, $ <input id="ai-monthly" type="number" min="0" step="0.5"></label>
             <label>Shundan qimmat so‘rovda so‘rasin, $ <input id="ai-confirm" type="number" min="0" step="0.01"></label>
+            <label>Bitta topshiriq limiti, $ <input id="ai-task" type="number" min="0" step="0.05"></label>
+            <label class="check-label"><input id="ai-fallback" type="checkbox">
+              Provayder javob bermasa, boshqa ulangan provayderga o‘tish</label>
             <label class="check-label"><input id="ai-send-text" type="checkbox">
               Savollarga javobda darslik parchalarini AI’ga yuborish</label>
           </div>
@@ -297,7 +333,7 @@
     <section class="page" id="page-memory">
       <h1>Xotira</h1>
       <p class="muted">NEXVARA eslab qolgan narsalar, suhbatlar va fayllar. Hammasi faqat shu
-        kompyuterda (D:\NEXVARA\app.db) saqlanadi. Chatda «Eslab qol: ...» deb yozsangiz ham bo‘ladi.</p>
+        kompyuterda (D:\NEXVARA\app.db) saqlanadi. Suhbatda «Eslab qol: ...» deb yozsangiz ham bo‘ladi.</p>
       <div class="card wide">
         <div class="card-label">Qidiruv</div>
         <form class="row" id="mem-search-form">
@@ -334,10 +370,10 @@
     </section>
 
     <section class="page" id="page-teach">
-      <h1>Teach NEXVARA</h1>
+      <h1 data-i18n="nav.teach">NEXVARA’ga o‘rgatish</h1>
       <p class="muted">Bir marta o‘rgating — NEXVARA keyingi har bir ishda qo‘llaydi. Masalan:
         «Har doim Excel raqamlarini markazga joyla», «Word hujjatlarida doim sahifa raqamini qo‘y»,
-        «testlar doim 2 variant bo‘lsin». Chatda ham shunday yozsangiz bo‘ladi.</p>
+        «testlar doim 2 variant bo‘lsin». Suhbatda ham shunday yozsangiz bo‘ladi.</p>
       <form class="card wide" id="teach-form">
         <div class="card-label">Yangi qoida</div>
         <div class="form-grid">
@@ -426,20 +462,20 @@
     </section>
 
     <section class="page" id="page-workflows">
-      <h1>Workflows</h1>
+      <h1 data-i18n="nav.workflows">Ish jarayonlari</h1>
       <p class="muted">Bir necha buyruqni ketma-ket saqlab qo‘ying: qo‘lda, papkaga yangi fayl
         tushganda yoki har kuni belgilangan vaqtda bajariladi. Buyruqlar chatdagi kabi yoziladi;
-        <b>{fayl}</b> — ishlanayotgan fayl o‘rni. Pullik AI so‘rovlari workflow ichida bajarilmaydi.</p>
+        <b>{fayl}</b> — ishlanayotgan fayl o‘rni. Pullik AI so‘rovlari ish jarayoni ichida bajarilmaydi.</p>
       <div class="card wide" id="wf-active-card" hidden>
         <div class="card-label">Hozir bajarilmoqda</div>
         <div id="wf-active"></div>
       </div>
       <div class="card wide">
-        <div class="card-label">Saqlangan workflowlar</div>
+        <div class="card-label">Saqlangan ish jarayonlari</div>
         <div id="wf-list"></div>
       </div>
       <form class="card wide" id="wf-form">
-        <div class="card-label" id="wf-form-title">Yangi workflow</div>
+        <div class="card-label" id="wf-form-title">Yangi ish jarayoni</div>
         <div class="form-grid">
           <label class="wide-field">Shablondan boshlash <select id="wf-template"><option value="">—</option></select></label>
           <label class="wide-field">Nomi <input id="wf-name" type="text" placeholder="masalan: Kelgan hisobotlarni tayyorlash"></label>
@@ -482,7 +518,7 @@
     <section class="page" id="page-bi">
       <h1>NEXVARA BI</h1>
       <p class="muted">Excel, CSV, JSON, XML yoki TXT fayldan (yoki papkadagi bir nechta fayldan)
-        interaktiv dashboard. Power BI kerak emas. Chatda «Savdo.xlsx dan dashboard yarat» deb
+        interaktiv boshqaruv paneli. Power BI kerak emas. Suhbatda «Savdo.xlsx dan panel yarat» deb
         yozsangiz ham bo‘ladi.</p>
       <div class="card wide">
         <div class="row wrap">
@@ -499,7 +535,7 @@
       <div id="bi-board" hidden>
         <div class="card wide">
           <div class="row wrap">
-            <input class="grow-input" id="bi-name" type="text" placeholder="Dashboard nomi">
+            <input class="grow-input" id="bi-name" type="text" placeholder="Panel nomi">
             <button class="btn primary" id="bi-save" type="button">Saqlash</button>
             <button class="btn" id="bi-add-widget" type="button">+ Vidjet</button>
             <button class="btn" data-bi-export="png" type="button">PNG</button>
@@ -563,8 +599,8 @@
         <div class="card-label">Bog‘langan qurilmalar</div>
         <div id="dev-list"></div>
       </div>
-      <p class="muted small">Alohida Android ilova va Google orqali kirish keyingi bosqichda (ular uchun
-        Android SDK va Google Cloud loyihasi kerak). Hozirgi telefon paneli istalgan telefon brauzerida ishlaydi.</p>
+      <p class="muted small">Alohida Android ilova keyingi bosqichda. Hozirgi telefon paneli istalgan
+        telefon brauzerida ishlaydi.</p>
     </section>
 
     <section class="page" id="page-placeholder">
@@ -590,6 +626,7 @@
     </div>
   </aside>
 
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
   <script src="bi.js"></script>
 </body>

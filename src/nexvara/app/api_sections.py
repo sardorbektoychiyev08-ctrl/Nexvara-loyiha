@@ -61,7 +61,7 @@ class SectionsChatApi:
 
     # ----- Tasks / History -----
     def _chat_history(self, f: str, text: str) -> dict[str, Any] | None:
-        if re.search(r"\b(workflow|ish jarayon|dashboard)\w*", f):
+        if re.search(r"\b(workflow|ish jarayon|dashboard|panel)\w*", f):
             return None  # "workflow tarixini ko‘rsat" is the workflow's own history
         if not re.search(r"\b(oxirgi|songgi|bugungi)\s+(vazifa\w*|natija\w*|ishlar\w*)|"
                          r"\b(vazifalar|tarix)\w*\s+(ni\s+)?korsat", f):  # fmt: skip
