@@ -124,7 +124,8 @@ def test_ai_planner_runs_tool_calls_in_order(env):
     api.fake.replies = [json.dumps(plan)]
     r = api.chat("ish papkamdagi hamma excellarni arxivga olib qo‘y")
     assert r["reply"].startswith("Tushundim: Excel fayllarni arxivlayman"), r
-    snap = done(api, r)
+    assert r["confirm"] and "to‘g‘rimi" in r["reply"] and not arxiv.exists()  # asks first
+    snap = done(api, api.confirm_ai(r["confirm"]))
     assert snap["status"] == "succeeded" and len(list(arxiv.glob("*.xlsx"))) == 3
     assert list(work.glob("Arxiv*.zip"))
     sent = api.fake.calls[-1]
@@ -141,6 +142,10 @@ def test_ai_planner_risky_and_unknown_tools(env):
         {"tool": "files.recycle", "args": {"paths": [str(work / "Oylik.xlsx")]}}]})]  # fmt: skip
     r = api.chat("eski oylik faylidan qutulaylik")
     assert r["confirm"] and (work / "Oylik.xlsx").is_file()
+    api.fake.replies = [json.dumps({"kind": "tools", "calls": [
+        {"tool": "files.search", "args": {"folder": str(work), "ext": "xlsx"}}]})]  # fmt: skip
+    r = api.chat("qanaqa excel fayllarim bor")
+    assert "confirm" not in r and len(r["files"]) == 3  # a pure lookup runs at once
     api.fake.replies = [json.dumps({"kind": "tools", "calls": [{"tool": "os.format_disk"}]})]
     assert "Noma’lum amal" in api.chat("kompyuterimni tezlashtir")["reply"]
     api.fake.replies = ['{"kind": "command", "command": "Savdo.xlsx ni och va saqla"}']

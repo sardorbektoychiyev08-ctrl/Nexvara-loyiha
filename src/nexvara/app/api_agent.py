@@ -119,7 +119,11 @@ class AgentApi:
     def _approved_now(self) -> bool:
         return bool(getattr(self._local, "approved", False))
 
-    def _run_calls(self, calls: list, approved: bool = False, intro: str = "") -> dict[str, Any]:
+    def _run_calls(
+        self, calls: list, approved: bool = False, intro: str = "", from_ai: bool = False
+    ) -> dict[str, Any]:
+        """`from_ai`: the plan came from the AI planner. Then anything that changes data or
+        settings is shown first and runs only after "Ha" (read-only lookups run at once)."""
         from nexvara.agent import tools
 
         try:
@@ -127,12 +131,16 @@ class AgentApi:
         except tools.ToolError as e:
             return {"reply": str(e), "error": True}
         risky = [c for c in calls if tools.TOOLS[c.tool].risky]
-        if risky and not (approved or self._approved_now()):
+        changes = [c for c in calls if c.tool not in tools.READ_ONLY]
+        if (risky or (from_ai and changes)) and not (approved or self._approved_now()):
             token = uuid.uuid4().hex[:12]
             self._pending[token] = ("tools", calls)
             lines = "\n".join(f"{i}. {c.describe()}" for i, c in enumerate(calls, 1))
-            warn = "; ".join(tools.TOOLS[c.tool].title for c in risky)
-            return {"reply": f"{intro}Bajaraman:\n{lines}\n\nDiqqat: {warn}. Davom etaymi?",
+            if risky:
+                warn = "Diqqat: " + "; ".join(tools.TOOLS[c.tool].title for c in risky) + ". "
+            else:
+                warn = "AI shunday tushundi — to‘g‘rimi? "
+            return {"reply": f"{intro}Bajaraman:\n{lines}\n\n{warn}Davom etaymi?",
                     "confirm": token}  # fmt: skip
         if len(calls) == 1:
             one = calls[0]
@@ -190,6 +198,7 @@ class AgentApi:
 
         outputs: list[str] = []
         report: list[str] = []
+        replies: list[str] = []  # what each step said (taught rules applied, plan ...)
         for i, (step, label) in enumerate(zip(steps, labels, strict=True), 1):
             with task.step(f"{i}. {label[:90]}") as st:
                 if isinstance(step, ToolCall):
@@ -204,6 +213,7 @@ class AgentApi:
                 else:
                     out = self._chat_inner(step, _use_ai=False)
                 reply = out.get("reply", "")
+                replies.append(reply)
                 st.detail = reply[:200]
                 if out.get("confirm"):
                     raise UserError(f"{i}-qadam tasdiq so‘radi: {reply[:200]}")
@@ -230,7 +240,7 @@ class AgentApi:
                     outputs.append(p)
                 report.append(f"{i}. {label}: {st.detail}")
         last = next((o for o in reversed(outputs) if Path(o).exists()), "")
-        return {"report": report, "path": last}
+        return {"report": report, "path": last, "replies": replies}
 
     # ----- the agent's entry -----
     def _chat_agent(self, text: str, use_ai: bool) -> dict[str, Any] | None:

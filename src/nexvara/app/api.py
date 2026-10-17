@@ -363,7 +363,7 @@ class Api(
                 if not calls:
                     return {"reply": p.say or "Nima qilishni tushunmadim, aniqroq yozing."}
                 intro = f"Tushundim: {p.say}\n\n" if p.say else ""
-                return self._run_calls(calls, intro=intro)
+                return self._run_calls(calls, intro=intro, from_ai=True)
             intent = p.intent
             if intent.kind in ("test", "topic", "presentation", "command") and intent.command:
                 out = self._chat_inner(intent.command, _use_ai=False)
