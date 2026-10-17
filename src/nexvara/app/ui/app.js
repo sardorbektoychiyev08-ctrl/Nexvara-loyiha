@@ -8,7 +8,7 @@ window.addEventListener("unhandledrejection", (e) => window.__errors.push(String
 const $ = (sel) => document.querySelector(sel);
 const STATUS_LABEL = {
   pending: i18n("status.pending"), running: i18n("status.running"), succeeded: i18n("status.succeeded"),
-  failed: i18n("status.failed"), cancelled: i18n("status.cancelled"),
+  failed: i18n("status.failed"), cancelled: i18n("status.cancelled"), paused: i18n("status.paused"),
 };
 const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows", "bi", "devices"]);
 
@@ -185,8 +185,13 @@ function renderTask(t) {
   }
   res.hidden = !res.childElementCount;
 
-  const running = t.status === "running" || t.status === "pending";
+  const running = t.status === "running" || t.status === "pending" || t.status === "paused";
   $("#task-cancel").disabled = !running || t.cancel_requested;
+  // Pause stops at the next step (never inside an Office call); paused time is not a timeout.
+  const pause = $("#task-pause");
+  pause.disabled = !running || t.cancel_requested;
+  pause.textContent = t.pause_requested ? i18n("task.resume") : i18n("task.pause");
+  pause.dataset.paused = t.pause_requested ? "1" : "";
   document.querySelectorAll(".run-task").forEach((b) => { b.disabled = running; });
 }
 
@@ -221,6 +226,33 @@ document.querySelectorAll(".run-task").forEach((btn) => btn.addEventListener("cl
   if (!btn.dataset.api) return;
   track(await api()[btn.dataset.api]());
 }));
+
+$("#task-pause").addEventListener("click", async () => {
+  if (!currentTaskId) return;
+  if ($("#task-pause").dataset.paused) await api().resume_task(currentTaskId);
+  else await api().pause_task(currentTaskId);
+  poll();
+});
+
+// Commands sent from the phone show up here too: the message, its task, the dashboard.
+async function phoneEvents() {
+  if (!api() || !api().ui_events) return;
+  let events = [];
+  try { events = await api().ui_events(); } catch (_) { return; }
+  for (const ev of events) {
+    if (ev.kind === "phone_chat") {
+      addMsg(i18n("phone.prefix") + ev.text, true);
+      handleReply(ev.reply || {});
+    } else if (ev.kind === "phone_file") {
+      addMsg(i18n("phone.file") + ev.name, false);
+      showContext(ev.path);
+    } else if (ev.kind === "task" && ev.task) {
+      track(ev.task, false);
+    } else if (ev.kind === "bi_open" && ev.file) {
+      biFromChat({ open: ev.file, state: ev.state && Object.keys(ev.state).length ? ev.state : null });
+    }
+  }
+}
 
 $("#task-cancel").addEventListener("click", async () => {
   if (currentTaskId) await api().cancel_task(currentTaskId);
@@ -1385,4 +1417,5 @@ window.addEventListener("pywebviewready", async () => {
   setTheme(settings.theme, false);
   applySettings();
   refreshCount();
+  setInterval(phoneEvents, 1500);
 });

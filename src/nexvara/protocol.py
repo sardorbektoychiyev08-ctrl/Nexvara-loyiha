@@ -28,7 +28,7 @@ ERRORS: dict[str, tuple[int, bool, str]] = {
     "INTERNAL": (500, True, "Kompyuterda xato yuz berdi"),
 }
 
-TASK_STATES = ("pending", "running", "succeeded", "failed", "cancelled")
+TASK_STATES = ("pending", "running", "paused", "succeeded", "failed", "cancelled")
 FINAL_STATES = ("succeeded", "failed", "cancelled")
 
 
@@ -59,6 +59,8 @@ def task_dto(t: dict[str, Any]) -> dict[str, Any]:
         "id": t.get("id"),
         "title": t.get("title", ""),
         "status": t.get("status", "pending"),
+        "pause_requested": bool(t.get("pause_requested")),
+        "cancel_requested": bool(t.get("cancel_requested")),
         "error": t.get("error", ""),
         "created_at": t.get("created_at"),
         "finished_at": t.get("finished_at"),

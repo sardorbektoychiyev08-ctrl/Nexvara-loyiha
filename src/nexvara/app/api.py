@@ -906,6 +906,35 @@ class Api(
         task.cancel()
         return True
 
+    def pause_task(self, task_id: str) -> bool:
+        """Stop at the next step boundary (never inside an Office call)."""
+        task = self._runner.get(task_id)
+        return bool(task and task.pause())
+
+    def resume_task(self, task_id: str) -> bool:
+        task = self._runner.get(task_id)
+        return bool(task and task.resume())
+
+    # ----- events for the PC window (a command from the phone shows up on the PC too) -----
+    def ui_push(self, event: dict[str, Any]) -> None:
+        import collections
+        import threading
+
+        if not hasattr(self, "_ui_queue"):
+            self._ui_queue = collections.deque(maxlen=50)
+            self._ui_lock = threading.Lock()
+        with self._ui_lock:
+            self._ui_queue.append(event)
+
+    def ui_events(self) -> list[dict[str, Any]]:
+        """Polled by the PC window: events since the last call (phone chat, open a dashboard)."""
+        if not hasattr(self, "_ui_queue"):
+            return []
+        with self._ui_lock:
+            out = list(self._ui_queue)
+            self._ui_queue.clear()
+        return out
+
     def list_tasks(self) -> list[dict[str, Any]]:
         live = [t.snapshot() for t in self._runner.list()]
         if self._history is None:

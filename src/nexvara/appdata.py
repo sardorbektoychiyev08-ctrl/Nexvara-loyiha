@@ -27,6 +27,9 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # Settings, memory and Teach rules between devices (sync.py). The passphrase is in
     # Credential Manager (NEXVARA/sync/passphrase), never here.
     "sync": {"enabled": False, "folder": "", "google_drive": False, "last": 0.0},
+    # Google on the phone: the "Web application" OAuth client ID (public, not a secret) that
+    # Android puts into the ID token's audience; the PC checks the phone's token against it.
+    "google": {"android_web_client_id": ""},
     "ai": {
         "enabled": False,
         "provider": "",  # openai | anthropic | gemini | deepseek

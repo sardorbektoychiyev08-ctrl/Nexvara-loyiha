@@ -3,6 +3,10 @@
 A task runs in a background thread and records its steps as it goes, so the UI
 can poll a snapshot and show live progress. Cancellation is cooperative: the
 running code calls ``check_cancelled()`` (``step()`` does it automatically).
+Pause is cooperative too: ``pause()`` only asks; the task stops at the next
+``check_cancelled()`` (a step boundary, never in the middle of an Office call) and
+waits there until ``resume()`` or ``cancel()``. Paused time does not count towards
+the watchdog timeout.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ class Status(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    PAUSED = "paused"
 
 
 class TaskCancelled(Exception):
@@ -66,17 +71,64 @@ class Task:
     created_at: float = field(default_factory=time.time)
     finished_at: float | None = None
     _cancel: threading.Event = field(default_factory=threading.Event, repr=False)
+    _pause: threading.Event = field(default_factory=threading.Event, repr=False)
+    _wake: threading.Event = field(default_factory=threading.Event, repr=False)
+    paused_seconds: float = 0.0
+    _paused_since: float | None = field(default=None, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _thread: threading.Thread | None = field(default=None, repr=False)
 
     def cancel(self) -> None:
         self._cancel.set()
+        self._wake.set()
 
     @property
     def cancel_requested(self) -> bool:
         return self._cancel.is_set()
 
+    def pause(self) -> bool:
+        """Ask the task to stop at its next step boundary. False if already finished."""
+        if self.done or self._cancel.is_set():
+            return False
+        self._pause.set()
+        return True
+
+    def resume(self) -> bool:
+        if self.done or not self._pause.is_set():
+            return False
+        self._pause.clear()
+        self._wake.set()
+        return True
+
+    @property
+    def pause_requested(self) -> bool:
+        return self._pause.is_set()
+
+    @property
+    def paused_total(self) -> float:
+        """Seconds spent paused so far (including a pause in progress)."""
+        since = self._paused_since
+        return self.paused_seconds + (time.time() - since if since is not None else 0.0)
+
     def check_cancelled(self) -> None:
+        if self._cancel.is_set():
+            raise TaskCancelled()
+        if self._pause.is_set():
+            self._wait_paused()
+
+    def _wait_paused(self) -> None:
+        before = self.status
+        self._paused_since = time.time()
+        self.status = Status.PAUSED
+        try:
+            while self._pause.is_set() and not self._cancel.is_set():
+                self._wake.wait(0.5)
+                self._wake.clear()
+        finally:
+            self.paused_seconds += time.time() - self._paused_since
+            self._paused_since = None
+            if self.status == Status.PAUSED:
+                self.status = before
         if self._cancel.is_set():
             raise TaskCancelled()
 
@@ -139,6 +191,7 @@ class Task:
             "created_at": self.created_at,
             "finished_at": self.finished_at,
             "cancel_requested": self.cancel_requested,
+            "pause_requested": self.pause_requested,
         }
 
 
@@ -196,7 +249,15 @@ class TaskRunner:
 
         def watchdog() -> None:
             if task._thread is not None:
-                task._thread.join(limit)
+                started = time.monotonic()
+                while task._thread.is_alive():  # paused time extends the deadline
+                    if task._paused_since is not None:
+                        task._thread.join(1.0)
+                        continue
+                    left = started + limit + task.paused_total - time.monotonic()
+                    if left <= 0:
+                        break
+                    task._thread.join(min(left, 1.0))
                 if task._thread.is_alive():
                     log.error("Task %s (%s) timed out after %ss", task.id, title, limit)
                     task.cancel()

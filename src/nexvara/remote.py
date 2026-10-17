@@ -58,6 +58,7 @@ _MIGRATIONS = {
     "platform": "TEXT NOT NULL DEFAULT 'browser'",
     "app_version": "TEXT NOT NULL DEFAULT ''",
     "install_id": "TEXT NOT NULL DEFAULT ''",
+    "google_email": "TEXT NOT NULL DEFAULT ''",  # set when the phone proved it is the owner
 }
 
 
@@ -141,6 +142,15 @@ class DeviceStore:
                 (_hash(token), time.time(), device_id),
             )
         return token
+
+    def set_google(self, device_id: int, email: str) -> None:
+        with self._lock, self._db() as db:
+            db.execute("UPDATE devices SET google_email = ? WHERE id = ?", (email[:120], device_id))
+
+    def google_email(self, device_id: int) -> str:
+        with self._db() as db:
+            r = db.execute("SELECT google_email FROM devices WHERE id = ?", (device_id,)).fetchone()
+        return r[0] if r else ""
 
     def revoke(self, device_id: int) -> None:
         with self._lock, self._db() as db:

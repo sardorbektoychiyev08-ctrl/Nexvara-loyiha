@@ -26,6 +26,11 @@ const I18N = {
     "status.succeeded": "Bajarildi",
     "status.failed": "Xatolik yuz berdi",
     "status.cancelled": "Bekor qilindi",
+    "status.paused": "Pauzada",
+    "task.pause": "Pauza",
+    "task.resume": "Davom ettirish",
+    "phone.prefix": "📱 Telefondan: ",
+    "phone.file": "📱 Telefondan fayl keldi: ",
     // umumiy tugmalar va so‘zlar
     "btn.save": "Saqlash",
     "btn.cancel": "Bekor qilish",

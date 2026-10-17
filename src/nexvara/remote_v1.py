@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import socket
 import time
@@ -15,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from nexvara import __version__, config
+from nexvara import __version__, config, remote_v1_sections
 from nexvara.protocol import MIN_CLIENT_PROTOCOL, PROTOCOL, ApiError, ok, task_dto
 
 # (method, path pattern, needs a device token)
@@ -35,7 +36,9 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("GET", "/api/v1/files", True),
     ("GET", "/api/v1/sync", True),
     ("POST", "/api/v1/sync", True),
+    *remote_v1_sections.ROUTES,  # Home, AI spend, Memory, Teach, Workflows, BI, textbooks...
 ]
+log = logging.getLogger(__name__)
 WATCH_MAX = 25.0  # seconds a long-poll may hang
 _ID = re.compile(r"^[0-9a-f]{6,32}$")
 
@@ -105,6 +108,11 @@ def handle(h: Any, method: str) -> None:
         err = ApiError("BAD_REQUEST", f"So‘rov noto‘g‘ri: {e}")
         h._send(err.status, json.dumps(err.body(), ensure_ascii=False).encode("utf-8"),
                 "application/json; charset=utf-8")  # fmt: skip
+    except Exception:  # never drop the connection: the phone gets a retryable INTERNAL
+        log.exception("phone API %s %s failed", method, h.path.split("?")[0])
+        err = ApiError("INTERNAL")
+        h._send(err.status, json.dumps(err.body(), ensure_ascii=False).encode("utf-8"),
+                "application/json; charset=utf-8")  # fmt: skip
 
 
 def _json_body(h: Any) -> dict[str, Any]:
@@ -134,6 +142,9 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
     from nexvara.remote import MAX_UPLOAD, TOKEN_MAX_DAYS, server_id
 
     api = srv.api
+    if route in remote_v1_sections.HANDLED:
+        assert dev is not None
+        return remote_v1_sections.route(h, srv, route, args, q, dev, lambda: _json_body(h))
     if route == "/api/v1/info":
         return {
             "protocol": PROTOCOL,
@@ -178,10 +189,16 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
         text = str(_json_body(h).get("text", "")).strip()[:4000]
         if not text:
             raise ApiError("BAD_REQUEST", "Matn bo‘sh")
-        return _chat_reply(api.chat(text))
+        out = api.chat(text)
+        # The PC window shows the phone's message and follows its task / opens the dashboard.
+        api.ui_push({"kind": "phone_chat", "text": text, "reply": out})
+        return _chat_reply(out)
     if route == "/api/v1/confirm":
         body = _json_body(h)
-        return _chat_reply(api.confirm_ai(str(body.get("token", "")), bool(body.get("yes"))))
+        out = api.confirm_ai(str(body.get("token", "")), bool(body.get("yes")))
+        api.ui_push({"kind": "phone_chat", "text": "Ha" if body.get("yes") else "Yo‘q",
+                     "reply": out})  # fmt: skip
+        return _chat_reply(out)
     if route == "/api/v1/tasks":
         limit = max(1, min(int((q.get("limit") or ["20"])[0]), 100))
         tasks = api.list_tasks()[:limit]
@@ -265,4 +282,5 @@ def _upload(h: Any, api: Any, limit: int) -> dict[str, Any]:
     target = free_name(folder / name)
     target.write_bytes(body)
     api.set_context_file(str(target))
+    api.ui_push({"kind": "phone_file", "name": target.name, "path": str(target)})
     return {"path": str(target), "name": target.name, "size": len(body), "sha256": digest}
