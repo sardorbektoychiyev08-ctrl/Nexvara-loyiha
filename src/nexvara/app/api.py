@@ -351,6 +351,18 @@ class Api(
         return {"token": token, "text": text}
 
     def _chat_ai(self, text: str, approved: bool = False) -> dict[str, Any]:
+        """The AI path, plus a note when personal data was kept on this PC."""
+        router = self._router()
+        before = getattr(router, "masked_total", 0)
+        out = self._chat_ai_inner(text, approved)
+        hidden = getattr(router, "masked_total", 0) - before
+        if hidden and out.get("reply"):
+            out["reply"] += (f"\n\n🔒 {hidden} ta shaxsiy ma’lumot AI’ga yuborilmadi: "
+                             "kompyuterda yashirildi va javobda qayta tiklandi.")  # fmt: skip
+            out["privacy_masked"] = hidden
+        return out
+
+    def _chat_ai_inner(self, text: str, approved: bool = False) -> dict[str, Any]:
         from nexvara.agent import tools as agent_tools
         from nexvara.ai import features
         from nexvara.ai.router import NeedsConfirmation
@@ -456,8 +468,10 @@ class Api(
             return {"supported": False, "error": "noma’lum provayder"}
         return self._router().balance(provider)
 
-    def ai_save_limits(self, provider: str, daily_usd: Any = None, monthly_usd: Any = None):
-        """Own daily/monthly caps for one provider ("" or None = use the overall limit)."""
+    def ai_save_limits(self, provider: str, daily_usd: Any = None, monthly_usd: Any = None,
+                       task_usd: Any = None):  # fmt: skip
+        """Own daily/monthly/one-task caps for one provider ("" or None = the overall limit).
+        These are NEXVARA's own limits, not the provider's real spending cap."""
         from nexvara.ai import models
 
         if provider not in models.PROVIDERS:
@@ -469,7 +483,8 @@ class Api(
         router = self._router()
         try:  # the router's own settings (the same file in the app)
             router.settings.update({"ai": {"limits": {provider: {
-                "daily_usd": num(daily_usd), "monthly_usd": num(monthly_usd)}}}})  # fmt: skip
+                "daily_usd": num(daily_usd), "monthly_usd": num(monthly_usd),
+                "task_usd": num(task_usd)}}}})  # fmt: skip
         except (TypeError, ValueError) as e:
             return {"ok": False, "error": f"Limit noto‘g‘ri: {e}"}
         return {"ok": True, "status": router.status()}

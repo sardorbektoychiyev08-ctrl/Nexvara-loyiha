@@ -85,6 +85,7 @@ def test_missing_models_are_not_shown_as_working(make):
     r = make()
     r.fakes["gemini"].models_list = ["gemini-3.6-flash"]  # an account without most models
     info = r.save_key("gemini", "AIza-test-key-123456")
+    r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     assert info["models"]["balanced"] == "gemini-3.6-flash"  # alternative from the account
     assert info["models"]["cheap"] == "gemini-3.6-flash"
     assert "Kuchli" in info["missing"] and "Maxsus" in info["missing"]
@@ -97,6 +98,7 @@ def test_missing_models_are_not_shown_as_working(make):
 def test_tier_routing_and_special_needs_confirmation(make):
     r = make()
     r.save_key("anthropic", "sk-ant-test-1234567890")
+    r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     msg = [{"role": "user", "content": "salom"}]
     r.complete("classify", "s", msg, max_tokens=200)
     r.complete("plan", "s", msg, max_tokens=200)
@@ -115,9 +117,15 @@ def test_tier_routing_and_special_needs_confirmation(make):
 def test_fallback_to_another_provider(make):
     r = make()
     r.save_key("openai", "sk-test-openai-123456")
+    r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     r.save_key("deepseek", "sk-test-deepseek-123456")
+    r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     r.settings.update({"ai": {"provider": "openai"}})
     r.fakes["openai"].fail = AiError("OpenAI serverida xato (503)", retryable=True)
+    with pytest.raises(AiError, match="503"):  # fallback is off by default: no paid retry
+        r.complete("plan", "s", [{"role": "user", "content": "x"}], max_tokens=200)
+    assert r.fakes["deepseek"].calls == []
+    r.settings.update({"ai": {"fallback": True}})  # the user turned it on
     reply = r.complete("plan", "s", [{"role": "user", "content": "x"}], max_tokens=200)
     assert reply.provider == "deepseek" and reply.fallback_from == "openai"
     assert r.ledger.recent(1)[0]["provider"] == "deepseek"  # cost recorded on who answered
@@ -133,6 +141,7 @@ def test_fallback_to_another_provider(make):
 def test_limits_block_and_warn(make):
     r = make()
     r.save_key("anthropic", "sk-ant-test-1234567890")
+    r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     msg = [{"role": "user", "content": "x"}]
     r.settings.update({"ai": {"task_limit_usd": 0.0001}})
     with pytest.raises(BudgetExceeded, match="Bitta topshiriq"):
@@ -156,6 +165,7 @@ def test_limits_block_and_warn(make):
 def test_dashboard_separates_limit_left_from_real_balance(make):
     r = make()
     r.save_key("deepseek", "sk-test-deepseek-123456")
+    r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     r.complete("plan", "s", [{"role": "user", "content": "x"}], max_tokens=200)
     d = r.dashboard()
     ds = d["providers"]["deepseek"]
@@ -247,7 +257,11 @@ def test_api_limits_balance_and_background_office(tmp_path, monkeypatch, make):
         TaskRunner(), overrides={"ai_router": r, "command": lambda t: titles.append(t.title) or {}}
     )
     assert api.ai_save_limits("openai", "1.5", "")["ok"]
-    assert r.config()["limits"]["openai"] == {"daily_usd": 1.5, "monthly_usd": None}
+    assert r.config()["limits"]["openai"] == {
+        "daily_usd": 1.5,
+        "monthly_usd": None,
+        "task_usd": None,
+    }
     assert api.ai_save_limits("openai", "-1", "")["ok"] is False
     assert api.ai_save_limits("yo‘q", 1, 1)["ok"] is False
     assert api.ai_balance("gemini") == {"supported": False}
@@ -264,3 +278,27 @@ def test_keys_never_synced():
     assert not any(k.startswith(("ai.models", "ai.limits", "ai.enabled", "ai.provider"))
                    for k in SYNC_SETTINGS)  # fmt: skip
     assert all("key" not in k for k in SYNC_SETTINGS)
+
+
+def test_openai_own_daily_and_task_limits(make):
+    """The limits set for the first real OpenAI test: $0.25 a day, $0.05 per task."""
+    r = make()
+    r.save_key("openai", "sk-test-openai-123456")
+    r.settings.update(
+        {
+            "ai": {
+                "enabled": True,
+                "provider": "openai",
+                "limits": {"openai": {"daily_usd": 0.25, "task_usd": 0.05}},
+            }
+        }
+    )
+    msg = [{"role": "user", "content": "Salom, bir jumlada o‘zingni tanishtir."}]
+    r.complete("plan", "s", msg, max_tokens=400)  # ~$0.004: allowed
+    with pytest.raises(BudgetExceeded, match="OpenAI uchun bitta topshiriq limiti"):
+        r.complete("plan", "s", msg, max_tokens=40000)  # ~$0.2: above $0.05
+    r.ledger.record("openai", "gpt-6-sol", "plan", 0, 0, 0.249)
+    with pytest.raises(BudgetExceeded, match="OpenAI uchun kunlik limit"):
+        r.complete("plan", "s", msg, max_tokens=400)
+    own = r.status()["providers"]["openai"]["own_limits"]
+    assert own == {"daily_usd": 0.25, "monthly_usd": None, "task_usd": 0.05}

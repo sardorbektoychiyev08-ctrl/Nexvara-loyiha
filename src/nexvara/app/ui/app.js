@@ -676,14 +676,20 @@ async function renderAi(status) {
     ld.placeholder = `umumiy (${st.daily_budget_usd})`; lm.placeholder = `umumiy (${st.monthly_budget_usd})`;
     ld.value = p.own_limits.daily_usd ?? ""; lm.value = p.own_limits.monthly_usd ?? "";
     ld.title = `${p.label}: ${i18n("ai.daily_limit")}, $`; lm.title = `${p.label}: ${i18n("ai.monthly_limit")}, $`;
+    const lt = el("input"); lt.type = "number"; lt.min = "0"; lt.step = "0.01";
+    lt.placeholder = `umumiy (${st.task_limit_usd ?? "—"})`; lt.value = p.own_limits.task_usd ?? "";
+    lt.title = `${p.label}: ${i18n("ai.task_limit")}, $`;
     const lsave = el("button", "btn small-btn", `${i18n("btn.save")} (limitlar)`); lsave.type = "button";
     lsave.addEventListener("click", async () => {
-      const r = await api().ai_save_limits(name, ld.value, lm.value);
+      const r = await api().ai_save_limits(name, ld.value, lm.value, lt.value);
       msg.textContent = r.ok ? i18n("msg.saved") : `Xatolik yuz berdi: ${r.error}`;
       if (r.ok) renderAi(r.status);
     });
-    lim.append(el("span", "muted small", `${i18n("ai.daily_limit")}, $`), ld, el("span", "muted small", `${i18n("ai.monthly_limit")}, $`), lm, lsave);
-    row.append(head, models, notes, form, lim, msg);
+    lim.append(el("span", "muted small", `${i18n("ai.daily_limit")}, $`), ld, el("span", "muted small", `${i18n("ai.monthly_limit")}, $`), lm,
+      el("span", "muted small", `${i18n("ai.task_limit")}, $`), lt, lsave);
+    const limNote = el("div", "muted small", "Bu NEXVARA’ning ichki limitlari — provayderdagi haqiqiy xarajat chegarasi emas. " +
+      "Haqiqiy chegarani provayder saytida («To‘lov / Balans») ham qo‘ying.");
+    row.append(head, models, notes, form, lim, limNote, msg);
     box.appendChild(row);
   });
   const sel = $("#ai-provider");
