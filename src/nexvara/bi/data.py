@@ -328,6 +328,7 @@ STEP_LABELS = {
     "drop_col": "Ustunni olib tashlash",
     "join": "Boshqa fayl bilan birlashtirish",
     "set_type": "Ustun turini o‘zgartirish",
+    "append": "Boshqa fayl qatorlarini qo‘shish",
 }
 _OPS = {"=", "!=", ">", ">=", "<", "<=", "contains"}
 _EXPR_TOKEN = re.compile(r"\s*(?:(\d+(?:[.,]\d+)?)|\[([^\]]+)\]|([-+*/()]))")
@@ -347,6 +348,8 @@ def describe_step(s: dict[str, Any]) -> str:
         return f"{label}: {s.get('col')} → {s.get('name')}"
     if op == "join":
         return f"{label}: {Path(str(s.get('file'))).name} ({s.get('on')})"
+    if op == "append":
+        return f"{label}: {Path(str(s.get('file'))).name}"
     return label
 
 
@@ -545,6 +548,32 @@ def apply_steps(t: Table, steps: list[dict[str, Any]], loader=None) -> Table:
                 t.types[n] = other.types.get(c, "text")
             matched = sum(_key(r[j]) in index for r in t.rows)
             t.notes.append(f"Birlashtirildi: {matched}/{len(t.rows)} qator mos keldi")
+        elif op == "append":
+            # Rows of another file below these ones (same-named columns line up; new
+            # columns are added; "Manba" tells which file a row came from).
+            other = loader(s["file"])
+            if "Manba" not in t.columns:
+                t.columns.append("Manba")
+                t.types["Manba"] = "text"
+                first = Path(str(t.source or "")).name or "asosiy"
+                for r in t.rows:
+                    r.append(first)
+            for c in other.columns:
+                if c not in t.columns:
+                    t.columns.append(c)
+                    t.types[c] = other.types.get(c, "text")
+                    for r in t.rows:
+                        r.append(None)
+            idx = {c: i for i, c in enumerate(other.columns)}
+            name = Path(str(s["file"])).name
+            added = 0
+            for r in other.rows:
+                row = [r[idx[c]] if c in idx else None for c in t.columns]
+                row[t.col("Manba")] = name
+                t.rows.append(row)
+                added += 1
+            t.rows = t.rows[:MAX_ROWS]
+            t.notes.append(f"{name} dan {added} ta qator qo‘shildi")
         else:
             raise ValueError(f"noma’lum bosqich: {op}")
     return t

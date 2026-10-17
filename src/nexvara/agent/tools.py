@@ -47,6 +47,12 @@ class Tool:
 
 TOOLS: dict[str, Tool] = {}
 
+# Lookups that change nothing: an AI plan made only of these runs without asking.
+READ_ONLY = frozenset({
+    "files.search", "files.info", "files.versions", "bi.list", "bi.summary", "bi.steps",
+    "bi.widgets", "workflow.list", "workflow.history", "settings.show", "settings.update_check",
+})  # fmt: skip
+
 
 def tool(tool_name: str, title: str, /, risky: bool = False, **params: tuple[str, bool, str]):
     def deco(fn):
@@ -403,10 +409,56 @@ def _dashboard(api, name: str) -> dict[str, Any]:
     return hits[0]
 
 
-def _bi_state(api, cfg: dict[str, Any], flt: str) -> tuple[dict[str, Any], str]:
-    """'Toshkent' or 'Hudud=Toshkent' -> slicer state; the column is found by its values."""
+def _bi_cfg(api, d: dict[str, Any]) -> dict[str, Any]:
+    opened = api.bi_open(d["file"])
+    if not opened.get("ok"):
+        raise ToolError(opened["error"])
+    api._ctx.dashboard = d["file"]
+    return opened["config"]
+
+
+def _bi_columns(api, cfg: dict[str, Any]) -> list[str]:
+    prev = api.bi_preview(cfg)
+    if not prev.get("ok"):
+        raise ToolError(prev["error"])
+    return [c["name"] for c in prev["columns"]]
+
+
+def _bi_save(api, cfg: dict[str, Any]) -> str:
+    saved = api.bi_save(cfg)
+    if not saved.get("ok"):
+        raise ToolError(saved["error"])
+    api._ctx.dashboard = saved["file"]
+    return saved["file"]
+
+
+def _iso(value: str) -> str:
+    from nexvara.bi.data import parse_date
+
+    d = parse_date(value)
+    if d is None:
+        raise ToolError(f"Sana tushunarsiz: «{value}» (masalan 2026-01-31 yoki 31.01.2026)")
+    return d.isoformat()[:10]
+
+
+def _bi_state(api, cfg: dict[str, Any], flt: str, a: dict[str, Any] | None = None):
+    """'Toshkent' or 'Hudud=Toshkent' -> slicer state (the column is found by its values);
+    date_from/date_to -> the date range."""
+    a = a or {}
+    state: dict[str, Any] = {"filters": {}, "page": 0}
+    notes = []
+    if a.get("date_from") or a.get("date_to"):
+        if not cfg.get("date_col"):
+            raise ToolError("Bu dashboardda sana ustuni yo‘q")
+        if a.get("date_from"):
+            state["date_from"] = _iso(a["date_from"])
+        if a.get("date_to"):
+            state["date_to"] = _iso(a["date_to"])
+        notes.append(f"{state.get('date_from', '…')} — {state.get('date_to', '…')}")
+    if a.get("page"):
+        state["page"] = max(0, int(a["page"]) - 1)
     if not flt:
-        return {"filters": {}, "page": 0}, ""
+        return state, ", ".join(notes)
     from nexvara.bi.dash import compute
 
     col, _, val = flt.partition("=") if "=" in flt else ("", "", flt)
@@ -417,29 +469,32 @@ def _bi_state(api, cfg: dict[str, Any], flt: str) -> tuple[dict[str, Any], str]:
             continue
         for v in values:
             if fold(str(v)) == wanted:
-                return {"filters": {c: [v]}, "page": 0}, f"{c} = {v}"
+                state["filters"] = {c: [v]}
+                return state, ", ".join([f"{c} = {v}", *notes])
     raise ToolError(f"Dashboardda «{flt}» qiymati topilmadi (filtr ustunlari: "
                     + ", ".join(res["slicers"]) + ")")  # fmt: skip
 
 
-@tool("bi.create", "Dashboard yaratish", file=("string", False, "ma’lumot fayli"),
+_VIEW = {"filter": ("string", False, "masalan Toshkent yoki Hudud=Toshkent"),
+         "date_from": ("string", False, "sanadan"), "date_to": ("string", False, "sanagacha"),
+         "page": ("integer", False, "sahifa raqami")}  # fmt: skip
+
+
+@tool("bi.create", "Dashboard yaratish", file=("string", False, "ma’lumot fayli yoki papka"),
       name=("string", False, "saqlash nomi"))  # fmt: skip
 def bi_create(api, a):
-    src = resolve_file(api, a.get("file", ""))
-    api._ctx.file = str(src)
+    v = a.get("file", "")
+    src = Path(v) if v and Path(v).is_dir() else resolve_file(api, v)
+    api._ctx.file = str(src) if src.is_file() else api._ctx.file
     if not a.get("name"):
         return {"reply": f"{src.name} dan dashboard tayyorlayapman — NEXVARA BI bo‘limi ochiladi.",
                 "open_bi": str(src)}  # fmt: skip
     r = api.bi_auto(str(src))
     if not r.get("ok"):
         raise ToolError(r["error"])
-    cfg = {**r["config"], "name": a["name"]}
-    saved = api.bi_save(cfg)
-    if not saved.get("ok"):
-        raise ToolError(saved["error"])
-    api._ctx.dashboard = saved["file"]
+    file = _bi_save(api, {**r["config"], "name": a["name"]})
     return {"reply": f"«{a['name']}» dashboardi yaratildi va saqlandi ({src.name}).",
-            "bi_ui": {"open": saved["file"]}}  # fmt: skip
+            "bi_ui": {"open": file}}  # fmt: skip
 
 
 @tool("bi.list", "Saqlangan dashboardlar")
@@ -451,31 +506,21 @@ def bi_list(api, a):
         f"• {d['name']} — {Path(str(d.get('source') or '')).name}" for d in items)}  # fmt: skip
 
 
-@tool("bi.open", "Dashboardni ochish", name=("string", False, "dashboard nomi"),
-      filter=("string", False, "masalan Toshkent yoki Hudud=Toshkent"))  # fmt: skip
+@tool("bi.open", "Dashboardni ochish", name=("string", False, "dashboard nomi"), **_VIEW)
 def bi_open(api, a):
     d = _dashboard(api, a.get("name", ""))
-    api._ctx.dashboard = d["file"]
-    ui: dict[str, Any] = {"open": d["file"]}
-    note = ""
-    if a.get("filter"):
-        ui["state"], note = _bi_state(api, api.bi_open(d["file"])["config"], a["filter"])
-        note = f", filtr: {note}"
-    return {"reply": f"«{d['name']}» dashboardi ochildi{note}.", "bi_ui": ui}
+    state, note = _bi_state(api, _bi_cfg(api, d), a.get("filter", ""), a)
+    return {"reply": f"«{d['name']}» dashboardi ochildi" + (f" ({note})" if note else "") + ".",
+            "bi_ui": {"open": d["file"], "state": state}}  # fmt: skip
 
 
-@tool("bi.summary", "Dashboard ko‘rsatkichlari", name=("string", False, "dashboard nomi"),
-      filter=("string", False, "masalan Toshkent"))  # fmt: skip
+@tool("bi.summary", "Dashboard ko‘rsatkichlari", name=("string", False, "dashboard nomi"), **_VIEW)
 def bi_summary(api, a):
     from nexvara.bi.dash import compute
 
     d = _dashboard(api, a.get("name", ""))
-    api._ctx.dashboard = d["file"]
-    opened = api.bi_open(d["file"])
-    if not opened.get("ok"):
-        raise ToolError(opened["error"])
-    cfg = opened["config"]
-    state, note = _bi_state(api, cfg, a.get("filter", ""))
+    cfg = _bi_cfg(api, d)
+    state, note = _bi_state(api, cfg, a.get("filter", ""), a)
     res = compute(cfg, state, table=api._bi_table(cfg))
     kpis = [w for w in res["widgets"] if w.get("type") == "kpi"]
 
@@ -492,17 +537,15 @@ def bi_summary(api, a):
 
 
 @tool("bi.export", "Dashboardni eksport qilish", name=("string", False, "dashboard nomi"),
-      format=("string", True, "pdf, png, xlsx yoki csv"),
-      filter=("string", False, "masalan Toshkent"))  # fmt: skip
+      format=("string", True, "pdf, png, xlsx yoki csv"), **_VIEW)  # fmt: skip
 def bi_export(api, a):
     fmt = fold(a["format"]).strip(". ")
     fmt = {"excel": "xlsx", "rasm": "png"}.get(fmt, fmt)
     if fmt not in ("pdf", "png", "xlsx", "csv"):
         raise ToolError("Format: PDF, PNG, Excel yoki CSV")
     d = _dashboard(api, a.get("name", ""))
-    api._ctx.dashboard = d["file"]
-    cfg = api.bi_open(d["file"])["config"]
-    state, note = _bi_state(api, cfg, a.get("filter", ""))
+    cfg = _bi_cfg(api, d)
+    state, note = _bi_state(api, cfg, a.get("filter", ""), a)
     if fmt in ("xlsx", "csv"):
         r = api.bi_export(cfg, state, fmt)
         if not r.get("ok"):
@@ -511,13 +554,135 @@ def bi_export(api, a):
         return {"reply": f"Eksport qilindi: {r['path']}", "files": [r["path"]]}
     # PDF/PNG are drawn by the page itself: open it there and press export.
     return {"reply": f"«{d['name']}» {fmt.upper()} qilinmoqda — NEXVARA BI bo‘limida." +
-            (f" Filtr: {note}." if note else ""),
+            (f" ({note})" if note else ""),
             "bi_ui": {"open": d["file"], "state": state, "export": fmt}}  # fmt: skip
 
+
+# ----- data steps (ETL): formula columns, joining/appending files, cleaning -----
+
+_STEP_OPS = ("calc", "join", "append", "filter", "rename", "drop_col", "fill_null", "drop_null",
+             "dedupe", "drop_empty", "set_type")  # fmt: skip
+
+
+def _formula(expr: str, columns: list[str]) -> str:
+    """'Daromad - Xarajat' -> '[Daromad] - [Xarajat]' (longest names first, already
+    bracketed names are kept)."""
+    if "[" in expr:
+        return expr
+    out = expr
+    for c in sorted(columns, key=len, reverse=True):
+        pat = re.compile(rf"(?<![\w\[]){re.escape(c)}(?![\w\]])", re.IGNORECASE)
+        out = pat.sub(lambda _m, c=c: f"[{c}]", out)
+    return out
+
+
+@tool(
+    "bi.add_step",
+    "Dashboard ma’lumotiga qadam qo‘shish",
+    name=("string", False, "dashboard"),
+    op=("string", True, ", ".join(_STEP_OPS)),
+    column=("string", False, "ustun"),
+    new_name=("string", False, "yangi ustun nomi"),
+    formula=("string", False, "masalan Daromad - Xarajat"),
+    file=("string", False, "boshqa fayl"),
+    on=("string", False, "qaysi ustun bo‘yicha birlashtirish"),
+    cmp=("string", False, "=, !=, >, >=, <, <=, contains"),
+    value=("string", False, "qiymat"),
+    type=("string", False, "number, date, text"),
+)
+def bi_add_step(api, a):
+    from nexvara.bi.data import describe_step
+
+    op = a["op"]
+    if op not in _STEP_OPS:
+        raise ToolError("Qadam turi: " + ", ".join(_STEP_OPS))
+    d = _dashboard(api, a.get("name", ""))
+    cfg = _bi_cfg(api, d)
+    columns = _bi_columns(api, cfg)
+    step: dict[str, Any] = {"op": op}
+    if op == "calc":
+        if not a.get("new_name") or not a.get("formula"):
+            raise ToolError(
+                "Formula ustuni: nomi va formulasi kerak, masalan «Foyda = Daromad - Xarajat»"
+            )
+        step.update(name=a["new_name"], expr=_formula(a["formula"], columns))
+    elif op in ("join", "append"):
+        other = resolve_file(api, a.get("file", ""))
+        step["file"] = str(other)
+        if op == "join":
+            if not a.get("on"):
+                raise ToolError("Qaysi ustun bo‘yicha birlashtiray? Masalan «Mahsulot bo‘yicha»")
+            step["on"] = _column(columns, a["on"])
+    elif op in ("filter", "rename", "drop_col", "fill_null", "drop_null", "set_type"):
+        step["col"] = _column(columns, a.get("column", ""))
+        if op == "filter":
+            cmp = {"teng": "=", "katta": ">", "kichik": "<", "ichida": "contains"}.get(
+                fold(a.get("cmp", "")), a.get("cmp") or "=")  # fmt: skip
+            step.update(cmp=cmp, value=a.get("value", ""))
+        elif op == "rename":
+            if not a.get("new_name"):
+                raise ToolError("Yangi nomni yozing")
+            step["name"] = a["new_name"]
+        elif op == "fill_null":
+            v = fold(a.get("value", ""))
+            step["value"] = {"ortacha": "__mean__", "": "__zero__", "0": "__zero__"}.get(
+                v, a["value"]
+            )
+        elif op == "set_type":
+            t = fold(a.get("type") or a.get("value", ""))
+            step["type"] = {"son": "number", "raqam": "number", "sana": "date",
+                            "matn": "text"}.get(t, t)  # fmt: skip
+    new = {**cfg, "steps": [*(cfg.get("steps") or []), step]}
+    test = api.bi_preview(new)  # run it once: a bad formula or a missing file fails here
+    if not test.get("ok"):
+        raise ToolError(f"Qadam qo‘shilmadi: {test['error']}")
+    file = _bi_save(api, new)
+    note = " · ".join(test.get("notes") or [])
+    return {"reply": f"«{d['name']}»: {describe_step(step)} ✓ ({test['total']} ta qator"
+            + (f"; {note}" if note else "") + ")", "bi_ui": {"open": file}}  # fmt: skip
+
+
+@tool("bi.steps", "Dashboard ma’lumot qadamlari", name=("string", False, "dashboard"))
+def bi_steps(api, a):
+    from nexvara.bi.data import describe_step
+
+    d = _dashboard(api, a.get("name", ""))
+    steps = _bi_cfg(api, d).get("steps") or []
+    if not steps:
+        return {"reply": f"«{d['name']}»da ma’lumot qadamlari yo‘q (asl fayl o‘zgarmagan holda)."}
+    return {"reply": f"«{d['name']}» qadamlari:\n" + "\n".join(
+        f"{i}. {describe_step(s)}" for i, s in enumerate(steps, 1))}  # fmt: skip
+
+
+@tool("bi.remove_step", "Ma’lumot qadamini olib tashlash", name=("string", False, "dashboard"),
+      number=("integer", True, "nechanchi qadam"))  # fmt: skip
+def bi_remove_step(api, a):
+    from nexvara.bi.data import describe_step
+
+    d = _dashboard(api, a.get("name", ""))
+    cfg = _bi_cfg(api, d)
+    steps = list(cfg.get("steps") or [])
+    i = int(a["number"])
+    if not 1 <= i <= len(steps):
+        raise ToolError(f"{i}-qadam yo‘q (jami {len(steps)})")
+    gone = steps.pop(i - 1)
+    new = {**cfg, "steps": steps}
+    test = api.bi_preview(new)
+    if not test.get("ok"):
+        raise ToolError(f"Olib tashlab bo‘lmaydi: keyingi qadamlar unga bog‘liq ({test['error']})")
+    file = _bi_save(api, new)
+    return {"reply": f"Olib tashlandi: {describe_step(gone)}", "bi_ui": {"open": file}}
+
+
+# ----- widgets (charts, KPIs, tables) -----
 
 _WIDGET_WORDS = {"ustun": "bar", "gistogram": "bar", "doira": "pie", "pirog": "pie",
                  "chiziq": "line", "grafik": "line", "nuqta": "scatter", "kpi": "kpi",
                  "korsatkich": "kpi", "jadval": "table"}  # fmt: skip
+_TYPE_UZ = {"bar": "ustunli", "line": "chiziqli", "pie": "doiraviy", "scatter": "nuqtali",
+            "kpi": "KPI", "table": "jadval"}  # fmt: skip
+_AGG_UZ = {"ortacha": "avg", "orta": "avg", "soni": "count", "son": "count", "eng kichik": "min",
+           "eng katta": "max", "yigindi": "sum", "jami": "sum", "summa": "sum"}  # fmt: skip
 
 
 def _column(columns: list[str], wanted: str) -> str:
@@ -529,45 +694,174 @@ def _column(columns: list[str], wanted: str) -> str:
     return hit
 
 
-@tool(
-    "bi.add_widget",
-    "Dashboardga vidjet qo‘shish",
-    name=("string", False, "dashboard nomi"),
-    type=("string", True, "bar, line, pie, scatter, kpi yoki table"),
-    x=("string", False, "qaysi ustun bo‘yicha"),
-    y=("string", False, "qaysi raqam ustuni"),
-    agg=("string", False, "sum, avg, count, min, max"),
-    title=("string", False, "sarlavha"),
-)
+def _wtype(value: str) -> str:
+    t = fold(value)
+    t = next((v for k, v in _WIDGET_WORDS.items() if t.startswith(k)), t)
+    if t not in _TYPE_UZ:
+        raise ToolError("Vidjet turi: ustunli, chiziqli, doiraviy, nuqtali, KPI yoki jadval")
+    return t
+
+
+def _agg(value: str) -> str:
+    v = fold(value).strip()
+    v = _AGG_UZ.get(v, v) or "sum"
+    if v not in ("sum", "avg", "count", "min", "max"):
+        raise ToolError("Hisob: yig‘indi, o‘rtacha, soni, eng katta yoki eng kichik")
+    return v
+
+
+def _find_widget(cfg: dict[str, Any], ref: str) -> tuple[int, int]:
+    """'3' (numbered across pages, as bi.widgets shows them) or a title fragment."""
+    flat = [(p, i) for p, page in enumerate(cfg["pages"]) for i, _w in enumerate(page["widgets"])]
+    if str(ref).strip().isdigit():
+        n = int(ref)
+        if not 1 <= n <= len(flat):
+            raise ToolError(f"{n}-vidjet yo‘q (jami {len(flat)})")
+        return flat[n - 1]
+    key = fold(ref)
+    for p, i in flat:
+        if key and key in fold(str(cfg["pages"][p]["widgets"][i].get("title") or "")):
+            return p, i
+    raise ToolError(f"«{ref}» vidjeti topilmadi. «vidjetlarini ko‘rsat» deb yozing.")
+
+
+@tool("bi.widgets", "Dashboard vidjetlari", name=("string", False, "dashboard"))
+def bi_widgets(api, a):
+    d = _dashboard(api, a.get("name", ""))
+    cfg = _bi_cfg(api, d)
+    lines, n = [], 0
+    for page in cfg["pages"]:
+        lines.append(f"— {page.get('title') or 'Sahifa'}")
+        for w in page["widgets"]:
+            n += 1
+            ys = w.get("y")
+            what = ", ".join(ys) if isinstance(ys, list) else (ys or "")
+            by = f" / {w['x']}" if w.get("x") else ""
+            lines.append(f"{n}. {w.get('title') or '—'} ({_TYPE_UZ.get(w['type'], w['type'])}"
+                         f"{': ' + what if what else ''}{by}, {w.get('agg', 'sum')})")  # fmt: skip
+    return {"reply": f"«{d['name']}» vidjetlari:\n" + "\n".join(lines)}
+
+
+@tool("bi.add_widget", "Dashboardga vidjet qo‘shish", name=("string", False, "dashboard nomi"),
+      type=("string", True, "bar, line, pie, scatter, kpi yoki table"),
+      x=("string", False, "qaysi ustun bo‘yicha"), y=("string", False, "qaysi raqam ustuni"),
+      agg=("string", False, "sum, avg, count, min, max"), title=("string", False, "sarlavha"),
+      page=("integer", False, "sahifa raqami"))  # fmt: skip
 def bi_add_widget(api, a):
     import uuid
 
     d = _dashboard(api, a.get("name", ""))
-    cfg = api.bi_open(d["file"])["config"]
-    columns = [c["name"] for c in api.bi_preview(cfg).get("columns", [])]
-    typ = fold(a["type"])
-    typ = next((v for k, v in _WIDGET_WORDS.items() if typ.startswith(k)), typ)
-    if typ not in ("kpi", "bar", "line", "pie", "scatter", "table"):
-        raise ToolError("Vidjet turi: ustunli, chiziqli, doiraviy, nuqtali, KPI yoki jadval")
-    agg = {"ortacha": "avg", "soni": "count", "eng kichik": "min", "eng katta": "max"}.get(
-        fold(a.get("agg", "")), a.get("agg") or "sum")  # fmt: skip
-    w: dict[str, Any] = {"id": uuid.uuid4().hex[:8], "type": typ, "agg": agg}
+    cfg = _bi_cfg(api, d)
+    columns = _bi_columns(api, cfg)
+    typ = _wtype(a["type"])
+    w: dict[str, Any] = {"id": uuid.uuid4().hex[:8], "type": typ, "agg": _agg(a.get("agg", ""))}
     if a.get("x"):
         w["x"] = _column(columns, a["x"])
     if a.get("y"):
         w["y"] = _column(columns, a["y"])
-    elif typ != "table" and agg != "count":
+    elif typ != "table" and w["agg"] != "count":
         raise ToolError("Qaysi raqam ustuni? Masalan «Filial bo‘yicha Daromad ustunli diagramma»")
     if typ in ("bar", "pie", "line", "scatter") and "x" not in w:
         raise ToolError("Qaysi ustun bo‘yicha? Masalan «Filial bo‘yicha ...»")
     w["title"] = a.get("title") or " · ".join(str(v) for v in (w.get("y"), w.get("x")) if v)
-    cfg["pages"][0]["widgets"].append(w)
-    saved = api.bi_save(cfg)
-    if not saved.get("ok"):
-        raise ToolError(saved["error"])
-    api._ctx.dashboard = saved["file"]
-    return {"reply": f"«{d['name']}» dashboardiga qo‘shildi: {w['title']} ({typ}).",
-            "bi_ui": {"open": saved["file"]}}  # fmt: skip
+    p = max(0, min(int(a.get("page") or 1) - 1, len(cfg["pages"]) - 1))
+    cfg["pages"][p]["widgets"].append(w)
+    file = _bi_save(api, cfg)
+    return {"reply": f"«{d['name']}» dashboardiga qo‘shildi: {w['title']} ({_TYPE_UZ[typ]}).",
+            "bi_ui": {"open": file}}  # fmt: skip
+
+
+@tool(
+    "bi.edit_widget",
+    "Vidjetni tahrirlash",
+    name=("string", False, "dashboard"),
+    widget=("string", True, "raqami yoki sarlavhasidan so‘z"),
+    title=("string", False, "yangi sarlavha"),
+    type=("string", False, "yangi tur"),
+    x=("string", False, "bo‘yicha ustun"),
+    y=("string", False, "raqam ustuni"),
+    agg=("string", False, "hisob"),
+    top=("integer", False, "nechta eng katta qiymat"),
+)
+def bi_edit_widget(api, a):
+    d = _dashboard(api, a.get("name", ""))
+    cfg = _bi_cfg(api, d)
+    columns = _bi_columns(api, cfg)
+    p, i = _find_widget(cfg, a["widget"])
+    w = dict(cfg["pages"][p]["widgets"][i])
+    changed = []
+    if a.get("type"):
+        w["type"] = _wtype(a["type"])
+        changed.append(f"tur: {_TYPE_UZ[w['type']]}")
+    if a.get("title"):
+        w["title"] = a["title"]
+        changed.append(f"sarlavha: {a['title']}")
+    if a.get("x"):
+        w["x"] = _column(columns, a["x"])
+        changed.append(f"bo‘yicha: {w['x']}")
+    if a.get("y"):
+        w["y"] = _column(columns, a["y"])
+        changed.append(f"qiymat: {w['y']}")
+    if a.get("agg"):
+        w["agg"] = _agg(a["agg"])
+        changed.append(f"hisob: {w['agg']}")
+    if a.get("top"):
+        w["top"] = int(a["top"])
+        changed.append(f"eng kattasi: {w['top']} ta")
+    if not changed:
+        raise ToolError("Nimani o‘zgartiray? Tur, sarlavha, ustun yoki hisobni yozing.")
+    if w["type"] in ("bar", "pie", "line", "scatter") and not w.get("x"):
+        raise ToolError("Bu turdagi diagrammaga «... bo‘yicha» ustuni kerak")
+    cfg["pages"][p]["widgets"][i] = w
+    from nexvara.bi.dash import compute_widget
+
+    try:  # the new combination must still compute
+        compute_widget(api._bi_table(cfg), w, cfg.get("date_col"))
+    except (LookupError, ValueError, TypeError, KeyError) as e:
+        raise ToolError(f"Bu o‘zgarish ishlamaydi: {e}") from e
+    file = _bi_save(api, cfg)
+    return {"reply": f"«{w.get('title')}» o‘zgardi: " + ", ".join(changed), "bi_ui": {"open": file}}
+
+
+@tool("bi.remove_widget", "Vidjetni olib tashlash", name=("string", False, "dashboard"),
+      widget=("string", True, "raqami yoki sarlavhasi"))  # fmt: skip
+def bi_remove_widget(api, a):
+    d = _dashboard(api, a.get("name", ""))
+    cfg = _bi_cfg(api, d)
+    p, i = _find_widget(cfg, a["widget"])
+    gone = cfg["pages"][p]["widgets"].pop(i)
+    file = _bi_save(api, cfg)
+    return {
+        "reply": f"Olib tashlandi: {gone.get('title') or gone['type']}",
+        "bi_ui": {"open": file},
+    }
+
+
+@tool("bi.add_page", "Dashboardga sahifa qo‘shish", name=("string", False, "dashboard"),
+      title=("string", True, "sahifa nomi"))  # fmt: skip
+def bi_add_page(api, a):
+    d = _dashboard(api, a.get("name", ""))
+    cfg = _bi_cfg(api, d)
+    cfg["pages"].append({"title": a["title"], "widgets": []})
+    file = _bi_save(api, cfg)
+    return {
+        "reply": f"«{a['title']}» sahifasi qo‘shildi ({len(cfg['pages'])}-sahifa). Vidjet "
+        f"qo‘shishda «{len(cfg['pages'])}-sahifaga» deb yozing.",
+        "bi_ui": {"open": file},
+    }
+
+
+@tool("bi.rename", "Dashboard nomini o‘zgartirish", name=("string", False, "dashboard"),
+      new_name=("string", True, "yangi nom"))  # fmt: skip
+def bi_rename(api, a):
+    d = _dashboard(api, a.get("name", ""))
+    cfg = _bi_cfg(api, d)
+    if any(fold(x.get("name") or "") == fold(a["new_name"]) for x in api.bi_list()):
+        raise ToolError(f"«{a['new_name']}» nomli dashboard allaqachon bor")
+    file = _bi_save(api, {**cfg, "name": a["new_name"]})
+    if Path(file) != Path(d["file"]):
+        api.bi_delete(d["file"])
+    return {"reply": f"Dashboard nomi: «{d['name']}» → «{a['new_name']}»", "bi_ui": {"open": file}}
 
 
 @tool("bi.delete", "Dashboardni o‘chirish", risky=True, name=("string", True, "dashboard nomi"))
