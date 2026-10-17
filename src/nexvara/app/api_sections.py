@@ -1,10 +1,10 @@
 """Chat commands for the sections that had only buttons (mixed into app.api.Api):
 
-- Workflows: "«Ertalabki hisobot» workflowini ishga tushir", "workflowlarni ko‘rsat";
 - Tasks / History: "oxirgi vazifalarni ko‘rsat";
 - Memory: "nimalarni eslab qolgansan?", "xotiradan maktab haqida top";
 - Devices: "telefon ulanishini yoq / o‘chir", "telefon ulanganmi?";
 - Settings: "yorug‘ mavzuga o‘t", "qorong‘i mavzu".
+Workflows, Files, BI and the other settings are in agent/nlu.py.
 Patterns are strict on purpose: anything else falls through to the other handlers.
 """
 
@@ -24,7 +24,7 @@ class SectionsChatApi:
         from nexvara.knowledge.textnorm import fold
 
         f = fold(text).strip(" ?!.")
-        for fn in (self._chat_memory_recall, self._chat_workflow, self._chat_history,
+        for fn in (self._chat_memory_recall, self._chat_history,
                    self._chat_devices, self._chat_theme):  # fmt: skip
             out = fn(f, text)
             if out is not None:
@@ -59,36 +59,10 @@ class SectionsChatApi:
                     "\n".join(f"• {h['text'][:200]}" for h in hits)}  # fmt: skip
         return None
 
-    # ----- Workflows -----
-    def _chat_workflow(self, f: str, text: str) -> dict[str, Any] | None:
-        from nexvara.knowledge.textnorm import fold
-
-        if not re.search(r"\b(workflow\w*|ish jarayon\w*)", f):
-            return None
-        eng = self._wf()
-        if eng is None:
-            return {"reply": "Workflowlar bu rejimda o‘chirilgan."}
-        flows = eng.store.all()
-        if re.search(r"\b(ishga tushir|boshla|bajar|yurgiz)\w*", f):
-            hit = sorted((w for w in flows if fold(w.name) in f), key=lambda w: -len(w.name))
-            if not hit:
-                names = ", ".join(f"«{w.name}»" for w in flows) or "hali yo‘q"
-                return {"reply": f"Qaysi workflow? Saqlanganlari: {names}."}
-            r = self.wf_run(hit[0].id, self._context_file or "")
-            if not r["ok"]:
-                return {"reply": r["error"]}
-            return {"reply": f"«{hit[0].name}» workflowi boshlandi — jarayon o‘ng panelda.",
-                    "task": r["task"]}  # fmt: skip
-        if re.search(r"\b(korsat|royxat|qaysi|bor)\w*", f):
-            if not flows:
-                return {"reply": "Saqlangan workflow yo‘q. Workflows bo‘limida yarating."}
-            return {"reply": "Workflowlar:\n" + "\n".join(
-                f"• {w.name} ({len(w.steps)} qadam{'' if w.enabled else ', o‘chirilgan'})"
-                for w in flows)}  # fmt: skip
-        return None
-
     # ----- Tasks / History -----
     def _chat_history(self, f: str, text: str) -> dict[str, Any] | None:
+        if re.search(r"\b(workflow|ish jarayon|dashboard|panel)\w*", f):
+            return None  # "workflow tarixini ko‘rsat" is the workflow's own history
         if not re.search(r"\b(oxirgi|songgi|bugungi)\s+(vazifa\w*|natija\w*|ishlar\w*)|"
                          r"\b(vazifalar|tarix)\w*\s+(ni\s+)?korsat", f):  # fmt: skip
             return None

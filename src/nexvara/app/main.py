@@ -77,18 +77,31 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="smoke test, then type an Office command about FILE into the chat and wait",
     )
+    parser.add_argument(
+        "--selftest-installed",
+        metavar="DIR",
+        type=Path,
+        help="check an installed copy with the real data (read-only) + Office/BI demos in DIR",
+    )
     parser.add_argument("--debug", action="store_true", help="enable WebView dev tools")
     args = parser.parse_args(argv)
 
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
+    from nexvara.ai.keys import RedactingFilter
+
+    for handler in logging.getLogger().handlers:  # API keys never reach a log
+        handler.addFilter(RedactingFilter())
 
     selftest = args.selftest_excel is not None
     selftest_dir = args.selftest_excel or args.selftest_library
-    if args.selftest_chat is not None:
+    if args.selftest_chat is not None or args.selftest_installed is not None:
         args.smoke = True
-    if selftest_dir is not None:
+    if args.selftest_installed is not None:
+        args.selftest_installed.mkdir(parents=True, exist_ok=True)
+        api = Api(persist=True)  # the real data, only read (no watchers, no update step)
+    elif selftest_dir is not None:
         args.smoke = True
         selftest_dir.mkdir(parents=True, exist_ok=True)
         api = Api(output_dir=selftest_dir.resolve(), keep_office_open=False)
@@ -102,6 +115,14 @@ def main(argv: list[str] | None = None) -> int:
                 api.update_after_start()  # did an update started last time succeed?
             except Exception:  # noqa: BLE001 - never block the app from opening
                 logging.getLogger(__name__).exception("update check after start failed")
+
+            def resume_google() -> None:  # saved Google session, checked without a browser
+                try:
+                    api.account_resume()
+                except Exception:  # noqa: BLE001 - the Settings card shows the state
+                    logging.getLogger(__name__).exception("Google session check failed")
+
+            threading.Thread(target=resume_google, name="google-resume", daemon=True).start()
     window = webview.create_window(
         "NEXVARA",
         url=str(UI_DIR / "index.html"),
@@ -163,12 +184,76 @@ def main(argv: list[str] | None = None) -> int:
                 ok = library_selftest(window)
             if ok and args.selftest_chat is not None:
                 ok = chat_selftest(window, args.selftest_chat)
+            if args.selftest_installed is not None:
+                ok = installed_selftest(api, args.selftest_installed, smoke_ok=ok)
             result["ok"] = ok
         finally:
             window.destroy()
 
     webview.start(smoke if args.smoke else None, debug=args.debug)
     return 0 if result["ok"] else 1
+
+
+def installed_selftest(api: Api, out: Path, smoke_ok: bool) -> bool:
+    """After an install or update: are the accounts, sync, AI settings and Office still fine?
+    Only reads the real data; Office/BI demos write into `out`. Report: out/report.json
+    (no e-mail, token or key is written — only yes/no and counts)."""
+    from nexvara import config
+    from nexvara.sync import unseal
+
+    rep: dict = {"version": __version__, "frozen": bool(getattr(sys, "frozen", False)),
+                 "exe": sys.executable, "data_dir": str(config.data_dir()),
+                 "smoke_12_pages": smoke_ok}  # fmt: skip
+    g = api.account_status()
+    rep["google"] = {"configured": g["configured"], "signed_in": g["signed_in"],
+                     "owner_set": g["owner_set"], "session": g["session"]}  # fmt: skip
+    s = api.sync_status()
+    folder = Path(s.get("folder") or "")
+    files = sorted((folder / "NEXVARA-sync").glob("*.nxsync")) if s.get("folder") else []
+    pw = api._sync_keys().load("passphrase") or ""
+    opened = 0
+    for f in files:
+        try:
+            opened += isinstance(unseal(f.read_bytes(), pw), dict)
+        except Exception:  # noqa: BLE001 - counted as not opened
+            pass
+    rep["sync"] = {"folder_set": bool(s.get("folder")), "folder_exists": folder.is_dir(),
+                   "has_passphrase": s["has_passphrase"], "files": len(files),
+                   "decrypted": opened}  # fmt: skip
+    ai = api.ai_status()
+    dash = api.ai_dashboard()
+    rep["ai"] = {"providers": len(ai["providers"]), "enabled": ai.get("enabled"),
+                 "keys": sum(bool(p["has_key"]) for p in ai["providers"].values()),
+                 "dashboard_rows": len(dash.get("providers") or [])}  # fmt: skip
+    u = api.update_status()
+    rep["update"] = {"current": u["current"], "channel_set": bool(u["channel"]),
+                     "kept": u["kept"]}  # fmt: skip
+    work = Api(output_dir=out.resolve(), keep_office_open=False)
+    office = {}
+    demos = [("excel", work.run_excel_demo), ("excel_dashboard", work.run_excel_dashboard),
+             ("word", work.run_word_report), ("powerpoint", work.run_presentation)]  # fmt: skip
+    for name, start in demos:
+        snap = start()
+        deadline = time.monotonic() + 600
+        while time.monotonic() < deadline and snap["status"] in ("pending", "running"):
+            time.sleep(1)
+            snap = work.get_task(snap["id"]) or snap
+        office[name] = snap["status"]
+    rep["office"] = office
+    csv = out / "bi_sinov.csv"
+    csv.write_text("Oy,Hudud,Savdo\n" + "\n".join(
+        f"2026-{m:02d}-01,{h},{m * 100 + i * 7}" for m in range(1, 7)
+        for i, h in enumerate(("Toshkent", "Samarqand", "Buxoro"))), "utf-8")  # fmt: skip
+    bi = work.bi_auto(str(csv))
+    pages = (bi.get("config") or {}).get("pages") or []
+    rep["bi"] = {"ok": bi.get("ok"), "widgets": sum(len(pg["widgets"]) for pg in pages)}
+    ok = (smoke_ok and rep["ai"]["providers"] == 4
+          and all(v == "succeeded" for v in office.values())
+          and bool(bi.get("ok")) and rep["bi"]["widgets"] > 0)  # fmt: skip
+    rep["ok"] = ok
+    (out / "report.json").write_text(json.dumps(rep, indent=1, ensure_ascii=False), "utf-8")
+    print("INSTALLED", "PASS" if ok else "FAIL", json.dumps(rep, ensure_ascii=False))
+    return ok
 
 
 def chat_selftest(window: webview.Window, file: Path) -> bool:

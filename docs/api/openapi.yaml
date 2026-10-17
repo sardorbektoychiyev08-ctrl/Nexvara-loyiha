@@ -130,6 +130,21 @@ paths:
           description: File bytes; header X-Content-SHA256 carries the hex SHA-256
           content: {application/octet-stream: {schema: {type: string, format: binary}}}
         "404": {$ref: "#/components/responses/Error"}
+  /api/v1/sync:
+    get:
+      summary: All sync records of the PC (settings, memory facts, Teach rules) — see MOBILE_API.md §10
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/SyncEnvelope"}}}}
+        "401": {$ref: "#/components/responses/Error"}
+    post:
+      summary: Send the phone's records; the PC merges them (last writer wins per item) and returns all records
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [records], properties: {records: {type: array, items: {$ref: "#/components/schemas/SyncRecord"}}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/SyncEnvelope"}}}}
+        "400": {$ref: "#/components/responses/Error"}
 components:
   securitySchemes:
     deviceToken: {type: http, scheme: bearer, description: Token from /api/v1/pair. Store it in Android Keystore-backed storage.}
@@ -266,6 +281,22 @@ components:
         - properties: {data: {type: object, properties: {changed: {type: boolean}, etag: {type: string}, tasks: {type: array, items: {$ref: "#/components/schemas/Task"}}}}}
     CancelEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {type: object, properties: {cancelled: {type: boolean}}}}}]}
     FileEnvelope: {allOf: [{$ref: "#/components/schemas/Ok"}, {properties: {data: {$ref: "#/components/schemas/FileInfo"}}}]}
+    SyncRecord:
+      type: object
+      required: [kind, uid, data, updated, device, deleted]
+      properties:
+        kind: {type: string, enum: [fact, rule, setting]}
+        uid: {type: string, description: "stable id; for settings the key, e.g. theme, test_count"}
+        data:
+          type: object
+          description: "fact: {text}; rule: {app, text, enabled}; setting: {value}; {} when deleted"
+        updated: {type: number, description: unix seconds of the last change}
+        device: {type: string, description: "who changed it (pc-..., phone-<n>)"}
+        deleted: {type: boolean}
+    SyncEnvelope:
+      allOf:
+        - {$ref: "#/components/schemas/Ok"}
+        - properties: {data: {type: object, properties: {device: {type: string}, applied: {type: integer}, records: {type: array, items: {$ref: "#/components/schemas/SyncRecord"}}}}}
     Ok:
       type: object
       required: [v, ok, data]

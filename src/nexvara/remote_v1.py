@@ -33,6 +33,8 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("POST", "/api/v1/tasks/{id}/cancel", True),
     ("POST", "/api/v1/files", True),
     ("GET", "/api/v1/files", True),
+    ("GET", "/api/v1/sync", True),
+    ("POST", "/api/v1/sync", True),
 ]
 WATCH_MAX = 25.0  # seconds a long-poll may hang
 _ID = re.compile(r"^[0-9a-f]{6,32}$")
@@ -222,6 +224,15 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
             "X-Content-SHA256": hashlib.sha256(data).hexdigest(),
         })  # fmt: skip
         return None
+    if route == "/api/v1/sync" and h.command == "GET":
+        return api.sync_export()
+    if route == "/api/v1/sync":
+        raw = h._body(8 << 20)
+        body = json.loads(raw) if raw else {}
+        recs = body.get("records") if isinstance(body, dict) else None
+        if not isinstance(recs, list):
+            raise ApiError("BAD_REQUEST", "records ro‘yxati kerak")
+        return api.sync_import(f"phone-{dev['id']}", recs)
     raise ApiError("NOT_FOUND")
 
 

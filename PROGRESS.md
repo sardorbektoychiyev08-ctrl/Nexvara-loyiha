@@ -4,6 +4,219 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (20) — Claude Code — Windows V1: to'liq o'rnatish va yangilanish (1.0.1 o'rnatildi)
+
+**Foydalanuvchi talabi:** barcha bo'limlarni bitta Windows installerga yig'ish; mavjud o'rnatishni aniqlab xavfsiz yangilash; Google, OneDrive NEXVARA-SYNC, Memory/Teach, darsliklar, dashboardlar, API sozlamalari, imzo kaliti va rollback yo'qolmasin — avval zaxira va tiklash sinovi; o'zbekcha UI, yorliq, Start menyu; AI ulanishi qulay (rasmiy OAuth bo'lsa), kalitlar faqat Windows himoyalangan xotirasida; yangilanish xabari va «Yangilash»; o'rnatilgan dasturni haqiqatda ochib tekshirish; Codex Android'ga tegmaslik; private push.
+
+**Aniqlangan holat:** o'rnatilgan NEXVARA yo'q edi — ish stoli yorlig'i repodagi dev versiyani (`.venv\pythonw -m nexvara.app.main`) ochardi. Dev nusxasi (ishlab turgan) to'xtatilmadi.
+
+**Qilindi** (tarmoq `claude/windows-v1-install`):
+- `scripts/backup_userdata.py`: D:\NEXVARA to'liq zaxirasi (SQLite — backup API orqali, har fayl SHA-256, ish stoli yorlig'i; Credential Manager sirlari eksport qilinmaydi, faqat nomlari), `verify`, `restore` (bo'sh bo'lmagan papkaga faqat `--i-approve` va eski fayllar chetga ko'chiriladi). Zaxira: `D:\NEXVARA-zaxira\20261017-160705` (292 fayl, 7.34 GB, xato 0). Tiklash sinovi vaqtinchalik papkaga: 292/292 mos, himoya ishladi, sinov nusxasi o'chirildi.
+- Versiya 1.0.1 (1.0.0 → 1.0.1 haqiqiy yangilash sinovi uchun).
+- Ishga tushganda yangilanish xabari (Bosh sahifa ustida): «Yangi versiya bor: X» + «Yangilash» / «Keyinroq»; yangilangandan keyin «NEXVARA yangilandi ✓», muvaffaqiyatsizda rollback ko'rsatmasi. Faqat imzoli manifest o'qiladi, bosilmaguncha hech narsa yuklanmaydi (`update_auto`).
+- Installer o'zining nusxasini `%LOCALAPPDATA%\NEXVARA\installers\<ver>` ga qoldiradi — qo'lda o'rnatilgan versiyaga ham rollback mumkin; updater yangilanish papkasi yo'q bo'lsa yiqilardi (tuzatildi).
+- Installer oynasi o'zbekcha ([Messages]); o'chirishda «ma'lumotlaringiz o'chirilmaydi».
+- AI ulanishi: «Buferdan kalitni saqlash» — saytda nusxalangan kalit sahifadan o'tmaydi, bepul tekshiriladi, Credential Manager'ga yoziladi, bufer tozalanadi, AI o'zi yoqilmaydi; qadamma-qadam ko'rsatma. Rasmiy OAuth: OpenAI/Claude/DeepSeek'da uchinchi tomon API uchun yo'q; Gemini'da bor, lekin Google Cloud loyihasi va keng `cloud-platform` ruxsati kerak, Google o'zi API kalitni eng oddiy yo'l deydi → hammasi uchun bir martalik kalit.
+- `NEXVARA.exe --selftest-installed <papka>`: haqiqiy ma'lumotlarni faqat o'qib 12 sahifa, Google, sinxron fayli shifrini ochish, AI sozlamalari, yangilanish holati; Excel/Word/PowerPoint/BI namunalari faqat shu papkaga; `report.json` (faqat ha/yo'q va sonlar).
+- Tuzatildi: `DeviceStore` jadval migratsiyasi ikki oqim bir vaqtda ochsa «duplicate column» bilan yiqilardi (Qurilmalar sahifasi UI testida topildi).
+- Mahalliy yangilanish kanali: `D:\NEXVARA\releases` (settings.json `update.channel`) — bu **mahalliy**, internet yangilanishi emas.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| `.\scripts\test.ps1 -Office` | 354/356 — 2 UI testi: `ai_money` (tugma tartibi o'zgargan, test tugma nomi bo'yicha qidiradigan qilindi), `devices_page` (yuqoridagi migratsiya xatosi). Ikkalasi tuzatilib qayta: 2/2 PASS |
+| `.\scripts\test.ps1` (tuzatishlardan keyin) | 300 passed (56 Office testi o'tkazib yuborildi), smoke PASS |
+| Vaqtinchalik papkada (vaqtinchalik ma'lumotlar, ish stoli yorlig'isiz): 0.1.0 o'rnatish → smoke → haqiqiy updater bilan 1.0.0 → rollback 0.1.0 → yana 1.0.0 → smoke → buzilgan manifest rad etildi → o'chirish (registr yozuvi va fayllar yo'q) → ma'lumotlar har bosqichda o'zgarmagan | 14/14 PASS |
+| Haqiqiy o'rnatish 1.0.0 (`%LOCALAPPDATA%\Programs\NEXVARA`, Start menyu, ish stoli yorlig'i → o'rnatilgan exe) | PASS |
+| Haqiqiy yangilash 1.0.0 → 1.0.1 mahalliy kanal orqali (imzo, SHA-256, jim o'rnatish, dastur o'zi qayta ochildi, pending yo'q, rollback uchun 1.0.1 va 1.0.0 saqlangan) | PASS |
+| O'rnatilgan 1.0.1 `--selftest-installed`: 12 sahifa, Google (sozlangan, kirgan, egasi belgilangan), OneDrive NEXVARA-SYNC (papka bor, parol bor, 1/1 fayl shifri ochildi), AI 4 provayder (AI o'chiq, kalit 0), Excel, Excel dashboard, Word, PowerPoint — succeeded, BI 8 vidjet | PASS |
+| Ma'lumotlar zaxira bilan solishtirildi: 289 fayl bir xil, 277/277 PDF joyida, google_client.json va imzo kaliti o'zgarmagan, Credential Manager nomlari bir xil; o'zgargan yagona narsa `update.channel` | PASS |
+| Internet (https) yangilanishi | BLOCKED — server yo'q, sotib olinmadi |
+| Authenticode imzo | BLOCKED — sertifikat yo'q |
+| Haqiqiy pullik AI | NOT TESTED — ruxsat kutilmoqda |
+| Ikkinchi qurilma (Nilufar) sinxroni | NOT TESTED — hozircha faqat shu kompyuter fayli bor |
+
+**Eslatma:** fon jarayonlarida eski yashirin Excel/PowerPoint (avtomatlashtirish) jarayonlari qolgan bo'lishi mumkin — ruxsatsiz majburan to'xtatilmagan.
+
+**Keyingi qadam:** https yangilanish serveri kerakmi — egasi qaror qiladi; AI kalitini kiritib, ruxsat bilan `scripts/ai_live_test.py`.
+
+---
+
+## 2026-10-17 (19) — Claude Code — Shaxsiy ma'lumotlarni himoyalash, OpenAI/Gemini haqiqiy sinovga tayyorgarlik
+
+**Foydalanuvchi talabi:** haqiqiy AI sinovidan OLDIN o'quvchilar va boshqa shaxslarning ma'lumotlarini (ism-familiya, JSHSHIR, telefon, pasport, manzil…) tashqi AI'ga yuborishdan oldin mahalliy yashirish, javobda mahalliy tiklash; ishonchsizda bloklash; Gemini, OpenAI va fallback holatlarida test; OpenAI uchun kunlik $0.25 va bitta vazifa $0.05 ichki limiti; pullik fallback avtomatik boshlanmasin; birinchi sinovlar faqat sun'iy matnlar; pullik chaqiruv yo'q, ruxsatni kutish; Codex Android'ga tegmaslik.
+
+**Audit:** himoya YO'Q edi — AI yoqilsa chatdagi va eslatmalardagi shaxsiy ma'lumotlar, fayl yo'llari ochiq ketardi (faqat API kalitlari yashirilardi).
+
+**Qilindi** (tarmoq `claude/maxfiylik`; [docs/PRIVACY.md](docs/PRIVACY.md)):
+- `ai/privacy.py`: ISM (familiya/otasining ismi shakllari, keng tarqalgan ismlar, «F.I.Sh.:», «ismi», «familiyasi», «o'quvchi», «ota-onasi» dan keyingi so'zlar), JSHSHIR/PINFL, pasport/ID-karta, telefon, e-mail, bank kartasi (Luhn), manzil, tug'ilgan sana, STIR → `⟦ISM_1⟧` kabi belgilar; bir xil qiymat — bir xil belgi; javobda tiklash (model `[ISM_1]`, `«ISM_1»` deb yozsa ham). Ishonchsiz holat (kalit so'z yonida tanilmagan qiymat, 8+ xonali noma'lum raqam) → so'rov yuborilmaydi, pul sarflanmaydi. Ommaviy shaxslar (Alisher Navoiy, Amir Temur…), joy nomlari, so'mdagi summalar yashirilmaydi.
+- Yagona eshik: `AiRouter.complete` — barcha 4 provayder, barcha maqsadlar va fallback provayder ham faqat yashirilgan matnni oladi. NEXVARA ko'rsatmalari va darslik parchalari `public()` bilan belgilangan (tarixiy ismlar kerak). Javob oxirida: «🔒 N ta shaxsiy ma'lumot AI'ga yuborilmadi…».
+- Pullik fallback **sukut bo'yicha o'chiq**; kalit saqlash AI'ni **o'zi yoqmaydi** (faqat tekshiradi, bepul).
+- Provayderga alohida «bitta topshiriq» limiti (`limits.<provider>.task_usd`), Sozlamalar → AI da maydon va «bu NEXVARA ichki limiti, provayderdagi haqiqiy chegara emas» izohi. Haqiqiy `D:\NEXVARA\settings.json` ga yozildi: OpenAI kunlik $0.25, bitta topshiriq $0.05, fallback o'chiq, AI o'chiq (avvalgi nusxa scratchpad'da saqlandi). Kalitlar: hech biri kiritilmagan.
+- `scripts/ai_live_test.py`: faqat sun'iy matnlar (maxfiylik qoravuli ularda hech narsa topmasligi tekshiriladi); sukut bo'yicha quruq rejim — hech narsa yubormaydi; haqiqiy chaqiruv faqat `--run --i-approve`, saqlangan kalit, «AI yoqilgan» va o'chiq fallback bilan. Quruq taxmin: OpenAI ≈ $0.021, Gemini ≈ $0.017 (4 so'rov).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| `tests/unit/test_privacy.py` — 28 ta: har tur, tiklash, bloklash, oddiy so'rovlar o'zgarmasligi, ommaviy matn, OpenAI va Gemini HTTP qatlami (tarmoqqa chiqadigan baytlar tekshirildi), fallback OpenAI→Gemini, fallback sukutda o'chiq, bloklangan so'rov yubormaydi va sarflamaydi, eslatma/tarix/fayl yo'li/AI reja argumentlari | PASS |
+| OpenAI ichki limitlari (kunlik $0.25, bitta topshiriq $0.05) testi | PASS |
+| `.\scripts\test.ps1 -Office` 1-yugurish | 352/353 — Word'dagi soxta-AI testi kalit saqlanganda AI yoqiladi deb kutgan; test yangi qoidaga moslandi, fayl qayta 8/8 PASS |
+| `.\scripts\test.ps1 -Office` yakuniy | **353/353 PASS**, smoke PASS |
+| UI: `ai_money`, `uzbek_ui` (100%), `settings_integrations` | PASS |
+| Haqiqiy OpenAI/Gemini chaqiruvi | NOT TESTED — egasining alohida ruxsati kutilmoqda |
+
+**Keyingi qadam:** egasi kalitni Sozlamalar → AI orqali kiritadi, «AI yoqilgan» ni o'zi yoqadi, ruxsat beradi → `scripts/ai_live_test.py openai --run --i-approve` (keyin gemini).
+
+---
+
+## 2026-10-17 (18) — Claude Code — Windows V1 integratsiya: to'liq o'zbekcha UI, AI provayderlar (Router v2), to'lov tugmalari, AI xarajat paneli
+
+**Foydalanuvchi talabi:** shaxsiy foydalanish (egasi va Nilufar); 12 bo'lim to'liq o'zbekcha; 4 AI provayder rasmiy hujjatlar bo'yicha; Tejamkor/Muvozanatli/Kuchli/Maxsus; fallback, limitlar; har provayderga To'lov/Balans tugmasi; Bosh sahifada «AI balans va xarajatlar»; xavfsizlik; pullik AI chaqiruvi yo'q; Codex Android ishiga tegmaslik.
+
+**Audit (haqiqiy holat):** foydalanuvchi oldingi bosqichdan keyin Google client'ni import qilib, o'zi kirgan (sessiya faol, egasi belgilangan, ruxsatlar: openid/email/profile). OneDrive `C:\Users\toych\OneDrive\NEXVARA-SYNC` sinxron papkasi sozlangan va shu kompyuter fayli bor. Rasmiy hujjatlar (2026-10-17) bilan solishtirilganda eskirgan model nomlari topildi: `gemini-3.5-flash` ro'yxatda yo'q, `deepseek-v4-flash` eski nom (`deepseek-flash`), OpenAI'da GPT-6 avlodi bor; Anthropic modellari va narxlari to'g'ri.
+
+**Qilindi** (tarmoq `claude/uzbek-ai`; [docs/AI.md](docs/AI.md)):
+- **O'zbekcha UI**: markaziy lug'at `app/ui/i18n.js` (`i18n()`, `[data-i18n]`; boshqa til qo'shishga tayyor), menyu nomlari foydalanuvchi bergan ro'yxat bo'yicha, sahifa sarlavhalari, vazifa holatlari (Kutilmoqda/Bajarilmoqda/Bajarildi/Xatolik yuz berdi/Bekor qilindi), «workflow»→«ish jarayoni», «dashboard»→«panel» (chat ikkalasini ham tushunadi), «Teach/Devices/Chat», tizim ma'lumoti o'zbekcha. Tekshiruv: `tests/uzbek_check.py` (inglizcha so'zlar + o'zbekcha qo'shimchali shakllar, brendlar va model ID'lari istisno).
+- **Model Router v2** (`ai/models.py`, `ai/router.py`): 4 daraja; kalit tekshirilganda hisobda yo'q model ishlaydigan qilib ko'rsatilmaydi (muqobili yoki «bu hisobda mavjud emas»); maqsad bo'yicha daraja (oddiy → Tejamkor, kundalik/Office → Muvozanatli, tahlil/reja/uzun → Kuchli, «eng kuchli model bilan» → Maxsus, doim tasdiq); xavfsiz fallback (faqat 429/5xx/tarmoq, o'sha daraja, o'sha limitlar); limitlar: umumiy kunlik/oylik, provayder kunlik/oylik, bitta topshiriq ($0.50), «shundan qimmatda so'ra»; 80% ogohlantirish, 100% bloklash; kunlik seriya, provayder ulushi, tarix.
+- **To'lov**: har provayderda «API kalitini olish», «Kalitni tekshirish va saqlash», «To'lov / Balans», «Sarfni saytda ko'rish» — faqat rasmiy sahifalar; obuna ≠ API krediti izohi; bepul kvota faqat rasmiy shartlar bo'yicha (Gemini Free Tier; boshqalarda e'lon qilinmagan).
+- **Bosh sahifa paneli**: 4 karta (ulangan holati, bugun/oy sarfi, limitlar va progress, «Limitdan qolgan»), alohida «Provayderdagi haqiqiy balans» — DeepSeek uchun rasmiy `GET /user/balance`, qolganlarda «Haqiqiy balansni avtomatik olish imkoni yo'q»; jami, ulush, 30 kunlik diagramma, tarix; «Taxminiy sarf» belgisi; qorong'i/yorug' mavzuda ko'z bilan tekshirildi.
+- **Office**: sukut bo'yicha ko'rinadigan oyna; «fonda bajar» deyilsa ko'rinmas rejim.
+- **Xavfsizlik**: AI xatolarida va barcha log qatorlarida kalitga o'xshash satrlar yashiriladi (`keys.redact`, `RedactingFilter`); kalitlar sinxronlanmaydi (test).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 268 (oldingi 253 + Router v2 12 + o'zbekcha UI 3) | PASS |
+| `.\scripts\test.ps1 -Office`: **324/324** (Office testlari va 9 ta UI skripti, jumladan yangi `uzbek_ui.py`, `ai_money.py`) | PASS (yagona xato — bitta test skriptining formatlanishi, tuzatildi, skript qayta PASS) |
+| O'zbekcha UI jonli tekshiruv: 12 bo'lim × 2 mavzu, 1202 matn bo'lagi | **100%** o'zbekcha, JS xatosiz |
+| Haqiqiy Google sessiyani tiklash (brauzersiz) | PASS (`active`, egasi ✓) |
+| OneDrive `NEXVARA-SYNC`: shu kompyuter faylini saqlangan parol bilan ochish (faqat o'qish) | PASS; ikkinchi qurilma fayli hali yo'q — NOT TESTED |
+| Installer: qayta yig'ish → jim o'rnatish → o'rnatilgan exe smoke → o'chirish; `D:\NEXVARA` saqlandi | PASS |
+| Updater (unit) | PASS; https kanal — NOT TESTED |
+| Haqiqiy pullik AI chaqiruvi | NOT TESTED — ruxsat kutilmoqda (taxmin docs/AI.md da) |
+
+**Keyingi qadam:** egasi bitta yoki bir nechta API kalitini Sozlamalar → AI da kiritadi; ruxsat bilan haqiqiy sinov (har provayderga < $0.05).
+
+---
+
+## 2026-10-17 (17) — Claude Code — Windows Google login: haqiqiy hisobga tayyorgarlik, owner-only
+
+**Foydalanuvchi talabi:** mavjud Google OAuth sozlamalarini xavfsiz tekshirish (maxfiy qiymatlarni chiqarmasdan), mosini qayta ishlatish, ruxsatsiz yangi Google Cloud loyihasi yaratmaslik; haqiqiy Google Sign-In (brauzer, Code + PKCE, callback, profil, xavfsiz saqlash, sessiyani tiklash, chiqish); faqat egasining hisobi (`sub` bo'yicha, emailni taxmin qilmasdan); Android uchun tayyorgarlik (kodiga tegmasdan); Drive uchun minimal ruxsat; brauzerda tasdiqlash bosqichida to'xtash; testlar; push.
+
+**Tekshiruv (maxfiy qiymatlar chiqarilmadi):** D:\ (D:\NEXVARA, D:\Mahalla_nasiya_bot, loyiha, Codex worktree — faqat o'qish), C:\Users\toych (Downloads, Documents, Desktop, OneDrive, Pictures) — client JSON, `google-services.json` va `apps.googleusercontent.com` bo'yicha qidirildi; Credential Manager'da NEXVARA/Google yozuvlari faqat nomi bo'yicha tekshirildi. **Natija: hech qanday Google OAuth sozlamasi yo'q** (faqat testlardagi soxta ID'lar). Yangi loyiha yaratilmadi.
+
+**Qilindi** (tarmoq `claude/google-owner`):
+- Owner-only (`account.py`): birinchi kirishda hech narsa saqlanmaydi, ilova «Ha, bu mening hisobim / Yo'q» deb so'raydi; «Ha» → Google `sub` Credential Manager'ga (`NEXVARA/google/owner_sub`); boshqa `sub` bilan kirish rad etiladi va uning tokenlari darhol Google'da bekor qilinadi; email tasdiqlanmagan hisob rad etiladi; yangilangan ID token boshqa hisobniki bo'lsa chiqiladi; «Egani almashtirish» faqat chiqilgan holatda va tasdiq bilan.
+- Sessiyani tiklash: ilova ochilganda fonda, brauzersiz (`account_resume`); bekor qilingan grant → chiqish (ega eslab qolinadi); internet yo'q → «offline», keyingi safar tekshiriladi.
+- Sozlamalar UI: egani tasdiqlash qatori, «egasi ✓», oflayn belgi, «Egani almashtirish».
+- [docs/GOOGLE_LOGIN.md](docs/GOOGLE_LOGIN.md): holat, ishlash tartibi, egasi uchun bosqichma-bosqich sozlash, Drive uchun minimal ruxsat (`drive.appdata`; `drive.file`/`drive` so'ralmaydi), Android uchun bir loyihada Android client (`uz.nexvara.mobile` + SHA-1) va Web client ID (`serverClientId`), `sub` orqali egasini moslash. Codex kodiga tegilmadi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 253 (oldingi 246 + 7 owner-only/sessiya testi; 3 ta eski Google testi birinchi kirish tasdig'iga moslandi) | PASS |
+| `.\scripts\test.ps1 -Office` | **307/307 PASS**, smoke PASS |
+| Google oqimi **soxta** Google serveri bilan (PKCE, state, nonce, RS256, owner-only, revoke, resume, offline) | PASS |
+| **Haqiqiy** Google login | BLOCKED — kompyuterda OAuth client yo'q; egasi Desktop client yaratib o'zi kirishi kerak |
+| Haqiqiy Drive sinxron | BLOCKED — yuqoridagiga bog'liq |
+
+**Keyingi qadam:** egasi GOOGLE_LOGIN.md 1–5-bosqichlarni bajaradi va brauzerda o'zi kiradi; keyin haqiqiy natija shu yerga yoziladi.
+
+---
+
+## 2026-10-17 (16) — Claude Code — BI: vidjetni sahifaga ko'chirish, sahifani o'chirish; ochiq Office jarayonlari tekshiruvi
+
+**Foydalanuvchi talabi:** 299/299 PASS ni saqlab, BI'dagi qolgan ikki chat funksiyasi (o'chirishdan oldin tasdiq), testlar, push; ochiq qolgan 3 Excel + 1 PowerPoint jarayonini tekshirish — foydalanuvchi hujjati bo'lsa yopmaslik, shubhalisini majburan to'xtatmaslik. Codex Android'ga tegmaslik, pullik AI yo'q.
+
+**Qilindi** (tarmoq `claude/bi-sahifa`):
+- `bi.move_widget`: ««Savdo» dashboardidagi 3-vidjetni 2-sahifaga ko'chir», ««Ulush» vidjetini «Mahsulotlar» sahifasiga o'tkaz» (sahifa raqami yoki nomi; o'sha sahifada bo'lsa aytadi; ochilganda o'sha sahifa ko'rinadi).
+- `bi.delete_page` (xavfli → «Davom etaymi?»): ««Savdo» dashboardidagi 2-sahifani / «Mahsulotlar» sahifasini o'chir»; «Yo'q» → hech narsa o'chmaydi; yagona sahifa o'chirilmaydi; javobda nechta vidjet bilan o'chgani aytiladi.
+- UI sinov skriptlari (`agent_chat.py`, `settings_integrations.py`) endi faqat yangi kelgan xabarlarni tekshiradi: 1-yugurishda `agent_chat` yiqildi, chunki «saqlandi» so'zi oldingi BI javobida ham bor edi va skript workflow javobidan oldin tekshirib qo'ygan (skriptdagi poyga, mahsulot xatosi emas).
+
+**Office jarayonlari (faqat o'qib tekshirildi):** to'rttalasi ham COM avtomatlashtirish orqali ishga tushgan (`/automation -Embedding`, ota jarayon svchost/DcomLaunch), oynasiz, 10:29–11:05 da — oldingi test yugurishlaridan qolgan. Running Object Table'da birorta ham ochiq hujjat yo'q. Javob bergan yagona Excel (PID 2388): yashirin, foydalanuvchi boshqaruvida emas, 0 ta kitob → unga faqat Excel'ning o'z `Quit` buyrug'i yuborildi (majburlash yo'q). Jarayon chiqmadi (tashqi COM havolalari ushlab turibdi). PID 4880, 4296 (Excel) va 1848 (PowerPoint) ROT orqali javob bermadi → tekshirib bo'lmadi, tegilmadi. Hech biri majburan to'xtatilmadi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 246 (oldingi 245 + sahifa/ko'chirish testi) | PASS |
+| `.\scripts\test.ps1 -Office` 1-yugurish | 299/300 — `agent_chat.py` UI skriptidagi poyga |
+| UI skriptlari tuzatilgandan keyin alohida | PASS (ikkalasi) |
+| `.\scripts\test.ps1 -Office` yakuniy | **300/300 PASS** (11 daq 14 s), smoke PASS |
+
+**Keyingi qadam:** foydalanuvchi ruxsat bersa, 4 ta yashirin Office jarayonini majburan yopish (ularda ochiq hujjat yo'q); HANDOFF_CODEX.md dagi ochiq ishlar.
+
+---
+
+## 2026-10-17 (15) — Claude Code — BI chatdan to'liq, haqiqiy Office integratsiyasi, xavfsizlik, Codex handoff
+
+**Foydalanuvchi talabi:** 240 PASS testni saqlab: BI'ning qolgan qismlari (formula ustun, fayllarni birlashtirish, diagramma tahrirlash, barcha amallar chatdan); haqiqiy Office sinovlari (ruxsat berildi, faqat sinov fayllarida, oynalar ko'rinadigan); yakuniy integratsiya; barcha testlar; xavfsizlik; push; Codex Android tarmog'iga tegmaslik; pullik AI yo'q; HANDOFF_CODEX.md.
+
+**Qilindi** (tarmoq `claude/bi-yakun`):
+- **BI dvigateli**: yangi `append` qadami (boshqa fayl qatorlari ostiga, ustunlar mos keladi, «Manba» ustuni); brauzer UI'sidagi ETL formasiga ham qo'shildi.
+- **BI chatdan** (9 ta yangi/yangilangan asbob, `agent/tools.py` + `agent/nlu.py`): formula ustun (««Foyda» = Daromad - Xarajat», «minus/ko'paytir» so'zlari, `[ustun]` avtomatik), kalit bo'yicha birlashtirish («narxlar.csv bilan Mahsulot bo'yicha birlashtir»), qatorlarni qo'shish, filtr qadami («Daromad 1000000 dan katta qatorlar qolsin», «Daromad > 1000000 qolsin»), nomlash, olib tashlash, bo'shlarni to'ldirish (0/son/o'rtacha), takrorlarni o'chirish, tur o'zgartirish, qadamlar ro'yxati va N-qadamni bekor qilish (bog'liq qadam bo'lsa rad etiladi); vidjetlar ro'yxati, tahrirlash (tur, sarlavha, «X bo'yicha», qiymat ustuni, o'rtacha/soni/…, eng kattasi N), olib tashlash, sahifa qo'shish va N-sahifaga vidjet, sana oralig'i («01.02.2026 dan 31.03.2026 gacha»), dashboard nomini o'zgartirish. Har o'zgarish saqlashdan oldin hisoblab ko'riladi; xato bo'lsa saqlanmaydi.
+- **Xavfsizlik**: AI planner taklif qilgan va biror narsani o'zgartiradigan reja endi doim avval ko'rsatiladi («AI shunday tushundi — to'g'rimi?») va faqat «Ha»dan keyin bajariladi; faqat o'qiydigan so'rovlar darhol. Tekshirildi: kuzatilayotgan fayllar va Git tarixida kalit/token yo'q, `.gitignore` maxfiy fayllarni qamraydi, UI'da foydalanuvchi matni `esc()`/`textContent` bilan chiqadi, `pip-audit`: ma'lum zaiflik yo'q.
+- **Haqiqiy Office integratsiya testi** (`tests/office/test_agent_office.py`, ko'rinadigan Office, faqat pytest vaqtinchalik papkasi): Excel — xotira taxallusi + Teach qoidasi + 2 qadamli zanjir (Office → Files ko'chirish) + natijadan BI dashboard va KPI javobi, asl fayl bayt-bayt o'zgarmagan; Word — chat orqali workflow yaratish, ishga tushirish, tarix; Excel+Word+PowerPoint papkasini chat orqali ommaviy PDF, manbalar o'zgarmagan.
+- `test_ui_button_runs_real_excel` vaqt chegarasi 300 → 600 s (4 ta Office demo ketma-ket; 1-yugurishda band kompyuterda 300 s yetmadi, alohida 81 s da PASS).
+- [HANDOFF_CODEX.md](HANDOFF_CODEX.md): Codex Windows ishini davom ettirishi uchun holat, yangi imkoniyat qo'shish andozasi, ochiq ishlar, buzilmasligi kerak bo'lgan xavfsizlik qoidalari. AGENTS.md dan havola.
+- Codex'ning `codex/android-mobile` tarmog'i va `.worktrees/android` ga tegilmadi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 245 ta (oldingi 240 + BI chatdan 5; AI tasdiq testi yangilandi) | PASS |
+| `.\scripts\test.ps1 -Office` 1-yugurish | 298/299 — `test_ui_button_runs_real_excel` 300 s vaqt chegarasi; alohida qayta: PASS (81 s) |
+| `.\scripts\test.ps1 -Office` yakuniy (barcha o'zgarishlardan keyin) | **299/299 PASS** (11 daq 25 s), smoke PASS |
+| Shu ichida UI skriptlari haqiqiy oynada (7 ta, `agent_chat` va `settings_integrations` bilan) | PASS |
+| Haqiqiy Office integratsiyasi (3 test) | PASS |
+| pip-audit | PASS (zaiflik yo'q) |
+| Haqiqiy AI planner | NOT TESTED — pullik chaqiruv qilinmadi |
+| Haqiqiy Google login / Drive sinxron | BLOCKED — foydalanuvchining Google Cloud client'i kerak |
+
+**Kuzatuv:** testlardan oldin (10:29–10:30) ochilgan 3 ta yashirin Excel va 1 ta yashirin PowerPoint jarayoni (oynasiz) ochiq qoldi; foydalanuvchi ruxsatisiz yopilmadi. Yakuniy yugurish yangi jarayon qoldirmadi.
+
+**Keyingi qadam:** HANDOFF_CODEX.md dagi ochiq ishlar (haqiqiy AI/Google sinovi foydalanuvchi bilan, tarix sinxroni, BI'da vidjetni sahifalararo ko'chirish).
+
+---
+
+## 2026-10-17 (14) — Claude Code — Core Agent: tool-calling, kontekst, ketma-ket topshiriqlar, bo'limlar chatdan, Memory↔Teach↔Office, sinxronlash, Google tayyorgarlik
+
+**Foydalanuvchi talabi:** EXE, updater va 214 PASS testni saqlab: Files/BI/Workflows/Settings chatdan to'liq; Core Agent oddiy gaplar, oldingi suhbat va ketma-ket topshiriqlarni tushunsin (AI tool-calling); Memory, Teach va Office bog'langan; qurilmalararo sinxron; Google login haqiqiy konfiguratsiyaga tayyor (hisobga o'zi kirmasin); Codex'ning Android ishiga tegmaslik; pullik AI chaqirmaslik.
+
+**Qilindi** (tarmoq `claude/chat-agent`; arxitektura: [docs/AGENT.md](docs/AGENT.md)):
+- **Tool reyestri** (`agent/tools.py`): 36 asbob — Files 14, BI 7, Workflows 10, Settings/yangilanish/sinxron 4, `nexvara.command` (Office, test, mavzu, taqdimot, xotira, Teach). Har birida turli parametrlar, tekshiruv (noma'lum asbob/parametr rad etiladi), xavfli amallarga (o'chirish, tartiblash, tiklash, dashboard/workflow o'chirish) «Davom etaymi?».
+- **AI'siz o'zbekcha qoidalar** (`agent/nlu.py`): yo'llar («...», D:\..., fayl nomlari, «ish stoli/hujjatlar/yuklanmalar»), nusxa/ko'chirish, nomlash va ommaviy nomlash, ZIP, zaxira/versiya/tiklash, tartiblash, Savat, ommaviy PDF, papka/tur bo'yicha qidiruv; BI: yaratib saqlash, ro'yxat, ochish, «faqat Toshkent» filtri, KPI javobi chatda, vidjet qo'shish, Excel/CSV/PDF/PNG eksport, o'chirish; Workflows: yaratish (qadamlar, «N soniya kut», «har kuni soat 08:30 da», «papkaga yangi fayl tushganda», xatoda davom), ishga tushirish, pauza/davom/tasdiq/to'xtatish, yoqish/o'chirish, tarix, o'chirish; Settings: barcha xavfsiz sozlamalar, yangilanish tekshiruvi, sinxron.
+- **Kontekst** (`agent/context.py`): «uni/natijani» = oxirgi natija, «shu fayl», «topilgan fayllar», «shu papka», ishlatilgan papkalar, oxirgi 12 gap; «xuddi shunday Savdo.xlsx bilan ham qil».
+- **Ketma-ket topshiriqlar**: «A.xlsx ni PDF qil, keyin uni D:\Arxiv ga ko'chir» → bitta zanjir vazifa, har qadam oldingisining natijasini ko'radi; bitta fayl haqidagi Office klauzalari bitta buyruq bo'lib qoladi; xavfli qadam bo'lsa butun ro'yxat oldindan tasdiqlanadi.
+- **AI tool-calling planner** (`ai/features.plan`): asboblar katalogi + kontekst + oxirgi gaplar + mos eslatmalar + Teach qoidalari → JSON chaqiruvlar; ijro har doim bir xil tekshiruvdan o'tadi; eski bitta-buyruq formati ham ishlaydi. Faqat soxta provayder bilan sinaldi.
+- **Memory ↔ Teach ↔ Office**: yo'lli eslatmalar nom sifatida ishlaydi («hisobot papkamdagi fayllarni PDF qil», «oylik hisobotimni och»); «Shu faylni eslab qol» haqiqiy yo'lni saqlaydi; Teach qoidalari Office buyrug'i, zanjir va workflow'da qo'llanadi; AI planner'ga qoidalar va mos eslatmalar beriladi. Chatga yozilgan API kalit rad etiladi va hech qayerda saqlanmaydi.
+- **Sinxronlash** (`sync.py`, Sozlamalar → Sinxronlash, chatda «sinxronla»): eslatmalar, Teach qoidalari va xavfsiz sozlamalar; har yozuvga uid, «oxirgi o'zgarish yutadi», o'chirish belgisi; umumiy papka (OneDrive va h.k.) — scrypt + AES-256-GCM, parol Credential Manager'da; telefon uchun `GET/POST /api/v1/sync` (openapi + MOBILE_API §10); Google Drive appDataFolder transporti. AI yoqilishi, kalitlar, kompyuterga xos yo'llar hech qachon uzatilmaydi.
+- **Google tayyorgarlik**: Sozlamalar → «Client JSON faylini tanlash» (faqat Desktop app turi qabul qilinadi, eski fayl .bak), status client_id'ni niqoblab ko'rsatadi, sinxron uchun ixtiyoriy `drive.appdata` ruxsati, berilgan ruxsatlar profilda. NEXVARA hisobga o'zi kirmaydi, men ham kirmadim.
+- Codex'ning `.worktrees/android` (`codex/android-mobile`) ishiga tegilmadi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 240 ta (oldingi 214 + bo'limlar chatdan 10, agent yadrosi 8, sinxron 6, Google 2) | PASS |
+| Oyna smoke | PASS |
+| UI haqiqiy oynada: `agent_chat.py` (chatdan nusxa, BI yaratish/sahifa/KPI, workflow yaratish, sozlama, sinxron kartasi) va `settings_integrations.py` | PASS |
+| Office testlari (`-Office`) | NOT TESTED — Office kodi o'zgarmadi, ruxsatsiz Office ochilmadi |
+| Haqiqiy AI planner | NOT TESTED — pullik chaqiruv qilinmadi |
+| Haqiqiy Google login va Drive sinxron | BLOCKED — foydalanuvchining Google Cloud client'i kerak |
+| Ikki haqiqiy kompyuter / telefon o'rtasida sinxron | NOT TESTED |
+
+**Keyingi qadam:** foydalanuvchi — Google client JSON import va o'zi kirishi; Codex — Android'da `/api/v1/sync`; Claude — BI ETL chatdan, tarix sinxroni.
+
+---
+
+---
+
 ## 2026-10-17 — Codex — Android vaqtincha to‘xtatildi
 
 - Foydalanuvchi ko‘rsatmasiga ko‘ra Windows NEXVARA PERSONAL to‘liq tugamaguncha Android ishlab chiqilishi to‘xtaydi. Qolgan ishlar `docs/ANDROID_HANDOFF.md` ga yozildi. Claude Windows ishchi papkasi va fayllariga tegilmadi.

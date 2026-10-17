@@ -141,6 +141,24 @@ with `GET /api/v1/files?path=<exact string>` (only files that some task produced
 240 requests/minute per address, 10 pairing attempts/minute per address, 5 wrong codes lock
 the current code. Long-poll holds at most 25 s.
 
+## 10. Sync (settings, memory, Teach rules)
+
+`GET /api/v1/sync` → `{device, records}`; `POST /api/v1/sync` `{records}` → the PC merges and
+returns `{applied, device, records}` (all records after the merge). A record:
+
+```json
+{"kind": "fact|rule|setting", "uid": "…", "data": {…}, "updated": 1792215013.9,
+ "device": "phone-3", "deleted": false}
+```
+
+- `fact.data = {text}`, `rule.data = {app, text, enabled}`, `setting.data = {value}`
+  (`uid` = key: theme, test_count, test_variants, keep_office_open, ai.daily_budget_usd,
+  ai.monthly_budget_usd, ai.confirm_over_usd, ai.send_textbook_text). Other keys are ignored.
+- Merge rule per item: the larger `(updated, device)` wins; deletions are records with
+  `deleted: true` (keep them). New items on the phone get a random `uid`.
+- App algorithm: keep local records the same way; on sync POST your changed records, replace
+  local state with the returned list (apply newer ones), remember the time.
+
 ## 9. Testing without the real PC data
 
 ```

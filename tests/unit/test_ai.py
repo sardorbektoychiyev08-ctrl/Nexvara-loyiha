@@ -75,7 +75,10 @@ def test_not_ready_without_key(router):
 def test_save_key_turns_ai_on(router):
     info = router.save_key("anthropic", "sk-ant-test-1234567890")
     assert info["models"]["powerful"] == "claude-opus-5-5"
-    assert router.ready() and router.provider_name() == "anthropic"
+    # A saved key does not switch paid AI on by itself; the user does that.
+    assert not router.ready() and router.provider_name() == "anthropic"
+    router.settings.update({"ai": {"enabled": True}})
+    assert router.ready()
     st = router.status()
     assert st["providers"]["anthropic"]["has_key"]
     assert "1234567890" not in json.dumps(st)  # the key itself never reaches the UI
@@ -87,6 +90,7 @@ def test_save_key_turns_ai_on(router):
 
 def test_complete_records_cost_and_tiers(router):
     router.save_key("anthropic", "sk-ant-test-1234567890")
+    router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     router.fake.replies = ["salom"]
     r = router.complete("classify", "sys", [{"role": "user", "content": "hi"}], max_tokens=100)
     assert r.text == "salom" and r.provider == "anthropic"
@@ -98,6 +102,7 @@ def test_complete_records_cost_and_tiers(router):
 
 def test_budget_and_confirmation(router):
     router.save_key("anthropic", "sk-ant-test-1234567890")
+    router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     big = [{"role": "user", "content": "x" * 60000}]  # ~20k tokens on the balanced tier
     with pytest.raises(NeedsConfirmation) as e:
         router.complete("qa", "s", big, max_tokens=8000)
@@ -111,6 +116,7 @@ def test_budget_and_confirmation(router):
 
 def test_classify_reads_fenced_json(router):
     router.save_key("anthropic", "sk-ant-test-1234567890")
+    router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     router.fake.replies = [
         '```json\n{"kind": "test", "command": "7-sinf fizika 10 ta test", "grade": "7"}\n```'
     ]
@@ -146,6 +152,7 @@ def test_ai_quizzes_variants(router, monkeypatch):
     monkeypatch.setattr(service, "topic_material", lambda req: (book, [(5, "matn " * 50)], "Kuch"))
     monkeypatch.setattr(service, "make_quizzes", lambda req: (book, "Kuch", []))
     router.save_key("anthropic", "sk-ant-test-1234567890")
+    router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     pool = [
         {
             "q": f"Savol {i}?",
@@ -241,6 +248,7 @@ def test_api_chat_with_ai(router, monkeypatch):
 
     monkeypatch.setattr(features, "find_passages", lambda *a, **k: [])
     router.save_key("anthropic", "sk-ant-test-1234567890")
+    router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     api = Api(overrides={"ai_router": router})
     assert api.get_info()["ai_connected"]
     router.fake.replies = ['{"kind": "question"}', "Nyutonning birinchi qonuni — inersiya."]
@@ -281,3 +289,20 @@ def test_credential_manager_roundtrip():
     finally:
         store.delete("openai")
     assert store.load("openai") is None
+
+
+def test_key_from_clipboard_is_checked_saved_and_cleared(router, tmp_path, monkeypatch):
+    monkeypatch.setenv("NEXVARA_DATA", str(tmp_path / "data"))
+    from nexvara.app.api import Api
+
+    board = {"text": "  sk-ant-test-1234567890\n"}
+    api = Api(overrides={"ai_router": router, "clipboard": lambda: board["text"],
+                         "clipboard_clear": lambda: board.update(text="")})  # fmt: skip
+    r = api.ai_save_key_from_clipboard("anthropic")
+    assert r["ok"] and r["clipboard_cleared"] and board["text"] == ""
+    assert router.keys.load("anthropic") == "sk-ant-test-1234567890"
+    assert "1234567890" not in json.dumps(r)  # the key never goes back to the page
+    assert not router.ready()  # saving a key does not switch paid AI on
+    assert api.ai_save_key_from_clipboard("anthropic")["ok"] is False  # empty clipboard
+    board["text"] = "short"
+    assert api.ai_save_key_from_clipboard("openai")["ok"] is False and board["text"] == "short"

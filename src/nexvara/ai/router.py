@@ -1,14 +1,19 @@
 """Model router: picks provider and tier, enforces the budget, records every call's cost.
 
 Rules (spec: no surprise spending):
-- nothing is sent unless the user turned AI on and saved a key;
-- a call whose estimate would cross the daily or monthly budget is refused;
-- a call estimated above `confirm_over_usd` waits for the user's "Ha";
-- the real cost (from the provider's token counts) is written to app.db.
+- nothing is sent unless the user turned AI on and saved a key; one key is enough;
+- a call whose estimate would cross the daily or monthly budget (overall, or the
+  provider's own limit) is refused; so is a single task above `task_limit_usd`;
+- a call estimated above `confirm_over_usd` — and every "special" tier call — waits for "Ha";
+- a busy/down/unreachable provider falls back to another connected provider at the same
+  tier (`fallback`), with the same budget checks; a wrong key or missing credit never does;
+- the real cost (from the provider's token counts) is written to app.db. It is an
+  estimate of the bill: the provider's own billing page is the source of truth.
 """
 
 from __future__ import annotations
 
+import datetime as dt
 import sqlite3
 import threading
 import time
@@ -20,17 +25,29 @@ from typing import Any
 from nexvara import config
 from nexvara.ai import models
 from nexvara.ai.keys import KeyStore, mask
-from nexvara.ai.providers import AiError, Provider, Reply, make_provider
+from nexvara.ai.privacy import Guard
+from nexvara.ai.providers import AiError, Provider, Reply, fetch_balance, make_provider
 from nexvara.core.task import UserError
 
-# purpose -> tier. Understanding a command is easy; answers and tests need a better model.
-TIER_FOR = {"classify": "cheap", "qa": "balanced", "test": "balanced", "command": "cheap"}
+# purpose -> tier. Understanding a command is easy; daily work is balanced; analysis and
+# planning of big tasks use the strong tier; "special" only when the user asks for it.
+TIER_FOR = {
+    "classify": "cheap", "command": "cheap", "chat": "cheap",
+    "plan": "balanced", "qa": "balanced", "test": "balanced",
+    "analysis": "powerful", "special": "special",
+}  # fmt: skip
 PURPOSE_LABELS = {
     "classify": "Buyruqni tushunish",
+    "command": "Buyruqni tushunish",
+    "chat": "Suhbat",
+    "plan": "Rejalashtirish",
     "qa": "Savolga javob",
     "test": "AI test",
+    "analysis": "Tahlil",
+    "special": "Maxsus vazifa",
     "check": "Kalitni tekshirish",
 }
+WARN_AT = 0.8  # warn when 80% of a limit is spent
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS ai_usage (
@@ -44,6 +61,16 @@ CREATE TABLE IF NOT EXISTS ai_usage (
 );
 CREATE INDEX IF NOT EXISTS ai_usage_ts ON ai_usage(ts);
 """
+
+
+def _day_start(t: float | None = None) -> float:
+    lt = time.localtime(t)
+    return time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, 0, 0, 0, 0, 0, -1))
+
+
+def _month_start() -> float:
+    lt = time.localtime()
+    return time.mktime((lt.tm_year, lt.tm_mon, 1, 0, 0, 0, 0, 0, -1))
 
 
 class Ledger:
@@ -64,20 +91,40 @@ class Ledger:
                 (time.time(), provider, model, purpose, tin, tout, cost),
             )
 
-    def spent_since(self, ts: float) -> float:
+    def spent_since(self, ts: float, provider: str | None = None) -> float:
+        sql = "SELECT COALESCE(SUM(cost), 0) FROM ai_usage WHERE ts >= ?"
+        args: tuple = (ts,)
+        if provider:
+            sql += " AND provider = ?"
+            args += (provider,)
         with self._db() as db:
-            (v,) = db.execute(
-                "SELECT COALESCE(SUM(cost), 0) FROM ai_usage WHERE ts >= ?", (ts,)
-            ).fetchone()
+            (v,) = db.execute(sql, args).fetchone()
         return float(v)
 
-    def today(self) -> float:
-        t = time.localtime()
-        return self.spent_since(time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1)))
+    def today(self, provider: str | None = None) -> float:
+        return self.spent_since(_day_start(), provider)
 
-    def month(self) -> float:
-        t = time.localtime()
-        return self.spent_since(time.mktime((t.tm_year, t.tm_mon, 1, 0, 0, 0, 0, 0, -1)))
+    def month(self, provider: str | None = None) -> float:
+        return self.spent_since(_month_start(), provider)
+
+    def daily(self, days: int = 30) -> list[dict[str, Any]]:
+        """Spend per day and provider for the last `days` days (oldest first)."""
+        start = _day_start(time.time() - (days - 1) * 86400)
+        with self._db() as db:
+            rows = db.execute("SELECT ts, provider, cost FROM ai_usage WHERE ts >= ?",
+                              (start,)).fetchall()  # fmt: skip
+        out = []
+        for i in range(days):
+            d0 = _day_start(start + i * 86400 + 3600)
+            out.append({"day": dt.date.fromtimestamp(d0).isoformat(), "total": 0.0,
+                        "providers": {}})  # fmt: skip
+        index = {o["day"]: o for o in out}
+        for ts, prov, cost in rows:
+            o = index.get(dt.date.fromtimestamp(ts).isoformat())
+            if o is not None:
+                o["total"] += cost
+                o["providers"][prov] = o["providers"].get(prov, 0.0) + cost
+        return out
 
     def recent(self, limit: int = 30) -> list[dict[str, Any]]:
         with self._db() as db:
@@ -105,8 +152,9 @@ class Estimate:
 
     def describe(self) -> str:
         return (
-            f"{models.PROVIDERS[self.provider]['label']} · {self.model}: taxminan "
-            f"${self.cost:.3f} (≈{self.input_tokens} + {self.output_tokens} token)"
+            f"{models.PROVIDERS[self.provider]['label']} · {self.model} "
+            f"({models.TIER_LABELS.get(self.tier, self.tier)}): taxminan ${self.cost:.3f} "
+            f"(≈{self.input_tokens} + {self.output_tokens} token)"
         )
 
 
@@ -131,6 +179,7 @@ class AiRouter:
         keys: KeyStore | None = None,
         ledger: Ledger | None = None,
         factory: Callable[[str, str], Provider] | None = None,
+        balance_fetch: Callable[[str, str], dict] | None = None,
     ) -> None:
         from nexvara.appdata import Settings
 
@@ -138,34 +187,53 @@ class AiRouter:
         self.keys = keys or KeyStore()
         self.ledger = ledger or Ledger()
         self.factory = factory or make_provider
+        self.balance_fetch = balance_fetch or fetch_balance
+        self._balances: dict[str, dict] = {}  # provider -> last real balance (memory only)
+        self.last_masked = 0  # personal items hidden in the last request (count only)
 
     # ----- configuration -----
     def config(self) -> dict[str, Any]:
         return self.settings.load()["ai"]
+
+    def connected(self) -> list[str]:
+        return [n for n in models.PROVIDERS if self.keys.load(n)]
 
     def provider_name(self) -> str | None:
         """The chosen provider if it has a key, else the first provider that has one."""
         chosen = self.config().get("provider") or ""
         if chosen and self.keys.load(chosen):
             return chosen
-        for name in models.PROVIDERS:
-            if self.keys.load(name):
-                return name
-        return None
+        conn = self.connected()
+        return conn[0] if conn else None
 
     def ready(self) -> bool:
         return bool(self.config().get("enabled")) and self.provider_name() is not None
 
-    def model_for(self, provider: str, tier: str) -> str:
+    def model_for(self, provider: str, tier: str) -> str | None:
+        """The checked model for this tier; None when the account has no model for it."""
         chosen = (self.config().get("models") or {}).get(provider) or {}
-        return chosen.get(tier) or models.PROVIDERS[provider]["tiers"][tier]
+        if tier in chosen:
+            return chosen[tier]
+        return models.PROVIDERS[provider]["tiers"][tier]
+
+    def _limits(self, provider: str) -> tuple[float | None, float | None]:
+        lim = (self.config().get("limits") or {}).get(provider) or {}  # daily/monthly/task
+        d, m = lim.get("daily_usd"), lim.get("monthly_usd")
+        return (float(d) if d not in (None, "") else None,
+                float(m) if m not in (None, "") else None)  # fmt: skip
 
     # ----- spending -----
-    def estimate(self, tier: str, system: str, messages: list[dict], expected_out: int) -> Estimate:
-        provider = self.provider_name()
+    def estimate(self, tier: str, system: str, messages: list[dict], expected_out: int,
+                 provider: str | None = None) -> Estimate:  # fmt: skip
+        provider = provider or self.provider_name()
         if provider is None:
             raise AiUnavailable("AI kaliti kiritilmagan (Sozlamalar → AI).")
         model = self.model_for(provider, tier)
+        if model is None:
+            raise AiUnavailable(
+                f"{models.PROVIDERS[provider]['label']} hisobida "
+                f"«{models.TIER_LABELS[tier]}» darajasiga mos model topilmadi."
+            )
         tin = models.estimate_tokens(system + "".join(m["content"] for m in messages))
         c = models.cost(model, provider, tin, expected_out, self.config().get("prices"))
         return Estimate(provider, model, tier, tin, expected_out, c)
@@ -173,18 +241,36 @@ class AiRouter:
     def check_budget(self, est: Estimate, approved: bool) -> None:
         cfg = self.config()
         today, month = self.ledger.today(), self.ledger.month()
+        label = models.PROVIDERS[est.provider]["label"]
         if today + est.cost > float(cfg["daily_budget_usd"]):
             raise BudgetExceeded(
-                f"Kunlik AI byudjeti (${cfg['daily_budget_usd']:.2f}) tugaydi: bugun "
-                f"${today:.3f} sarflangan, bu so‘rov ≈${est.cost:.3f}. Byudjetni "
-                "Sozlamalar → AI bo‘limida oshirish mumkin."
+                f"Kunlik AI limiti (${cfg['daily_budget_usd']:.2f}) tugaydi: bugun "
+                f"${today:.3f} sarflangan, bu so‘rov ≈${est.cost:.3f}. Yangi pullik so‘rovlar "
+                "to‘xtatildi. Limitni Sozlamalar → AI bo‘limida oshirish mumkin."
             )
         if month + est.cost > float(cfg["monthly_budget_usd"]):
             raise BudgetExceeded(
-                f"Oylik AI byudjeti (${cfg['monthly_budget_usd']:.2f}) tugaydi: shu oy "
-                f"${month:.3f} sarflangan."
+                f"Oylik AI limiti (${cfg['monthly_budget_usd']:.2f}) tugaydi: shu oy "
+                f"${month:.3f} sarflangan. Yangi pullik so‘rovlar to‘xtatildi."
             )
-        if not approved and est.cost > float(cfg["confirm_over_usd"]):
+        p_day, p_month = self._limits(est.provider)
+        if p_day is not None and self.ledger.today(est.provider) + est.cost > p_day:
+            raise BudgetExceeded(f"{label} uchun kunlik limit (${p_day:.2f}) tugaydi.")
+        if p_month is not None and self.ledger.month(est.provider) + est.cost > p_month:
+            raise BudgetExceeded(f"{label} uchun oylik limit (${p_month:.2f}) tugaydi.")
+        p_task = ((cfg.get("limits") or {}).get(est.provider) or {}).get("task_usd")
+        if p_task not in (None, "") and est.cost > float(p_task):
+            raise BudgetExceeded(
+                f"{label} uchun bitta topshiriq limiti (${float(p_task):.2f}) dan oshadi: bu "
+                f"so‘rov ≈${est.cost:.3f}."
+            )
+        task = cfg.get("task_limit_usd")
+        if task not in (None, "") and est.cost > float(task):
+            raise BudgetExceeded(
+                f"Bitta topshiriq limiti (${float(task):.2f}) dan oshadi: bu so‘rov "
+                f"≈${est.cost:.3f}. Limitni Sozlamalar → AI bo‘limida o‘zgartirish mumkin."
+            )
+        if not approved and (est.cost > float(cfg["confirm_over_usd"]) or est.tier == "special"):
             raise NeedsConfirmation(est)
 
     def complete(
@@ -199,85 +285,177 @@ class AiRouter:
         tier: str | None = None,
         effort: str = "medium",
     ) -> Reply:
-        if not self.config().get("enabled"):
+        cfg = self.config()
+        if not cfg.get("enabled"):
             raise AiUnavailable("AI o‘chirilgan (Sozlamalar → AI).")
+        # Personal data is replaced locally before anything leaves this PC, for every
+        # provider including a fallback one; unreliable detection blocks the request.
+        guard = Guard()
+        system = guard.mask(system)
+        messages = [{**m, "content": guard.mask(m["content"])} for m in messages]
+        self.last_masked = guard.count
+        self.masked_total = getattr(self, "masked_total", 0) + guard.count
         tier = tier or TIER_FOR.get(purpose, "balanced")
-        est = self.estimate(tier, system, messages, expected_out or max_tokens // 2)
-        self.check_budget(est, approved)
-        key = self.keys.load(est.provider) or ""
-        reply = self.factory(est.provider, key).complete(
-            est.model, system, messages, max_tokens, effort
-        )
-        reply.provider = est.provider
-        reply.cost = models.cost(
-            reply.model or est.model,
-            est.provider,
-            reply.input_tokens,
-            reply.output_tokens,
-            self.config().get("prices"),
-        )
-        self.ledger.record(
-            est.provider, reply.model or est.model, purpose, reply.input_tokens,
-            reply.output_tokens, reply.cost,
-        )  # fmt: skip
-        return reply
+        first = self.provider_name()
+        if first is None:
+            raise AiUnavailable("AI kaliti kiritilmagan (Sozlamalar → AI).")
+        chain = [first]
+        if cfg.get("fallback", False):  # off by default: a paid fallback never starts by itself
+            chain += [p for p in self.connected() if p != first]
+        est = self.estimate(tier, system, messages, expected_out or max_tokens // 2, first)
+        self.check_budget(est, approved)  # confirmation is asked for the main provider
+        last_error: AiError | None = None
+        for i, provider in enumerate(chain):
+            if i:
+                try:
+                    est = self.estimate(tier, system, messages, expected_out or max_tokens // 2,
+                                        provider)  # fmt: skip
+                    # A fallback never costs more than what the user agreed to.
+                    self.check_budget(est, approved=True)
+                    if not approved and est.cost > float(cfg["confirm_over_usd"]):
+                        continue
+                except (AiUnavailable, BudgetExceeded):
+                    continue
+            key = self.keys.load(provider) or ""
+            try:
+                reply = self.factory(provider, key).complete(
+                    est.model, system, messages, max_tokens, effort
+                )
+            except AiError as e:
+                if not e.retryable:
+                    raise
+                last_error = e
+                continue
+            reply.provider = provider
+            reply.text = guard.restore(reply.text)  # real values back, on this PC only
+            reply.masked = guard.count  # type: ignore[attr-defined]
+            reply.cost = models.cost(reply.model or est.model, provider, reply.input_tokens,
+                                     reply.output_tokens, cfg.get("prices"))  # fmt: skip
+            self.ledger.record(provider, reply.model or est.model, purpose, reply.input_tokens,
+                               reply.output_tokens, reply.cost)  # fmt: skip
+            if i:
+                reply.fallback_from = first  # type: ignore[attr-defined]
+            return reply
+        raise last_error or AiUnavailable("Hech bir AI provayderi javob bermadi.")
 
     # ----- keys -----
     def save_key(self, provider: str, key: str) -> dict[str, Any]:
         """Check the key with the free model list, then store it and remember which model
-        ids this account really has for each tier."""
+        ids this account really has for each tier (a missing one is not shown as working)."""
         if provider not in models.PROVIDERS:
             raise ValueError("noma’lum provayder")
         key = (key or "").strip()
         if len(key) < 10:
             raise ValueError("kalit juda qisqa — to‘liq nusxalang")
         available = self.factory(provider, key).list_models()
-        tiers = {
-            t: models.pick_model(models.PROVIDERS[provider]["tiers"][t], available)
-            for t in models.TIERS
-        }
+        tiers = {t: models.pick_tier(provider, t, available) for t in models.TIERS}
         self.keys.save(provider, key)
         cfg = self.config()
         chosen = dict(cfg.get("models") or {})
         chosen[provider] = tiers
-        changes: dict[str, Any] = {"models": chosen}
+        checked = dict(cfg.get("checked") or {})
+        checked[provider] = {"at": time.time(), "models": len(available)}
+        changes: dict[str, Any] = {"models": chosen, "checked": checked}
         if not cfg.get("provider") or not self.keys.load(cfg["provider"]):
             changes["provider"] = provider
-        if not cfg.get("enabled"):
-            changes["enabled"] = True
         self.settings.update({"ai": changes})
-        missing = [m for m in tiers.values() if available and m not in available]
-        return {"models": tiers, "available": len(available), "missing": missing}
+        missing = [models.TIER_LABELS[t] for t, m in tiers.items() if m is None]
+        shown = {t: m for t, m in tiers.items() if m}
+        return {"models": shown, "available": len(available), "missing": missing}
 
     def delete_key(self, provider: str) -> None:
         self.keys.delete(provider)
+        self._balances.pop(provider, None)
+
+    # ----- real balance (only where the provider offers it officially) -----
+    def balance(self, provider: str) -> dict[str, Any]:
+        info = models.PROVIDERS[provider]
+        if not info.get("balance_api"):
+            return {"supported": False}
+        key = self.keys.load(provider)
+        if not key:
+            return {"supported": True, "error": "Kalit kiritilmagan"}
+        try:
+            out = self.balance_fetch(provider, key)
+        except AiError as e:
+            return {"supported": True, "error": str(e)}
+        self._balances[provider] = out
+        return out
+
+    # ----- state for the Settings page and the Home dashboard -----
+    def _provider_state(self, name: str, cfg: dict[str, Any]) -> dict[str, Any]:
+        info = models.PROVIDERS[name]
+        key = self.keys.load(name)
+        p_day, p_month = self._limits(name)
+        day_lim = p_day if p_day is not None else float(cfg["daily_budget_usd"])
+        month_lim = p_month if p_month is not None else float(cfg["monthly_budget_usd"])
+        today, month = self.ledger.today(name), self.ledger.month(name)
+        checked = (cfg.get("checked") or {}).get(name)
+        return {
+            "label": info["label"],
+            "key_url": info["key_url"],
+            "billing_url": info["billing_url"],
+            "usage_url": info["usage_url"],
+            "key_hint": info["key_hint"],
+            "free_tier": info["free_tier"],
+            "subscription_note": info["subscription_note"],
+            "balance_api": bool(info.get("balance_api")),
+            "balance": self._balances.get(name),
+            "has_key": bool(key),
+            "key_masked": mask(key),
+            "checked": checked,
+            "models": {t: self.model_for(name, t) for t in models.TIERS},
+            "spent_today": round(today, 4),
+            "spent_month": round(month, 4),
+            "daily_limit": day_lim,
+            "monthly_limit": month_lim,
+            "own_limits": {
+                "daily_usd": p_day,
+                "monthly_usd": p_month,
+                "task_usd": ((cfg.get("limits") or {}).get(name) or {}).get("task_usd"),
+            },
+            "left_today": round(max(0.0, day_lim - today), 4),
+            "left_month": round(max(0.0, month_lim - month), 4),
+        }
 
     def status(self) -> dict[str, Any]:
         cfg = self.config()
-        providers = {}
-        for name, info in models.PROVIDERS.items():
-            key = self.keys.load(name)
-            providers[name] = {
-                "label": info["label"],
-                "key_url": info["key_url"],
-                "key_hint": info["key_hint"],
-                "has_key": bool(key),
-                "key_masked": mask(key),
-                "models": {t: self.model_for(name, t) for t in models.TIERS},
-            }
+        today, month = self.ledger.today(), self.ledger.month()
+        daily, monthly = float(cfg["daily_budget_usd"]), float(cfg["monthly_budget_usd"])
+        warnings = []
+        for label, spent, lim in (("Kunlik", today, daily), ("Oylik", month, monthly)):
+            if lim > 0 and spent >= lim:
+                warnings.append(f"{label} limit tugadi: yangi pullik AI so‘rovlari to‘xtatildi.")
+            elif lim > 0 and spent >= lim * WARN_AT:
+                warnings.append(f"{label} limitning {spent / lim:.0%} qismi sarflandi.")
         return {
             "enabled": bool(cfg.get("enabled")),
             "provider": self.provider_name() or "",
             "ready": self.ready(),
-            "providers": providers,
+            "providers": {n: self._provider_state(n, cfg) for n in models.PROVIDERS},
             "tier_labels": models.TIER_LABELS,
-            "spent_today": round(self.ledger.today(), 4),
-            "spent_month": round(self.ledger.month(), 4),
-            "daily_budget_usd": cfg["daily_budget_usd"],
-            "monthly_budget_usd": cfg["monthly_budget_usd"],
+            "tier_help": models.TIER_HELP,
+            "spent_today": round(today, 4),
+            "spent_month": round(month, 4),
+            "daily_budget_usd": daily,
+            "monthly_budget_usd": monthly,
+            "task_limit_usd": cfg.get("task_limit_usd"),
             "confirm_over_usd": cfg["confirm_over_usd"],
             "send_textbook_text": cfg["send_textbook_text"],
+            "fallback": bool(cfg.get("fallback", False)),
+            "warnings": warnings,
+            "blocked": today >= daily or month >= monthly,
         }
+
+    def dashboard(self) -> dict[str, Any]:
+        """Home page: cards, totals, split by provider, history and a 30-day series."""
+        st = self.status()
+        month_total = st["spent_month"] or 0.0
+        split = [{"provider": n, "label": p["label"], "spent_month": p["spent_month"],
+                  "share": (p["spent_month"] / month_total) if month_total else 0.0}
+                 for n, p in st["providers"].items()]  # fmt: skip
+        return {**st, "split": split, "series": self.ledger.daily(30),
+                "history": self.ledger.recent(15), "estimated": True}  # fmt: skip
 
 
 __all__ = [

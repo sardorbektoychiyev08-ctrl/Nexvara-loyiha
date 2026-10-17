@@ -10,6 +10,7 @@ const BI_STEPS = {
   fill_null: "Bo‘sh qiymatlarni to‘ldirish", drop_null: "Ustunda bo‘sh qatorlarni o‘chirish",
   filter: "Filtr", calc: "Hisoblangan ustun", rename: "Ustun nomini o‘zgartirish",
   drop_col: "Ustunni olib tashlash", set_type: "Ustun turini o‘zgartirish", join: "Boshqa fayl bilan birlashtirish",
+  append: "Boshqa fayl qatorlarini qo‘shish",
 };
 let bi = { cfg: null, res: null, state: { filters: {}, page: 0 }, file: "" };
 
@@ -162,7 +163,7 @@ async function renderBi() {
 function drawBiSaved(list) {
   const sel = $("#bi-saved");
   sel.textContent = "";
-  sel.appendChild(el("option", "", list.length ? "— saqlangan dashboardlar —" : "— saqlangan dashboard yo‘q —")).value = "";
+  sel.appendChild(el("option", "", list.length ? "— saqlangan panellar —" : "— saqlangan panel yo‘q —")).value = "";
   list.forEach((d) => { const o = el("option", "", `${d.name} (${(d.source || "").split(/[\\/]/).pop()})`); o.value = d.file; sel.appendChild(o); });
 }
 
@@ -422,13 +423,13 @@ async function drawEtl() {
   pick.addEventListener("click", async () => { const p = await api().bi_pick_source(); if (p) file.value = p; });
   const sync = () => {
     const o = op.value;
-    colL.hidden = ["dedupe", "drop_empty", "calc"].includes(o);
+    colL.hidden = ["dedupe", "drop_empty", "calc", "append"].includes(o);
     cmpL.hidden = o !== "filter";
     valL.hidden = !["filter", "fill_null"].includes(o);
     nameL.hidden = !["calc", "rename"].includes(o);
     exprL.hidden = o !== "calc";
     typL.hidden = o !== "set_type";
-    fileL.hidden = o !== "join";
+    fileL.hidden = !["join", "append"].includes(o);
     val.placeholder = o === "fill_null" ? "masalan 0 (bo‘sh qoldirilsa 0)" : "";
   };
   op.addEventListener("change", sync); sync();
@@ -443,7 +444,7 @@ async function drawEtl() {
     if (!nameL.hidden) step.name = name.value.trim();
     if (!exprL.hidden) step.expr = expr.value.trim();
     if (!typL.hidden) step.type = typ.value;
-    if (!fileL.hidden) { step.file = file.value; step.on = col.value; }
+    if (!fileL.hidden) { step.file = file.value; if (op.value === "join") step.on = col.value; }
     bi.cfg.steps = [...(bi.cfg.steps || []), step];
     const test = await api().bi_preview(bi.cfg);
     if (!test.ok) { bi.cfg.steps.pop(); err.hidden = false; err.textContent = test.error; return; }
@@ -534,6 +535,19 @@ $("#bi-sheet").addEventListener("change", async () => {
   const src = bi.cfg && bi.cfg.source;
   if (src) await biLoad(await api().bi_auto(src, $("#bi-sheet").value));
 });
+// The chat asked for a saved dashboard (optionally filtered, optionally exported).
+async function biFromChat(ui) {
+  show("bi");
+  if (ui.open) {
+    await biLoad(await api().bi_open(ui.open));
+    bi.file = ui.open;
+  }
+  if (!bi.cfg) return;
+  if (ui.state) { bi.state = { ...bi.state, ...ui.state }; await biRefresh(); }
+  $("#bi-msg").textContent = `Ochildi: ${bi.cfg.name}`;
+  if (ui.export) await biExport(ui.export);
+}
+
 $("#bi-open").addEventListener("click", async () => {
   const f = $("#bi-saved").value;
   if (!f) return;
@@ -543,7 +557,7 @@ $("#bi-open").addEventListener("click", async () => {
 });
 $("#bi-del").addEventListener("click", async () => {
   const f = $("#bi-saved").value;
-  if (!f || !confirm("Saqlangan dashboard o‘chirilsinmi? (Ma’lumot fayli o‘chmaydi)")) return;
+  if (!f || !confirm("Saqlangan panel o‘chirilsinmi? (Ma’lumot fayli o‘chmaydi)")) return;
   drawBiSaved(await api().bi_delete(f));
 });
 $("#bi-save").addEventListener("click", async () => {

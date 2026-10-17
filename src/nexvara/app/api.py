@@ -15,11 +15,13 @@ from typing import Any
 
 from nexvara import __version__, config
 from nexvara.app.api_account import AccountApi
+from nexvara.app.api_agent import AgentApi, looks_like_secret
 from nexvara.app.api_bi import BiApi
 from nexvara.app.api_devices import DevicesApi
 from nexvara.app.api_files import FilesApi
 from nexvara.app.api_memory import MemoryApi
 from nexvara.app.api_sections import SectionsChatApi
+from nexvara.app.api_sync import SyncApi
 from nexvara.app.api_update import UpdateApi
 from nexvara.app.api_workflows import WorkflowsApi
 from nexvara.core.task import TaskFn, TaskRunner
@@ -38,6 +40,12 @@ OFFICE_TASKS: dict[str, tuple[str, str, str]] = {
 }
 
 
+_BACKGROUND = re.compile(
+    r",?\s*\b(?:orqa\s+)?fonda(?:\s+(?:bajar|ishla|qil)\w*)?\b|,?\s*\bko[‘’']?rinmas\s+holda\b",
+    re.IGNORECASE,
+)
+
+
 def _wants_ai(text: str) -> bool:
     """'AI bilan test tuz', 'sun'iy intellekt yordamida' -> the user asks for the AI version."""
     import re
@@ -48,7 +56,16 @@ def _wants_ai(text: str) -> bool:
 
 
 class Api(
-    MemoryApi, FilesApi, WorkflowsApi, BiApi, DevicesApi, AccountApi, UpdateApi, SectionsChatApi
+    AgentApi,
+    MemoryApi,
+    FilesApi,
+    WorkflowsApi,
+    BiApi,
+    DevicesApi,
+    AccountApi,
+    UpdateApi,
+    SectionsChatApi,
+    SyncApi,
 ):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
@@ -67,7 +84,9 @@ class Api(
         self._output_dir = output_dir
         self._keep_office_open = keep_office_open
         self._overrides = dict(overrides or {})
-        self._context_file: str | None = None  # "shu fayl": the last file worked on
+        from nexvara.agent.context import Context
+
+        self._ctx = Context()  # conversation state: "shu fayl", "uni", last folder/dashboard...
         self._pending: dict[str, tuple[str, Any]] = {}  # AI requests waiting for "Ha"
         self._ai = None
         # The desktop app keeps history and settings in D:\NEXVARA; tests run without.
@@ -76,11 +95,32 @@ class Api(
             from nexvara.appdata import History
 
             self._history = History()
-            self._runner.on_finish = lambda t: self._history.save(t.snapshot())
+        prev_hook = self._runner.on_finish
+
+        def on_finish(t: Any) -> None:
+            snap = t.snapshot()
+            if self._history is not None:
+                self._history.save(snap)
+            elif prev_hook is not None:
+                prev_hook(t)
+            self._ctx.task_done(snap)  # its output becomes "uni" / "natija"
+
+        self._runner.on_finish = on_finish
         if excel_demo:
             self._overrides["excel_demo"] = excel_demo
         if excel_dashboard:
             self._overrides["excel_dashboard"] = excel_dashboard
+
+    @property
+    def _context_file(self) -> str | None:
+        """ "shu fayl": the file the conversation is about."""
+        return self._ctx.file or None
+
+    @_context_file.setter
+    def _context_file(self, value: str | None) -> None:
+        self._ctx.file = value or ""
+        if value:
+            self._ctx.remember_dir(value)
 
     def _keep_open(self) -> bool:
         """Leave Office open after a task? The desktop app follows the user's setting."""
@@ -121,12 +161,18 @@ class Api(
         text = (text or "").strip()
         if not text:
             return {"reply": ""}
+        if looks_like_secret(text):  # never store or forward a pasted API key
+            return {"reply": "Bu API kalitga o‘xshaydi. Kalitni chatga yozmang: u Sozlamalar → AI "
+                    "bo‘limida kiritiladi va Windows Credential Manager’da saqlanadi. Bu xabar "
+                    "saqlanmadi."}  # fmt: skip
         mem = self._mem()
         if mem is not None:
             mem.log_chat("user", text)
-        out = self._chat_inner(text)
+        self._ctx.add_turn("user", text)
+        out = self._chat_inner(self._expand_aliases(text))
         if mem is not None:
             mem.log_chat("nexvara", out.get("reply", ""))
+        self._ctx.add_turn("nexvara", out.get("reply", ""))
         return out
 
     def _chat_inner(self, text: str, _use_ai: bool = True) -> dict[str, Any]:
@@ -139,6 +185,10 @@ class Api(
         teach = self._chat_teach(text)
         if teach is not None:
             return teach
+        text = self._bind_refs(text)  # "uni PDF qil" -> the file the last step produced
+        agent = self._chat_agent(text, _use_ai)  # several tasks; Files/BI/Workflows/Settings
+        if agent is not None:
+            return agent
         bi = self._chat_bi(text)
         if bi is not None:
             return bi
@@ -233,6 +283,12 @@ class Api(
             return {"reply": "Xotira bu rejimda o‘chirilgan."}
         if req.error:
             return {"reply": req.error}
+        cur = self._ctx.current_file(req.text)
+        if req.kind == "fact" and cur and self._ctx.refers_to_file(req.text):
+            # "Shu faylni eslab qol: oylik hisobot" -> the fact keeps the real path, so later
+            # "oylik hisobotni och" finds it (memory aliases).
+            pat = r"(?i)\b(shu|bu|ushbu|o[‘’']?sha)\s+fayl\w*|\buni\b"
+            req.text = re.sub(pat, lambda _m: cur, req.text, count=1)
         import uuid
 
         token = uuid.uuid4().hex[:12]
@@ -295,20 +351,43 @@ class Api(
         return {"token": token, "text": text}
 
     def _chat_ai(self, text: str, approved: bool = False) -> dict[str, Any]:
+        """The AI path, plus a note when personal data was kept on this PC."""
+        router = self._router()
+        before = getattr(router, "masked_total", 0)
+        out = self._chat_ai_inner(text, approved)
+        hidden = getattr(router, "masked_total", 0) - before
+        if hidden and out.get("reply"):
+            out["reply"] += (f"\n\n🔒 {hidden} ta shaxsiy ma’lumot AI’ga yuborilmadi: "
+                             "kompyuterda yashirildi va javobda qayta tiklandi.")  # fmt: skip
+            out["privacy_masked"] = hidden
+        return out
+
+    def _chat_ai_inner(self, text: str, approved: bool = False) -> dict[str, Any]:
+        from nexvara.agent import tools as agent_tools
         from nexvara.ai import features
         from nexvara.ai.router import NeedsConfirmation
         from nexvara.core.task import UserError
 
         router = self._router()
+        mem = self._mem()
         try:
-            intent = features.classify(router, text, approved)
+            facts = mem.relevant_facts(text) if mem is not None else []
+            rules = [f"{r.label()}: {r.text}" for r in mem.rules(enabled_only=True)] if mem else []
+            p = features.plan(router, text, agent_tools.catalog(), self._ctx.snapshot(),
+                              list(self._ctx.turns)[:-1], facts, rules, approved)  # fmt: skip
+            if p.kind == "tools":
+                calls = [agent_tools.ToolCall(str(c["tool"]), dict(c.get("args") or {}))
+                         for c in p.calls]  # fmt: skip
+                if not calls:
+                    return {"reply": p.say or "Nima qilishni tushunmadim, aniqroq yozing."}
+                intro = f"Tushundim: {p.say}\n\n" if p.say else ""
+                return self._run_calls(calls, intro=intro, from_ai=True)
+            intent = p.intent
             if intent.kind in ("test", "topic", "presentation", "command") and intent.command:
                 out = self._chat_inner(intent.command, _use_ai=False)
                 if not out.get("unhandled"):
                     out["reply"] = f"Tushundim: «{intent.command}»\n\n" + out["reply"]
                     return out
-            mem = self._mem()
-            facts = mem.relevant_facts(text) if mem is not None else []
             if intent.kind == "question":
                 ans = features.answer_question(
                     router, text, approved, intent.grade, intent.subject or None, facts=facts
@@ -344,6 +423,10 @@ class Api(
         kind, payload = item
         if kind == "teach":
             return self._save_teach(payload)
+        if kind == "tools":
+            return self._run_calls(payload, approved=True)
+        if kind == "chain":
+            return self._start_chain(payload, approved=True)
         if kind == "chat":
             return self._chat_ai(payload, approved=True)
         snap = self.make_test({**payload, "approved": True})
@@ -365,6 +448,22 @@ class Api(
             return {"ok": False, "error": f"Kalitni tekshirib bo‘lmadi: {e}"}
         return {"ok": True, **info, "status": self._router().status()}
 
+    def ai_save_key_from_clipboard(self, provider: str) -> dict[str, Any]:
+        """One-time connection without typing: the key copied on the provider's site is read
+        from the clipboard here (it never passes through the page), checked with the free
+        model list, stored in Credential Manager, and the clipboard is cleared. AI stays off."""
+        text = self._overrides["clipboard"]() if "clipboard" in self._overrides else _clipboard()
+        if not text or not text.strip():
+            return {"ok": False, "error": "Buferda kalit yo‘q: provayder saytida kalitni nusxalang"}
+        r = self.ai_save_key(provider, text.strip().splitlines()[0])
+        if r.get("ok"):
+            if "clipboard_clear" in self._overrides:
+                self._overrides["clipboard_clear"]()
+            else:
+                _clipboard(clear=True)
+            r["clipboard_cleared"] = True
+        return r
+
     def ai_delete_key(self, provider: str) -> dict[str, Any]:
         self._router().delete_key(provider)
         return self._router().status()
@@ -372,11 +471,49 @@ class Api(
     def ai_usage(self) -> list[dict[str, Any]]:
         return self._router().ledger.recent()
 
+    def ai_dashboard(self) -> dict[str, Any]:
+        """Home page "AI balans va xarajatlar": spend vs limits (estimated) per provider."""
+        return self._router().dashboard()
+
+    def ai_balance(self, provider: str) -> dict[str, Any]:
+        """The provider's REAL balance, only where an official API exists (DeepSeek). Free:
+        no model is called. Others: {"supported": False} — never a made-up number."""
+        from nexvara.ai import models
+
+        if provider not in models.PROVIDERS:
+            return {"supported": False, "error": "noma’lum provayder"}
+        return self._router().balance(provider)
+
+    def ai_save_limits(self, provider: str, daily_usd: Any = None, monthly_usd: Any = None,
+                       task_usd: Any = None):  # fmt: skip
+        """Own daily/monthly/one-task caps for one provider ("" or None = the overall limit).
+        These are NEXVARA's own limits, not the provider's real spending cap."""
+        from nexvara.ai import models
+
+        if provider not in models.PROVIDERS:
+            return {"ok": False, "error": "noma’lum provayder"}
+
+        def num(v: Any) -> float | None:
+            return None if v in (None, "") else float(v)
+
+        router = self._router()
+        try:  # the router's own settings (the same file in the app)
+            router.settings.update({"ai": {"limits": {provider: {
+                "daily_usd": num(daily_usd), "monthly_usd": num(monthly_usd),
+                "task_usd": num(task_usd)}}}})  # fmt: skip
+        except (TypeError, ValueError) as e:
+            return {"ok": False, "error": f"Limit noto‘g‘ri: {e}"}
+        return {"ok": True, "status": router.status()}
+
     # ----- Office commands ("Hisobot.xlsx ni och, ... va saqla") -----
     def _chat_command(self, text: str) -> dict[str, Any] | None:
         from nexvara.agent import files
         from nexvara.agent.parse import parse_command
 
+        # Office works in front of the user; only "fonda bajar" runs it without windows.
+        bg = _BACKGROUND.search(text)
+        if bg:
+            text = (text[: bg.start()] + text[bg.end() :]).strip(" ,.")
         plan = parse_command(text, self._context_file)
         if plan is None:
             return None
@@ -403,7 +540,8 @@ class Api(
         except LookupError as e:
             return {"reply": str(e)}
         self._context_file = str(source)
-        snap = self.run_command_plan(plan, str(source))
+        self._ctx.command = text
+        snap = self.run_command_plan(plan, str(source), background=bool(bg))
         steps = "\n".join(f"• {d}" for d in plan.describe())
         reply = f"Fayl: {source}\nBajaraman:\n{steps}"
         if taught:
@@ -412,7 +550,7 @@ class Api(
             reply += "\n\nTushunmadim (bajarilmaydi): " + "; ".join(f"«{u}»" for u in plan.unknown)
         return {"reply": reply, "task": snap, "plan": plan.describe()}
 
-    def run_command_plan(self, plan: Any, source: str) -> dict[str, Any]:
+    def run_command_plan(self, plan: Any, source: str, background: bool = False) -> dict[str, Any]:
         if "command" in self._overrides:
             fn = self._overrides["command"]
         else:
@@ -424,9 +562,12 @@ class Api(
                       "powerpoint": run_ppt_plan}[plan.app]  # fmt: skip
 
             def fn(task: Any) -> dict[str, Any]:
+                if background:
+                    return runner(task, plan, Path(source), keep_open=False, visible=False)
                 return runner(task, plan, Path(source), keep_open=self._keep_open())
 
-        return self._runner.start(f"Buyruq: {Path(source).name}", fn).snapshot()
+        title = f"Buyruq: {Path(source).name}" + (" (fonda)" if background else "")
+        return self._runner.start(title, fn).snapshot()
 
     def pick_file(self) -> dict[str, Any]:
         """Native "open file" dialog; the chosen file becomes "shu fayl" for commands."""
@@ -828,3 +969,19 @@ class Api(
         if os.name == "nt":
             subprocess.Popen(["explorer", "/select,", str(p)])
         return True
+
+
+def _clipboard(clear: bool = False) -> str:
+    """Windows clipboard text (or empty it). Used only for the one-time API key paste."""
+    import win32clipboard
+
+    win32clipboard.OpenClipboard()
+    try:
+        if clear:
+            win32clipboard.EmptyClipboard()
+            return ""
+        if not win32clipboard.IsClipboardFormatAvailable(win32clipboard.CF_UNICODETEXT):
+            return ""
+        return str(win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT))
+    finally:
+        win32clipboard.CloseClipboard()

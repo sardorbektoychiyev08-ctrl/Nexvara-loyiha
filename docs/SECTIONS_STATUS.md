@@ -1,4 +1,4 @@
-# 12 bo'lim va Core Agent: holat (2026-10-17)
+# 12 bo'lim va Core Agent: holat (2026-10-17, 3-tekshiruv)
 
 "Bo'lim ochiladi" ≠ "bo'lim chatdagi tabiiy til buyrug'ini bajaradi". Bu jadvalda faqat
 **chatga yozilgan gap** orqali haqiqatan bajariladigan narsa hisobga olingan. Har bo'lim uchun
@@ -16,14 +16,43 @@ muhitda sinalmagan.
 | 2 | AI Chat | AI'siz yo'naltiruvchi barcha bo'limlarga yuboradi; tushunilmasa aniq aytadi | — | REAL IMPLEMENTED (AI'siz) · haqiqiy AI kaliti bilan NOT TESTED |
 | 3 | Office Agent | «Hisobot.xlsx ni och, B ustun bo'yicha saralab, PDF qilib saqla» (Excel/Word/PowerPoint) | demo tugmalari | REAL IMPLEMENTED (haqiqiy Office testlari avval PASS) |
 | 4 | Darsliklar va testlar | «7-sinf fizika Nyuton qonunlari 20 ta test», «... mavzusini chiqarib ber», taqdimot | darslik yuklash, Telegram kirish | REAL IMPLEMENTED · Telegram haqiqiy hisob bilan NOT TESTED |
-| 5 | Files | «hisobot fayllarini top» | nusxa/ko'chirish, nomlash, ZIP, zaxira, tartiblash, PDF | PARTIAL |
-| 6 | NEXVARA BI | «Savdo.xlsx dan dashboard yarat» (BI ochiladi, avtomatik dashboard) | filtr, vidjet, eksport | PARTIAL |
-| 7 | Workflows | «workflowlarni ko'rsat», ««Kunlik hisobot» workflowini ishga tushir» (yangi) | yaratish/tahrirlash, pauza, tasdiq | PARTIAL |
+| 5 | Files | qidiruv (papka, tur), ma'lumot, nusxa, ko'chirish, nomlash, ommaviy nomlash, ZIP/ochish, zaxira, versiyalar, tiklash⚠, tartiblash⚠, Savatga⚠, ommaviy PDF; «topilgan fayllar», «uni» | — | REAL IMPLEMENTED |
+| 6 | NEXVARA BI | yaratish/saqlash, ro'yxat, ochish, filtr, sana oralig'i, sahifa, KPI javobi; formula ustun («Foyda = Daromad - Xarajat»), boshqa fayl bilan kalit bo'yicha birlashtirish, boshqa fayl qatorlarini qo'shish, filtr qadami, nomlash, ustunni olib tashlash, bo'sh qiymatlarni to'ldirish, takrorlarni o'chirish, tur o'zgartirish, qadamlar ro'yxati va bekor qilish; vidjetlar ro'yxati, qo'shish, tahrirlash (tur, sarlavha, ustunlar, hisob, eng kattasi N), olib tashlash, sahifa qo'shish, vidjetni boshqa sahifaga ko'chirish, sahifani o'chirish⚠ (yagona sahifa o'chmaydi), nomini o'zgartirish, eksport, o'chirish⚠ | — | REAL IMPLEMENTED |
+| 7 | Workflows | yaratish (qadamlar, kutish, tasdiq, har kuni SS:DD, papka kuzatish, xatoda davom), qayta yaratib tahrirlash, ro'yxat, ishga tushirish, pauza, davom, tasdiqlash, to'xtatish, yoqish/o'chirish, tarix, o'chirish⚠ | — | REAL IMPLEMENTED |
 | 8 | Teach NEXVARA | «Har doim Excel raqamlarini markazga joyla» → tasdiq → qoida | versiyalar, yoqish/o'chirish | REAL IMPLEMENTED |
 | 9 | Memory | «Eslab qol: ...», «nimalarni eslab qolgansan?», «xotiradan maktab haqida top» (yangi) | tahrir, o'chirish, zaxira/tiklash | REAL IMPLEMENTED (saqlash, eslash, qidiruv) |
 | 10 | Tasks / History | «oxirgi vazifalarni ko'rsat» (yangi) | bekor qilish (tugma yoki telefon) | REAL IMPLEMENTED (ko'rish) |
 | 11 | Devices | «telefon ulanishini yoq / o'chir», «telefon ulanganmi» (yangi) | QR skanerlash, qurilmani uzish | REAL IMPLEMENTED · haqiqiy telefon bilan NOT TESTED |
-| 12 | Settings | «yorug' mavzuga o't», «qorong'i mavzu» (yangi) | AI kalitlari va limitlar (ataylab chatdan emas), Google, yangilanish | PARTIAL |
+| 12 | Settings | mavzu, savollar/variantlar soni, Office oynasi, AI yoqish/o'chirish (kalit bo'lsa), kunlik/oylik limit, tasdiq chegarasi, telefon porti, yangilanish kanali va tekshiruvi, sinxron papkasi/yoqish/Drive, «sinxronla» | AI kalitlari (ataylab: faqat Sozlamalar → AI; chatga yozilgan kalit rad etiladi va saqlanmaydi), Google kirish (faqat foydalanuvchi brauzerda) | REAL IMPLEMENTED |
+
+⚠ = bajarishdan oldin «Davom etaymi?» so'raladi.
+
+## Windows V1 (2026-10-17)
+
+| Modul | Holat | Izoh |
+|---|---|---|
+| O'zbekcha interfeys (12 bo'lim, markaziy lug'at `i18n.js`) | REAL IMPLEMENTED | jonli tekshiruv: 100% (1202 bo'lak, 2 mavzu) |
+| Model Router v2 (4 daraja, fallback, limitlar, bloklash) | REAL IMPLEMENTED (soxta provayder bilan) | haqiqiy kalit bilan NOT TESTED |
+| To'lov/Balans tugmalari (rasmiy sahifalar) | REAL IMPLEMENTED | brauzerda ochiladi; to'lov NEXVARA ichida yo'q |
+| Bosh sahifa: AI balans va xarajatlar | REAL IMPLEMENTED | taxminiy sarf; haqiqiy balans faqat DeepSeek (rasmiy API) |
+| DeepSeek haqiqiy balansi | REAL IMPLEMENTED (soxta javob bilan) | haqiqiy kalit bilan NOT TESTED |
+| Shaxsiy ma'lumotlarni mahalliy yashirish/tiklash, ishonchsizda bloklash (barcha provayderlar, fallback) | REAL IMPLEMENTED | 28 test: OpenAI va Gemini HTTP qatlami, fallback; [PRIVACY.md](PRIVACY.md) |
+| OpenAI/Gemini haqiqiy sinov skripti (sun'iy matnlar, quruq rejim) | REAL IMPLEMENTED | haqiqiy chaqiruv — egasining ruxsatini kutmoqda |
+
+## Core Agent
+
+| Modul | Holat | Izoh |
+|---|---|---|
+| Tool reyestri (46 asbob, tur tekshiruvi, xavfli amallarga tasdiq) | REAL IMPLEMENTED | [AGENT.md](AGENT.md); unit testlar PASS |
+| Suhbat konteksti («uni», «shu fayl», «topilgan fayllar», «shu papka», «xuddi shunday … bilan ham») | REAL IMPLEMENTED | unit + UI testlar PASS |
+| Bir xabarda bir nechta topshiriq (zanjir, natija keyingi qadamga o'tadi) | REAL IMPLEMENTED | Office klauzalari bitta buyruq bo'lib qoladi |
+| AI tool-calling planner (JSON, 4 provayder uchun bir xil) | REAL IMPLEMENTED (soxta provayder bilan) | AI taklif qilgan o'zgartiruvchi reja avval ko'rsatiladi va «Ha»dan keyin bajariladi; haqiqiy kalit bilan NOT TESTED (pullik chaqiruv qilinmadi) |
+| Haqiqiy Office bilan yakuniy integratsiya (chat → Memory + Teach + zanjir + Files + BI; Workflow Word'da; 3 formatni ommaviy PDF) | REAL IMPLEMENTED | `tests/office/test_agent_office.py`, ko'rinadigan Office, faqat sinov fayllari |
+| Memory ↔ Teach ↔ Office | REAL IMPLEMENTED | yo'lli eslatmalar buyruqlarda nom sifatida ishlaydi; Teach qoidalari Office/zanjir/workflow'da; AI'ga mos eslatma va qoidalar |
+| Sinxronlash: papka (shifrlangan), telefon `/api/v1/sync` | REAL IMPLEMENTED | 2 qurilma, ziddiyat, o'chirish, xavfsizlik testlari PASS |
+| Sinxronlash: Google Drive appDataFolder | PARTIAL | soxta Drive bilan PASS; haqiqiy Drive BLOCKED (Google Cloud client + Drive API yoqilishi kerak) |
+| Ikki haqiqiy kompyuter o'rtasida sinxron | NOT TESTED | ikkinchi kompyuter kerak |
+| Vazifalar tarixini sinxronlash | TODO | yo'llar kompyuterga xos |
 
 ## Integratsiyalar
 
@@ -33,8 +62,9 @@ muhitda sinalmagan.
 | Haqiqiy telefon bilan ulanish | NOT TESTED | Foydalanuvchi telefoni kerak |
 | Native Android ilova | BLOCKED → Codex | JDK/Android SDK o'rnatilmagan; shartnoma va topshiriq tayyor: [ANDROID_HANDOFF.md](ANDROID_HANDOFF.md), [api/](api/) |
 | Google login (Windows, OAuth/OIDC + PKCE) | REAL IMPLEMENTED (soxta Google bilan) | 8 unit test PASS: PKCE, state, nonce, RS256 imzo, aud, refresh, invalid_grant, revoke |
-| Google login haqiqiy hisob bilan | BLOCKED | Google Cloud loyihasi va Desktop OAuth client kerak: [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md) |
-| Profil/Teach/tarix sinxronlash | TODO | Saqlash joyi tanlanmagan (masalan Drive appDataFolder) |
+| Google client JSON import (Desktop turi tekshiriladi) | REAL IMPLEMENTED | Sozlamalar → «Client JSON faylini tanlash»; NEXVARA o'zi kirmaydi |
+| Google login: faqat egasi (`sub`), birinchi kirishda egani foydalanuvchi tasdiqlaydi, begona hisob tokenlari darhol bekor qilinadi, sessiyani tiklash, oflayn holat | REAL IMPLEMENTED (soxta Google bilan) | 17 test PASS |
+| Google login haqiqiy hisob bilan | BLOCKED | Kompyuterda hech qanday Google OAuth sozlamasi yo'q (2026-10-17 tekshiruvi). Egasi Desktop client yaratib, JSON'ni import qilib, o'zi kirishi kerak: [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md) |
 | Windows installer (PyInstaller + Inno Setup) | REAL IMPLEMENTED | Build, jim o'rnatish, o'rnatilgan exe smoke PASS, o'chirish PASS, `D:\NEXVARA` tegilmadi |
 | Updater (imzoli manifest, SHA-256, tiklash, rollback) | REAL IMPLEMENTED | 6 unit test PASS; haqiqiy kalit + haqiqiy installer bilan papka kanali orqali qayta o'rnatish PASS |
 | Updater https kanali | NOT TESTED | https server yo'q (kod bor) |

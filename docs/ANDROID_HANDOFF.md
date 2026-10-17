@@ -38,7 +38,7 @@ Read first: [api/MOBILE_API.md](api/MOBILE_API.md) (protocol) and [api/openapi.y
 ```
 android/
   settings.gradle.kts, build.gradle.kts, gradle/libs.versions.toml, gradlew
-  app/src/main/java/uz/nexvara/app/
+  app/src/main/java/uz/nexvara/mobile/   (Codex uses applicationId uz.nexvara.mobile)
     data/api/        NexvaraApi (Retrofit or Ktor), DTOs generated from openapi.yaml or hand-written
     data/net/        PinnedTls (OkHttp X509TrustManager that checks SHA-256 of the leaf cert)
     data/store/      PcStore (DataStore + Keystore AES-GCM), OutboxQueue (Room)
@@ -92,10 +92,10 @@ Unit tests: OkHttp MockWebServer with recorded envelopes from MOBILE_API.md.
 
 | Item | Status | Why / what is needed |
 |---|---|---|
-| Google login on Android | BLOCKED | Needs a Google Cloud project with an **Android** OAuth client (package name + SHA-1 of the signing key). Use Credential Manager + "Sign in with Google". See [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md). The app must work fully without it |
+| Google login on Android | BLOCKED | Same Google Cloud project as Windows: an **Android** client (package `uz.nexvara.mobile` + SHA-1) and a **Web** client ID as `serverClientId` for Credential Manager. Only the PC owner (same Google `sub`) should be accepted. Details: [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md) §Android. The app must work fully without it |
 | Push notifications (FCM) | BLOCKED | Needs a Firebase project and an internet relay; v1 uses long-poll + WorkManager |
 | Access outside home Wi-Fi | BLOCKED | Needs a relay/VPN (e.g. Tailscale) chosen by the user; the protocol does not change |
-| Memory / Teach sync | TODO (Windows side) | No sync endpoint yet; v1 shows Memory through chat ("nimalarni eslab qolgansan?") |
+| Memory / Teach / settings sync | Windows side READY | `GET/POST /api/v1/sync` (MOBILE_API.md §10). Optional for the app v1 |
 
 ## 7. Rules (same as AGENTS.md)
 

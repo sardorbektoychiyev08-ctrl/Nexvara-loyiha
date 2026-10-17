@@ -24,14 +24,21 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "remote": {"enabled": False, "port": 8765},  # phone access over the local network
     # Private release channel: a folder or an https:// URL with a signed latest.json.
     "update": {"channel": "", "auto_check": True},
+    # Settings, memory and Teach rules between devices (sync.py). The passphrase is in
+    # Credential Manager (NEXVARA/sync/passphrase), never here.
+    "sync": {"enabled": False, "folder": "", "google_drive": False, "last": 0.0},
     "ai": {
         "enabled": False,
         "provider": "",  # openai | anthropic | gemini | deepseek
         "daily_budget_usd": 1.0,
         "monthly_budget_usd": 10.0,
         "confirm_over_usd": 0.05,  # ask before a single request that may cost more
+        "task_limit_usd": 0.50,  # a single request estimated above this is refused
+        "limits": {},  # provider -> {"daily_usd": x, "monthly_usd": y} (optional, own caps)
+        "fallback": False,  # busy/down provider -> another one; off: no paid call by itself
         "send_textbook_text": True,
         "models": {},  # provider -> tier -> model id (filled when a key is checked)
+        "checked": {},  # provider -> {"at": time, "models": n} of the last key check
         "prices": {},  # model id -> [input, output] USD per 1M tokens, overrides the table
     },
 }
@@ -105,6 +112,14 @@ def _validate(s: dict[str, Any]) -> None:
     for k in ("daily_budget_usd", "monthly_budget_usd", "confirm_over_usd"):
         if float(ai[k]) < 0:
             raise ValueError(f"{k} manfiy bo‘lmasin")
+    if ai.get("task_limit_usd") not in (None, "") and float(ai["task_limit_usd"]) < 0:
+        raise ValueError("task_limit_usd manfiy bo‘lmasin")
+    for prov, lim in (ai.get("limits") or {}).items():
+        if prov not in ("openai", "anthropic", "gemini", "deepseek") or not isinstance(lim, dict):
+            raise ValueError("noma’lum provayder limiti")
+        for v in lim.values():
+            if v not in (None, "") and float(v) < 0:
+                raise ValueError("limit manfiy bo‘lmasin")
 
 
 class History:

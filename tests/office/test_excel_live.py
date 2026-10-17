@@ -63,7 +63,7 @@ def test_ui_button_runs_real_excel(tmp_path):
         [sys.executable, "-m", "nexvara.app.main", "--selftest-excel", str(tmp_path)],
         capture_output=True,
         text=True,
-        timeout=300,
+        timeout=600,  # 4 Office demos in a row; slow on a busy PC
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "SELFTEST PASS [run-excel]" in proc.stdout
