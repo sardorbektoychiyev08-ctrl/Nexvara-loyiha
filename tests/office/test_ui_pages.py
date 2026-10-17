@@ -25,7 +25,7 @@ ROOT = Path(__file__).parents[2]
 
 @pytest.mark.parametrize("script", sorted(p.name for p in SCRIPTS.glob("*.py")))
 def test_ui_script(script):
-    env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+    env = {**os.environ, "PYTHONPATH": str(ROOT / "src"), "PYTHONIOENCODING": "utf-8"}
     r = subprocess.run(
         [sys.executable, str(SCRIPTS / script)], capture_output=True, text=True,
         encoding="utf-8", errors="replace", env=env, timeout=600, cwd=ROOT,

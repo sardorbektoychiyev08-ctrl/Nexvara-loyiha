@@ -20,6 +20,14 @@ Codex limit bo‘lsa shu tarmoqdan davom etadi (PROGRESS.md dagi oxirgi yozuv).
 - `MainActivity.kt` — QR, fayl/rasm/PDF/kamera, ovoz (SpeechRecognizer + TTS),
   bildirishnoma, BiometricPrompt qulf, Credential Manager (Google).
 
+**1.1.0 (2026-10-17 kechasi):** kompyuter ekrani (jonli, faqat ko‘rish), PC fayl qidirish /
+ochish / telefonga olish, «Tayyor buyruqlar» (o‘qituvchi, ofis, hujjat, chizma), Tailscale
+orqali boshqa tarmoq (manzillar `session` dan, pin bo‘yicha ishonch), chizmani tuzatish + DXF,
+«Ulashish → NEXVARA», WorkManager bilan fon xabarlari (`Notifier.kt`), skrinshot taqiqi.
+Telefonda (Xiaomi, Android 16) adb bilan E2E qilindi — skriptlar scratchpad’da edi; qayta
+qilish uchun: `adb reverse tcp:8766 tcp:8766`, vaqtinchalik `NEXVARA_DATA` bilan Agent,
+havolani `127.0.0.1` ga almashtirib qo‘lda joylash, uiautomator dump + `input tap`.
+
 **Qolgan ish (keyingi agent uchun):** 1) haqiqiy telefon + haqiqiy Windows Agent E2E
 (foydalanuvchi bilan); 2) release imzo kaliti `D:\NEXVARA\android\release.jks` (foydalanuvchi
 tasdig‘i bilan yaratiladi) va `-Release` build; 3) Google: foydalanuvchi Google Cloud’da

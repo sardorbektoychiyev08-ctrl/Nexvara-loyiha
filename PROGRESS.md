@@ -4,6 +4,46 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (22) — Claude Code — Android 1.1.0: barcha qulayliklar, boshqa tarmoq, telefonda haqiqiy E2E
+
+**Foydalanuvchi talabi:** Android’da hamma ishni tugatish (o‘qituvchidan ofisgacha barcha imkoniyatlar, juda qulay), har xil Wi-Fi’da xavfsiz ishlash, taklif qilingan barcha qulayliklar; API kalitsiz Android va Windows’ni o‘zim sinash — telefon USB bilan ulab qo‘yildi, foydalanuvchi uxladi.
+
+**Qo‘shildi (Windows):** `/api/v1/screen` (kompyuter ekrani, faqat ko‘rish, PC’da «📱 Telefon ekranni ko‘rmoqda», `remote.screen_view` bilan o‘chadi); fayl qidirish / PC’da ochish / telefonga berish (10/30 daqiqalik ruxsat, kalit va bazalar hech qachon, dastur ochilmaydi); `info`/`session` da manzillar (LAN + Tailscale); sertifikat tarmoq almashganda o‘zgarmaydi; internetdan to‘g‘ridan-to‘g‘ri so‘rov rad etiladi; chizma DXF (AutoCAD) va «oxirgi chizmani o‘zgartir»; uzilgan ulanish logni ifloslamaydi.
+
+**Qo‘shildi (Android 1.1.0):** Kompyuter ekrani (jonli, kattalashtirish, ostida buyruq maydoni), Fayllar → kompyuterdan qidirish, «Tayyor buyruqlar» (o‘qituvchi: test, mavzu, taqdimot, dars rejasi, uyga vazifa, e’lon, baholar; ofis; hujjatlar; chizma; xotira), Darsliklar → Mavzu matni / Taqdimot / Dars rejasi, chizmani tuzatish tugmasi, Tailscale kartasi (manzillar o‘zi saqlanadi, avtomatik almashadi), «Ulashish → NEXVARA», fon xabarlari (WorkManager, 15 daqiqa), skrinshot taqiqi, Bosh sahifada 8 tezkor amal.
+
+**Telefonda haqiqiy sinov (Xiaomi 24115RA8EG, Android 16, adb; Agent shu tarmoq kodi, vaqtinchalik ma’lumot papkasi, AI kalitsiz):**
+| Sinov | Natija |
+|---|---|
+| Codex 0.1.0 ustidan o‘rnatish, saqlangan kompyuter yo‘qolmadi | PASS |
+| Birinchi ishga tushirishda yiqilish (bildirishnoma ruxsati erta so‘ralgan) | TOPILDI → tuzatildi → PASS |
+| Havola bilan ulash (USB `adb reverse`), ikki kompyuter, nom berish | PASS |
+| Bosh sahifa ulangan, AI panel 4 provayder | PASS |
+| Suhbat: buyruq → javob; PC oynasiga «📱 Telefondan» hodisasi | PASS |
+| Kompyuterdan fayl qidirish → «Buyruq» → haqiqiy Excel bilan bajarildi | PASS (kursor xatosi topildi → tuzatildi) |
+| Natijani telefonga saqlash (tizim «Saqlash»), SHA-256 PC nusxasi bilan bir xil | PASS |
+| Word hisobot (haqiqiy Word): Pauza → «Pauzada» → Davom → Bajarildi | PASS |
+| BI panel telefonda (KPI, chiziq, ustun) + PC’da ochilish hodisasi | PASS |
+| Xotira: PC eslatmasi ko‘rindi, telefondan qo‘shildi | PASS |
+| Teach: tekshirish → saqlash | PASS (noto‘g‘ri namuna matni topildi → tuzatildi) |
+| Workflow shablondan yaratildi | PASS |
+| Darsliklar sahifasi, AI xarajat sahifasi (4 karta, «To‘ldirish») | PASS |
+| Kompyuter ekrani telefonda jonli | PASS |
+| Tayyor buyruq → suhbat maydoni; «Ulashish» matni → suhbat | PASS |
+| Chizma AI kalitisiz → to‘g‘ri tushuntirish | PASS |
+| Yorug‘/qorong‘i mavzu; tizim panellari rangi | PASS (panel rangi tuzatildi) |
+| Fon xabarlari (WorkManager), barmoq izi qulfi, ovoz, kamera, QR kamera bilan | NOT TESTED — qo‘l bilan |
+| Tailscale orqali boshqa tarmoq | NOT TESTED — Tailscale o‘rnatilmagan |
+| Haqiqiy AI (chizma, rasmdan chizma, AI test) | NOT TESTED — kalit yo‘q, pul sarflanmadi |
+
+**Windows testlari:** ruff PASS; unit 326 PASS; Office bilan to‘liq (`NEXVARA_RUN_OFFICE=1`): PASS — 381 passed + devices_page qayta: 1 passed (birinchi urinishda konsol kodirovkasi tufayli yiqildi; test ishga tushiruvchisi UTF-8 ga o‘tkazildi), jami 382/382; oyna smoke PASS (oldingi bosqichda).
+
+**APK:** `D:\NEXVARA\android\NEXVARA-Android-1.1.0-debug.apk`. Telefonda «ekran o‘chmasin» (`stay_on_while_plugged_in`) sinov uchun yoqilgan edi va asl qiymatga (0) qaytarildi.
+
+**Keyingi qadam:** foydalanuvchi bilan qo‘l sinovlari (QR kamera, ovoz, barmoq izi, fon xabari), Tailscale, AI kaliti bilan chizma; keyin `main` ga merge.
+
+---
+
 ## 2026-10-17 (21) — Claude Code — Android V1: yangi dizayn, barcha bo‘limlar, chizma, xavfsizlik
 
 **Foydalanuvchi talabi:** Codex’ning Android ishini Claude oladi (Codex dizayni yoqmadi), Windows 1.0.1 ni buzmasdan Android V1 ni yakunlash: 12 bo‘lim, AI yozish/ovoz, Office jonli, BI, darsliklardan test, fayl/PDF/rasm/kamera, natijani yuklash, Memory/Teach, Workflow, pauza/davom, ish/uy kompyuteri, Google, NEXVARA-SYNC, AI balans paneli (4 provayder), maxfiylik telefon so‘rovlarida ham, pullik chaqiruvsiz. Qo‘shimcha (yo‘l-yo‘lakay): xavfsizlik maksimal; «chizib ber» va qo‘lda chizilgan chala chizma rasmini mukammal chizish.

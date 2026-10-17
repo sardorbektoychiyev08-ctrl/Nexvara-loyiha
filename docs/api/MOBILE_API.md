@@ -200,6 +200,24 @@ JSHSHIR, phone numbers… → placeholders; blocked when unsure). Covered by
 token's signature, audience and that `sub` equals the PC owner, then stores only the email on
 the device row. Setup: [../GOOGLE_LOGIN.md](../GOOGLE_LOGIN.md) § Android.
 
+## 12. Other networks, PC screen, PC files
+
+**Other Wi-Fi / mobile data (Tailscale).** `info` and `session` return `port` and
+`addresses` (`{"ip", "kind": "lan"|"tailscale"}`); the phone stores them and tries them in
+order, remembering the one that answered. Trust is the certificate pin only (hostname is not
+checked), so the PC is the same PC on any address. The certificate is made once and **kept**
+when the PC changes network (older builds regenerated it per IP and broke the pin). Requests
+from public internet addresses are refused (`remote.allowed_client`: private ranges,
+loopback, link-local, Tailscale 100.64.0.0/10 only) — a router port-forward cannot expose it.
+
+**PC screen.** `GET /screen` → JPEG of the primary monitor (view only). `settings.json →
+remote.screen_view: false` turns it off; the PC window shows «📱 Telefon ekranni ko‘rmoqda».
+
+**PC files.** `GET /files/search?q=&ext=` searches the user folders by name; results may be
+opened on the PC (`POST /files/open`, programs/scripts refused) or shared to the phone
+(`POST /files/share` → `GET /files?path=` for 30 minutes) for 10 minutes. Keys, databases,
+`*.pem/*.jks/*.kdbx…` and NEXVARA's own `remote/`, `telegram/`, `release/` are never listed.
+
 ## 9. Testing without the real PC data
 
 ```
