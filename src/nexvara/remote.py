@@ -5,8 +5,13 @@ pairs with a one-time 6-digit code and gets a device token. Security:
 - HTTPS with a certificate made on this PC (the phone shows a one-time warning);
 - one-time pairing code valid 10 minutes, locked after 5 wrong attempts;
 - tokens are stored only as SHA-256 hashes; a device can be revoked at any time;
-- tokens are rotated weekly; requests carry an id so a retried command never runs twice;
+- tokens are rotated weekly (the old one works until the new one is used) and expire
+  after 30 days without rotation; requests carry an id so a retried command never runs twice;
+- requests are rate-limited per address;
 - off by default; nothing is reachable from the internet (local network only).
+
+The native Android app uses the versioned API in `remote_v1.py` (/api/v1/...); the
+browser page keeps the original /api/... routes.
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ DEFAULT_PORT = 8765
 CODE_TTL = 600
 MAX_BAD_CODES = 5
 TOKEN_ROTATE_DAYS = 7
+TOKEN_MAX_DAYS = 30  # a token not rotated for this long stops working (re-pair)
 MAX_UPLOAD = 50 * 1024 * 1024
 UI_FILE = Path(__file__).parent / "app" / "ui" / "mobile.html"
 
@@ -46,6 +52,13 @@ CREATE TABLE IF NOT EXISTS devices (
     last_ip TEXT NOT NULL DEFAULT ''
 );
 """
+# Columns added after the first release (old app.db files get them on open).
+_MIGRATIONS = {
+    "prev_hash": "TEXT",  # the previous token, valid until the new one is first used
+    "platform": "TEXT NOT NULL DEFAULT 'browser'",
+    "app_version": "TEXT NOT NULL DEFAULT ''",
+    "install_id": "TEXT NOT NULL DEFAULT ''",
+}
 
 
 def _hash(token: str) -> str:
@@ -69,39 +82,60 @@ class DeviceStore:
         self._lock = threading.Lock()
         with self._db() as db:
             db.executescript(_SCHEMA)
+            have = {r[1] for r in db.execute("PRAGMA table_info(devices)")}
+            for col, decl in _MIGRATIONS.items():
+                if col not in have:
+                    db.execute(f"ALTER TABLE devices ADD COLUMN {col} {decl}")
 
     def _db(self) -> sqlite3.Connection:
         return sqlite3.connect(str(self.path), timeout=10)
 
-    def add(self, name: str) -> tuple[int, str]:
+    def add(self, name: str, platform: str = "browser", app_version: str = "",
+            install_id: str = "") -> tuple[int, str]:  # fmt: skip
         token = secrets.token_urlsafe(32)
         now = time.time()
+        name = (name or "Telefon").strip()[:60] or "Telefon"
         with self._lock, self._db() as db:
+            if install_id:  # the same phone pairing again replaces its old entry
+                db.execute("DELETE FROM devices WHERE install_id = ?", (install_id[:64],))
             cur = db.execute(
-                "INSERT INTO devices (name, token_hash, created, token_created) "
-                "VALUES (?, ?, ?, ?)",
-                ((name or "Telefon").strip()[:60] or "Telefon", _hash(token), now, now),
+                "INSERT INTO devices (name, token_hash, created, token_created, platform, "
+                "app_version, install_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (name, _hash(token), now, now, platform[:20], app_version[:20], install_id[:64]),
             )
             return int(cur.lastrowid), token
 
     def check(self, token: str, ip: str = "") -> dict[str, Any] | None:
+        """The device owning `token`, or None. An expired token gives {"expired": True}."""
         if not token:
             return None
+        h = _hash(token)
         with self._lock, self._db() as db:
             r = db.execute(
-                "SELECT id, name, token_created FROM devices WHERE token_hash = ?", (_hash(token),)
+                "SELECT id, name, token_created, token_hash = ?, platform FROM devices "
+                "WHERE token_hash = ? OR prev_hash = ?",
+                (h, h, h),
             ).fetchone()
             if r is None:
                 return None
+            if time.time() - r[2] > TOKEN_MAX_DAYS * 86400:
+                return {"id": r[0], "name": r[1], "token_created": r[2], "expired": True}
+            if r[3]:  # the new token is in use: the previous one stops working
+                db.execute("UPDATE devices SET prev_hash = NULL WHERE id = ?", (r[0],))
             db.execute("UPDATE devices SET last_seen = ?, last_ip = ? WHERE id = ?",
                        (time.time(), ip, r[0]))  # fmt: skip
-        return {"id": r[0], "name": r[1], "token_created": r[2]}
+        return {"id": r[0], "name": r[1], "token_created": r[2], "platform": r[4]}
 
     def rotate(self, device_id: int) -> str:
+        """A new token; the current one keeps working until the new one is first used
+        (so a reply lost on the way does not lock the phone out)."""
         token = secrets.token_urlsafe(32)
         with self._lock, self._db() as db:
-            db.execute("UPDATE devices SET token_hash = ?, token_created = ? WHERE id = ?",
-                       (_hash(token), time.time(), device_id))  # fmt: skip
+            db.execute(
+                "UPDATE devices SET prev_hash = token_hash, token_hash = ?, token_created = ? "
+                "WHERE id = ?",
+                (_hash(token), time.time(), device_id),
+            )
         return token
 
     def revoke(self, device_id: int) -> None:
@@ -111,10 +145,53 @@ class DeviceStore:
     def all(self) -> list[dict[str, Any]]:
         with self._db() as db:
             rows = db.execute(
-                "SELECT id, name, created, last_seen, last_ip FROM devices ORDER BY id"
+                "SELECT id, name, created, last_seen, last_ip, platform, app_version "
+                "FROM devices ORDER BY id"
             ).fetchall()
-        return [{"id": r[0], "name": r[1], "created": r[2], "last_seen": r[3], "last_ip": r[4]}
-                for r in rows]  # fmt: skip
+        return [{"id": r[0], "name": r[1], "created": r[2], "last_seen": r[3], "last_ip": r[4],
+                 "platform": r[5], "app_version": r[6]} for r in rows]  # fmt: skip
+
+
+def server_id() -> str:
+    """A random id of this PC, so the phone can tell Work PC from Home PC."""
+    p = config.data_dir() / "remote" / "server_id.txt"
+    try:
+        sid = p.read_text(encoding="ascii").strip()
+        if sid:
+            return sid
+    except OSError:
+        pass
+    p.parent.mkdir(parents=True, exist_ok=True)
+    sid = secrets.token_hex(8)
+    p.write_text(sid, encoding="ascii")
+    return sid
+
+
+def cert_fingerprint(cert_path: Path) -> str:
+    """SHA-256 of the certificate (DER), hex. The QR code carries it so the Android app
+    pins this exact certificate instead of trusting any self-signed one."""
+    der = ssl.PEM_cert_to_DER_cert(cert_path.read_text(encoding="ascii"))
+    return hashlib.sha256(der).hexdigest()
+
+
+class RateLimiter:
+    """Sliding window per key (client address)."""
+
+    def __init__(self, limit: int, window: float = 60.0) -> None:
+        self.limit = limit
+        self.window = window
+        self._hits: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def allow(self, key: str) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            hits = [t for t in self._hits.get(key, []) if now - t < self.window]
+            allowed = len(hits) < self.limit
+            if allowed:
+                hits.append(now)
+            self._hits[key] = hits
+            return allowed
 
 
 def ensure_certificate(folder: Path, ip: str) -> tuple[Path, Path]:
@@ -171,6 +248,9 @@ class RemoteServer:
         self.bad_codes = 0
         self._seen: dict[str, tuple[float, dict]] = {}  # request id -> reply (idempotency)
         self._lock = threading.Lock()
+        self.fingerprint = ""
+        self.limiter = RateLimiter(240)  # requests per minute per address
+        self.pair_limiter = RateLimiter(10)
 
     # ----- lifecycle -----
     @property
@@ -185,6 +265,7 @@ class RemoteServer:
         httpd.daemon_threads = True
         if self.use_tls:
             cert, key = ensure_certificate(config.data_dir() / "remote", lan_ip())
+            self.fingerprint = cert_fingerprint(cert)
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             ctx.minimum_version = ssl.TLSVersion.TLSv1_2
             ctx.load_cert_chain(cert, key)
@@ -204,6 +285,12 @@ class RemoteServer:
     def url(self) -> str:
         return f"{'https' if self.use_tls else 'http'}://{lan_ip()}:{self.port}/"
 
+    def pair_link(self) -> str:
+        """What the QR code holds: the browser opens the URL (and reads p=), the Android
+        app reads all fields: p = code, fp = certificate SHA-256, sid = this PC's id."""
+        link = f"{self.url()}#p={self.code}&sid={server_id()}"
+        return link + (f"&fp={self.fingerprint}" if self.fingerprint else "")
+
     def new_code(self) -> str:
         self.code = f"{secrets.randbelow(1_000_000):06d}"
         self.code_expires = time.time() + CODE_TTL
@@ -220,27 +307,31 @@ class RemoteServer:
                 "code": self.code if code_ok else "",
                 "code_left": max(0, left),
                 "locked": self.bad_codes >= MAX_BAD_CODES,
+                "fingerprint": self.fingerprint,
             })  # fmt: skip
             if code_ok:
                 import segno
 
-                out["qr_svg"] = segno.make(f"{self.url()}#p={self.code}", error="m").svg_inline(
+                out["qr_svg"] = segno.make(self.pair_link(), error="m").svg_inline(
                     scale=5, dark="#121933", light="#ffffff"
                 )
         return out
 
     # ----- requests -----
-    def pair(self, code: str, name: str) -> dict[str, Any]:
+    def pair(self, code: str, name: str, **device: str) -> dict[str, Any]:
+        """`error_code` is the protocol code (protocol.ERRORS) for the v1 API."""
         with self._lock:
             if self.bad_codes >= MAX_BAD_CODES:
-                return {"error": "Ko‘p noto‘g‘ri urinish. Kompyuterda yangi kod oling."}
+                return {"error": "Ko‘p noto‘g‘ri urinish. Kompyuterda yangi kod oling.",
+                        "error_code": "PAIRING_LOCKED"}  # fmt: skip
             if not self.code or time.time() > self.code_expires:
-                return {"error": "Kod eskirgan. Kompyuterdagi Devices bo‘limida yangi kod oling."}
-            if not secrets.compare_digest(str(code).strip(), self.code):
+                return {"error": "Kod eskirgan. Kompyuterdagi Devices bo‘limida yangi kod oling.",
+                        "error_code": "PAIRING_CODE_EXPIRED"}  # fmt: skip
+            if not secrets.compare_digest(str(code).strip().encode(), self.code.encode()):
                 self.bad_codes += 1
-                return {"error": "Kod noto‘g‘ri"}
+                return {"error": "Kod noto‘g‘ri", "error_code": "PAIRING_CODE_INVALID"}
             self.code = ""  # one-time
-        device_id, token = self.store.add(name)
+        device_id, token = self.store.add(name, **device)
         return {"token": token, "device_id": device_id}
 
     def remember(self, request_id: str, reply: dict | None = None) -> dict | None:
@@ -299,10 +390,29 @@ class _Handler(BaseHTTPRequestHandler):
     def _device(self) -> dict[str, Any] | None:
         auth = self.headers.get("Authorization", "")
         token = auth[7:] if auth.startswith("Bearer ") else ""
-        return self.server_ref.store.check(token, self.client_address[0])
+        dev = self.server_ref.store.check(token, self.client_address[0])
+        return None if dev is None or dev.get("expired") else dev
+
+    def _limited(self) -> bool:
+        if self.server_ref.limiter.allow(self.client_address[0]):
+            return False
+        self._send(429, b'{"error": "rate limited"}', "application/json", {"Retry-After": "30"})
+        return True
+
+    def _v1(self, method: str) -> bool:
+        if not self.path.startswith("/api/v1/"):
+            return False
+        from nexvara.remote_v1 import handle
+
+        handle(self, method)
+        return True
 
     # ----- routes -----
     def do_GET(self) -> None:  # noqa: N802
+        if self._v1("GET"):
+            return
+        if self._limited():
+            return
         u = urlparse(self.path)
         if u.path in ("/", "/index.html"):
             csp = {"Content-Security-Policy": "default-src 'self' 'unsafe-inline' data: blob:"}
@@ -335,12 +445,20 @@ class _Handler(BaseHTTPRequestHandler):
             self._json({"error": "not found"}, 404)
 
     def do_POST(self) -> None:  # noqa: N802
+        if self._v1("POST"):
+            return
+        if self._limited():
+            return
         u = urlparse(self.path)
         srv = self.server_ref
         try:
             if u.path == "/api/pair":
+                if not srv.pair_limiter.allow(self.client_address[0]):
+                    self._json({"error": "Juda ko‘p urinish. Biroz kuting."}, 429)
+                    return
                 data = json.loads(self._body() or b"{}")
                 out = srv.pair(str(data.get("code", "")), str(data.get("name", "")))
+                out.pop("error_code", None)
                 self._json(out, 200 if "token" in out else 403)
                 return
             dev = self._device()

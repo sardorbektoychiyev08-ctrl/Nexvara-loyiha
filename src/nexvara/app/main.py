@@ -98,6 +98,10 @@ def main(argv: list[str] | None = None) -> int:
         api = Api(persist=True)  # history and settings survive restarts
         if not args.smoke:
             api.start_background()  # workflow folder watchers and daily schedules
+            try:
+                api.update_after_start()  # did an update started last time succeed?
+            except Exception:  # noqa: BLE001 - never block the app from opening
+                logging.getLogger(__name__).exception("update check after start failed")
     window = webview.create_window(
         "NEXVARA",
         url=str(UI_DIR / "index.html"),

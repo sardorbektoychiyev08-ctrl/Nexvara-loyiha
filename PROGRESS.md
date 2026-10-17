@@ -4,6 +4,37 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (13) — Claude Code — Windows Agent integratsiyalari: telefon API v1, Google login, installer/updater, bo'limlar auditi
+
+**Foydalanuvchi talabi:** 179 PASS testni saqlab, Android uchun xavfsiz API, Google OAuth/OIDC, installer/updater tekshiruvi, 12 bo'lim ↔ Core Agent holati, Codex uchun Android hujjatlari, PROGRESS va private GitHub'ga push. Pullik AI chaqirilmadi.
+
+**Qilindi** (tarmoq `claude/integratsiyalar`):
+- **Telefon API v1** (`remote_v1.py`, `protocol.py`, [docs/api/](docs/api/)): 13 marshrut, `{"v":1,"ok":...}` javob + 11 ta barqaror xato kodi, QR'da sertifikat SHA-256 (`fp`) va kompyuter ID (`sid`) — Android sertifikatni pin qiladi; tokenni yumshoq almashtirish (eski token yangisi ishlatilguncha ishlaydi), 30 kunlik muddat, chiqish, bir xil o'rnatish qayta bog'lansa eski yozuv almashadi; long-poll `tasks/watch`; fayl yuklash/olishda SHA-256; har manzilga tezlik cheklovi (240/daq, bog'lash 10/daq); eski `app.db` avtomatik migratsiya. Brauzer sahifasi eski `/api/...` bilan ishlashda davom etadi. `openapi.yaml` marshrutlari test bilan serverga bog'langan. `python -m nexvara.devserver` — Android uchun demo server.
+- **Google login (Windows)** (`account.py`, Sozlamalar → Google hisobi): tizim brauzeri + `127.0.0.1` callback, PKCE S256, state, nonce, ID token RS256 imzosi (JWKS), iss/aud/exp tekshiruvi, refresh token Credential Manager'da, refresh, `invalid_grant` → avtomatik chiqish, logout → Google'da revoke. Client JSON yo'q bo'lsa karta **BLOCKED** deb aniq yozadi.
+- **Installer** (`installer/`, `scripts/build.ps1`): PyInstaller (NEXVARA.exe, 128 MB papka) + Inno Setup 6 (47 MB `NEXVARA-Setup-0.1.0.exe`): admin'siz, Start Menu, ixtiyoriy yorliq, uninstaller, `/NOLAUNCH`. Yorliq yaratish o'rnatilgan exe uchun tuzatildi. PyInstaller (.venv) va Inno Setup (winget, user scope) o'rnatildi.
+- **Updater** (`updater.py`, Sozlamalar → Versiya va yangilanish): papka yoki https kanal; Ed25519 imzoli `latest.json` (maxfiy kalit faqat `D:\NEXVARA\release\signing_key.pem`, ochig'i kodda), hajm + SHA-256, `pending.json` → keyingi ishga tushishda "yangilandi" yoki "muvaffaqiyatsiz", oxirgi 2 installer saqlanadi, rollback; `http://` rad etiladi.
+- **12 bo'lim auditi** ([docs/SECTIONS_STATUS.md](docs/SECTIONS_STATUS.md)): chatdan bajarilmaydigan bo'limlarga buyruqlar qo'shildi (`app/api_sections.py`): workflowni nomi bilan ishga tushirish/ro'yxat, oxirgi vazifalar, «nimalarni eslab qolgansan?», «xotiradan ... top», telefon ulanishini yoqish/o'chirish/holat, yorug'/qorong'i mavzu. Natija: 7 REAL IMPLEMENTED, 4 PARTIAL (Files, BI, Workflows, Settings), Home N/A.
+- **Codex uchun**: [docs/ANDROID_HANDOFF.md](docs/ANDROID_HANDOFF.md) (stek, tuzilma, 15 qabul mezoni, pinning, offline navbat, BLOCKED ro'yxat), [docs/api/MOBILE_API.md](docs/api/MOBILE_API.md), [docs/GOOGLE_LOGIN.md](docs/GOOGLE_LOGIN.md), [docs/RELEASE.md](docs/RELEASE.md). AGENTS.md: `android/` → Codex (`codex/android-mobile`).
+- Mavjud test o'zgardi (1 ta): `test_revoke_and_rotate` — eski token endi yangisi ishlatilguncha ishlaydi (yo'qolgan javob telefonni bloklamasligi uchun), keyin rad etiladi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 214 ta (oldingi 179 + telefon API v1 10, Google 8, updater 6, bo'limlar chat 11) | PASS |
+| Oyna smoke (12 sahifa, JS xatosiz) | PASS |
+| UI haqiqiy oynada: Google kartasi BLOCKED, yangilanish xatosi, chatdan mavzu/tarix/workflow (`tests/ui_scripts/settings_integrations.py`) | PASS |
+| Installer: build → jim o'rnatish → o'rnatilgan `NEXVARA.exe --smoke` → o'chirish; `D:\NEXVARA\app.db` tegilmadi; paketda maxfiy fayl yo'q | PASS |
+| Haqiqiy reliz kaliti bilan imzolash → tekshirish → SHA-256 → jim qayta o'rnatish → `after_start` = updated | PASS |
+| Office testlari (`-Office`) | NOT TESTED — Office kodi o'zgarmadi, ruxsatsiz Office ochilmadi |
+| Haqiqiy Google login | BLOCKED — Google Cloud Desktop OAuth client kerak |
+| Haqiqiy telefon bilan v1 | NOT TESTED — telefon kerak; native ilova BLOCKED (JDK/SDK) → Codex |
+| Updater https kanali | NOT TESTED; Authenticode imzo BLOCKED |
+
+**Keyingi qadam:** Codex — `codex/android-mobile` da APK (ANDROID_HANDOFF.md). Foydalanuvchi — `google_client.json` va AI kaliti (ixtiyoriy). Claude — Files/BI/Workflows/Settings qolgan amallarini chatga ulash, sync.
+
+---
+
 ## 2026-10-16 (12) — Claude Code — Qolgan barcha bo'limlar: Memory, Teach, Files, Workflows, NEXVARA BI, Devices
 
 **Foydalanuvchi talabi:** "qolgan barcha bo'limlarni mukammal darajada qo'sh". Endi 12 bo'limning hech biri bo'sh emas (smoke buni tekshiradi).
