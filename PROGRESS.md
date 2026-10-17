@@ -4,6 +4,32 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (17) — Claude Code — Windows Google login: haqiqiy hisobga tayyorgarlik, owner-only
+
+**Foydalanuvchi talabi:** mavjud Google OAuth sozlamalarini xavfsiz tekshirish (maxfiy qiymatlarni chiqarmasdan), mosini qayta ishlatish, ruxsatsiz yangi Google Cloud loyihasi yaratmaslik; haqiqiy Google Sign-In (brauzer, Code + PKCE, callback, profil, xavfsiz saqlash, sessiyani tiklash, chiqish); faqat egasining hisobi (`sub` bo'yicha, emailni taxmin qilmasdan); Android uchun tayyorgarlik (kodiga tegmasdan); Drive uchun minimal ruxsat; brauzerda tasdiqlash bosqichida to'xtash; testlar; push.
+
+**Tekshiruv (maxfiy qiymatlar chiqarilmadi):** D:\ (D:\NEXVARA, D:\Mahalla_nasiya_bot, loyiha, Codex worktree — faqat o'qish), C:\Users\toych (Downloads, Documents, Desktop, OneDrive, Pictures) — client JSON, `google-services.json` va `apps.googleusercontent.com` bo'yicha qidirildi; Credential Manager'da NEXVARA/Google yozuvlari faqat nomi bo'yicha tekshirildi. **Natija: hech qanday Google OAuth sozlamasi yo'q** (faqat testlardagi soxta ID'lar). Yangi loyiha yaratilmadi.
+
+**Qilindi** (tarmoq `claude/google-owner`):
+- Owner-only (`account.py`): birinchi kirishda hech narsa saqlanmaydi, ilova «Ha, bu mening hisobim / Yo'q» deb so'raydi; «Ha» → Google `sub` Credential Manager'ga (`NEXVARA/google/owner_sub`); boshqa `sub` bilan kirish rad etiladi va uning tokenlari darhol Google'da bekor qilinadi; email tasdiqlanmagan hisob rad etiladi; yangilangan ID token boshqa hisobniki bo'lsa chiqiladi; «Egani almashtirish» faqat chiqilgan holatda va tasdiq bilan.
+- Sessiyani tiklash: ilova ochilganda fonda, brauzersiz (`account_resume`); bekor qilingan grant → chiqish (ega eslab qolinadi); internet yo'q → «offline», keyingi safar tekshiriladi.
+- Sozlamalar UI: egani tasdiqlash qatori, «egasi ✓», oflayn belgi, «Egani almashtirish».
+- [docs/GOOGLE_LOGIN.md](docs/GOOGLE_LOGIN.md): holat, ishlash tartibi, egasi uchun bosqichma-bosqich sozlash, Drive uchun minimal ruxsat (`drive.appdata`; `drive.file`/`drive` so'ralmaydi), Android uchun bir loyihada Android client (`uz.nexvara.mobile` + SHA-1) va Web client ID (`serverClientId`), `sub` orqali egasini moslash. Codex kodiga tegilmadi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 253 (oldingi 246 + 7 owner-only/sessiya testi; 3 ta eski Google testi birinchi kirish tasdig'iga moslandi) | PASS |
+| `.\scripts\test.ps1 -Office` | **307/307 PASS**, smoke PASS |
+| Google oqimi **soxta** Google serveri bilan (PKCE, state, nonce, RS256, owner-only, revoke, resume, offline) | PASS |
+| **Haqiqiy** Google login | BLOCKED — kompyuterda OAuth client yo'q; egasi Desktop client yaratib o'zi kirishi kerak |
+| Haqiqiy Drive sinxron | BLOCKED — yuqoridagiga bog'liq |
+
+**Keyingi qadam:** egasi GOOGLE_LOGIN.md 1–5-bosqichlarni bajaradi va brauzerda o'zi kiradi; keyin haqiqiy natija shu yerga yoziladi.
+
+---
+
 ## 2026-10-17 (16) — Claude Code — BI: vidjetni sahifaga ko'chirish, sahifani o'chirish; ochiq Office jarayonlari tekshiruvi
 
 **Foydalanuvchi talabi:** 299/299 PASS ni saqlab, BI'dagi qolgan ikki chat funksiyasi (o'chirishdan oldin tasdiq), testlar, push; ochiq qolgan 3 Excel + 1 PowerPoint jarayonini tekshirish — foydalanuvchi hujjati bo'lsa yopmaslik, shubhalisini majburan to'xtatmaslik. Codex Android'ga tegmaslik, pullik AI yo'q.

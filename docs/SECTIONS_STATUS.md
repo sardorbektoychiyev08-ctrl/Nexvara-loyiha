@@ -51,7 +51,8 @@ muhitda sinalmagan.
 | Native Android ilova | BLOCKED → Codex | JDK/Android SDK o'rnatilmagan; shartnoma va topshiriq tayyor: [ANDROID_HANDOFF.md](ANDROID_HANDOFF.md), [api/](api/) |
 | Google login (Windows, OAuth/OIDC + PKCE) | REAL IMPLEMENTED (soxta Google bilan) | 8 unit test PASS: PKCE, state, nonce, RS256 imzo, aud, refresh, invalid_grant, revoke |
 | Google client JSON import (Desktop turi tekshiriladi) | REAL IMPLEMENTED | Sozlamalar → «Client JSON faylini tanlash»; NEXVARA o'zi kirmaydi |
-| Google login haqiqiy hisob bilan | BLOCKED | Foydalanuvchi Google Cloud'da Desktop OAuth client yaratib, o'zi kirishi kerak: [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md) |
+| Google login: faqat egasi (`sub`), birinchi kirishda egani foydalanuvchi tasdiqlaydi, begona hisob tokenlari darhol bekor qilinadi, sessiyani tiklash, oflayn holat | REAL IMPLEMENTED (soxta Google bilan) | 17 test PASS |
+| Google login haqiqiy hisob bilan | BLOCKED | Kompyuterda hech qanday Google OAuth sozlamasi yo'q (2026-10-17 tekshiruvi). Egasi Desktop client yaratib, JSON'ni import qilib, o'zi kirishi kerak: [GOOGLE_LOGIN.md](GOOGLE_LOGIN.md) |
 | Windows installer (PyInstaller + Inno Setup) | REAL IMPLEMENTED | Build, jim o'rnatish, o'rnatilgan exe smoke PASS, o'chirish PASS, `D:\NEXVARA` tegilmadi |
 | Updater (imzoli manifest, SHA-256, tiklash, rollback) | REAL IMPLEMENTED | 6 unit test PASS; haqiqiy kalit + haqiqiy installer bilan papka kanali orqali qayta o'rnatish PASS |
 | Updater https kanali | NOT TESTED | https server yo'q (kod bor) |

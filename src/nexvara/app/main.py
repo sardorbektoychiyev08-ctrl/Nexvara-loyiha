@@ -102,6 +102,14 @@ def main(argv: list[str] | None = None) -> int:
                 api.update_after_start()  # did an update started last time succeed?
             except Exception:  # noqa: BLE001 - never block the app from opening
                 logging.getLogger(__name__).exception("update check after start failed")
+
+            def resume_google() -> None:  # saved Google session, checked without a browser
+                try:
+                    api.account_resume()
+                except Exception:  # noqa: BLE001 - the Settings card shows the state
+                    logging.getLogger(__name__).exception("Google session check failed")
+
+            threading.Thread(target=resume_google, name="google-resume", daemon=True).start()
     window = webview.create_window(
         "NEXVARA",
         url=str(UI_DIR / "index.html"),

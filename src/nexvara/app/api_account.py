@@ -53,3 +53,17 @@ class AccountApi:
 
     def account_logout(self) -> dict[str, Any]:
         return self._google().logout()
+
+    def account_confirm_owner(self, yes: bool) -> dict[str, Any]:
+        """First login: "Ha, bu mening hisobim" binds NEXVARA to this Google account."""
+        return self._google().confirm_owner(bool(yes))
+
+    def account_forget_owner(self) -> dict[str, Any]:
+        return self._google().forget_owner()
+
+    def account_resume(self) -> dict[str, Any]:
+        """App start: restore the saved session (no browser, no new login)."""
+        acc = self._google()
+        if acc.client is None:
+            return acc.status()
+        return acc.resume()

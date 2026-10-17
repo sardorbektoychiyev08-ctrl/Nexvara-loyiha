@@ -455,8 +455,17 @@ async function renderAccount(status) {
   const info = $("#account-info"), err = $("#account-error");
   const login = $("#account-login"), logout = $("#account-logout");
   err.hidden = true;
+  const ask = $("#account-owner-ask");
+  ask.hidden = !st.pending_owner;
+  if (st.pending_owner) {
+    $("#account-owner-text").textContent = `Kirildi: ${st.pending_owner.name || ""} ${st.pending_owner.email}. ` +
+      "NEXVARA faqat shu hisob bilan ishlasinmi? (Boshqa hisoblar rad etiladi.)";
+  }
   if (st.signed_in) {
-    info.textContent = `Kirilgan: ${st.profile.name || ""} ${st.profile.email}`.trim();
+    const ses = st.session === "offline" ? " · internet yo‘q, sessiya keyin tekshiriladi" : "";
+    info.textContent = `Kirilgan: ${st.profile.name || ""} ${st.profile.email} · egasi ✓${ses}`;
+  } else if (st.pending_owner) {
+    info.textContent = "Bu hisob sizniki ekanini tasdiqlang:";
   } else if (!st.configured) {
     info.textContent = `Hozircha mavjud emas (BLOCKED): ${st.blocked}`;
   } else if (st.login.state === "waiting") {
@@ -468,10 +477,18 @@ async function renderAccount(status) {
   login.hidden = st.signed_in;
   login.disabled = !st.configured || st.login.state === "waiting";
   logout.hidden = !st.signed_in;
+  login.hidden = st.signed_in || !!st.pending_owner;
+  $("#account-forget-owner").hidden = st.signed_in || !st.owner_set;
   clearTimeout(accountTimer);
   if (st.login.state === "waiting") accountTimer = setTimeout(() => renderAccount(), 1500);
 }
 
+$("#account-owner-yes").addEventListener("click", async () => renderAccount(await api().account_confirm_owner(true)));
+$("#account-owner-no").addEventListener("click", async () => renderAccount(await api().account_confirm_owner(false)));
+$("#account-forget-owner").addEventListener("click", async () => {
+  if (!confirm("NEXVARA egasi bo‘lgan Google hisobi unutilsinmi? Keyingi kirgan hisobni yana tasdiqlaysiz.")) return;
+  renderAccount(await api().account_forget_owner());
+});
 $("#account-import").addEventListener("click", async () => {
   const r = await api().account_import_client();
   renderAccount(r);
