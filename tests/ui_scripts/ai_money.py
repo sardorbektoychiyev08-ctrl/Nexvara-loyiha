@@ -51,20 +51,40 @@ def run():
         wait_for("document.getElementById('version').textContent.startsWith('NEXVARA v')", 90)
         js = win.evaluate_js
         res["cards"] = wait_for("document.querySelectorAll('#ai-money-cards .ai-card').length")
-        res["labels"] = json.loads(js("JSON.stringify([...document.querySelectorAll('#ai-money-cards h3')].map(h => h.firstChild.textContent))"))
-        res["deepseek_month"] = js("[...document.querySelectorAll('#ai-money-cards .ai-card')].find(c => c.textContent.includes('DeepSeek')).textContent.includes('$0.0012')")
-        res["no_balance_api"] = js("document.getElementById('ai-money-cards').textContent.split('Haqiqiy balansni avtomatik olish imkoni yo‘q').length - 1")
+        res["labels"] = json.loads(
+            js(
+                "JSON.stringify([...document.querySelectorAll('#ai-money-cards h3')].map(h => h.firstChild.textContent))"
+            )
+        )
+        res["deepseek_month"] = js(
+            "[...document.querySelectorAll('#ai-money-cards .ai-card')].find(c => c.textContent.includes('DeepSeek')).textContent.includes('$0.0012')"
+        )
+        res["no_balance_api"] = js(
+            "document.getElementById('ai-money-cards').textContent.split('Haqiqiy balansni avtomatik olish imkoni yo‘q').length - 1"
+        )
         res["history_rows"] = js("document.querySelectorAll('#ai-money-history tr').length")
         res["chart"] = js("document.querySelectorAll('#ai-money-chart rect').length")
-        res["estimated_note"] = js("document.getElementById('ai-money').textContent.includes('taxminiy sarf')")
-        js("[...document.querySelectorAll('#ai-money-cards .ai-card')].find(c => c.textContent.includes('Gemini')).querySelector('button').click()")
+        res["estimated_note"] = js(
+            "document.getElementById('ai-money').textContent.includes('taxminiy sarf')"
+        )
+        js(
+            "[...document.querySelectorAll('#ai-money-cards .ai-card')].find(c => c.textContent.includes('Gemini')).querySelector('button').click()"
+        )
         time.sleep(0.5)
         js("document.querySelector('.nav-item[data-page=settings]').click()")
         res["rows"] = wait_for("document.querySelectorAll('.ai-prov').length")
-        res["pay_buttons"] = js("[...document.querySelectorAll('.ai-prov button')].filter(b => b.textContent.startsWith('To‘lov / Balans')).length")
-        res["key_buttons"] = js("[...document.querySelectorAll('.ai-prov button')].filter(b => b.textContent.startsWith('API kalitini olish')).length")
-        res["subscription_text"] = js("document.getElementById('ai-card').textContent.includes('API krediti bilan bir xil emas')")
-        js("[...document.querySelectorAll('.ai-prov')].find(r => r.textContent.includes('OpenAI')).querySelectorAll('button')[2].click()")
+        res["pay_buttons"] = js(
+            "[...document.querySelectorAll('.ai-prov button')].filter(b => b.textContent.startsWith('To‘lov / Balans')).length"
+        )
+        res["key_buttons"] = js(
+            "[...document.querySelectorAll('.ai-prov button')].filter(b => b.textContent.startsWith('API kalitini olish')).length"
+        )
+        res["subscription_text"] = js(
+            "document.getElementById('ai-card').textContent.includes('API krediti bilan bir xil emas')"
+        )
+        js(
+            "[...document.querySelectorAll('.ai-prov')].find(r => r.textContent.includes('OpenAI')).querySelectorAll('button')[2].click()"
+        )
         time.sleep(0.5)
         res["errors"] = json.loads(js("JSON.stringify(window.__errors)"))
     finally:
@@ -86,8 +106,11 @@ ok = (
     and res.get("pay_buttons") == 4
     and res.get("key_buttons") == 4
     and res.get("subscription_text")
-    and opened == ["https://aistudio.google.com/billing",
-                   "https://platform.openai.com/settings/organization/billing/overview"]
+    and opened
+    == [
+        "https://aistudio.google.com/billing",
+        "https://platform.openai.com/settings/organization/billing/overview",
+    ]
     and not res.get("errors")
 )
 print("E2E", "PASS" if ok else "FAIL")
