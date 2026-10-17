@@ -24,5 +24,5 @@ Bosqichlar [MASTER_SPEC.md](MASTER_SPEC.md) 26-bo'limidan olingan. Holat belgila
 1. M11 (Codex): Android APK — [ANDROID_HANDOFF.md](ANDROID_HANDOFF.md); sinxron uchun `/api/v1/sync` tayyor.
 2. Foydalanuvchi: Google Cloud Desktop client JSON → Sozlamalar → import → o'zi kiradi (keyin haqiqiy login va Drive sinxron sinovi).
 3. M7: foydalanuvchi kaliti bilan haqiqiy AI planner sinovi (ruxsat bilan).
-4. Vazifalar tarixini sinxronlash; BI: vidjetni sahifalararo ko'chirish, sahifani o'chirish.
+4. Vazifalar tarixini sinxronlash.
 5. M5: Vision, Web research, Computer control.

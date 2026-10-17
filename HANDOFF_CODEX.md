@@ -38,9 +38,10 @@ Read first: [AGENTS.md](AGENTS.md) (rules), the newest entry of [PROGRESS.md](PR
 | 1 | Real AI planner test with the user's key | Only with the user's explicit OK (paid). `Settings → AI`; budget limits already enforced |
 | 2 | Real Google login + Drive sync | User creates a *Desktop app* OAuth client, imports JSON in Settings, signs in **themselves**. Never sign in for them. Steps: docs/GOOGLE_LOGIN.md |
 | 3 | Task history sync | `sync.py` syncs facts, rules, safe settings. History rows hold PC paths; sync titles/status only, mark files as "on <pc>" |
-| 4 | BI: widget move between pages, delete page, slicer list editing via chat | Tools `bi.*` in tools.py; UI in `app/ui/bi.js` |
+| 4 | BI: slicer list editing via chat | Tools `bi.*` in tools.py; UI in `app/ui/bi.js` (moving widgets between pages and deleting pages are done) |
 | 5 | M5: Vision / Web research / Computer control | not started |
 | 6 | Code signing (Authenticode) | BLOCKED: needs a certificate |
+| 8 | Leftover hidden Office processes | Earlier test runs left windowless `/automation` Excel/PowerPoint instances (see PROGRESS 16). Never force-kill without the user's OK; check `Workbooks.Count` first |
 | 7 | Two real PCs / phone sync E2E | needs the user's second device |
 
 ## Safety rules that tests enforce — do not weaken

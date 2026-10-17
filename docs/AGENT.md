@@ -26,7 +26,7 @@ Every section's actions are registered once with a typed parameter list and a `r
 | Section | Tools |
 |---|---|
 | Files | `files.search`, `info`, `copy`, `move`, `rename`, `rename_batch`, `zip`, `unzip`, `backup`, `versions`, `restore`⚠, `tidy`⚠, `recycle`⚠, `pdf` |
-| NEXVARA BI | `bi.create`, `list`, `open`, `summary`, `export` (xlsx/csv here; pdf/png drawn by the page), `add_step` (calc, join, append, filter, rename, drop_col, fill_null, drop_null, dedupe, drop_empty, set_type), `steps`, `remove_step`, `widgets`, `add_widget`, `edit_widget`, `remove_widget`, `add_page`, `rename`, `delete`⚠ |
+| NEXVARA BI | `bi.create`, `list`, `open`, `summary`, `export` (xlsx/csv here; pdf/png drawn by the page), `add_step` (calc, join, append, filter, rename, drop_col, fill_null, drop_null, dedupe, drop_empty, set_type), `steps`, `remove_step`, `widgets`, `add_widget`, `edit_widget`, `remove_widget`, `move_widget`, `add_page`, `delete_page`⚠, `rename`, `delete`⚠ |
 | Workflows | `workflow.list`, `create` (steps, daily time, watched folder, retries, on_error), `run`, `pause`, `resume`, `approve`, `stop`, `enable`, `history`, `delete`⚠ |
 | Settings | `settings.show`, `settings.set` (whitelist; never API keys), `settings.update_check`, `sync.now` |
 | Everything else | `nexvara.command` → the offline pipeline (Office, tests, topics, slides, memory, Teach) |
