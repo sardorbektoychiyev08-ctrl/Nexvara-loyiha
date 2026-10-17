@@ -329,6 +329,16 @@ def _bi(text: str, f: str) -> list[ToolCall] | None:
     wref = re.search(r"(\d+)\s*-?\s*(vidjet|diagramm|grafik|korsatkich)\w*", f)
     wq = re.search(_Q + r"\s+(?:vidjet|diagramm|grafig|grafik|ko[‘’']?rsatkich)\w*", text, re.I)
     widget = wref.group(1) if wref else (wq.group(1) if wq else "")
+    # "...dagi 3-vidjetni 2-sahifaga ko‘chir",
+    # "«Ulush» diagrammasini «Mahsulotlar» sahifasiga o‘tkaz"
+    pnum = re.search(r"(\d+)\s*-?\s*sahifa\w*", f)
+    pq = re.search(_Q + r"\s+sahifa\w*", text, re.I)
+    page_ref = pnum.group(1) if pnum else (pq.group(1) if pq else "")
+    if widget and page_ref and _has(f, r"\b(kochir|kochirib|otkaz|olib\s+ot|joyla)\w*"):
+        return call("bi.move_widget", widget=widget, page=page_ref)
+    # "«Savdo» dashboardidagi 2-sahifani o‘chir" (asks first: the tool is risky)
+    if page_ref and not widget and _has(f, r"\b(ochir|olib\s+tashla)\w*"):
+        return call("bi.delete_page", page=page_ref)
     if _has(f, r"\b(vidjet|diagramm)\w*lar\w*") and _has(f, r"\b(korsat|royxat|qanday|qaysi)\w*"):
         return call("bi.widgets")
     if widget and _has(f, r"\b(ochir|olib\s+tashla)\w*"):

@@ -130,3 +130,35 @@ def test_dates_rename_and_open(api):
     r = api.chat("«Savdo» dashboardini «Savdo 2026» deb nomla")
     assert [d["name"] for d in api.bi_list()] == ["Savdo 2026"], r
     assert Path(api.bi_list()[0]["file"]).is_file()
+
+
+def test_move_widget_and_delete_page_with_confirmation(api):
+    def widgets(page):
+        return [w["title"] for w in cfg(api)["pages"][page]["widgets"]]
+
+    api.chat("«Savdo» dashboardiga «Mahsulotlar» sahifasini qo‘sh")
+    last = len(cfg(api)["pages"])
+    first = widgets(0)[0]
+    r = api.chat(f"«Savdo» dashboardidagi 1-vidjetni {last}-sahifaga ko‘chir")
+    assert "ko‘chirildi" in r["reply"] and widgets(last - 1) == [first], r
+    assert first not in widgets(0) and r["bi_ui"]["state"]["page"] == last - 1
+    r = api.chat(f"«Savdo» dashboardidagi «{first}» vidjetini «Mahsulotlar» sahifasiga ko‘chir")
+    assert "allaqachon" in r["reply"]
+    assert "topilmadi" in api.chat(
+        "«Savdo» dashboardidagi 1-vidjetni «Yo‘q» sahifasiga ko‘chir")["reply"]  # fmt: skip
+
+    pages = len(cfg(api)["pages"])
+    r = api.chat("«Savdo» dashboardidagi «Mahsulotlar» sahifasini o‘chir")
+    assert r["confirm"] and "Davom etaymi" in r["reply"], r
+    assert len(cfg(api)["pages"]) == pages  # nothing deleted before "Ha"
+    assert "Bekor" in api.confirm_ai(r["confirm"], yes=False)["reply"]
+    assert len(cfg(api)["pages"]) == pages
+    r = api.chat("«Savdo» dashboardidagi «Mahsulotlar» sahifasini o‘chir")
+    out = api.confirm_ai(r["confirm"])
+    assert "1 ta vidjeti bilan" in out["reply"] and len(cfg(api)["pages"]) == pages - 1, out
+    while len(cfg(api)["pages"]) > 1:
+        r = api.chat(f"«Savdo» dashboardidagi {len(cfg(api)['pages'])}-sahifani o‘chir")
+        api.confirm_ai(r["confirm"])
+    r = api.chat("«Savdo» dashboardidagi 1-sahifani o‘chir")
+    assert "yagona sahifasi" in api.confirm_ai(r["confirm"])["reply"]
+    assert len(cfg(api)["pages"]) == 1

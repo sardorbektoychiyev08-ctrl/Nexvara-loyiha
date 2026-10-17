@@ -4,6 +4,30 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (16) — Claude Code — BI: vidjetni sahifaga ko'chirish, sahifani o'chirish; ochiq Office jarayonlari tekshiruvi
+
+**Foydalanuvchi talabi:** 299/299 PASS ni saqlab, BI'dagi qolgan ikki chat funksiyasi (o'chirishdan oldin tasdiq), testlar, push; ochiq qolgan 3 Excel + 1 PowerPoint jarayonini tekshirish — foydalanuvchi hujjati bo'lsa yopmaslik, shubhalisini majburan to'xtatmaslik. Codex Android'ga tegmaslik, pullik AI yo'q.
+
+**Qilindi** (tarmoq `claude/bi-sahifa`):
+- `bi.move_widget`: ««Savdo» dashboardidagi 3-vidjetni 2-sahifaga ko'chir», ««Ulush» vidjetini «Mahsulotlar» sahifasiga o'tkaz» (sahifa raqami yoki nomi; o'sha sahifada bo'lsa aytadi; ochilganda o'sha sahifa ko'rinadi).
+- `bi.delete_page` (xavfli → «Davom etaymi?»): ««Savdo» dashboardidagi 2-sahifani / «Mahsulotlar» sahifasini o'chir»; «Yo'q» → hech narsa o'chmaydi; yagona sahifa o'chirilmaydi; javobda nechta vidjet bilan o'chgani aytiladi.
+- UI sinov skriptlari (`agent_chat.py`, `settings_integrations.py`) endi faqat yangi kelgan xabarlarni tekshiradi: 1-yugurishda `agent_chat` yiqildi, chunki «saqlandi» so'zi oldingi BI javobida ham bor edi va skript workflow javobidan oldin tekshirib qo'ygan (skriptdagi poyga, mahsulot xatosi emas).
+
+**Office jarayonlari (faqat o'qib tekshirildi):** to'rttalasi ham COM avtomatlashtirish orqali ishga tushgan (`/automation -Embedding`, ota jarayon svchost/DcomLaunch), oynasiz, 10:29–11:05 da — oldingi test yugurishlaridan qolgan. Running Object Table'da birorta ham ochiq hujjat yo'q. Javob bergan yagona Excel (PID 2388): yashirin, foydalanuvchi boshqaruvida emas, 0 ta kitob → unga faqat Excel'ning o'z `Quit` buyrug'i yuborildi (majburlash yo'q). Jarayon chiqmadi (tashqi COM havolalari ushlab turibdi). PID 4880, 4296 (Excel) va 1848 (PowerPoint) ROT orqali javob bermadi → tekshirib bo'lmadi, tegilmadi. Hech biri majburan to'xtatilmadi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 246 (oldingi 245 + sahifa/ko'chirish testi) | PASS |
+| `.\scripts\test.ps1 -Office` 1-yugurish | 299/300 — `agent_chat.py` UI skriptidagi poyga |
+| UI skriptlari tuzatilgandan keyin alohida | PASS (ikkalasi) |
+| `.\scripts\test.ps1 -Office` yakuniy | **300/300 PASS** (11 daq 14 s), smoke PASS |
+
+**Keyingi qadam:** foydalanuvchi ruxsat bersa, 4 ta yashirin Office jarayonini majburan yopish (ularda ochiq hujjat yo'q); HANDOFF_CODEX.md dagi ochiq ishlar.
+
+---
+
 ## 2026-10-17 (15) — Claude Code — BI chatdan to'liq, haqiqiy Office integratsiyasi, xavfsizlik, Codex handoff
 
 **Foydalanuvchi talabi:** 240 PASS testni saqlab: BI'ning qolgan qismlari (formula ustun, fayllarni birlashtirish, diagramma tahrirlash, barcha amallar chatdan); haqiqiy Office sinovlari (ruxsat berildi, faqat sinov fayllarida, oynalar ko'rinadigan); yakuniy integratsiya; barcha testlar; xavfsizlik; push; Codex Android tarmog'iga tegmaslik; pullik AI yo'q; HANDOFF_CODEX.md.
