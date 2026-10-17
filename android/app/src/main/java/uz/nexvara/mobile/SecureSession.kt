@@ -79,6 +79,24 @@ class SecureSession(context: Context) {
         saveState(state)
     }
 
+    /** "Ish kompyuteri" / "Uy kompyuteri": a local name; the PC itself is not changed. */
+    @Synchronized fun rename(serverId: String, label: String) {
+        val state = state()
+        val pc = state.getJSONObject("pcs").optJSONObject(serverId) ?: return
+        pc.put("label", label.trim().take(40))
+        saveState(state)
+    }
+
+    /** Id of the last PC chat message this phone has seen (GET /api/v1/chat/history?after=). */
+    @Synchronized fun historyCursor(serverId: String): Int = state().optJSONObject("cursor")?.optInt(serverId) ?: 0
+
+    @Synchronized fun setHistoryCursor(serverId: String, id: Int) {
+        val state = state()
+        val c = state.optJSONObject("cursor") ?: JSONObject().also { state.put("cursor", it) }
+        c.put(serverId, id)
+        saveState(state)
+    }
+
     @Synchronized fun updateToken(token: String) {
         val state = state()
         val active = state.getJSONObject("pcs").optJSONObject(state.optString("active")) ?: return
@@ -145,6 +163,10 @@ class SecureSession(context: Context) {
         state.put("queue", kept)
         saveState(state)
     }
+
+    /** Non-secret one-time flags (e.g. "already asked for the notification permission"). */
+    fun flag(name: String): Boolean = prefs.getBoolean("flag_$name", false)
+    fun setFlag(name: String) { prefs.edit().putBoolean("flag_$name", true).apply() }
 
     @Synchronized fun clear() { prefs.edit().clear().commit() }
 }

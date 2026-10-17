@@ -68,17 +68,26 @@ scopes beyond name/email are granted (Drive). NEXVARA then simply asks you to si
 NEXVARA writes one encrypted file per device (`<device>.nxsync`, AES-256-GCM with your sync
 passphrase), so even Google sees only ciphertext.
 
-## Android (prepared, not implemented — Codex's area)
+## Android (implemented; needs the owner's Google Cloud clients)
 
-Use the **same Google Cloud project** so the phone and the PC see the same account:
+The phone signs in with Android **Credential Manager** ("Sign in with Google"). The PC checks
+the phone's ID token: Google's RS256 signature, issuer, expiry, audience = our **Web client
+ID**, verified email, and `sub` = the PC owner. Only the email is stored on the paired
+device's row (`app.db`). No password, no secret, no `google-services.json`.
 
-- an **Android** OAuth client: package `uz.nexvara.mobile` (Codex's applicationId) + SHA-1 of the release keystore
-  (and the debug keystore while developing);
-- a **Web application** OAuth client: its client ID is the `serverClientId` that Android
-  Credential Manager (`GetGoogleIdOption` / Sign in with Google) puts in the ID token's `aud`.
-  No secret of it goes into the app.
-- Owner check on the phone: compare the ID token's `sub` with the PC owner. Google's `sub` is
-  the same for one Google account across all clients, so the phone can confirm it is the same
-  person. A PC endpoint for this (verify the phone's ID token against the Web client ID) is
-  not built yet; until then the phone pairs by QR as today.
-- No `google-services.json` is needed for Sign in with Google alone (only for Firebase).
+Owner's one-time steps (Google Cloud Console → the **same project** as the Windows client →
+APIs & Services → Credentials → Create credentials → OAuth client ID):
+
+1. **Android** client: package name `uz.nexvara.mobile`, SHA-1 of the signing certificate.
+   - debug APK (this PC's debug key): `5F:D9:63:6F:A9:BD:5F:A0:0A:4C:A5:CD:D4:C6:18:E1:74:68:BE:11`
+   - release APK: the SHA-1 of `D:\NEXVARA\android\release.jks` (made when the release key is
+     created; `keytool -list -v -keystore release.jks`). Add both.
+2. **Web application** client: no redirect URI needed. Copy its **Client ID** (ends with
+   `.apps.googleusercontent.com`; it is public, not a secret).
+3. Put the Web Client ID into `D:\NEXVARA\settings.json` → `"google": {"android_web_client_id":
+   "…"}` (NEXVARA reads it; the phone gets it from the PC).
+4. On the PC: Settings → Google → sign in and answer «Ha, bu mening hisobim» (sets the owner).
+5. On the phone: Kompyuterlar → Google hisobi → «Google bilan bog‘lash».
+
+Until then the phone works fully with QR pairing; the Google card says what is missing.
+

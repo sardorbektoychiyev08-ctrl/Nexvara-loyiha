@@ -39,6 +39,50 @@ MAX_BAD_CODES = 5
 TOKEN_ROTATE_DAYS = 7
 TOKEN_MAX_DAYS = 30  # a token not rotated for this long stops working (re-pair)
 MAX_UPLOAD = 50 * 1024 * 1024
+# Files a phone may never put on this PC: programs, scripts, shortcuts, installers, add-ins
+# that run by double-click. Documents, PDFs, pictures, archives and data files are fine.
+BLOCKED_UPLOADS = (
+    ".exe",
+    ".com",
+    ".scr",
+    ".pif",
+    ".bat",
+    ".cmd",
+    ".ps1",
+    ".psm1",
+    ".psd1",
+    ".vbs",
+    ".vbe",
+    ".js",
+    ".jse",
+    ".wsf",
+    ".wsh",
+    ".hta",
+    ".msi",
+    ".msp",
+    ".msix",
+    ".appx",
+    ".lnk",
+    ".url",
+    ".reg",
+    ".dll",
+    ".sys",
+    ".cpl",
+    ".jar",
+    ".inf",
+    ".scf",
+    ".application",
+    ".msc",
+    ".chm",
+    ".iso",
+    ".img",
+    ".vhd",
+    ".vhdx",
+    ".xll",
+    ".ppam",
+    ".xlam",
+    ".settingcontent-ms",
+)
 UI_FILE = Path(__file__).parent / "app" / "ui" / "mobile.html"
 
 _SCHEMA = """
@@ -166,6 +210,13 @@ class DeviceStore:
                  "platform": r[5], "app_version": r[6]} for r in rows]  # fmt: skip
 
 
+def blocked_upload(name: str) -> bool:
+    """A program/script name, also behind trailing dots/spaces or a double extension such as
+    "hisobot.pdf.exe"."""
+    clean = name.strip().rstrip(". ").lower()
+    return clean.endswith(BLOCKED_UPLOADS)
+
+
 def server_id() -> str:
     """A random id of this PC, so the phone can tell Work PC from Home PC."""
     p = config.data_dir() / "remote" / "server_id.txt"
@@ -265,6 +316,7 @@ class RemoteServer:
         self.fingerprint = ""
         self.limiter = RateLimiter(240)  # requests per minute per address
         self.pair_limiter = RateLimiter(10)
+        self.bad_auth = RateLimiter(20)  # wrong/unknown tokens per minute per address
 
     # ----- lifecycle -----
     @property
@@ -386,6 +438,8 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -505,6 +559,10 @@ class _Handler(BaseHTTPRequestHandler):
 
                 name = Path(unquote(self.headers.get("X-Filename", "fayl"))).name
                 name = "".join(c for c in name if c not in '<>:"/\\|?*').strip() or "fayl"
+                if blocked_upload(name):
+                    self._json({"error": "Bu turdagi fayl (dastur yoki skript) qabul qilinmaydi"},
+                               400)  # fmt: skip
+                    return
                 body = self._body(MAX_UPLOAD)
                 folder = config.data_dir() / "Telefondan"
                 folder.mkdir(parents=True, exist_ok=True)

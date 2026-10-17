@@ -34,7 +34,7 @@ from nexvara.core.task import UserError
 TIER_FOR = {
     "classify": "cheap", "command": "cheap", "chat": "cheap",
     "plan": "balanced", "qa": "balanced", "test": "balanced",
-    "analysis": "powerful", "special": "special",
+    "analysis": "powerful", "special": "special", "drawing": "powerful",
 }  # fmt: skip
 PURPOSE_LABELS = {
     "classify": "Buyruqni tushunish",
@@ -46,8 +46,10 @@ PURPOSE_LABELS = {
     "analysis": "Tahlil",
     "special": "Maxsus vazifa",
     "check": "Kalitni tekshirish",
+    "drawing": "Chizma",
 }
 WARN_AT = 0.8  # warn when 80% of a limit is spent
+IMAGE_TOKENS = 1600  # a photo (<= 1600 px) counted for the estimate
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS ai_usage (
@@ -235,6 +237,7 @@ class AiRouter:
                 f"«{models.TIER_LABELS[tier]}» darajasiga mos model topilmadi."
             )
         tin = models.estimate_tokens(system + "".join(m["content"] for m in messages))
+        tin += IMAGE_TOKENS * sum(len(m.get("images") or []) for m in messages)
         c = models.cost(model, provider, tin, expected_out, self.config().get("prices"))
         return Estimate(provider, model, tier, tin, expected_out, c)
 
@@ -302,6 +305,15 @@ class AiRouter:
         chain = [first]
         if cfg.get("fallback", False):  # off by default: a paid fallback never starts by itself
             chain += [p for p in self.connected() if p != first]
+        if any(m.get("images") for m in messages):  # only providers that can read a picture
+            from nexvara.ai.providers import VISION
+
+            vision = [p for p in chain if p in VISION]
+            if not vision:
+                raise AiUnavailable("Rasmni o‘qiydigan AI ulanmagan: OpenAI, Gemini yoki Claude "
+                                    "kalitini kiriting (DeepSeek rasmni o‘qimaydi).")  # fmt: skip
+            chain = vision
+            first = chain[0]
         est = self.estimate(tier, system, messages, expected_out or max_tokens // 2, first)
         self.check_budget(est, approved)  # confirmation is asked for the main provider
         last_error: AiError | None = None

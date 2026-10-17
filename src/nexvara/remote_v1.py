@@ -85,6 +85,9 @@ def handle(h: Any, method: str) -> None:
             token = auth[7:] if auth.startswith("Bearer ") else ""
             dev = srv.store.check(token, h.client_address[0])
             if dev is None:
+                limiter = getattr(srv, "bad_auth", None)
+                if limiter is not None and not limiter.allow(h.client_address[0]):
+                    raise ApiError("RATE_LIMITED")  # someone is guessing tokens
                 raise ApiError("AUTH_REQUIRED")
             if dev.get("expired"):
                 raise ApiError("TOKEN_EXPIRED")
@@ -272,6 +275,11 @@ def _upload(h: Any, api: Any, limit: int) -> dict[str, Any]:
         raise ApiError("PAYLOAD_TOO_LARGE")
     name = Path(unquote(h.headers.get("X-Filename", "fayl"))).name
     name = "".join(c for c in name if c not in '<>:"/\\|?*' and ord(c) >= 32).strip() or "fayl"
+    from nexvara.remote import blocked_upload
+
+    if blocked_upload(name):
+        raise ApiError("BAD_REQUEST", "Bu turdagi fayl (dastur, skript yoki yorliq) qabul "
+                       "qilinmaydi. Hujjat, PDF, rasm yoki arxiv yuboring.")  # fmt: skip
     body = h._body(limit)
     want = h.headers.get("X-Content-SHA256", "").lower()
     digest = hashlib.sha256(body).hexdigest()

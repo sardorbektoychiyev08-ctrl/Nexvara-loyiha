@@ -30,12 +30,12 @@ Bu loyihada **Claude Code** va **OpenAI Codex** navbatma-navbat ishlaydi: birini
   - `app/ui/i18n.js` (o'zbekcha lug'at), `docs/AI.md`, `tests/uzbek_check.py` → Claude (`claude/*`)
   - `src/nexvara/agent/` (tools, nlu, context), `app/api_agent.py`, `app/api_sync.py`, `sync.py`, `docs/AGENT.md` → Claude (`claude/*`)
   - `src/nexvara/remote.py`, `remote_v1.py`, `protocol.py`, `devserver.py`, `docs/api/` (telefon API shartnomasi), `account.py`, `updater.py`, `installer/`, `scripts/build.ps1` → Claude (`claude/*`)
-  - `android/` (native Android ilova, Kotlin + Compose) → Codex (`codex/android-mobile`). Topshiriq: [docs/ANDROID_HANDOFF.md](docs/ANDROID_HANDOFF.md). API o'zgarishi kerak bo'lsa PROGRESS.md da Claude'ga yozing
+  - `android/` (native Android ilova, Kotlin + Compose) → Claude (`claude/android-v1`, 2026-10-17 dan foydalanuvchi topshirdi; Codex limitda davom ettiradi). Topshiriq va holat: [docs/ANDROID_HANDOFF.md](docs/ANDROID_HANDOFF.md). Build: `.\scripts\android_build.ps1`
   - Umumiy fayllar (`PROGRESS.md`, `ROADMAP.md`, `pyproject.toml`, `app/`) → kichik, alohida commitlarda o'zgartiring; konflikt bo'lsa ikkala tomonning yozuvlarini saqlang.
 
 ## Hozirgi vazifalar taqsimoti
 - **Claude**: Office skill'lari, darsliklar, buyruqlar va M7 (AI). Codex `codex/model-router` da hech narsa commit qilmagani uchun M7 ni Claude o'z zimmasiga oldi (2026-10-16): `src/nexvara/ai/`.
-- **Codex**: limit tugaganda Claude'ning so'nggi `claude/*` tarmog'ini davom ettiradi (PROGRESS.md dagi oxirgi yozuvdan boshlab). Asosiy alohida vazifa: Android APK (`android/`, [docs/ANDROID_HANDOFF.md](docs/ANDROID_HANDOFF.md)).
+- **Codex**: limit tugaganda Claude'ning so'nggi `claude/*` tarmog'ini davom ettiradi (PROGRESS.md dagi oxirgi yozuvdan boshlab). Android ham shu tartibda: `claude/android-v1` dan davom ettiriladi ([docs/ANDROID_HANDOFF.md](docs/ANDROID_HANDOFF.md)).
 - **Maxfiylik**: tashqi AI'ga har so'rov `ai/privacy.py` orqali mahalliy yashiriladi va javob mahalliy tiklanadi; aniqlash ishonchsiz bo'lsa so'rov bloklanadi. Boshqa yo'l bilan foydalanuvchi matnini provayderga yubormang.
 - **AI qoidalari**: API kalitlar faqat Windows Credential Manager'da (`NEXVARA/ai/<provayder>`), hech qachon faylda yoki Git'da emas. Testlarda faqat soxta provayder; haqiqiy pullik chaqiruv faqat foydalanuvchi kalit kiritib, AI'ni o'zi yoqqanda. Har chaqiruv `app.db` dagi `ai_usage` jadvaliga yoziladi, kunlik/oylik limit va "qimmat so'rovda so'rash" chegarasi `settings.json` da.
 

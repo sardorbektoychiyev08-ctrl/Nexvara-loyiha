@@ -20,8 +20,8 @@ android {
         applicationId = "uz.nexvara.mobile"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "1.0.0"
     }
     signingConfigs {
         if (releaseStore != null) create("nexvaraRelease") {
@@ -56,5 +56,12 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("androidx.biometric:biometric:1.1.0")  // app lock
+    // Google sign-in on the phone (Credential Manager); the PC verifies the ID token.
+    implementation("androidx.credentials:credentials:1.5.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.5.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")  // real org.json for JVM unit tests
 }

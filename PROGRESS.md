@@ -4,6 +4,43 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (21) — Claude Code — Android V1: yangi dizayn, barcha bo‘limlar, chizma, xavfsizlik
+
+**Foydalanuvchi talabi:** Codex’ning Android ishini Claude oladi (Codex dizayni yoqmadi), Windows 1.0.1 ni buzmasdan Android V1 ni yakunlash: 12 bo‘lim, AI yozish/ovoz, Office jonli, BI, darsliklardan test, fayl/PDF/rasm/kamera, natijani yuklash, Memory/Teach, Workflow, pauza/davom, ish/uy kompyuteri, Google, NEXVARA-SYNC, AI balans paneli (4 provayder), maxfiylik telefon so‘rovlarida ham, pullik chaqiruvsiz. Qo‘shimcha (yo‘l-yo‘lakay): xavfsizlik maksimal; «chizib ber» va qo‘lda chizilgan chala chizma rasmini mukammal chizish.
+
+**Tarmoq:** `claude/android-v1` (= `codex/android-mobile` f0311f3 + `main` 1.0.1). Worktree `.worktrees/android`. `main` ga merge qilinmadi.
+
+**Windows (Claude):**
+- `core/task.py`: kooperativ pauza/davom — faqat qadam chegarasida (Office chaqiruvi o‘rtasida emas), pauza vaqti 10 daqiqalik watchdog’ga kirmaydi; PC oynasida «Pauza/Davom ettirish» tugmasi.
+- `remote_v1_sections.py`: telefon uchun 27 marshrut (overview, chat tarixi, AI xarajat/balans, Memory, Teach, Workflow, BI, darsliklar, Office, Google, pauza/davom). AI kaliti (hatto yashirilgani ham) telefonga yuborilmaydi. Xarajat bitta `ai_usage` jadvalidan — ikki marta hisoblanmaydi.
+- Telefon buyrug‘i PC chatida «📱 Telefondan: …» bo‘lib chiqadi, vazifasi PC panelida, BI dashboard PC oynasida ochiladi (`Api.ui_events`).
+- Google telefonda: `account.verify_phone` — ID token imzosi, Web client auditoriyasi, tasdiqlangan email va PC egasining `sub` i tekshiriladi.
+- **Chizma** (`drawing.py`, `app/api_drawing.py`): AI faqat qat’iy tekshiriladigan JSON shakllar ro‘yxatini beradi, SVG’ni NEXVARA o‘zi chizadi (AI kodi kira olmaydi); SVG + PDF + PNG, PDF PC ekranida ochiladi. Rasmdan: EXIF/GPS o‘chiriladi, kichraytiriladi, har safar alohida ruxsat; DeepSeek rasm o‘qimaydi — OpenAI/Gemini/Claude. Provayderlarga rasm yuborish qo‘shildi.
+- **Xavfsizlik:** telefondan dastur/skript/yorliq fayllari (.exe, .bat, .ps1, .lnk, «x.pdf.exe»…) qabul qilinmaydi; noto‘g‘ri token bilan urinish daqiqasiga 20 tadan oshsa bloklanadi; `X-Frame-Options`, `Referrer-Policy`; kutilmagan xatoda ulanish uzilmaydi (INTERNAL).
+- Demo server barcha bo‘limlar bilan; `scripts/android_build.ps1`.
+
+**Android (Claude, yangi dizayn):** Kotlin/Compose, ViewModel + coroutines; brend ranglari, qorong‘i/yorug‘/tizim mavzusi, 100% o‘zbekcha. Bosh sahifa (kompyuter holati, tezkor amallar, AI balans paneli, vazifalar, holat), AI suhbat (fayl/PDF/rasm/kamera biriktirish, «Fonda bajar», ovozli buyruq, ovozli suhbat rejimi — javob TTS bilan), Vazifalar (progress, pauza/davom, bekor, natija yuklash va ichida ko‘rish), Bo‘limlar: Office + Chizma, Darsliklar (sinf/fan/mavzu/son/variant/AI), Fayllar, NEXVARA BI (KPI, ustunli, chiziqli grafik, jadval; PC’da ochish), Workflow (yaratish/tahrir/ishga tushirish/tasdiq/pauza/o‘chirish), Teach (tekshirish → saqlash, yoqish/o‘chirish), Xotira (qidiruv, qo‘shish/tahrir/o‘chirish), AI xarajatlari (4 provayder, qolgan limit, haqiqiy balans DeepSeek, «To‘ldirish» rasmiy billing brauzerda), Kompyuterlar (ish/uy, nom berish, tanlash, chiqish), Google bog‘lash, Sozlamalar. Ilova qulfi (barmoq izi/yuz/PIN, 1 daqiqadan keyin qayta qulf), bildirishnoma (telefondan boshlangan vazifa tugaganda), PC chat tarixini olish, offline navbat. Zaxira nusxa olinmaydi (Keystore kalitli ma’lumot). Versiya 1.0.0 (versionCode 2).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff check + format | PASS |
+| Windows unit (`pytest`) | PASS — 322 passed, 56 skipped (Office testlari ruxsatsiz o‘tkazilmadi) |
+| Yangi: telefon bo‘limlari (11), chizma + xavfsizlik (11) | PASS |
+| Windows oyna smoke (`--smoke`) | PASS — 12 bo‘lim, JS xato yo‘q |
+| Demo server orqali barcha yangi GET/POST bo‘limlar | PASS |
+| Android `assembleDebug` + 12 unit test | PASS — APK SHA-256 `6848e14b10eeabf4f5e3509eccb271d07fdae7e82556f2d74b9595d05f4fe233`, nusxa `D:\NEXVARA\android\NEXVARA-Android-1.0.0-debug.apk` |
+| Chizma renderi (namunaviy flanes, shtrix/o‘q chiziqlari, o‘lchamlar) | PASS — PNG ko‘zda tekshirildi |
+| Haqiqiy telefon, haqiqiy Windows Agent E2E, kamera, ovoz, qulf, bildirishnoma | NOT TESTED — foydalanuvchi bilan |
+| Haqiqiy AI (chizma, rasm) | NOT TESTED — kalit ertaga, pullik chaqiruv qilinmadi |
+| Google telefonda | BLOCKED — Android + Web OAuth client kerak (docs/GOOGLE_LOGIN.md § Android) |
+| `.\scripts\test.ps1 -Office` | NOT TESTED — Office kodi o‘zgarmadi |
+| Release APK imzo | BLOCKED — `release.jks` hali yaratilmagan |
+
+**Keyingi qadam:** foydalanuvchi bilan: APK’ni telefonga o‘rnatish, haqiqiy QR pairing, Office/BI/test/chizma E2E; AI kaliti bilan chizma sinovi; Google client; release kaliti; keyin `main` ga merge.
+
+---
+
 ## 2026-10-17 (20) — Claude Code — Windows V1: to'liq o'rnatish va yangilanish (1.0.1 o'rnatildi)
 
 **Foydalanuvchi talabi:** barcha bo'limlarni bitta Windows installerga yig'ish; mavjud o'rnatishni aniqlab xavfsiz yangilash; Google, OneDrive NEXVARA-SYNC, Memory/Teach, darsliklar, dashboardlar, API sozlamalari, imzo kaliti va rollback yo'qolmasin — avval zaxira va tiklash sinovi; o'zbekcha UI, yorliq, Start menyu; AI ulanishi qulay (rasmiy OAuth bo'lsa), kalitlar faqat Windows himoyalangan xotirasida; yangilanish xabari va «Yangilash»; o'rnatilgan dasturni haqiqatda ochib tekshirish; Codex Android'ga tegmaslik; private push.

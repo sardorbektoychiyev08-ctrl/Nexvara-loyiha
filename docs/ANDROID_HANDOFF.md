@@ -1,6 +1,33 @@
-# Android app — handoff for Codex
+# Android app — handoff (Claude → Codex)
 
-## 2026-10-17 — vaqtinchalik to‘xtash
+## 2026-10-17 (kech) — Claude: Android V1 qayta dizayn va to‘liq bo‘limlar
+
+**Egasi o‘zgardi:** foydalanuvchi Android’ni Claude’ga topshirdi. Tarmoq: `claude/android-v1`
+(worktree `D:\Nexvara loyiha\.worktrees\android`, `codex/android-mobile` + `main` ustiga).
+Codex limit bo‘lsa shu tarmoqdan davom etadi (PROGRESS.md dagi oxirgi yozuv).
+
+**Build:** `.\scripts\android_build.ps1` (JDK/SDK/Gradle `.tools` da, Git’da emas) →
+`android/app/build/outputs/apk/debug/app-debug.apk`, nusxasi `D:\NEXVARA\android\`.
+
+**Kod tuzilishi** (`android/app/src/main/java/uz/nexvara/mobile/`):
+- `AppModel.kt` — butun holat va barcha `/api/v1` chaqiruvlari (ViewModel, coroutines);
+- `Model.kt` — server JSON → Kotlin (`Parse`), o‘zbekcha format (`Fmt`);
+- `WindowsApi.kt` (TLS pin), `SecureSession.kt` (Keystore AES-GCM), `TransferChecks.kt`;
+- `ui/Theme.kt` (brend ranglari, qorong‘i/yorug‘), `ui/Components.kt`,
+  `ui/MainScreens.kt` (qulf, ulanish, Bosh sahifa, Suhbat, Vazifalar, Bo‘limlar),
+  `ui/SectionScreens.kt` (Office+Chizma, Darsliklar, Fayllar, BI, Workflow, Teach, Xotira,
+  AI xarajat, Kompyuterlar+Google, Sozlamalar);
+- `MainActivity.kt` — QR, fayl/rasm/PDF/kamera, ovoz (SpeechRecognizer + TTS),
+  bildirishnoma, BiometricPrompt qulf, Credential Manager (Google).
+
+**Qolgan ish (keyingi agent uchun):** 1) haqiqiy telefon + haqiqiy Windows Agent E2E
+(foydalanuvchi bilan); 2) release imzo kaliti `D:\NEXVARA\android\release.jks` (foydalanuvchi
+tasdig‘i bilan yaratiladi) va `-Release` build; 3) Google: foydalanuvchi Google Cloud’da
+Android + Web client yaratadi ([GOOGLE_LOGIN.md](GOOGLE_LOGIN.md) § Android), Web client ID
+`settings.json → google.android_web_client_id`; 4) fon bildirishnomalari uchun WorkManager
+(hozir ilova jarayoni tirik paytda ishlaydi).
+
+## 2026-10-17 — Codex: vaqtinchalik to‘xtash (tarix)
 
 Foydalanuvchi ko‘rsatmasi: Windows NEXVARA PERSONAL to‘liq tugamaguncha Android ishlab chiqilishi davom ettirilmaydi. Claude Windows versiyasini yakunlaydi; Codex uning ishchi papkasi va fayllariga tegmaydi. Android kodi faqat `D:\Nexvara loyiha\.worktrees\android` va `codex/android-mobile` tarmog‘ida.
 
@@ -19,7 +46,7 @@ Oxirgi build fayli: `android/app/build/outputs/apk/debug/app-debug.apk` (Git’g
 
 Goal: a native Android app (MASTER_SPEC §18) that controls the NEXVARA Windows Agent over the
 local network. The Windows side is done and tested; this document is everything needed to
-build the APK against it. Owner: **Codex**, branch `codex/android-mobile`, folder `android/`.
+build the APK against it. Owner now: **Claude**, branch `claude/android-v1`, folder `android/`.
 
 Read first: [api/MOBILE_API.md](api/MOBILE_API.md) (protocol) and [api/openapi.yaml](api/openapi.yaml)
 (contract). Do not change the Windows API without a matching change in `remote_v1.py`,

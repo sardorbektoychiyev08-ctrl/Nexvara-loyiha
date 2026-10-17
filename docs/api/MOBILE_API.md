@@ -93,9 +93,14 @@ without a `confirm` answered with `yes: true`.
 
 ```
 pending → running → succeeded
-                  ↘ failed
-                  ↘ cancelled   (after POST /cancel; cancellation is cooperative)
+             ⇅     ↘ failed
+           paused   ↘ cancelled   (after POST /cancel; cancellation is cooperative)
 ```
+
+`POST /tasks/{id}/pause` only sets `pause_requested`; the task stops at its **next step
+boundary** (never in the middle of an Office call) and its status becomes `paused`.
+`POST /tasks/{id}/resume` continues it. Cancel works while paused. Paused time does not count
+towards the 10-minute hung-task timeout.
 
 `succeeded`, `failed`, `cancelled` are final. `files` lists PC paths of results; download them
 with `GET /api/v1/files?path=<exact string>` (only files that some task produced are served).
@@ -158,6 +163,42 @@ returns `{applied, device, records}` (all records after the merge). A record:
   `deleted: true` (keep them). New items on the phone get a random `uid`.
 - App algorithm: keep local records the same way; on sync POST your changed records, replace
   local state with the returned list (apply newer ones), remember the time.
+
+## 11. Sections (Android V1 screens)
+
+All routes need the device token; POSTs take `X-Request-Id`. They wrap the same `Api`
+methods the PC window uses (`src/nexvara/remote_v1_sections.py`), so the phone and the PC see
+one database.
+
+| Screen | Routes |
+|---|---|
+| Home | `GET /overview` — PC, last 5 tasks, running count, counts (memory, teach, workflows, dashboards), AI panel, sync state (folder *name* only), Google state |
+| Chat history | `GET /chat/history?limit=&after=` — the PC chat log (`id`, `ts`, `role`, `text`); `after` is the last id the phone saw |
+| AI spend | `GET /ai` — per provider (openai, gemini, anthropic, deepseek): spent today/month, NEXVARA limits, `left_today`/`left_month`, real `balance` if known, official `billing_url`/`usage_url`, 30-day series, last calls. **No key, not even masked.** `POST /ai/{provider}/balance` refreshes the real balance (DeepSeek only; no model call) |
+| Memory | `GET/POST /memory`, `GET /memory/search?q=`, `POST /memory/{id}`, `POST /memory/{id}/delete` |
+| Teach | `GET/POST /teach` (`preview: true` only checks), `POST /teach/{id}` (`text`, `enabled`), `POST /teach/{id}/delete` |
+| Workflows | `GET/POST /workflows`, `POST /workflows/{id}/run` (`file` must be a file the phone uploaded), `POST /workflows/{id}/delete`, `POST /workflows/runs/{id}/{approve|pause|resume}` |
+| NEXVARA BI | `GET /bi`, `POST /bi/open` (`file`, `state`, `show_on_pc`) → compact widgets (KPI, bar/pie top 12, line ≤ 60 points × 3 series, table ≤ 20 rows); the PC window opens the same dashboard |
+| Textbooks | `GET /library`, `POST /library/test` (`grade`, `subject`, `topic`, `count`, `variants`, `ai`); a paid AI test returns `confirm` first |
+| Office | `POST /office/{excel_demo|excel_dashboard|word_report|presentation}`; free-form Office commands go through `/chat` |
+| Google | `GET /account`; `POST /account/link` (`id_token` from Android Credential Manager) |
+
+**One system.** A command from the phone shows up in the PC chat ("📱 Telefondan: …"), its
+task appears in the PC task panel, and a dashboard opened from the phone opens in the PC
+window (`Api.ui_events`, polled by the PC page). Office runs **visibly** on the PC screen
+unless the command says "fonda bajar".
+
+**AI spend is counted once.** The phone never calls an AI provider: its requests run on the
+PC through `AiRouter.complete` (privacy guard → provider → `ai_usage` ledger in `app.db`).
+
+**Privacy.** Every AI request from the phone passes the same local masking as the PC (names,
+JSHSHIR, phone numbers… → placeholders; blocked when unsure). Covered by
+`test_phone_ai_chat_is_masked_and_counted_once`.
+
+**Google on the phone.** The phone signs in with Android Credential Manager using the PC's
+`android_web_client_id` (settings.json, public) as `serverClientId`; the PC verifies the ID
+token's signature, audience and that `sub` equals the PC owner, then stores only the email on
+the device row. Setup: [../GOOGLE_LOGIN.md](../GOOGLE_LOGIN.md) § Android.
 
 ## 9. Testing without the real PC data
 

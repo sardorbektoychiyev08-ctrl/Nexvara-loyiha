@@ -18,6 +18,7 @@ from nexvara.app.api_account import AccountApi
 from nexvara.app.api_agent import AgentApi, looks_like_secret
 from nexvara.app.api_bi import BiApi
 from nexvara.app.api_devices import DevicesApi
+from nexvara.app.api_drawing import DrawingApi
 from nexvara.app.api_files import FilesApi
 from nexvara.app.api_memory import MemoryApi
 from nexvara.app.api_sections import SectionsChatApi
@@ -66,6 +67,7 @@ class Api(
     UpdateApi,
     SectionsChatApi,
     SyncApi,
+    DrawingApi,
 ):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
@@ -185,6 +187,9 @@ class Api(
         teach = self._chat_teach(text)
         if teach is not None:
             return teach
+        drawn = self._chat_drawing(text)  # "... chizib ber", a photo of a hand-drawn sketch
+        if drawn is not None:
+            return drawn
         text = self._bind_refs(text)  # "uni PDF qil" -> the file the last step produced
         agent = self._chat_agent(text, _use_ai)  # several tasks; Files/BI/Workflows/Settings
         if agent is not None:
@@ -429,6 +434,8 @@ class Api(
             return self._start_chain(payload, approved=True)
         if kind == "chat":
             return self._chat_ai(payload, approved=True)
+        if kind == "drawing":
+            return self._run_drawing(payload)
         snap = self.make_test({**payload, "approved": True})
         if "id" not in snap:
             return {"reply": snap.get("error") or "Test boshlanmadi"}
