@@ -21,6 +21,7 @@ import java.util.UUID
 /** Screens of the app. The bottom bar shows the first four; the rest open from "Bo‘limlar". */
 enum class Screen(val title: String) {
     Home("Bosh sahifa"), Chat("AI suhbat"), Tasks("Vazifalar"), Sections("Bo‘limlar"),
+    PcScreen("Kompyuter ekrani"), Templates("Tayyor buyruqlar"),
     Office("Office yordamchisi"), Library("Darsliklar va testlar"), Files("Fayllar"),
     Bi("NEXVARA BI"), Workflows("Ish jarayonlari"), Teach("NEXVARA’ga o‘rgatish"),
     Memory("Xotira"), Ai("AI balans va xarajatlar"), Devices("Kompyuterlar"), Settings("Sozlamalar"),
@@ -49,6 +50,14 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     var themeMode by mutableStateOf(ThemeMode.entries.getOrElse(prefs.getInt("theme", 0)) { ThemeMode.System })
         private set
     var speakReplies by mutableStateOf(prefs.getBoolean("speak", false)); private set
+    var secureScreen by mutableStateOf(prefs.getBoolean("secure_screen", false)); private set
+    var backgroundAlerts by mutableStateOf(prefs.getBoolean("bg_alerts", true)); private set
+    var draft by mutableStateOf<String?>(null)  // a ready command put into the chat box
+    var pcFiles by mutableStateOf<List<PcFile>>(emptyList()); private set
+    var screenShot by mutableStateOf<android.graphics.Bitmap?>(null); private set
+    var screenLive by mutableStateOf(false); private set
+    var screenInfo by mutableStateOf(""); private set
+    private var screenJob: Job? = null
     var background by mutableStateOf(false)
 
     val messages = mutableStateListOf<ChatMsg>()
@@ -74,8 +83,10 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     // App lock: fingerprint/face or the phone's PIN before anything is shown (on by default
     // when the phone itself has a screen lock); locks again after a minute in the background.
     private val deviceSecure = app.getSystemService(android.app.KeyguardManager::class.java)?.isDeviceSecure == true
-    var lockEnabled by mutableStateOf(prefs.getBoolean("lock", deviceSecure)); private set
-    var locked by mutableStateOf(prefs.getBoolean("lock", deviceSecure))
+    // Debug (test) builds start unlocked so automated tests can run; release builds lock by default.
+    private val lockDefault = deviceSecure && !BuildConfig.DEBUG
+    var lockEnabled by mutableStateOf(prefs.getBoolean("lock", lockDefault)); private set
+    var locked by mutableStateOf(prefs.getBoolean("lock", lockDefault))
     private var stoppedAt = 0L
     var onReply: ((String) -> Unit)? = null  // voice mode reads replies aloud
     var onTaskDone: ((TaskItem) -> Unit)? = null  // notification while in the background
@@ -92,8 +103,10 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     // ---------------- navigation ----------------
     fun open(s: Screen) {
         if (s == screen) return
+        if (screen == Screen.PcScreen) stopScreen()
         if (s.ordinal <= Screen.Sections.ordinal) back.clear() else back.addLast(screen)
         screen = s
+        if (s == Screen.PcScreen) startScreen()
         when (s) {
             Screen.Home -> refreshAll()
             Screen.Tasks -> refreshTasks()
@@ -109,6 +122,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     fun goBack(): Boolean {
         if (biView != null && screen == Screen.Bi) { biView = null; return true }
+        if (screen == Screen.PcScreen) stopScreen()
         val prev = back.removeLastOrNull() ?: return if (screen != Screen.Home) { screen = Screen.Home; true } else false
         screen = prev
         return true
@@ -117,6 +131,17 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     fun setTheme(m: ThemeMode) { themeMode = m; prefs.edit().putInt("theme", m.ordinal).apply() }
     fun setSpeak(v: Boolean) { speakReplies = v; prefs.edit().putBoolean("speak", v).apply() }
     fun setLock(v: Boolean) { lockEnabled = v; prefs.edit().putBoolean("lock", v).apply() }
+    fun useSecureScreen(v: Boolean) { secureScreen = v; prefs.edit().putBoolean("secure_screen", v).apply() }
+    fun useBackgroundAlerts(v: Boolean) { backgroundAlerts = v; prefs.edit().putBoolean("bg_alerts", v).apply() }
+
+    /** Puts a ready command into the chat box for the user to finish and send. */
+    fun compose(text: String) { draft = text; open(Screen.Chat) }
+
+    /** How the PC is reached right now: "lan", "tailscale" or null (unknown yet). */
+    val route: String?
+        get() = sid?.let { WindowsApi.current(it) }?.let { if (WindowsApi.isTailnet(it)) "tailscale" else "lan" }
+    val knownHosts: List<String>
+        get() = profile?.optJSONArray("hosts")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
     fun wentBackground() { stoppedAt = System.currentTimeMillis() }
     fun cameForeground() {
         if (lockEnabled && stoppedAt > 0 && System.currentTimeMillis() - stoppedAt > 60_000) locked = true
@@ -125,7 +150,8 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     // ---------------- network helpers ----------------
     private fun api(): WindowsApi {
         val p = profile ?: throw ApiFailure("AUTH_REQUIRED", "Kompyuter ulanmagan")
-        return WindowsApi(PairCode.parse(p.getString("qr")), p.getString("token"))
+        val hosts = p.optJSONArray("hosts")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+        return WindowsApi(PairCode.parse(p.getString("qr")), p.getString("token"), hosts)
     }
 
     private val sid get() = profile?.optString("qr")?.takeIf { it.isNotBlank() }?.let { PairCode.parse(it).serverId }
@@ -163,6 +189,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
                 val code = PairCode.parse(raw)
                 val result = withContext(Dispatchers.IO) { WindowsApi(code).pair(android.os.Build.MODEL) }
                 secure.save(raw, result.getString("token"), result.optString("pc_name"))
+                secure.updateHosts(WindowsApi.hostsFrom(result.optJSONObject("hosts_info")))
                 switched()
                 pairing = false
                 notice = "Kompyuter ulandi ✓"
@@ -209,6 +236,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         if (profile == null) return
         call(quiet = overview != null, block = { a ->
             val s = a.json("/api/v1/session")
+            secure.updateHosts(WindowsApi.hostsFrom(s))  // reconnect later from another network
             if (s.optBoolean("rotate_recommended")) {
                 val fresh = a.json("/api/v1/session/rotate", "POST", JSONObject(), UUID.randomUUID().toString()).getString("token")
                 secure.updateToken(fresh)
@@ -500,6 +528,46 @@ class AppModel(app: Application) : AndroidViewModel(app) {
 
     fun office(kind: String) = call(block = post("/api/v1/office/$kind")) { r ->
         track(r.optJSONObject("task")); notice = "Kompyuter ekranida bajarilmoqda"; open(Screen.Tasks)
+    }
+
+    // ---------------- the PC screen (view only, refreshed while the screen is open) ----------------
+    fun startScreen() {
+        screenJob?.cancel()
+        screenLive = true
+        screenJob = viewModelScope.launch {
+            var fails = 0
+            while (isActive && screenLive) {
+                try {
+                    val data = withContext(Dispatchers.IO) { api().bytes("/api/v1/screen") }
+                    val bmp = withContext(Dispatchers.Default) { android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size) }
+                    if (bmp != null) { screenShot = bmp; screenInfo = "Yangilandi"; fails = 0 }
+                    connected = true
+                } catch (e: ApiFailure) {
+                    screenInfo = e.message ?: "Ekranni olib bo‘lmadi"
+                    if (e.errorCode == "NOT_FOUND") { screenLive = false; break }
+                } catch (_: Exception) {
+                    fails++
+                    screenInfo = "Kompyuter javob bermayapti"
+                    if (fails > 5) { screenLive = false; break }
+                }
+                delay(if (background) 5_000 else 1_200)
+            }
+        }
+    }
+
+    fun stopScreen() { screenLive = false; screenJob?.cancel() }
+
+    // ---------------- PC files ----------------
+    fun searchPc(q: String, ext: String = "") = call(block = get(
+        "/api/v1/files/search?q=" + java.net.URLEncoder.encode(q, "UTF-8") + "&ext=" + java.net.URLEncoder.encode(ext, "UTF-8"))) {
+        pcFiles = Parse.pcFiles(it.optJSONArray("files"))
+        if (pcFiles.isEmpty()) notice = "Hech narsa topilmadi"
+    }
+    fun openOnPc(f: PcFile) = call(block = post("/api/v1/files/open", JSONObject().put("path", f.path))) {
+        notice = "«${f.name}» kompyuter ekranida ochildi"
+    }
+    fun shareToPhone(f: PcFile, then: (String) -> Unit) = call(block = post("/api/v1/files/share", JSONObject().put("path", f.path))) {
+        then(it.optString("path"))
     }
 
     fun linkGoogle(idToken: String) = call(block = post("/api/v1/account/link", JSONObject().put("id_token", idToken))) {

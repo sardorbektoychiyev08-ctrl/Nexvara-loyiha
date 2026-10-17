@@ -179,6 +179,16 @@ fun LibraryScreen(m: AppModel) {
                     modifier = Modifier.fillMaxWidth().height(50.dp)) {
                     Icon(Icons.Default.Quiz, null); Spacer(Modifier.width(8.dp)); Text("Test tuzish (Word kompyuterda)")
                 }
+                val what = listOfNotNull(grade?.let { "$it-sinf" }, subject, topic.ifBlank { null }).joinToString(" ")
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { m.send("$what mavzusini chiqarib ber"); m.open(Screen.Chat) },
+                        enabled = grade != null && subject != null && topic.isNotBlank(), modifier = Modifier.weight(1f)) { Text("Mavzu matni") }
+                    OutlinedButton(onClick = { m.send("$what bo‘yicha taqdimot tayyorla"); m.open(Screen.Chat) },
+                        enabled = grade != null && subject != null && topic.isNotBlank(), modifier = Modifier.weight(1f)) { Text("Taqdimot") }
+                }
+                TextButton(onClick = { m.compose("AI bilan $what uchun 45 daqiqalik dars rejasi tuz") },
+                    enabled = grade != null && subject != null) { Text("Dars rejasi (AI) →") }
             }
         }
         if (lib != null && lib.books.isNotEmpty()) {
@@ -219,6 +229,7 @@ fun FilesScreen(m: AppModel, act: PhoneActions) {
                 }
             }
         }
+        item { PcFilesPanel(m, act) }
         item { SectionTitle("Tayyor natijalar") }
         val results = m.results
         if (results.isEmpty()) item { EmptyState(Icons.Default.Inventory2, "Hali natija yo‘q", "NEXVARA yaratgan fayllar shu yerda paydo bo‘ladi.") }
@@ -783,6 +794,28 @@ fun SettingsScreen(m: AppModel, act: PhoneActions) {
                             style = MaterialTheme.typography.bodySmall, color = x.muted)
                     }
                     Switch(m.speakReplies, { m.setSpeak(it); if (!it) act.stopSpeaking() })
+                }
+            }
+        }
+        item { SectionTitle("Boshqa tarmoqdan ulanish") }
+        item { NetworkCard(m, act) }
+        item { SectionTitle("Maxfiylik va xabarlar") }
+        item {
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Ekran rasmini taqiqlash", style = MaterialTheme.typography.bodyLarge)
+                        Text("Skrinshot olinmaydi, «so‘nggi ilovalar»da ko‘rinmaydi", style = MaterialTheme.typography.bodySmall, color = x.muted)
+                    }
+                    Switch(m.secureScreen, { m.useSecureScreen(it) })
+                }
+                HorizontalDivider(Modifier.padding(vertical = 10.dp), color = x.cardBorder)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Ilova yopiq bo‘lsa ham xabar", style = MaterialTheme.typography.bodyLarge)
+                        Text("Har 15 daqiqada vazifalar tekshiriladi (kompyuter yoqiq bo‘lsa)", style = MaterialTheme.typography.bodySmall, color = x.muted)
+                    }
+                    Switch(m.backgroundAlerts, { m.useBackgroundAlerts(it) })
                 }
             }
         }

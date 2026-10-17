@@ -86,6 +86,8 @@ data class Book(val label: String, val grade: Int, val subject: String, val page
 
 data class Library(val books: List<Book>, val catalog: Map<Int, List<String>>)
 
+data class PcFile(val path: String, val name: String, val folder: String, val ext: String, val size: Long, val modified: Double)
+
 object Parse {
     private fun JSONArray?.objects(): List<JSONObject> =
         if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it) }
@@ -217,6 +219,10 @@ object Parse {
         o.optInt("rows"), o.optInt("total_rows"),
     )
 
+    fun pcFiles(a: JSONArray?) = a.objects().map {
+        PcFile(it.str("path"), it.str("name"), it.str("folder"), it.str("ext"), it.optLong("size"), it.optDouble("modified", 0.0))
+    }
+
     fun library(o: JSONObject): Library {
         val cat = o.optJSONObject("catalog") ?: JSONObject()
         return Library(
@@ -253,6 +259,12 @@ object Fmt {
             s < 86_400 -> "${s / 3600} soat oldin"
             else -> "${s / 86_400} kun oldin"
         }
+    }
+
+    fun size(b: Long): String = when {
+        b >= 1_048_576 -> usFmt("%.1f MB", b / 1_048_576.0)
+        b >= 1024 -> "${b / 1024} KB"
+        else -> "$b bayt"
     }
 
     fun number(v: Double?): String {

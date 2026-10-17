@@ -70,6 +70,10 @@ def handle(h: Any, method: str) -> None:
     u = urlparse(h.path)
     q = parse_qs(u.query)
     try:
+        from nexvara.remote import allowed_client
+
+        if not allowed_client(h.client_address[0]):
+            raise ApiError("AUTH_REQUIRED", "Faqat uy/ish tarmog‘i yoki Tailscale orqali")
         if not srv.limiter.allow(h.client_address[0]):
             raise ApiError("RATE_LIMITED")
         client = h.headers.get("X-Nexvara-Protocol", "")
@@ -126,6 +130,15 @@ def _json_body(h: Any) -> dict[str, Any]:
     return data
 
 
+def _addresses() -> list[dict[str, str]]:
+    from nexvara.remote import addresses
+
+    try:
+        return addresses()
+    except Exception:
+        return []
+
+
 def _session(srv: Any, dev: dict[str, Any]) -> dict[str, Any]:
     from nexvara.remote import TOKEN_MAX_DAYS, TOKEN_ROTATE_DAYS, server_id
 
@@ -137,6 +150,8 @@ def _session(srv: Any, dev: dict[str, Any]) -> dict[str, Any]:
         "server_id": server_id(),
         "token_expires_at": dev["token_created"] + TOKEN_MAX_DAYS * 86400,
         "rotate_recommended": age > TOKEN_ROTATE_DAYS * 86400,
+        "port": srv.port,
+        "addresses": _addresses(),  # the phone keeps them to reconnect from another network
     }
 
 
@@ -158,6 +173,8 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
             "server_id": server_id(),
             "pairing_open": bool(srv.code) and time.time() < srv.code_expires,
             "max_upload_bytes": MAX_UPLOAD,
+            "port": srv.port,
+            "addresses": _addresses(),
         }
     if route == "/api/v1/pair":
         if not srv.pair_limiter.allow(h.client_address[0]):
@@ -235,7 +252,8 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
     if route == "/api/v1/files":
         path = (q.get("path") or [""])[0]
         p = Path(path)
-        if path not in _allowed_files(api) or not p.is_file():
+        shared = dev is not None and remote_v1_sections.granted(srv, dev, path)
+        if (path not in _allowed_files(api) and not shared) or not p.is_file():
             raise ApiError("NOT_FOUND", "Fayl topilmadi")
         data = p.read_bytes()
         name = p.name.encode("ascii", "replace").decode()

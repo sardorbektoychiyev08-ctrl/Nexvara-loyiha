@@ -52,9 +52,11 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         BuildConfigInfo.version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
-        createChannel()
+        Notifier.channel(this)
+        Notifier.schedule(this, model.backgroundAlerts)
         model.onReply = { text -> if (model.speakReplies) speak(text) }
-        model.onTaskDone = { t -> if (model.background) notifyDone(t) }
+        model.onTaskDone = { t -> if (model.background) Notifier.taskDone(this, t) }
+        handleShare(intent)
         setContent {
             var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
             var pendingSave by rememberSaveable { mutableStateOf<String?>(null) }
@@ -122,6 +124,11 @@ class MainActivity : FragmentActivity() {
                 model.secure.setFlag("asked_notifications")
                 notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
+            androidx.compose.runtime.LaunchedEffect(model.secureScreen) {
+                if (model.secureScreen) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            }
+            androidx.compose.runtime.LaunchedEffect(model.backgroundAlerts) { Notifier.schedule(this@MainActivity, model.backgroundAlerts) }
             NexvaraTheme(model.themeMode) { AppRoot(model, actions) }
         }
     }
@@ -153,6 +160,28 @@ class MainActivity : FragmentActivity() {
             }
         }).authenticate(info.build())
     }
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleShare(intent)
+    }
+
+    /** "Ulashish → NEXVARA" from any app: files go to the PC, text goes into the chat box. */
+    private fun handleShare(intent: Intent?) {
+        if (intent == null || model.profile == null) return
+        val uris: List<Uri> = when (intent.action) {
+            Intent.ACTION_SEND -> listOfNotNull(
+                if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                else @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_STREAM))
+            Intent.ACTION_SEND_MULTIPLE -> (if (Build.VERSION.SDK_INT >= 33) intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                else @Suppress("DEPRECATION") intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)).orEmpty()
+            else -> return
+        }
+        uris.take(10).forEach { model.upload(it) }
+        if (uris.isNotEmpty()) model.open(Screen.Chat)
+        else intent.getStringExtra(Intent.EXTRA_TEXT)?.let { model.compose(it.take(4000)) }
+        intent.action = null  // handled once
+    }
+
     override fun onDestroy() { tts?.shutdown(); tts = null; super.onDestroy() }
 
     // ---------------- voice replies (the phone's own TTS: free, offline when the voice is installed) ----------------
@@ -173,28 +202,6 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun stopSpeaking() { tts?.stop() }
-
-    // ---------------- notifications ----------------
-    private fun createChannel() {
-        if (Build.VERSION.SDK_INT >= 26) {
-            val ch = NotificationChannel("tasks", "Vazifalar", NotificationManager.IMPORTANCE_DEFAULT)
-            ch.description = "Kompyuterdagi vazifa tugaganda xabar"
-            getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
-        }
-    }
-
-    private fun notifyDone(t: TaskItem) {
-        if (Build.VERSION.SDK_INT >= 33 &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
-        val open = android.app.PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), android.app.PendingIntent.FLAG_IMMUTABLE)
-        val n = NotificationCompat.Builder(this, "tasks")
-            .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle(if (t.status == "succeeded") "Tayyor: ${t.title}" else "${Fmt.status(t.status)}: ${t.title}")
-            .setContentText(if (t.files.isNotEmpty()) "Natijani telefonga olish mumkin" else t.error.ifBlank { "NEXVARA" })
-            .setContentIntent(open).setAutoCancel(true).build()
-        try { NotificationManagerCompat.from(this).notify(t.id.hashCode(), n) } catch (_: SecurityException) { }
-    }
 
     // ---------------- Google (Android Credential Manager; the PC verifies the token) ----------------
     private fun googleSignIn(webClientId: String) {

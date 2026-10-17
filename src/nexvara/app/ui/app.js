@@ -234,6 +234,21 @@ $("#task-pause").addEventListener("click", async () => {
   poll();
 });
 
+// The phone is looking at this screen: say so (it is turned off in settings.json if unwanted).
+function showPhoneBadge() {
+  let b = document.getElementById("phone-badge");
+  if (!b) {
+    b = el("div", "phone-badge", i18n("phone.screen"));
+    b.id = "phone-badge";
+    b.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:50;padding:8px 14px;border-radius:12px;" +
+      "background:#6366F1;color:#fff;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25)";
+    document.body.appendChild(b);
+  }
+  b.hidden = false;
+  clearTimeout(showPhoneBadge.t);
+  showPhoneBadge.t = setTimeout(() => { b.hidden = true; }, 35000);
+}
+
 // Commands sent from the phone show up here too: the message, its task, the dashboard.
 async function phoneEvents() {
   if (!api() || !api().ui_events) return;
@@ -248,6 +263,8 @@ async function phoneEvents() {
       showContext(ev.path);
     } else if (ev.kind === "task" && ev.task) {
       track(ev.task, false);
+    } else if (ev.kind === "phone_screen") {
+      showPhoneBadge();
     } else if (ev.kind === "bi_open" && ev.file) {
       biFromChat({ open: ev.file, state: ev.state && Object.keys(ev.state).length ? ev.state : null });
     }

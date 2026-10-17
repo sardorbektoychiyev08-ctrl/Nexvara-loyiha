@@ -9,6 +9,7 @@ privacy guard (every AI request still goes through `AiRouter.complete`). Routes 
 
 from __future__ import annotations
 
+import hashlib
 import socket
 import time
 from pathlib import Path
@@ -45,6 +46,10 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("POST", "/api/v1/office/{kind}", True),
     ("GET", "/api/v1/account", True),
     ("POST", "/api/v1/account/link", True),
+    ("GET", "/api/v1/screen", True),
+    ("GET", "/api/v1/files/search", True),
+    ("POST", "/api/v1/files/share", True),
+    ("POST", "/api/v1/files/open", True),
 ]
 HANDLED = {p for _m, p, _a in ROUTES}
 
@@ -205,6 +210,72 @@ def _phone_file(path: str) -> str:
     return str(p)
 
 
+# ---------------- PC files for the phone (search, open on the PC, send to it) ----------------
+FOUND_TTL = 600.0  # a search result may be opened/shared for 10 minutes
+SHARED_TTL = 1800.0  # a shared file may be downloaded for 30 minutes
+# Never handed to a phone, even if found: keys, tokens, databases, NEXVARA's own secrets.
+_SECRET_NAMES = {"google_client.json", "account.json", "settings.json", "app.db", "nexvara.db",
+                 ".env", "id_rsa", "id_ed25519", "known_hosts", "cert.pem", "key.pem"}  # fmt: skip
+_SECRET_EXT = (".pem", ".key", ".jks", ".keystore", ".p12", ".pfx", ".kdbx", ".ppk", ".sqlite",
+               ".session", ".db")  # fmt: skip
+
+
+def _secret(p: Path) -> bool:
+    name = p.name.lower()
+    if name in _SECRET_NAMES or name.endswith(_SECRET_EXT):
+        return True
+    data = config.data_dir().resolve()
+    for sub in ("remote", "telegram", "release", "updates", "android"):
+        if (data / sub) in p.parents or p == data / sub:
+            return True
+    return False
+
+
+def _grants(srv: Any) -> dict:
+    if not hasattr(srv, "phone_files"):
+        srv.phone_files = {}
+    return srv.phone_files
+
+
+def _grant(srv: Any, dev: dict[str, Any], path: str, kind: str, ttl: float) -> None:
+    g = _grants(srv)
+    now = time.time()
+    for k in [k for k, exp in g.items() if exp < now]:
+        del g[k]
+    g[(dev["id"], kind, path)] = now + ttl
+
+
+def granted(srv: Any, dev: dict[str, Any], path: str, kind: str = "shared") -> bool:
+    exp = _grants(srv).get((dev["id"], kind, path))
+    return exp is not None and exp > time.time()
+
+
+def _found_file(srv: Any, dev: dict[str, Any], path: str) -> Path:
+    if not (granted(srv, dev, path, "found") or granted(srv, dev, path, "shared")):
+        raise ApiError("NOT_FOUND", "Avval faylni qidiruvdan toping")
+    p = Path(path)
+    if not p.is_file() or _secret(p.resolve()):
+        raise ApiError("NOT_FOUND", "Fayl topilmadi")
+    return p
+
+
+def _screen(h: Any, api: Any) -> None:
+    if not api.get_settings().get("remote", {}).get("screen_view", True):
+        raise ApiError("NOT_FOUND", "Ekranni ko‘rish kompyuterda o‘chirilgan")
+    cap = getattr(api, "_overrides", {}).get("screen_capture")
+    if cap is None:
+        from nexvara.screen import capture_jpeg as cap
+    try:
+        data = cap()
+    except Exception as e:
+        raise ApiError("INTERNAL", f"Ekranni olib bo‘lmadi: {e}") from e
+    last = getattr(api, "_screen_seen", 0.0)
+    if time.time() - last > 30:  # the PC shows that it is being watched
+        api._screen_seen = time.time()
+        api.ui_push({"kind": "phone_screen"})
+    h._send(200, data, "image/jpeg", {"X-Content-SHA256": hashlib.sha256(data).hexdigest()})
+
+
 # ---------------- router ----------------
 def route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list[str]],
           dev: dict[str, Any], body: Any) -> dict[str, Any]:  # fmt: skip
@@ -341,6 +412,42 @@ def route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list[
         snap = api._start(args["kind"])
         api.ui_push({"kind": "task", "task": snap})
         return {"task": task_dto(snap)}
+    # ----- PC screen and files -----
+    if route == "/api/v1/screen":
+        _screen(h, api)
+        return None
+    if route == "/api/v1/files/search":
+        query = (q.get("q") or [""])[0]
+        ext = (q.get("ext") or [""])[0]
+        out = api.files_search(query, "", ext)
+        if not out.get("ok"):
+            raise ApiError("BAD_REQUEST", out.get("error") or "Qidirib bo‘lmadi")
+        files = []
+        for f in out["files"][:60]:
+            p = Path(f["path"])
+            if _secret(p.resolve()):
+                continue
+            _grant(srv, dev, f["path"], "found", FOUND_TTL)
+            files.append({k: f[k] for k in ("path", "name", "folder", "ext", "size", "modified")})
+        return {"files": files}
+    if route == "/api/v1/files/share":
+        p = _found_file(srv, dev, str(body().get("path", "")))
+        from nexvara.remote import MAX_UPLOAD
+
+        if p.stat().st_size > MAX_UPLOAD:
+            raise ApiError("PAYLOAD_TOO_LARGE")
+        _grant(srv, dev, str(p), "shared", SHARED_TTL)
+        return {"path": str(p), "name": p.name, "size": p.stat().st_size}
+    if route == "/api/v1/files/open":
+        from nexvara.remote import blocked_upload
+
+        p = _found_file(srv, dev, str(body().get("path", "")))
+        if blocked_upload(p.name):  # never start a program from the phone
+            raise ApiError(
+                "BAD_REQUEST", "Dastur va skriptlarni telefondan ishga tushirib bo‘lmaydi"
+            )
+        api.ui_push({"kind": "phone_file", "name": p.name, "path": str(p)})
+        return {"opened": bool(api.open_file(str(p)))}
     # ----- Google -----
     if route == "/api/v1/account":
         return _account(api, dev, srv.store)

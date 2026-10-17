@@ -98,6 +98,8 @@ fun AppRoot(m: AppModel, act: PhoneActions) {
                 Screen.Chat -> ChatScreen(m, act)
                 Screen.Tasks -> TasksScreen(m, act)
                 Screen.Sections -> SectionsScreen(m)
+                Screen.PcScreen -> PcScreenView(m)
+                Screen.Templates -> TemplatesScreen(m)
                 Screen.Office -> OfficeScreen(m, act)
                 Screen.Library -> LibraryScreen(m)
                 Screen.Files -> FilesScreen(m, act)
@@ -233,16 +235,23 @@ fun HomeScreen(m: AppModel, act: PhoneActions) {
             }
             SectionTitle("Tezkor amallar")
             val quick = listOf(
-                Triple(Icons.Default.TableChart, "Excel", Screen.Office), Triple(Icons.Default.School, "Test tuzish", Screen.Library),
-                Triple(Icons.Default.Insights, "BI panellar", Screen.Bi), Triple(Icons.Default.UploadFile, "Fayl yuborish", Screen.Files),
+                Triple(Icons.Default.TableChart, "Office", Screen.Office), Triple(Icons.Default.School, "Test tuzish", Screen.Library),
+                Triple(Icons.Default.Insights, "BI panellar", Screen.Bi), Triple(Icons.Default.UploadFile, "Fayllar", Screen.Files),
+                Triple(Icons.Default.Monitor, "Ekran", Screen.PcScreen), Triple(Icons.Default.Architecture, "Chizma", Screen.Office),
+                Triple(Icons.Default.Bolt, "Tayyor buyruq", Screen.Templates), Triple(Icons.Default.Bookmarks, "Xotira", Screen.Memory),
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                quick.forEachIndexed { i, (ic, t, s) ->
-                    Column(Modifier.weight(1f).clip(MaterialTheme.shapes.large).background(x.card)
-                        .clickableSafe { m.open(s) }.padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        IconBadge(ic, listOf(Color(0xFF16A34A), Brand.Indigo, Brand.Cyan, Color(0xFFF59E0B))[i], 42.dp)
-                        Spacer(Modifier.height(6.dp))
-                        Text(t, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            val tints = listOf(Color(0xFF16A34A), Brand.Indigo, Brand.Cyan, Color(0xFFF59E0B), Color(0xFF0EA5E9), Color(0xFF8B5CF6),
+                Color(0xFFEC4899), Color(0xFF10B981))
+            quick.chunked(4).forEachIndexed { row, items ->
+                if (row > 0) Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items.forEachIndexed { i, (ic, t, s) ->
+                        Column(Modifier.weight(1f).clip(MaterialTheme.shapes.large).background(x.card)
+                            .clickableSafe { m.open(s) }.padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            IconBadge(ic, tints[row * 4 + i], 42.dp)
+                            Spacer(Modifier.height(6.dp))
+                            Text(t, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                        }
                     }
                 }
             }
@@ -332,6 +341,7 @@ fun ChatScreen(m: AppModel, act: PhoneActions) {
     var input by rememberSaveable { mutableStateOf("") }
     var bg by rememberSaveable { mutableStateOf(false) }
     var attach by remember { mutableStateOf(false) }
+    LaunchedEffect(m.draft) { m.draft?.let { input = it; m.draft = null } }
     LaunchedEffect(m.dictated) {
         m.dictated?.let { said ->
             m.dictated = null
@@ -349,6 +359,10 @@ fun ChatScreen(m: AppModel, act: PhoneActions) {
         }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = PaddingValues(horizontal = Gutter, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            item {
+                AssistChip(onClick = { m.open(Screen.Templates) }, label = { Text("Tayyor buyruqlar: o‘qituvchi, ofis, hujjat, chizma") },
+                    leadingIcon = { Icon(Icons.Default.Bolt, null, Modifier.size(18.dp)) })
+            }
             if (m.messages.isEmpty()) item {
                 Column {
                     EmptyState(Icons.Default.AutoAwesome, "Nima qilay?", "Masalan quyidagilardan birini tanlang yoki o‘zingiz yozing.")
@@ -486,6 +500,12 @@ fun TaskCard(m: AppModel, t: TaskItem, act: PhoneActions, compact: Boolean = fal
                 }
             }
         }
+        if (t.title.startsWith("Chizma") && t.status == "succeeded" && !compact) {
+            var fixing by remember { mutableStateOf(false) }
+            TextButton(onClick = { fixing = true }) { Icon(Icons.Default.Edit, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Chizmani tuzatish") }
+            if (fixing) TextInputDialog("Chizmani tuzatish", label = "Nimani o‘zgartiray? (masalan: teshik 10 mm bo‘lsin)", confirm = "Yuborish",
+                multiline = true, onSave = { m.send("Oxirgi chizmani o‘zgartir: $it"); m.open(Screen.Chat) }, onDismiss = { fixing = false })
+        }
         if (t.active) {
             Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (t.status == "paused" || t.pauseRequested)
@@ -505,6 +525,8 @@ fun TaskCard(m: AppModel, t: TaskItem, act: PhoneActions, compact: Boolean = fal
 fun SectionsScreen(m: AppModel) {
     val c = m.overview?.counts ?: emptyMap()
     val items = listOf(
+        Triple(Screen.Templates, Icons.Default.Bolt, "O‘qituvchi, ofis, hujjat"),
+        Triple(Screen.PcScreen, Icons.Default.Monitor, "Jonli ko‘rish"),
         Triple(Screen.Office, Icons.Default.Description, "Excel, Word, PowerPoint, chizma"),
         Triple(Screen.Library, Icons.Default.School, "Darslikdan test tuzish"),
         Triple(Screen.Files, Icons.Default.Folder, "Yuborish va natijalar"),
@@ -516,8 +538,8 @@ fun SectionsScreen(m: AppModel) {
         Triple(Screen.Devices, Icons.Default.Devices, "Ish va uy kompyuteri"),
         Triple(Screen.Settings, Icons.Default.Settings, "Mavzu, ovoz, Google"),
     )
-    val tints = listOf(Color(0xFF16A34A), Brand.Indigo, Color(0xFFF59E0B), Brand.Cyan, Color(0xFF8B5CF6),
-        Color(0xFFEC4899), Color(0xFF0EA5E9), Color(0xFF10B981), Color(0xFF64748B), Color(0xFF6366F1))
+    val tints = listOf(Color(0xFFEC4899), Color(0xFF0EA5E9), Color(0xFF16A34A), Brand.Indigo, Brand.Cyan, Color(0xFFF59E0B),
+        Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF0EA5E9), Color(0xFF10B981), Color(0xFF64748B), Color(0xFF6366F1))
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("Bo‘limlar", "Windows NEXVARA’ning barcha bo‘limlari")
         LazyVerticalGrid(GridCells.Fixed(2), contentPadding = PaddingValues(Gutter), horizontalArrangement = Arrangement.spacedBy(12.dp),

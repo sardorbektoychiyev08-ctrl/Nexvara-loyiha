@@ -315,8 +315,57 @@ def render_svg(spec: dict[str, Any]) -> str:
 </svg>"""  # noqa: E501
 
 
+def to_dxf(spec: dict[str, Any]) -> str:
+    """The same drawing as AutoCAD R12 DXF (mm; y flipped because DXF y grows upwards)."""
+    s = validate(spec)
+    hgt = s["height"]
+    out: list[str] = ["0", "SECTION", "2", "ENTITIES"]
+
+    def ent(kind: str, *pairs: tuple[int, Any]) -> None:
+        out.extend([("0"), kind, "8", "0"])
+        for code, val in pairs:
+            out.extend([str(code), _f(val) if isinstance(val, float | int) else str(val)])
+
+    def line(x1: float, y1: float, x2: float, y2: float) -> None:
+        ent("LINE", (10, x1), (20, hgt - y1), (11, x2), (21, hgt - y2))
+
+    def text(x: float, y: float, value: str, size: float) -> None:
+        clean = "".join(ch if ord(ch) < 128 else "?" for ch in value)  # R12 is ASCII
+        ent("TEXT", (10, x), (20, hgt - y), (40, size), (1, clean))
+
+    for c in s["shapes"]:
+        t = c["type"]
+        if t == "circle":
+            ent("CIRCLE", (10, c["cx"]), (20, hgt - c["cy"]), (40, c["r"]))
+        elif t == "arc":  # SVG angles run clockwise on screen; DXF counter-clockwise
+            ent("ARC", (10, c["cx"]), (20, hgt - c["cy"]), (40, c["r"]),
+                (50, (-c["end"]) % 360), (51, (-c["start"]) % 360))  # fmt: skip
+        elif t == "text":
+            text(c["x"], c["y"], c["text"], c["size"])
+        elif t == "dim":
+            x1, y1, x2, y2, off = c["x1"], c["y1"], c["x2"], c["y2"], c["offset"]
+            length = math.hypot(x2 - x1, y2 - y1)
+            if length:
+                nx, ny = -(y2 - y1) / length, (x2 - x1) / length
+                ax, ay, bx, by = x1 + nx * off, y1 + ny * off, x2 + nx * off, y2 + ny * off
+                line(x1, y1, ax, ay)
+                line(x2, y2, bx, by)
+                line(ax, ay, bx, by)
+                text((ax + bx) / 2, (ay + by) / 2 - 1, c["label"] or _f(round(length, 1)), 3.5)
+        else:
+            shape = _outline(c)
+            if shape:
+                pts, closed = shape
+                if closed:
+                    pts = [*pts, pts[0]]
+                for (xa, ya), (xb, yb) in zip(pts, pts[1:], strict=False):
+                    line(xa, ya, xb, yb)
+    out.extend(["0", "ENDSEC", "0", "EOF"])
+    return "\n".join(out) + "\n"
+
+
 def export(spec: dict[str, Any], folder: Path, name: str = "") -> dict[str, str]:
-    """Write SVG, PDF and PNG; returns their paths."""
+    """Write SVG, PDF, PNG and DXF; returns their paths."""
     import fitz  # PyMuPDF
 
     svg = render_svg(spec)
@@ -325,6 +374,8 @@ def export(spec: dict[str, Any], folder: Path, name: str = "") -> dict[str, str]
     stem = f"{base.replace(' ', '_')}_{time.strftime('%Y%m%d-%H%M%S')}"
     svg_p, pdf_p, png_p = (folder / f"{stem}{ext}" for ext in (".svg", ".pdf", ".png"))
     svg_p.write_text(svg, encoding="utf-8")
+    dxf_p = folder / f"{stem}.dxf"
+    dxf_p.write_text(to_dxf(spec), encoding="ascii")
     doc = fitz.open(stream=svg.encode("utf-8"), filetype="svg")
     try:
         pdf_p.write_bytes(doc.convert_to_pdf())
@@ -333,7 +384,7 @@ def export(spec: dict[str, Any], folder: Path, name: str = "") -> dict[str, str]
         page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False).save(str(png_p))
     finally:
         doc.close()
-    return {"svg": str(svg_p), "pdf": str(pdf_p), "png": str(png_p)}
+    return {"svg": str(svg_p), "pdf": str(pdf_p), "png": str(png_p), "dxf": str(dxf_p)}
 
 
 # ---------------- the photo ----------------
@@ -376,8 +427,29 @@ main contours w=0.7, hidden lines "hidden", axes "center", dimensions with "dim"
 notes in Uzbek (Latin). At most 300 shapes."""
 
 
-def ai_messages(request: str, image: tuple[str, str] | None) -> tuple[str, list[dict[str, Any]]]:
+_EDIT = re.compile(
+    r"\b(oxirgi|shu|bu)?\s*chizma\w*.*\b(o[‘’']?zgartir|tuzat|qo[‘’']?sh|olib tashla|"
+    r"kattalashtir|kichraytir|almashtir|uzaytir|qisqartir|o[‘’']?chir)\w*",
+    re.IGNORECASE,
+)
+
+
+def is_edit_request(text: str) -> bool:
+    """ "Oxirgi chizmani o‘zgartir: teshik 10 mm bo‘lsin" (needs a previous drawing)."""
+    return bool(_EDIT.search(text or "")) and "chizib ber" not in (text or "").lower()
+
+
+Messages = list[dict[str, Any]]
+
+
+def ai_messages(request: str, image: tuple[str, str] | None,
+                previous: dict[str, Any] | None = None) -> tuple[str, Messages]:  # fmt: skip
     """(system, messages) for AiRouter.complete. The user text is masked by the router."""
+    if previous is not None:
+        task = ("Here is the current drawing JSON. Apply the user's change and return the whole "
+                f"new drawing JSON. Change: {request}\nCurrent: "
+                + json.dumps(previous, ensure_ascii=False))  # fmt: skip
+        return PROMPT, [{"role": "user", "content": task}]
     if image is None:
         task = f"Draw: {request}"
     else:

@@ -20,8 +20,8 @@ android {
         applicationId = "uz.nexvara.mobile"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.1.0"
     }
     signingConfigs {
         if (releaseStore != null) create("nexvaraRelease") {
@@ -43,7 +43,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 }
 
@@ -58,6 +58,7 @@ dependencies {
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("androidx.biometric:biometric:1.1.0")  // app lock
+    implementation("androidx.work:work-runtime-ktx:2.10.1")  // "task finished" while the app is closed
     // Google sign-in on the phone (Credential Manager); the PC verifies the ID token.
     implementation("androidx.credentials:credentials:1.5.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.5.0")

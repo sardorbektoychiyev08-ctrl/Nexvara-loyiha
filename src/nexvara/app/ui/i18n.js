@@ -31,6 +31,7 @@ const I18N = {
     "task.resume": "Davom ettirish",
     "phone.prefix": "📱 Telefondan: ",
     "phone.file": "📱 Telefondan fayl keldi: ",
+    "phone.screen": "📱 Telefon ekranni ko‘rmoqda",
     // umumiy tugmalar va so‘zlar
     "btn.save": "Saqlash",
     "btn.cancel": "Bekor qilish",

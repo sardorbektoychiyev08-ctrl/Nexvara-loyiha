@@ -79,6 +79,15 @@ class SecureSession(context: Context) {
         saveState(state)
     }
 
+    /** The PC's other addresses (LAN, Tailscale) for reaching it from another network. */
+    @Synchronized fun updateHosts(hosts: List<String>) {
+        if (hosts.isEmpty()) return
+        val state = state()
+        val active = state.getJSONObject("pcs").optJSONObject(state.optString("active")) ?: return
+        active.put("hosts", JSONArray(hosts))
+        saveState(state)
+    }
+
     /** "Ish kompyuteri" / "Uy kompyuteri": a local name; the PC itself is not changed. */
     @Synchronized fun rename(serverId: String, label: String) {
         val state = state()

@@ -21,7 +21,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "test_count": 20,
     "test_variants": 1,
     "keep_office_open": True,
-    "remote": {"enabled": False, "port": 8765},  # phone access over the local network
+    # phone access over the local network; screen_view: the paired phone may see the screen
+    "remote": {"enabled": False, "port": 8765, "screen_view": True},
     # Private release channel: a folder or an https:// URL with a signed latest.json.
     "update": {"channel": "", "auto_check": True},
     # Settings, memory and Teach rules between devices (sync.py). The passphrase is in

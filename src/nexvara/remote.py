@@ -110,6 +110,48 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+_TAILNET = ipaddress.ip_network("100.64.0.0/10")  # Tailscale (WireGuard) addresses
+
+
+def allowed_client(ip: str) -> bool:
+    """Only the home/work network, this PC, or a private Tailscale network may connect. A
+    request from a public internet address (e.g. after a router port-forward) is refused."""
+    try:
+        a = ipaddress.ip_address(ip.split("%")[0])
+    except ValueError:
+        return False
+    if isinstance(a, ipaddress.IPv6Address) and a.ipv4_mapped:
+        a = a.ipv4_mapped
+    if a.is_loopback or a.is_link_local:
+        return True
+    if isinstance(a, ipaddress.IPv4Address) and a in _TAILNET:
+        return True
+    return a.is_private and not a.is_global
+
+
+def addresses() -> list[dict[str, str]]:
+    """This PC's IPv4 addresses the phone may try, best first: the local network, then
+    Tailscale (works from any Wi-Fi or mobile data when both devices are in one tailnet)."""
+    found: list[str] = []
+    try:
+        found.append(lan_ip())
+    except OSError:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            found.append(str(info[4][0]))
+    except OSError:
+        pass
+    out, seen = [], set()
+    for ip in found:
+        if ip in seen or ip.startswith("127.") or not allowed_client(ip):
+            continue
+        seen.add(ip)
+        kind = "tailscale" if ipaddress.ip_address(ip) in _TAILNET else "lan"
+        out.append({"ip": ip, "kind": kind})
+    return sorted(out, key=lambda x: x["kind"] != "lan")
+
+
 def lan_ip() -> str:
     """This PC's address in the local network (no packet is sent)."""
     try:
@@ -260,7 +302,9 @@ class RateLimiter:
 
 
 def ensure_certificate(folder: Path, ip: str) -> tuple[Path, Path]:
-    """A self-signed certificate for this PC (made once, renewed when the IP changes)."""
+    """A self-signed certificate for this PC, made once and kept: the phone trusts it by its
+    SHA-256 (from the QR code), so it must not change when the PC moves to another Wi-Fi or
+    network. Old installs made it per IP; such a certificate is simply kept."""
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import ec
@@ -268,7 +312,7 @@ def ensure_certificate(folder: Path, ip: str) -> tuple[Path, Path]:
 
     folder.mkdir(parents=True, exist_ok=True)
     cert_p, key_p, ip_p = folder / "cert.pem", folder / "key.pem", folder / "ip.txt"
-    if cert_p.is_file() and key_p.is_file() and ip_p.is_file() and ip_p.read_text() == ip:
+    if cert_p.is_file() and key_p.is_file():
         return cert_p, key_p
     key = ec.generate_private_key(ec.SECP256R1())
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "NEXVARA " + socket.gethostname())])
@@ -462,6 +506,9 @@ class _Handler(BaseHTTPRequestHandler):
         return None if dev is None or dev.get("expired") else dev
 
     def _limited(self) -> bool:
+        if not allowed_client(self.client_address[0]):
+            self._send(403, b'{"error": "network"}', "application/json")
+            return True
         if self.server_ref.limiter.allow(self.client_address[0]):
             return False
         self._send(429, b'{"error": "rate limited"}', "application/json", {"Retry-After": "30"})
