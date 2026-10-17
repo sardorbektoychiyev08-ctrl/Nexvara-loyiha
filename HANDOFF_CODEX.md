@@ -35,8 +35,9 @@ Read first: [AGENTS.md](AGENTS.md) (rules), the newest entry of [PROGRESS.md](PR
 
 | # | Item | Notes |
 |---|---|---|
-| 1 | Real AI planner test with the user's key | Only with the user's explicit OK (paid). `Settings → AI`; budget limits already enforced |
+| 1 | Real AI test with the user's key(s) | Only with the user's explicit OK (paid). Plan and cost in docs/AI.md (< $0.05 per provider). Router v2: 4 tiers, fallback, limits |
 | 2 | Real Google login + Drive sync | User creates a *Desktop app* OAuth client, imports JSON in Settings, signs in **themselves**. Never sign in for them. Steps: docs/GOOGLE_LOGIN.md |
+| 2b | Second device for OneDrive sync | Nilufar's PC must sync once into `OneDrive\NEXVARA-SYNC` with the same passphrase; then verify both ways |
 | 3 | Task history sync | `sync.py` syncs facts, rules, safe settings. History rows hold PC paths; sync titles/status only, mark files as "on <pc>" |
 | 4 | BI: slicer list editing via chat | Tools `bi.*` in tools.py; UI in `app/ui/bi.js` (moving widgets between pages and deleting pages are done) |
 | 5 | M5: Vision / Web research / Computer control | not started |
@@ -56,6 +57,12 @@ Read first: [AGENTS.md](AGENTS.md) (rules), the newest entry of [PROGRESS.md](PR
   encrypted with the user's passphrase.
 - Updates are accepted only with a valid Ed25519 signature + SHA-256 (`updater.py`).
 - Never commit `D:\NEXVARA\*` (keys, `google_client.json`, `app.db`, `release\signing_key.pem`).
+
+## UI language
+
+All user-visible text is Uzbek (Latin). New strings: add a key to `app/ui/i18n.js` and use
+`i18n("key")` in JS or `data-i18n="key"` in HTML. `tests/unit/test_uzbek_ui.py` and
+`tests/ui_scripts/uzbek_ui.py` fail on English words (brands, API, file types, model ids allowed).
 
 ## Where things are
 

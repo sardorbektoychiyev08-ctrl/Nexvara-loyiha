@@ -129,6 +129,25 @@ def _tool_lines(catalog: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+_SPECIAL = re.compile(r"\b(eng kuchli model\w*|maxsus model\w*|eng aqlli model\w*)")
+_HARD = re.compile(r"\b(tahlil\w*|rejala\w*|strategiya\w*|murakkab\w*|batafsil\w*|"
+                   r"chuqur\w*|solishtir\w*|xulosa chiqar\w*)")  # fmt: skip
+
+
+def plan_purpose(text: str) -> str:
+    """Router purpose (-> tier) for a free-form message: everyday work is "plan"
+    (balanced); analysis/planning or a long multi-part message is "analysis" (powerful);
+    "eng kuchli model bilan" is "special" (always asks first)."""
+    from nexvara.knowledge.textnorm import fold
+
+    f = fold(text)
+    if _SPECIAL.search(f):
+        return "special"
+    if _HARD.search(f) or len(text) > 600:
+        return "analysis"
+    return "plan"
+
+
 def plan(
     router: AiRouter,
     text: str,
@@ -139,6 +158,7 @@ def plan(
     rules=(),
     approved: bool = False,
 ) -> Plan:
+    purpose = plan_purpose(text)
     system = PLAN_SYSTEM + "\n\nASBOBLAR (* — majburiy):\n" + _tool_lines(catalog)
     ctx = {k: v for k, v in context.items() if v}
     if ctx:
@@ -151,13 +171,13 @@ def plan(
                         for t in turns[-8:])  # fmt: skip
     content = f"Oldingi suhbat:\n{history}\n\nYangi xabar: {text}" if history else text
     r = router.complete(
-        "classify",
+        purpose,
         system,
         [{"role": "user", "content": content}],
         max_tokens=3000,
         expected_out=500,
         approved=approved,
-        effort="low",
+        effort="low" if purpose == "plan" else "medium",
     )
     data = _json_from(r.text)
     if not isinstance(data, dict):
@@ -257,7 +277,7 @@ def chat_reply(router: AiRouter, text: str, approved: bool = False, facts=()) ->
         "tuzasan. O‘zbek tilida (lotin) qisqa va do‘stona javob ber."
     )
     r = router.complete(
-        "classify", _with_facts(system, facts), [{"role": "user", "content": text}],
+        "chat", _with_facts(system, facts), [{"role": "user", "content": text}],
         max_tokens=2000, expected_out=300, approved=approved, effort="low",
     )  # fmt: skip
     return Answer(r.text.strip(), [], r.cost)

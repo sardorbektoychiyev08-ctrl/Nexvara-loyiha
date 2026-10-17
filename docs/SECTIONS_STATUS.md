@@ -27,6 +27,16 @@ muhitda sinalmagan.
 
 ⚠ = bajarishdan oldin «Davom etaymi?» so'raladi.
 
+## Windows V1 (2026-10-17)
+
+| Modul | Holat | Izoh |
+|---|---|---|
+| O'zbekcha interfeys (12 bo'lim, markaziy lug'at `i18n.js`) | REAL IMPLEMENTED | jonli tekshiruv: 100% (1202 bo'lak, 2 mavzu) |
+| Model Router v2 (4 daraja, fallback, limitlar, bloklash) | REAL IMPLEMENTED (soxta provayder bilan) | haqiqiy kalit bilan NOT TESTED |
+| To'lov/Balans tugmalari (rasmiy sahifalar) | REAL IMPLEMENTED | brauzerda ochiladi; to'lov NEXVARA ichida yo'q |
+| Bosh sahifa: AI balans va xarajatlar | REAL IMPLEMENTED | taxminiy sarf; haqiqiy balans faqat DeepSeek (rasmiy API) |
+| DeepSeek haqiqiy balansi | REAL IMPLEMENTED (soxta javob bilan) | haqiqiy kalit bilan NOT TESTED |
+
 ## Core Agent
 
 | Modul | Holat | Izoh |

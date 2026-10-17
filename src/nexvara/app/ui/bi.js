@@ -163,7 +163,7 @@ async function renderBi() {
 function drawBiSaved(list) {
   const sel = $("#bi-saved");
   sel.textContent = "";
-  sel.appendChild(el("option", "", list.length ? "— saqlangan dashboardlar —" : "— saqlangan dashboard yo‘q —")).value = "";
+  sel.appendChild(el("option", "", list.length ? "— saqlangan panellar —" : "— saqlangan panel yo‘q —")).value = "";
   list.forEach((d) => { const o = el("option", "", `${d.name} (${(d.source || "").split(/[\\/]/).pop()})`); o.value = d.file; sel.appendChild(o); });
 }
 
@@ -557,7 +557,7 @@ $("#bi-open").addEventListener("click", async () => {
 });
 $("#bi-del").addEventListener("click", async () => {
   const f = $("#bi-saved").value;
-  if (!f || !confirm("Saqlangan dashboard o‘chirilsinmi? (Ma’lumot fayli o‘chmaydi)")) return;
+  if (!f || !confirm("Saqlangan panel o‘chirilsinmi? (Ma’lumot fayli o‘chmaydi)")) return;
   drawBiSaved(await api().bi_delete(f));
 });
 $("#bi-save").addEventListener("click", async () => {

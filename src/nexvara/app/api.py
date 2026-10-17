@@ -40,6 +40,12 @@ OFFICE_TASKS: dict[str, tuple[str, str, str]] = {
 }
 
 
+_BACKGROUND = re.compile(
+    r",?\s*\b(?:orqa\s+)?fonda(?:\s+(?:bajar|ishla|qil)\w*)?\b|,?\s*\bko[‘’']?rinmas\s+holda\b",
+    re.IGNORECASE,
+)
+
+
 def _wants_ai(text: str) -> bool:
     """'AI bilan test tuz', 'sun'iy intellekt yordamida' -> the user asks for the AI version."""
     import re
@@ -437,11 +443,46 @@ class Api(
     def ai_usage(self) -> list[dict[str, Any]]:
         return self._router().ledger.recent()
 
+    def ai_dashboard(self) -> dict[str, Any]:
+        """Home page "AI balans va xarajatlar": spend vs limits (estimated) per provider."""
+        return self._router().dashboard()
+
+    def ai_balance(self, provider: str) -> dict[str, Any]:
+        """The provider's REAL balance, only where an official API exists (DeepSeek). Free:
+        no model is called. Others: {"supported": False} — never a made-up number."""
+        from nexvara.ai import models
+
+        if provider not in models.PROVIDERS:
+            return {"supported": False, "error": "noma’lum provayder"}
+        return self._router().balance(provider)
+
+    def ai_save_limits(self, provider: str, daily_usd: Any = None, monthly_usd: Any = None):
+        """Own daily/monthly caps for one provider ("" or None = use the overall limit)."""
+        from nexvara.ai import models
+
+        if provider not in models.PROVIDERS:
+            return {"ok": False, "error": "noma’lum provayder"}
+
+        def num(v: Any) -> float | None:
+            return None if v in (None, "") else float(v)
+
+        router = self._router()
+        try:  # the router's own settings (the same file in the app)
+            router.settings.update({"ai": {"limits": {provider: {
+                "daily_usd": num(daily_usd), "monthly_usd": num(monthly_usd)}}}})  # fmt: skip
+        except (TypeError, ValueError) as e:
+            return {"ok": False, "error": f"Limit noto‘g‘ri: {e}"}
+        return {"ok": True, "status": router.status()}
+
     # ----- Office commands ("Hisobot.xlsx ni och, ... va saqla") -----
     def _chat_command(self, text: str) -> dict[str, Any] | None:
         from nexvara.agent import files
         from nexvara.agent.parse import parse_command
 
+        # Office works in front of the user; only "fonda bajar" runs it without windows.
+        bg = _BACKGROUND.search(text)
+        if bg:
+            text = (text[: bg.start()] + text[bg.end() :]).strip(" ,.")
         plan = parse_command(text, self._context_file)
         if plan is None:
             return None
@@ -469,7 +510,7 @@ class Api(
             return {"reply": str(e)}
         self._context_file = str(source)
         self._ctx.command = text
-        snap = self.run_command_plan(plan, str(source))
+        snap = self.run_command_plan(plan, str(source), background=bool(bg))
         steps = "\n".join(f"• {d}" for d in plan.describe())
         reply = f"Fayl: {source}\nBajaraman:\n{steps}"
         if taught:
@@ -478,7 +519,7 @@ class Api(
             reply += "\n\nTushunmadim (bajarilmaydi): " + "; ".join(f"«{u}»" for u in plan.unknown)
         return {"reply": reply, "task": snap, "plan": plan.describe()}
 
-    def run_command_plan(self, plan: Any, source: str) -> dict[str, Any]:
+    def run_command_plan(self, plan: Any, source: str, background: bool = False) -> dict[str, Any]:
         if "command" in self._overrides:
             fn = self._overrides["command"]
         else:
@@ -490,9 +531,12 @@ class Api(
                       "powerpoint": run_ppt_plan}[plan.app]  # fmt: skip
 
             def fn(task: Any) -> dict[str, Any]:
+                if background:
+                    return runner(task, plan, Path(source), keep_open=False, visible=False)
                 return runner(task, plan, Path(source), keep_open=self._keep_open())
 
-        return self._runner.start(f"Buyruq: {Path(source).name}", fn).snapshot()
+        title = f"Buyruq: {Path(source).name}" + (" (fonda)" if background else "")
+        return self._runner.start(title, fn).snapshot()
 
     def pick_file(self) -> dict[str, Any]:
         """Native "open file" dialog; the chosen file becomes "shu fayl" for commands."""

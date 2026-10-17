@@ -31,7 +31,16 @@ class Reply:
 
 
 class AiError(UserError):
-    """A provider call failed; the message is shown to the user."""
+    """A provider call failed; the message is shown to the user (never contains the key).
+
+    `retryable`: the provider was busy, down or unreachable — another provider may answer
+    (the router's fallback). Wrong key, no credit or a bad request are not retryable."""
+
+    def __init__(self, message: str, retryable: bool = False) -> None:
+        from nexvara.ai.keys import redact
+
+        super().__init__(redact(message))  # a provider may echo part of the key back
+        self.retryable = retryable
 
 
 class Provider:
@@ -75,16 +84,22 @@ class AnthropicProvider(Provider):
         if isinstance(e, a.NotFoundError):
             return AiError("Anthropic: model topilmadi.")
         if isinstance(e, a.RateLimitError):
-            return AiError("Anthropic: so‘rovlar chegarasi. Birozdan keyin qayta urinib ko‘ring.")
+            return AiError(
+                "Anthropic: so‘rovlar chegarasi. Birozdan keyin qayta urinib ko‘ring.",
+                retryable=True,
+            )
         if isinstance(e, a.BadRequestError):
             msg = str(getattr(e, "message", e))
             if "credit" in msg.lower() or "billing" in msg.lower():
                 return AiError("Anthropic hisobida mablag‘ yetarli emas (Billing bo‘limi).")
             return AiError(f"Anthropic so‘rovni qabul qilmadi: {msg}")
         if isinstance(e, a.APIStatusError):
-            return AiError(f"Anthropic serverida xato ({e.status_code}). Keyinroq urinib ko‘ring.")
+            return AiError(
+                f"Anthropic serverida xato ({e.status_code}). Keyinroq urinib ko‘ring.",
+                retryable=e.status_code >= 500,
+            )
         if isinstance(e, a.APIConnectionError):
-            return AiError("Internetga ulanib bo‘lmadi (Anthropic).")
+            return AiError("Internetga ulanib bo‘lmadi (Anthropic).", retryable=True)
         return AiError(f"Anthropic: {e}")
 
     def complete(self, model, system, messages, max_tokens, effort="medium") -> Reply:
@@ -176,15 +191,19 @@ class ChatCompletionsProvider(Provider):
                     time.sleep(delay or (2**attempt + random.random()))
                     continue
                 if e.code == 429:
-                    raise AiError(f"{label}: so‘rovlar chegarasi yoki kvota tugagan.") from e
+                    raise AiError(
+                        f"{label}: so‘rovlar chegarasi yoki kvota tugagan.", retryable=True
+                    ) from e
                 if e.code == 404:
                     raise AiError(f"{label}: model topilmadi. {detail}".strip()) from e
-                raise AiError(f"{label} xatosi ({e.code}): {detail or e.reason}") from e
+                raise AiError(
+                    f"{label} xatosi ({e.code}): {detail or e.reason}", retryable=e.code >= 500
+                ) from e
             except (urllib.error.URLError, TimeoutError, OSError) as e:
                 if attempt < 2:
                     time.sleep(2**attempt)
                     continue
-                raise AiError(f"Internetga ulanib bo‘lmadi ({label}).") from e
+                raise AiError(f"Internetga ulanib bo‘lmadi ({label}).", retryable=True) from e
         raise AiError(f"{label}: javob olinmadi")
 
     def complete(self, model, system, messages, max_tokens, effort="medium") -> Reply:
@@ -218,6 +237,25 @@ class ChatCompletionsProvider(Provider):
         data = self._request("GET", "/models")
         ids = [m.get("id", "") for m in data.get("data", [])]
         return [i.removeprefix("models/") for i in ids if i]
+
+
+def fetch_balance(name: str, key: str, opener=None) -> dict[str, Any]:
+    """The provider's real account balance, only where an official endpoint exists for a
+    normal API key (DeepSeek: GET /user/balance). Free: no model is called."""
+    if name != "deepseek":
+        return {"supported": False}
+    data = ChatCompletionsProvider("deepseek", key, opener=opener)._request("GET", "/user/balance")
+    infos = []
+    for b in data.get("balance_infos") or []:
+        try:
+            infos.append({"currency": str(b.get("currency", "")),
+                          "total": float(b.get("total_balance") or 0),
+                          "granted": float(b.get("granted_balance") or 0),
+                          "topped_up": float(b.get("topped_up_balance") or 0)})  # fmt: skip
+        except (TypeError, ValueError):
+            continue
+    return {"supported": True, "available": bool(data.get("is_available")), "balances": infos,
+            "checked_at": time.time()}  # fmt: skip
 
 
 def make_provider(name: str, key: str) -> Provider:

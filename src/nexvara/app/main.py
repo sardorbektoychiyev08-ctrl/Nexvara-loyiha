@@ -83,6 +83,10 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
+    from nexvara.ai.keys import RedactingFilter
+
+    for handler in logging.getLogger().handlers:  # API keys never reach a log
+        handler.addFilter(RedactingFilter())
 
     selftest = args.selftest_excel is not None
     selftest_dir = args.selftest_excel or args.selftest_library

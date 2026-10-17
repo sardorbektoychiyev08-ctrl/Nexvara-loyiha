@@ -4,6 +4,37 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-17 (18) — Claude Code — Windows V1 integratsiya: to'liq o'zbekcha UI, AI provayderlar (Router v2), to'lov tugmalari, AI xarajat paneli
+
+**Foydalanuvchi talabi:** shaxsiy foydalanish (egasi va Nilufar); 12 bo'lim to'liq o'zbekcha; 4 AI provayder rasmiy hujjatlar bo'yicha; Tejamkor/Muvozanatli/Kuchli/Maxsus; fallback, limitlar; har provayderga To'lov/Balans tugmasi; Bosh sahifada «AI balans va xarajatlar»; xavfsizlik; pullik AI chaqiruvi yo'q; Codex Android ishiga tegmaslik.
+
+**Audit (haqiqiy holat):** foydalanuvchi oldingi bosqichdan keyin Google client'ni import qilib, o'zi kirgan (sessiya faol, egasi belgilangan, ruxsatlar: openid/email/profile). OneDrive `C:\Users\toych\OneDrive\NEXVARA-SYNC` sinxron papkasi sozlangan va shu kompyuter fayli bor. Rasmiy hujjatlar (2026-10-17) bilan solishtirilganda eskirgan model nomlari topildi: `gemini-3.5-flash` ro'yxatda yo'q, `deepseek-v4-flash` eski nom (`deepseek-flash`), OpenAI'da GPT-6 avlodi bor; Anthropic modellari va narxlari to'g'ri.
+
+**Qilindi** (tarmoq `claude/uzbek-ai`; [docs/AI.md](docs/AI.md)):
+- **O'zbekcha UI**: markaziy lug'at `app/ui/i18n.js` (`i18n()`, `[data-i18n]`; boshqa til qo'shishga tayyor), menyu nomlari foydalanuvchi bergan ro'yxat bo'yicha, sahifa sarlavhalari, vazifa holatlari (Kutilmoqda/Bajarilmoqda/Bajarildi/Xatolik yuz berdi/Bekor qilindi), «workflow»→«ish jarayoni», «dashboard»→«panel» (chat ikkalasini ham tushunadi), «Teach/Devices/Chat», tizim ma'lumoti o'zbekcha. Tekshiruv: `tests/uzbek_check.py` (inglizcha so'zlar + o'zbekcha qo'shimchali shakllar, brendlar va model ID'lari istisno).
+- **Model Router v2** (`ai/models.py`, `ai/router.py`): 4 daraja; kalit tekshirilganda hisobda yo'q model ishlaydigan qilib ko'rsatilmaydi (muqobili yoki «bu hisobda mavjud emas»); maqsad bo'yicha daraja (oddiy → Tejamkor, kundalik/Office → Muvozanatli, tahlil/reja/uzun → Kuchli, «eng kuchli model bilan» → Maxsus, doim tasdiq); xavfsiz fallback (faqat 429/5xx/tarmoq, o'sha daraja, o'sha limitlar); limitlar: umumiy kunlik/oylik, provayder kunlik/oylik, bitta topshiriq ($0.50), «shundan qimmatda so'ra»; 80% ogohlantirish, 100% bloklash; kunlik seriya, provayder ulushi, tarix.
+- **To'lov**: har provayderda «API kalitini olish», «Kalitni tekshirish va saqlash», «To'lov / Balans», «Sarfni saytda ko'rish» — faqat rasmiy sahifalar; obuna ≠ API krediti izohi; bepul kvota faqat rasmiy shartlar bo'yicha (Gemini Free Tier; boshqalarda e'lon qilinmagan).
+- **Bosh sahifa paneli**: 4 karta (ulangan holati, bugun/oy sarfi, limitlar va progress, «Limitdan qolgan»), alohida «Provayderdagi haqiqiy balans» — DeepSeek uchun rasmiy `GET /user/balance`, qolganlarda «Haqiqiy balansni avtomatik olish imkoni yo'q»; jami, ulush, 30 kunlik diagramma, tarix; «Taxminiy sarf» belgisi; qorong'i/yorug' mavzuda ko'z bilan tekshirildi.
+- **Office**: sukut bo'yicha ko'rinadigan oyna; «fonda bajar» deyilsa ko'rinmas rejim.
+- **Xavfsizlik**: AI xatolarida va barcha log qatorlarida kalitga o'xshash satrlar yashiriladi (`keys.redact`, `RedactingFilter`); kalitlar sinxronlanmaydi (test).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| unit: 268 (oldingi 253 + Router v2 12 + o'zbekcha UI 3) | PASS |
+| `.\scripts\test.ps1 -Office`: **324/324** (Office testlari va 9 ta UI skripti, jumladan yangi `uzbek_ui.py`, `ai_money.py`) | PASS (yagona xato — bitta test skriptining formatlanishi, tuzatildi, skript qayta PASS) |
+| O'zbekcha UI jonli tekshiruv: 12 bo'lim × 2 mavzu, 1202 matn bo'lagi | **100%** o'zbekcha, JS xatosiz |
+| Haqiqiy Google sessiyani tiklash (brauzersiz) | PASS (`active`, egasi ✓) |
+| OneDrive `NEXVARA-SYNC`: shu kompyuter faylini saqlangan parol bilan ochish (faqat o'qish) | PASS; ikkinchi qurilma fayli hali yo'q — NOT TESTED |
+| Installer: qayta yig'ish → jim o'rnatish → o'rnatilgan exe smoke → o'chirish; `D:\NEXVARA` saqlandi | PASS |
+| Updater (unit) | PASS; https kanal — NOT TESTED |
+| Haqiqiy pullik AI chaqiruvi | NOT TESTED — ruxsat kutilmoqda (taxmin docs/AI.md da) |
+
+**Keyingi qadam:** egasi bitta yoki bir nechta API kalitini Sozlamalar → AI da kiritadi; ruxsat bilan haqiqiy sinov (har provayderga < $0.05).
+
+---
+
 ## 2026-10-17 (17) — Claude Code — Windows Google login: haqiqiy hisobga tayyorgarlik, owner-only
 
 **Foydalanuvchi talabi:** mavjud Google OAuth sozlamalarini xavfsiz tekshirish (maxfiy qiymatlarni chiqarmasdan), mosini qayta ishlatish, ruxsatsiz yangi Google Cloud loyihasi yaratmaslik; haqiqiy Google Sign-In (brauzer, Code + PKCE, callback, profil, xavfsiz saqlash, sessiyani tiklash, chiqish); faqat egasining hisobi (`sub` bo'yicha, emailni taxmin qilmasdan); Android uchun tayyorgarlik (kodiga tegmasdan); Drive uchun minimal ruxsat; brauzerda tasdiqlash bosqichida to'xtash; testlar; push.

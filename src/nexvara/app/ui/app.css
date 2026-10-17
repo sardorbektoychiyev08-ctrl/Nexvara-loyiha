@@ -6,6 +6,33 @@
   --warn: #F59E0B;
   --radius: 14px;
 }
+/* ---- Bosh sahifa: AI balans va xarajatlar ---- */
+.ai-money { margin-top: 28px; }
+.ai-money-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ai-money h2 { font-size: 18px; margin: 0; }
+.ai-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 14px 0; }
+.ai-total { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+.ai-total b { display: block; font-size: 18px; }
+.ai-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.ai-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.ai-card h3 { margin: 0; font-size: 15px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ai-row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; }
+.ai-row span:first-child { color: var(--muted); }
+.ai-bar { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.ai-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.ai-bar.warn > i { background: var(--warn); }
+.ai-bar.over > i { background: var(--err); }
+.ai-balance { font-size: 12px; color: var(--muted); border-top: 1px dashed var(--border); padding-top: 6px; }
+.ai-warn { margin: 10px 0; padding: 10px 12px; border-radius: 10px; color: var(--text);
+  background: color-mix(in srgb, var(--warn) 18%, transparent); border: 1px solid var(--warn); }
+.ai-warn.over { background: color-mix(in srgb, var(--err) 16%, transparent); border-color: var(--err); }
+.ai-money-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 14px; }
+.ai-split-row { display: grid; grid-template-columns: 110px 1fr 70px; align-items: center; gap: 8px; font-size: 13px; margin: 6px 0; }
+.ai-chart svg { width: 100%; height: 140px; display: block; }
+.ai-chart .bar { fill: var(--accent); }
+.ai-chart .axis { stroke: var(--border); }
+.ai-chart text { fill: var(--muted); font-size: 10px; }
+
 :root[data-theme="dark"] {
   --bg: #0B1020;
   --surface: #121933;

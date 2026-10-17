@@ -169,7 +169,7 @@ def _filter(text: str) -> str:
     return (m.group(1) or m.group(2)).strip() if m else ""
 
 
-_DASH = r"(?:dashboard|dashbord)\w*"
+_DASH = r"(?:dashboard|dashbord|panel)\w*"  # "panel" = the Uzbek UI word
 _Q = r"[«\"“]([^«»\"“”]+)[»\"”]"
 _WTYPES = (r"(ustun\w*|gistogramm\w*|doira\w*|pirog\w*|chiziq\w*|grafik\w*|nuqta\w*|kpi|"
            r"ko[‘’']?rsatkich\w*|jadval\w*)")  # fmt: skip
@@ -184,7 +184,20 @@ def _dash_name(text: str) -> str:
     m = re.search(r"((?:[\w‘’'-]+\s+){1,3})" + _DASH, text, re.I)
     if not m:
         return ""
-    stop = {"shu", "bu", "ushbu", "osha", "oxirgi", "mening", "va", "keyin", "ni", "yangi", "bir"}
+    stop = {
+        "shu",
+        "bu",
+        "ushbu",
+        "osha",
+        "oxirgi",
+        "mening",
+        "va",
+        "keyin",
+        "ni",
+        "yangi",
+        "bir",
+        "boshqaruv",
+    }
     words = [w for w in m.group(1).split() if fold(w) not in stop and not _NAME.fullmatch(w)]
     return " ".join(words[-3:])
 
@@ -255,7 +268,7 @@ def _bi(text: str, f: str) -> list[ToolCall] | None:
             ]
         return None  # "Savdo.xlsx dan dashboard yarat": the page builds it (existing handler)
 
-    if _has(f, r"\bdashboardlar|\b(royxat|qaysi)\w*") and not _QUOTED.search(text):
+    if _has(f, r"\b(dashboardlar|panellar)|\b(royxat|qaysi)\w*") and not _QUOTED.search(text):
         if not _has(f, r"\b(vidjet|diagramm|qadam|bosqich)\w*"):
             return [ToolCall("bi.list")]
 
