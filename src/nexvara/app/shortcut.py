@@ -69,9 +69,13 @@ def create_desktop_shortcut() -> Path:
     exe = Path(sys.executable)
     pythonw = exe.with_name("pythonw.exe")
     lnk = shell.CreateShortcut(str(desktop / "NEXVARA.lnk"))
-    lnk.TargetPath = str(pythonw if pythonw.is_file() else exe)
-    lnk.Arguments = "-m nexvara.app.main"
-    lnk.WorkingDirectory = str(Path(__file__).resolve().parents[3])
+    if getattr(sys, "frozen", False):  # installed NEXVARA.exe (PyInstaller build)
+        lnk.TargetPath = str(exe)
+        lnk.WorkingDirectory = str(exe.parent)
+    else:
+        lnk.TargetPath = str(pythonw if pythonw.is_file() else exe)
+        lnk.Arguments = "-m nexvara.app.main"
+        lnk.WorkingDirectory = str(Path(__file__).resolve().parents[3])
     lnk.IconLocation = str(icon_path())
     lnk.Description = "NEXVARA — shaxsiy AI yordamchi"
     lnk.Save()

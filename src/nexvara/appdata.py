@@ -22,6 +22,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "test_variants": 1,
     "keep_office_open": True,
     "remote": {"enabled": False, "port": 8765},  # phone access over the local network
+    # Private release channel: a folder or an https:// URL with a signed latest.json.
+    "update": {"channel": "", "auto_check": True},
     "ai": {
         "enabled": False,
         "provider": "",  # openai | anthropic | gemini | deepseek
@@ -94,6 +96,9 @@ def _validate(s: dict[str, Any]) -> None:
         raise ValueError("test_variants 1–6")
     if not 1024 <= int(s["remote"]["port"]) <= 65535:
         raise ValueError("port 1024–65535")
+    ch = str(s["update"]["channel"]).strip()
+    if ch.startswith("http://"):
+        raise ValueError("yangilanish kanali: faqat https:// yoki papka")
     ai = s["ai"]
     if ai["provider"] not in ("", "openai", "anthropic", "gemini", "deepseek"):
         raise ValueError("noma’lum AI provayder")
