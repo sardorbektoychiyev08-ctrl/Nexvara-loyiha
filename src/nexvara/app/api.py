@@ -14,10 +14,13 @@ from pathlib import Path
 from typing import Any
 
 from nexvara import __version__, config
+from nexvara.app.api_account import AccountApi
 from nexvara.app.api_bi import BiApi
 from nexvara.app.api_devices import DevicesApi
 from nexvara.app.api_files import FilesApi
 from nexvara.app.api_memory import MemoryApi
+from nexvara.app.api_sections import SectionsChatApi
+from nexvara.app.api_update import UpdateApi
 from nexvara.app.api_workflows import WorkflowsApi
 from nexvara.core.task import TaskFn, TaskRunner
 
@@ -44,7 +47,9 @@ def _wants_ai(text: str) -> bool:
     return bool(re.search(r"\b(ai|sun.?iy intellekt\w*|aqlli)\b", fold(text)))
 
 
-class Api(MemoryApi, FilesApi, WorkflowsApi, BiApi, DevicesApi):
+class Api(
+    MemoryApi, FilesApi, WorkflowsApi, BiApi, DevicesApi, AccountApi, UpdateApi, SectionsChatApi
+):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
 
@@ -128,6 +133,9 @@ class Api(MemoryApi, FilesApi, WorkflowsApi, BiApi, DevicesApi):
         from nexvara.agent.parse import find_file
         from nexvara.knowledge.service import parse_test_request
 
+        section = self._chat_sections(text)  # workflows, history, memory, devices, theme
+        if section is not None:
+            return section
         teach = self._chat_teach(text)
         if teach is not None:
             return teach
