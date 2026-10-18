@@ -172,13 +172,8 @@ def test_wake_info_any_language():
     en = (
         "Windows IP Configuration\n\nEthernet adapter Ethernet:\n\n   Physical Address. . . . : "
         "A4-BB-6D-12-34-56\n   IPv4 Address. . . . : 192.168.1.20(Preferred)\n   Subnet Mask . . : "
-        "255.255.255.0
-
-Wireless LAN adapter Wi-Fi:
-
-   Physical Address. . : "
-        "11-22-33-44-55-66
-"
+        "255.255.255.0\n\nWireless LAN adapter Wi-Fi:\n\n   Physical Address. . : "
+        "11-22-33-44-55-66\n"
         "   IPv4 Address. . : 10.0.0.5(Preferred)\n   Subnet Mask . : 255.255.0.0\n"
     )
     ru = en.replace("Physical Address", "Физический адрес").replace("IPv4 Address", "IPv4-адрес")
