@@ -339,3 +339,57 @@ def test_routes_control_and_autostart(env):
     assert j(call(srv, "GET", "/api/v1/autostart", token=token))["data"] == {"on": True}
     sess = j(call(srv, "GET", "/api/v1/session", token=token))["data"]
     assert "wake" in sess
+
+
+# ---------------- reading a photo ----------------
+def test_ocr_text_is_tidied_and_scored():
+    from nexvara.knowledge.ocr import score, tidy
+
+    t = "Nyuton qonun-\nlari jismlar\nharakati haqida. O'quvchilar\ng`oyalari\n\nYangi xatboshi."
+    assert tidy(t) == (
+        "Nyuton qonunlari jismlar harakati haqida. O‘quvchilar g‘oyalari\n\nYangi xatboshi."
+    )
+    assert score("Bu oddiy matn edi", "latin") > score("Ву оддий матн", "latin")
+    assert score("Ву оддий матн", "cyrillic") > score("Bu oddiy matn", "cyrillic")
+
+
+def test_read_photo_in_chat_offline_and_with_ai(tmp_path, monkeypatch):
+    monkeypatch.setenv("NEXVARA_DATA", str(tmp_path / "data"))
+    from test_drawing import Draftsman, _jpeg_with_gps
+
+    from nexvara.ai.keys import MemoryKeyStore
+    from nexvara.ai.providers import Reply
+    from nexvara.ai.router import AiRouter, Ledger
+    from nexvara.app.api import Api
+    from nexvara.appdata import Settings
+
+    photo = tmp_path / "sahifa.jpg"
+    photo.write_bytes(_jpeg_with_gps())
+    # Offline: Windows OCR (faked here); the text becomes the chat's file.
+    api = Api(overrides={"ocr": lambda p, lang: "Inersiya — jismning xossasi."})
+    api.set_context_file(str(photo))
+    out = api.chat("Shu rasmdagi matnni o‘qi")
+    assert "Inersiya" in out["reply"] and "internetsiz" in out["reply"]
+    assert api.get_context_file().endswith("sahifa.txt")
+
+    # With AI: asks first, then the cleaned picture goes to a vision model.
+    class Reader(Draftsman):
+        def complete(self, model, system, messages, max_tokens, effort="medium"):
+            self.calls.append(messages)
+            return Reply("Qo‘lda yozilgan: uyga vazifa 12-mashq", model, 1500, 40)
+
+    pro = Reader()
+    r = AiRouter(
+        Settings(tmp_path / "s.json"),
+        MemoryKeyStore({"gemini": "AIza-test-gemini-1234567"}),
+        Ledger(tmp_path / "l.db"),
+        factory=lambda n, k: pro,
+    )
+    r.settings.update({"ai": {"enabled": True, "provider": "gemini"}})
+    api2 = Api(overrides={"ai_router": r})
+    api2.set_context_file(str(photo))
+    ask = api2.chat("AI bilan shu rasmdagi qo‘lyozmani o‘qi")
+    assert ask.get("confirm") and pro.calls == []
+    done = api2.confirm_ai(ask["confirm"], True)
+    assert "12-mashq" in done["reply"] and "GPSLatitude" not in pro.calls[0][0]["images"][0]["data"]
+    assert r.ledger.recent()[0]["purpose"] == "Rasmdan matn"

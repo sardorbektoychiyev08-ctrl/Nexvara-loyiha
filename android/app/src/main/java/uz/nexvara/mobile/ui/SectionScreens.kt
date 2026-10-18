@@ -229,13 +229,16 @@ fun FilesScreen(m: AppModel, act: PhoneActions) {
                 }
             }
         }
+        item { ScanPanel(act) }
+        item { OcrPanel(m, act) }
         item { PcFilesPanel(m, act) }
         item { SectionTitle("Tayyor natijalar") }
         val results = m.results
         if (results.isEmpty()) item { EmptyState(Icons.Default.Inventory2, "Hali natija yo‘q", "NEXVARA yaratgan fayllar shu yerda paydo bo‘ladi.") }
         items(results.take(50)) { (t, f) ->
             Panel(padding = 12.dp) {
-                ListRow(Icons.Default.InsertDriveFile, TransferChecks.resultFileName(f), t.title, Brand.Indigo, onClick = { act.saveResult(f) }) {
+                ListRow(Icons.Default.InsertDriveFile, TransferChecks.resultFileName(f), t.title, Brand.Indigo, onClick = { m.previewFile(f) }) {
+                    IconButton(onClick = { m.previewFile(f) }) { Icon(Icons.Default.Visibility, "Ko‘rish") }
                     IconButton(onClick = { act.saveResult(f) }) { Icon(Icons.Default.Download, "Yuklab olish") }
                 }
             }
@@ -424,7 +427,7 @@ fun WorkflowsScreen(m: AppModel) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(w.name, style = MaterialTheme.typography.titleSmall)
-                        Text(when (w.trigger) { "daily" -> "Har kuni ${w.time}"; "folder" -> "Papkaga fayl tushganda"; else -> "Qo‘lda" } +
+                        Text(when (w.trigger) { "daily" -> "Har kuni ${w.time}"; "weekly" -> "Har hafta ${w.time}"; "folder" -> "Papkaga fayl tushganda"; else -> "Qo‘lda" } +
                             " · ${w.steps.size} qadam" + if (w.lastStatus.isNotBlank()) " · oxirgi: ${Fmt.status(w.lastStatus)}" else "",
                             style = MaterialTheme.typography.bodySmall, color = x.muted)
                     }
@@ -467,6 +470,7 @@ private fun WorkflowEditor(initial: JSONObject, onSave: (JSONObject) -> Unit, on
     val trig = initial.optJSONObject("trigger") ?: JSONObject().put("type", "manual")
     var type by remember { mutableStateOf(trig.optString("type", "manual")) }
     var time by remember { mutableStateOf(trig.optString("time").ifBlank { "08:00" }) }
+    var days by remember { mutableStateOf(trig.optJSONArray("days")?.let { a -> (0 until a.length()).map { a.optInt(it) }.toSet() } ?: setOf(0)) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(if (initial.optInt("id") > 0) "Jarayonni tahrirlash" else "Yangi jarayon") },
         text = {
             Column(Modifier.verticalScrollSafe()) {
@@ -475,10 +479,13 @@ private fun WorkflowEditor(initial: JSONObject, onSave: (JSONObject) -> Unit, on
                 OutlinedTextField(steps, { steps = it }, label = { Text("Qadamlar (har qatorda bitta buyruq)") }, minLines = 4, modifier = Modifier.fillMaxWidth())
                 Text("«tasdiq: …» — sizdan so‘raydi, «kut: 30» — 30 soniya kutadi.", style = MaterialTheme.typography.bodySmall, color = LocalExtra.current.muted)
                 Spacer(Modifier.height(8.dp))
-                val opts = mutableListOf("manual" to "Qo‘lda", "daily" to "Har kuni")
+                val opts = mutableListOf("manual" to "Qo‘lda", "daily" to "Har kuni", "weekly" to "Hafta kunlari")
                 if (type == "folder") opts += "folder" to "Papka"
                 ChipRow(opts, type) { type = it }
-                if (type == "daily") OutlinedTextField(time, { time = it }, label = { Text("Vaqt (SS:DD)") }, singleLine = true)
+                if (type == "weekly") ChipRow(listOf("Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya").mapIndexed { i, d -> i.toString() to (if (i in days) "✓ " else "") + d }, "") { k ->
+                    val i = k.toInt(); days = if (i in days) days - i else days + i
+                }
+                if (type == "daily" || type == "weekly") OutlinedTextField(time, { time = it }, label = { Text("Vaqt (SS:DD)") }, singleLine = true)
                 if (type == "folder") Text("Papka kuzatuvi kompyuterda sozlanadi: ${trig.optString("folder").ifBlank { "tanlanmagan" }}",
                     style = MaterialTheme.typography.bodySmall)
             }
@@ -494,7 +501,8 @@ private fun WorkflowEditor(initial: JSONObject, onSave: (JSONObject) -> Unit, on
                     })
                 }
                 val t = JSONObject(trig.toString()).put("type", type)
-                if (type == "daily") t.put("time", time.trim())
+                if (type == "daily" || type == "weekly") t.put("time", time.trim())
+                if (type == "weekly") t.put("days", JSONArray(days.sorted()))
                 onSave(JSONObject(initial.toString()).put("name", name.trim()).put("steps", arr).put("trigger", t))
             }, enabled = name.isNotBlank() && steps.isNotBlank()) { Text("Saqlash") }
         },
@@ -713,6 +721,11 @@ fun DevicesScreen(m: AppModel, act: PhoneActions) {
                 }
             }
         }
+        if (m.canWake) item {
+            FilledTonalButton(onClick = { m.wakePc() }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.PowerSettingsNew, null); Spacer(Modifier.width(6.dp)); Text("Tanlangan kompyuterni yoqish")
+            }
+        }
         item {
             OutlinedButton(onClick = { m.pairing = true }, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Add, null); Spacer(Modifier.width(6.dp)); Text("Yana kompyuter qo‘shish")
@@ -773,6 +786,10 @@ fun SettingsScreen(m: AppModel, act: PhoneActions) {
                 Text("Mavzu", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(8.dp))
                 ChipRow(listOf("System" to "Tizim bo‘yicha", "Light" to "Yorug‘", "Dark" to "Qorong‘i"), m.themeMode.name) { m.setTheme(ThemeMode.valueOf(it)) }
+                Spacer(Modifier.height(10.dp))
+                Text("Til", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(8.dp))
+                ChipRow(listOf("uz" to "O‘zbekcha", "ru" to "Русский"), if (m.russian) "ru" else "uz") { m.useRussian(it == "ru") }
             }
         }
         item { SectionTitle("Xavfsizlik va ovoz") }
@@ -795,6 +812,28 @@ fun SettingsScreen(m: AppModel, act: PhoneActions) {
                     }
                     Switch(m.speakReplies, { m.setSpeak(it); if (!it) act.stopSpeaking() })
                 }
+            }
+        }
+        item { SectionTitle("Ovoz tili") }
+        item {
+            Panel {
+                Text("Gapirganda qaysi tilda tanisin", style = MaterialTheme.typography.bodyLarge)
+                ChipRow(listOf("uz-UZ" to "O‘zbekcha", "ru-RU" to "Ruscha", "en-US" to "Inglizcha"), m.voiceLang) { m.useVoiceLang(it) }
+                Text("O‘zbekcha tanish internet orqali (Google ovoz xizmati) ishlaydi.", style = MaterialTheme.typography.bodySmall, color = x.muted)
+            }
+        }
+        item { SectionTitle("Kompyuter") }
+        item {
+            LaunchedEffect(Unit) { m.loadAutostart() }
+            Panel {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Windows bilan birga ishga tushsin", style = MaterialTheme.typography.bodyLarge)
+                        Text("Kompyuter yoqilganda NEXVARA o‘zi ochiladi va telefon ulanadi", style = MaterialTheme.typography.bodySmall, color = x.muted)
+                    }
+                    Switch(m.tools.autostart == true, { m.setAutostart(it) }, enabled = m.tools.autostart != null)
+                }
+                if (m.canWake) TextButton(onClick = { m.wakePc() }) { Text("Kompyuterni uyg‘otish (Wake-on-LAN)") }
             }
         }
         item { SectionTitle("Boshqa tarmoqdan ulanish") }

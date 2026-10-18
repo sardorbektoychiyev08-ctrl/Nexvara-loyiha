@@ -21,6 +21,7 @@ from nexvara.app.api_devices import DevicesApi
 from nexvara.app.api_drawing import DrawingApi
 from nexvara.app.api_files import FilesApi
 from nexvara.app.api_memory import MemoryApi
+from nexvara.app.api_reading import ReadingApi
 from nexvara.app.api_sections import SectionsChatApi
 from nexvara.app.api_sync import SyncApi
 from nexvara.app.api_update import UpdateApi
@@ -68,6 +69,7 @@ class Api(
     SectionsChatApi,
     SyncApi,
     DrawingApi,
+    ReadingApi,
 ):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
@@ -187,6 +189,9 @@ class Api(
         teach = self._chat_teach(text)
         if teach is not None:
             return teach
+        read = self._chat_read(text)  # "shu rasmdagi matnni o‘qi" (offline OCR or AI)
+        if read is not None:
+            return read
         drawn = self._chat_drawing(text)  # "... chizib ber", a photo of a hand-drawn sketch
         if drawn is not None:
             return drawn
@@ -436,6 +441,8 @@ class Api(
             return self._chat_ai(payload, approved=True)
         if kind == "drawing":
             return self._run_drawing(payload)
+        if kind == "read":
+            return self._run_read(payload)
         snap = self.make_test({**payload, "approved": True})
         if "id" not in snap:
             return {"reply": snap.get("error") or "Test boshlanmadi"}

@@ -34,7 +34,7 @@ from nexvara.core.task import UserError
 TIER_FOR = {
     "classify": "cheap", "command": "cheap", "chat": "cheap",
     "plan": "balanced", "qa": "balanced", "test": "balanced",
-    "analysis": "powerful", "special": "special", "drawing": "powerful",
+    "analysis": "powerful", "special": "special", "drawing": "powerful", "ocr": "balanced",
 }  # fmt: skip
 PURPOSE_LABELS = {
     "classify": "Buyruqni tushunish",
@@ -47,6 +47,7 @@ PURPOSE_LABELS = {
     "special": "Maxsus vazifa",
     "check": "Kalitni tekshirish",
     "drawing": "Chizma",
+    "ocr": "Rasmdan matn",
 }
 WARN_AT = 0.8  # warn when 80% of a limit is spent
 IMAGE_TOKENS = 1600  # a photo (<= 1600 px) counted for the estimate

@@ -88,6 +88,28 @@ class SecureSession(context: Context) {
         saveState(state)
     }
 
+    /** MAC + broadcast of the active PC, so the phone can wake it (Wake-on-LAN). */
+    @Synchronized fun updateWake(wake: JSONObject?) {
+        if (wake == null || wake.optString("mac").isBlank()) return
+        val state = state()
+        val active = state.getJSONObject("pcs").optJSONObject(state.optString("active")) ?: return
+        active.put("wake", wake)
+        saveState(state)
+    }
+
+    /** Favourite commands (encrypted like the chat: they may contain names). */
+    @Synchronized fun favorites(): List<String> {
+        val a = state().optJSONArray("fav") ?: return emptyList()
+        return (0 until a.length()).map { a.optString(it) }
+    }
+
+    @Synchronized fun setFavorite(text: String, on: Boolean) {
+        val state = state()
+        val now = favorites().filter { it != text }.let { if (on) listOf(text) + it else it }.take(40)
+        state.put("fav", JSONArray(now))
+        saveState(state)
+    }
+
     /** "Ish kompyuteri" / "Uy kompyuteri": a local name; the PC itself is not changed. */
     @Synchronized fun rename(serverId: String, label: String) {
         val state = state()

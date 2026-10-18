@@ -21,7 +21,9 @@ import java.util.UUID
 /** Screens of the app. The bottom bar shows the first four; the rest open from "Bo‘limlar". */
 enum class Screen(val title: String) {
     Home("Bosh sahifa"), Chat("AI suhbat"), Tasks("Vazifalar"), Sections("Bo‘limlar"),
-    PcScreen("Kompyuter ekrani"), Templates("Tayyor buyruqlar"),
+    PcScreen("Kompyuter ekrani"), Templates("Tayyor buyruqlar"), AnswerSheets("Javob varaqalari"),
+    Journal("Sinf jurnali"), Documents("Hujjat shablonlari"), Schedule("Dars jadvali"),
+    Dictation("Majlis yozuvi"), Preview("Ko‘rish"),
     Office("Office yordamchisi"), Library("Darsliklar va testlar"), Files("Fayllar"),
     Bi("NEXVARA BI"), Workflows("Ish jarayonlari"), Teach("NEXVARA’ga o‘rgatish"),
     Memory("Xotira"), Ai("AI balans va xarajatlar"), Devices("Kompyuterlar"), Settings("Sozlamalar"),
@@ -50,6 +52,10 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     var themeMode by mutableStateOf(ThemeMode.entries.getOrElse(prefs.getInt("theme", 0)) { ThemeMode.System })
         private set
     var speakReplies by mutableStateOf(prefs.getBoolean("speak", false)); private set
+    var russian by mutableStateOf(prefs.getBoolean("ru", false)); private set
+    fun useRussian(v: Boolean) { russian = v; prefs.edit().putBoolean("ru", v).apply() }
+    var voiceLang by mutableStateOf(prefs.getString("voice_lang", "uz-UZ") ?: "uz-UZ"); private set
+    fun useVoiceLang(tag: String) { voiceLang = tag; prefs.edit().putString("voice_lang", tag).apply() }
     var secureScreen by mutableStateOf(prefs.getBoolean("secure_screen", false)); private set
     var backgroundAlerts by mutableStateOf(prefs.getBoolean("bg_alerts", true)); private set
     var draft by mutableStateOf<String?>(null)  // a ready command put into the chat box
@@ -78,6 +84,17 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     var lastUpload by mutableStateOf<String?>(null); private set
     var dictated by mutableStateOf<String?>(null)  // speech recognised by the Activity
     var afterUpload: String? = null  // a command to send once the picked photo is on the PC
+    var onUploaded: ((String) -> Unit)? = null  // a tool waiting for the uploaded file's PC path
+    val tools = Tools()
+    val schedule = Schedule(app)
+    var favorites by mutableStateOf(secure.favorites()); private set
+    fun toggleFavorite(text: String) {
+        val on = text !in favorites
+        secure.setFavorite(text, on); favorites = secure.favorites()
+        notice = if (on) "Sevimlilarga qo‘shildi ★" else "Sevimlilardan olindi"
+    }
+    /** Commands this phone sent, newest first, without repeats. */
+    val recentCommands: List<String> get() = messages.filter { it.mine }.map { it.text }.asReversed().distinct().take(12)
     var preview by mutableStateOf<android.graphics.Bitmap?>(null)
 
     // App lock: fingerprint/face or the phone's PIN before anything is shown (on by default
@@ -154,7 +171,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         return WindowsApi(PairCode.parse(p.getString("qr")), p.getString("token"), hosts)
     }
 
-    private val sid get() = profile?.optString("qr")?.takeIf { it.isNotBlank() }?.let { PairCode.parse(it).serverId }
+    internal val sid get() = profile?.optString("qr")?.takeIf { it.isNotBlank() }?.let { PairCode.parse(it).serverId }
 
     /** Runs [block] on a background thread; errors become a short Uzbek notice. */
     fun <T> call(quiet: Boolean = false, block: (WindowsApi) -> T, done: (T) -> Unit = {}) {
@@ -176,10 +193,10 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun post(path: String, body: JSONObject = JSONObject()) =
+    internal fun post(path: String, body: JSONObject = JSONObject()) =
         { a: WindowsApi -> a.json(path, "POST", body, UUID.randomUUID().toString()) }
 
-    private fun get(path: String) = { a: WindowsApi -> a.json(path) }
+    internal fun get(path: String) = { a: WindowsApi -> a.json(path) }
 
     // ---------------- pairing / PCs ----------------
     fun connect(raw: String) {
@@ -237,6 +254,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         call(quiet = overview != null, block = { a ->
             val s = a.json("/api/v1/session")
             secure.updateHosts(WindowsApi.hostsFrom(s))  // reconnect later from another network
+            secure.updateWake(s.optJSONObject("wake"))  // wake this PC later (Wake-on-LAN)
             if (s.optBoolean("rotate_recommended")) {
                 val fresh = a.json("/api/v1/session/rotate", "POST", JSONObject(), UUID.randomUUID().toString()).getString("token")
                 secure.updateToken(fresh)
@@ -312,7 +330,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         messages.addAll(secure.history(s).map { ChatMsg(it.optString("text"), it.optBoolean("mine")) })
     }
 
-    private fun record(text: String, mine: Boolean) {
+    internal fun record(text: String, mine: Boolean) {
         val s = sid ?: return
         secure.appendHistory(s, text, mine)
         messages.add(ChatMsg(text, mine))
@@ -415,6 +433,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         call(block = { it.upload(ctx.contentResolver, uri, name, size.takeIf { s -> s >= 0 } ?: 50_000_000) }) { r ->
             lastUpload = r.optString("path")
             record("📎 «${r.optString("name")}» kompyuterga yuborildi. Endi u bilan nima qilishni yozing.", false)
+            onUploaded?.let { cb -> onUploaded = null; cb(r.optString("path")) }
             afterUpload?.let { cmd -> afterUpload = null; send(cmd); open(Screen.Chat) }
         }
     }

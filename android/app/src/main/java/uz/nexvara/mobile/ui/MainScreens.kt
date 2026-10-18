@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -42,6 +43,9 @@ class PhoneActions(
     val takePhoto: () -> Unit, val listen: () -> Unit, val saveResult: (String) -> Unit,
     val openUrl: (String) -> Unit, val googleSignIn: (String) -> Unit, val stopSpeaking: () -> Unit,
     val unlock: () -> Unit,
+    val confirm: (String, () -> Unit) -> Unit = { _, ok -> ok() }, val reschedule: () -> Unit = {},
+    val startDictation: () -> Unit = {}, val stopDictation: () -> Unit = {}, val copyText: (String) -> Unit = {},
+    val scanDocument: () -> Unit = {},
 )
 
 private data class NavItem(val screen: Screen, val label: String, val icon: ImageVector)
@@ -56,8 +60,9 @@ private val NAV = listOf(
 @Composable
 fun AppRoot(m: AppModel, act: PhoneActions) {
     val snack = remember { SnackbarHostState() }
+    Lang.ru = m.russian
     LaunchedEffect(m.notice) {
-        m.notice?.let { snack.showSnackbar(it, withDismissAction = true); m.notice = null }
+        m.notice?.let { snack.showSnackbar(tr(it), withDismissAction = true); m.notice = null }
     }
     BackHandler(enabled = m.screen != Screen.Home || m.pairing) {
         if (m.pairing && m.profile != null) m.pairing = false else m.goBack()
@@ -99,7 +104,13 @@ fun AppRoot(m: AppModel, act: PhoneActions) {
                 Screen.Chat -> ChatScreen(m, act)
                 Screen.Tasks -> TasksScreen(m, act)
                 Screen.Sections -> SectionsScreen(m)
-                Screen.PcScreen -> PcScreenView(m)
+                Screen.PcScreen -> PcScreenView(m, act)
+                Screen.AnswerSheets -> AnswerSheetsScreen(m, act)
+                Screen.Journal -> JournalScreen(m)
+                Screen.Documents -> DocumentsScreen(m)
+                Screen.Schedule -> ScheduleScreen(m, act)
+                Screen.Dictation -> DictationScreen(m, act)
+                Screen.Preview -> PreviewScreen(m, act)
                 Screen.Templates -> TemplatesScreen(m)
                 Screen.Office -> OfficeScreen(m, act)
                 Screen.Library -> LibraryScreen(m)
@@ -230,6 +241,12 @@ fun HomeScreen(m: AppModel, act: PhoneActions) {
                     }
                 }
             }
+            if (m.connected == false && m.canWake) {
+                Spacer(Modifier.height(10.dp))
+                Panel(onClick = { m.wakePc() }) {
+                    ListRow(Icons.Default.PowerSettingsNew, "Kompyuterni yoqish", "Uxlab yoki o‘chiq bo‘lsa — uyg‘otish signali (Wake-on-LAN)", x.warning)
+                }
+            }
             if (m.queued > 0) {
                 Spacer(Modifier.height(10.dp))
                 Panel { ListRow(Icons.Default.CloudQueue, "${m.queued} ta buyruq navbatda", "Kompyuter bilan aloqa tiklanganda yuboriladi", x.warning) }
@@ -256,6 +273,7 @@ fun HomeScreen(m: AppModel, act: PhoneActions) {
                     }
                 }
             }
+            TodayCard(m)
             SectionTitle("AI balans va xarajatlar", "Batafsil") { m.open(Screen.Ai) }
             AiSummary(ov?.ai, onOpen = { m.open(Screen.Ai) }, offline = m.connected == false)
             SectionTitle("Oxirgi vazifalar", "Hammasi") { m.open(Screen.Tasks) }
@@ -386,7 +404,7 @@ fun ChatScreen(m: AppModel, act: PhoneActions) {
                     }
                 }
             }
-            items(m.messages) { msg -> Bubble(msg) }
+            items(m.messages) { msg -> Bubble(msg) { if (msg.mine) m.toggleFavorite(msg.text) else act.copyText(msg.text) } }
             m.confirm?.let { c ->
                 item {
                     Panel {
@@ -438,7 +456,8 @@ fun ChatScreen(m: AppModel, act: PhoneActions) {
 }
 
 @Composable
-private fun Bubble(msg: ChatMsg) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private fun Bubble(msg: ChatMsg, onLong: () -> Unit = {}) {
     val mine = msg.mine
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
         Surface(
@@ -446,7 +465,8 @@ private fun Bubble(msg: ChatMsg) {
             contentColor = if (mine) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = if (mine) 20.dp else 6.dp, bottomEnd = if (mine) 6.dp else 20.dp),
             border = if (mine) null else androidx.compose.foundation.BorderStroke(1.dp, LocalExtra.current.cardBorder),
-            modifier = Modifier.widthIn(max = 320.dp),
+            modifier = Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(20.dp))
+                .combinedClickable(onClick = {}, onLongClick = onLong),
         ) { Text(msg.text, Modifier.padding(horizontal = 14.dp, vertical = 10.dp), style = MaterialTheme.typography.bodyLarge) }
     }
 }
@@ -540,6 +560,11 @@ fun SectionsScreen(m: AppModel) {
     val c = m.overview?.counts ?: emptyMap()
     val items = listOf(
         Triple(Screen.Templates, Icons.Default.Bolt, "O‘qituvchi, ofis, hujjat"),
+        Triple(Screen.AnswerSheets, Icons.Default.FactCheck, "Suratdan baholash"),
+        Triple(Screen.Journal, Icons.Default.Groups, "Baholar → Excel"),
+        Triple(Screen.Documents, Icons.Default.Description, "Ariza, buyruq, xat…"),
+        Triple(Screen.Schedule, Icons.Default.Event, "Darslar va eslatma"),
+        Triple(Screen.Dictation, Icons.Default.RecordVoiceOver, "Ovozdan bayonnoma"),
         Triple(Screen.PcScreen, Icons.Default.Monitor, "Jonli ko‘rish"),
         Triple(Screen.Office, Icons.Default.Description, "Excel, Word, PowerPoint, chizma"),
         Triple(Screen.Library, Icons.Default.School, "Darslikdan test tuzish"),
@@ -552,7 +577,8 @@ fun SectionsScreen(m: AppModel) {
         Triple(Screen.Devices, Icons.Default.Devices, "Ish va uy kompyuteri"),
         Triple(Screen.Settings, Icons.Default.Settings, "Mavzu, ovoz, Google"),
     )
-    val tints = listOf(Color(0xFFEC4899), Color(0xFF0EA5E9), Color(0xFF16A34A), Brand.Indigo, Brand.Cyan, Color(0xFFF59E0B),
+    val tints = listOf(Color(0xFFEC4899), Color(0xFF16A34A), Color(0xFF8B5CF6), Brand.Indigo, Color(0xFFF59E0B), Brand.Cyan,
+        Color(0xFF0EA5E9), Color(0xFF16A34A), Brand.Indigo, Brand.Cyan, Color(0xFFF59E0B),
         Color(0xFF8B5CF6), Color(0xFFEC4899), Color(0xFF0EA5E9), Color(0xFF10B981), Color(0xFF64748B), Color(0xFF6366F1))
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("Bo‘limlar", "Windows NEXVARA’ning barcha bo‘limlari")

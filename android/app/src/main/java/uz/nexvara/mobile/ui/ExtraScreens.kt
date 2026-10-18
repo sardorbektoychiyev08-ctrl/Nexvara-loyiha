@@ -22,40 +22,86 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import uz.nexvara.mobile.*
 
-// ---------------- the PC screen, live (view only) ----------------
+// ---------------- the PC screen, live; control mode taps on it ----------------
 @Composable
-fun PcScreenView(m: AppModel) {
+fun PcScreenView(m: AppModel, act: PhoneActions) {
     val x = LocalExtra.current
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var box by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
     val zoom = rememberTransformableState { z, pan, _ ->
         scale = (scale * z).coerceIn(1f, 5f)
         offset = if (scale == 1f) Offset.Zero else offset + pan
     }
     var cmd by rememberSaveable { mutableStateOf("") }
+    var typing by remember { mutableStateOf(false) }
+    val control = m.tools.controlOn
+    /** A tap on the picture → 0..1 of the PC screen (undoing fit, zoom and pan). */
+    fun toPc(p: Offset): Pair<Float, Float>? {
+        val bmp = m.screenShot ?: return null
+        if (box.width == 0) return null
+        val cx = box.width / 2f
+        val cy = box.height / 2f
+        val ux = (p.x - cx - offset.x) / scale + cx
+        val uy = (p.y - cy - offset.y) / scale + cy
+        val fit = minOf(box.width.toFloat() / bmp.width, box.height.toFloat() / bmp.height)
+        val w = bmp.width * fit
+        val h = bmp.height * fit
+        val nx = (ux - (box.width - w) / 2f) / w
+        val ny = (uy - (box.height - h) / 2f) / h
+        return if (nx in 0f..1f && ny in 0f..1f) nx to ny else null
+    }
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader("Kompyuter ekrani", if (m.screenLive) "Jonli · ${m.screenInfo}" else "To‘xtatilgan", onBack = { m.goBack() }) {
+        ScreenHeader("Kompyuter ekrani", if (control) "Boshqarish rejimi" else if (m.screenLive) "Jonli · ${m.screenInfo}" else "To‘xtatilgan",
+            onBack = { m.tools.controlOn = false; m.goBack() }) {
+            IconButton(onClick = {
+                if (control) m.tools.controlOn = false
+                else act.confirm("Kompyuterni boshqarish") { m.tools.controlOn = true }
+            }) { Icon(if (control) Icons.Default.TouchApp else Icons.Default.Mouse, "Boshqarish", tint = if (control) x.warning else LocalContentColor.current) }
             IconButton(onClick = { if (m.screenLive) m.stopScreen() else m.startScreen() }) {
                 Icon(if (m.screenLive) Icons.Default.Pause else Icons.Default.PlayArrow, if (m.screenLive) "To‘xtatish" else "Davom ettirish")
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 8.dp).clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFF05070F)).transformable(zoom), contentAlignment = Alignment.Center) {
+            .background(Color(0xFF05070F)).onSizeChanged { box = it }.transformable(zoom)
+            .pointerInput(control) {
+                if (control) detectTapGestures(
+                    onTap = { p -> toPc(p)?.let { (a, b) -> m.control("click", a, b) } },
+                    onDoubleTap = { p -> toPc(p)?.let { (a, b) -> m.control("double", a, b) } },
+                    onLongPress = { p -> toPc(p)?.let { (a, b) -> m.control("right", a, b) } },
+                )
+            }, contentAlignment = Alignment.Center) {
             val bmp = m.screenShot
             if (bmp == null) Text("Kompyuter ekrani yuklanmoqda…", color = Color.White.copy(0.7f))
             else Image(bmp.asImageBitmap(), "Kompyuter ekrani", contentScale = ContentScale.Fit,
                 modifier = Modifier.fillMaxSize().graphicsLayer(scaleX = scale, scaleY = scale,
                     translationX = offset.x, translationY = offset.y))
         }
-        Text("Faqat ko‘rish: telefondan ekranda hech narsa bosilmaydi. Kattalashtirish uchun ikki barmoq bilan cho‘zing. " +
-            "Kompyuterda «📱 Telefon ekranni ko‘rmoqda» yozuvi chiqadi.", style = MaterialTheme.typography.bodySmall, color = x.muted,
-            modifier = Modifier.padding(horizontal = Gutter, vertical = 6.dp))
+        if (control) {
+            Row(Modifier.fillMaxWidth().horizontalScrollSafe().padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                AssistChip(onClick = { typing = true }, label = { Text("Yozish") }, leadingIcon = { Icon(Icons.Default.Keyboard, null) })
+                AssistChip(onClick = { m.control("scroll", dy = 3) }, label = { Text("▲") })
+                AssistChip(onClick = { m.control("scroll", dy = -3) }, label = { Text("▼") })
+                listOf("enter" to "Enter", "esc" to "Esc", "tab" to "Tab", "backspace" to "⌫", "ctrl+z" to "Ctrl+Z",
+                    "ctrl+c" to "Ctrl+C", "ctrl+v" to "Ctrl+V", "ctrl+s" to "Ctrl+S", "alt+tab" to "Alt+Tab", "win" to "Win")
+                    .forEach { (k, label) -> AssistChip(onClick = { m.control("key", key = k) }, label = { Text(label) }) }
+            }
+            Text("Bosish — sichqoncha bosishi, ikki marta — ochish, uzoq bosish — o‘ng tugma. Kompyuterda «📱 Telefon boshqarmoqda» chiqadi.",
+                style = MaterialTheme.typography.bodySmall, color = x.muted, modifier = Modifier.padding(horizontal = Gutter))
+        } else {
+            Text("Ko‘rish rejimi. Boshqarish uchun yuqoridagi sichqoncha belgisini bosing (kompyuterda ruxsat yoqilgan bo‘lishi kerak).",
+                style = MaterialTheme.typography.bodySmall, color = x.muted, modifier = Modifier.padding(horizontal = Gutter, vertical = 6.dp))
+        }
         Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(cmd, { cmd = it }, modifier = Modifier.weight(1f), placeholder = { Text("Buyruq bering, ekranda kuzating…") },
+            OutlinedTextField(cmd, { cmd = it }, modifier = Modifier.weight(1f), placeholder = { Text("NEXVARA’ga buyruq…") },
                 maxLines = 3, shape = RoundedCornerShape(22.dp))
             Spacer(Modifier.width(6.dp))
             FilledIconButton(onClick = { m.send(cmd); cmd = "" }, enabled = cmd.isNotBlank(), modifier = Modifier.size(48.dp)) {
@@ -63,6 +109,8 @@ fun PcScreenView(m: AppModel) {
             }
         }
     }
+    if (typing) TextInputDialog("Kompyuterga yozish", label = "Matn (kursor turgan joyga yoziladi)", confirm = "Yozish", multiline = true,
+        onSave = { m.control("type", text = it) }, onDismiss = { typing = false })
 }
 
 // ---------------- ready commands for teachers, office work, documents ----------------
@@ -117,6 +165,29 @@ fun TemplatesScreen(m: AppModel) {
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("Tayyor buyruqlar", "Bosing — suhbatda tahrirlab yuborasiz", onBack = { m.goBack() })
         LazyColumn(contentPadding = PaddingValues(start = Gutter, end = Gutter, bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (m.favorites.isNotEmpty()) {
+                item { SectionTitle("★ Sevimlilar") }
+                items(m.favorites) { f ->
+                    Panel(onClick = { m.compose(f) }, padding = 12.dp) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(f, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            IconButton(onClick = { m.toggleFavorite(f) }) { Icon(Icons.Default.Star, "Olib tashlash", tint = x.warning) }
+                        }
+                    }
+                }
+            }
+            val recent = m.recentCommands.filter { it !in m.favorites }.take(6)
+            if (recent.isNotEmpty()) {
+                item { SectionTitle("Oxirgi buyruqlar") }
+                items(recent) { r ->
+                    Panel(onClick = { m.compose(r) }, padding = 12.dp) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(r, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            IconButton(onClick = { m.toggleFavorite(r) }) { Icon(Icons.Default.StarBorder, "Sevimlilarga") }
+                        }
+                    }
+                }
+            }
             READY.forEach { (group, icon, list) ->
                 item {
                     Row(Modifier.padding(top = 14.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
