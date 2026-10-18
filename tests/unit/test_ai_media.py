@@ -513,3 +513,18 @@ def test_openai_transcription_gets_the_uzbek_hint(tmp_path, monkeypatch):
     r.media_factory = lambda n, k: Ear(n, [])
     text = api._transcribe(base64.b64encode(WAV * 100).decode(), "audio/wav", "x", approved=True)
     assert "lotin" in seen["prompt"] and text.startswith("Bugun soat to")
+
+
+def test_streamed_wav_gets_real_sizes_for_android():
+    """Live check 2026-10-19: OpenAI's WAV said 0xFFFFFFFF sizes; Android MediaPlayer refused it."""
+    import struct
+
+    from nexvara.ai.media import fix_wav_sizes, wav_from_pcm
+
+    good = wav_from_pcm(b"\x01\x00" * 50)
+    bad = bytearray(good)
+    struct.pack_into("<I", bad, 4, 0xFFFFFFFF)
+    struct.pack_into("<I", bad, 40, 0xFFFFFFFF)
+    assert fix_wav_sizes(bytes(bad)) == good
+    net = Net({"/audio/speech": bytes(bad)})
+    assert OpenAIMedia("sk-test-openai-123456", opener=net).speak("gpt-4o-mini-tts", "x") == good
