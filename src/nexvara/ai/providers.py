@@ -229,9 +229,20 @@ class ChatCompletionsProvider(Provider):
             raise AiError(
                 f"{label} rasmni o‘qiy olmaydi: OpenAI, Gemini yoki Claude kalitini ulang."
             )
+        if any(m.get("audio") for m in messages) and self.name != "gemini":
+            raise AiError(
+                f"{_LABEL.get(self.name, self.name)} ovozni tinglay olmaydi: Gemini kerak."
+            )
         wire = []
         for m in messages:
-            if m.get("images"):
+            if m.get("audio"):  # Gemini (OpenAI-compatible endpoint): a spoken command
+                a = m["audio"]
+                fmt = "wav" if "wav" in a["mime"] else a["mime"].split("/")[-1]
+                wire.append({"role": m["role"], "content": [
+                    {"type": "text", "text": m["content"]},
+                    {"type": "input_audio", "input_audio": {"data": a["data"], "format": fmt}},
+                ]})  # fmt: skip
+            elif m.get("images"):
                 parts: list[dict[str, Any]] = [{"type": "text", "text": m["content"]}]
                 parts += [{"type": "image_url",
                            "image_url": {"url": f"data:{i['mime']};base64,{i['data']}"}}

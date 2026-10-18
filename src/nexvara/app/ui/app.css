@@ -305,3 +305,5 @@ body.cad-compact .cad-log { height: 32px; }
 .cad3d-bar { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
 .cad3d-bar .btn { margin-left: auto; }
 .cad3d canvas { flex: 1; width: 100%; min-height: 0; cursor: grab; touch-action: none; }
+
+#chat-mic.recording { background: var(--err); border-color: var(--err); color: #fff; animation: pulse 1s infinite; }

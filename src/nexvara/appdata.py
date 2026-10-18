@@ -42,6 +42,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "fallback": False,  # busy/down provider -> another one; off: no paid call by itself
         # With a Gemini key: everything goes to Gemini's free tier (Flash/Flash-Lite) at $0.
         "free_mode": True,
+        "voice_consent": False,  # spoken commands go to Gemini only after the user agreed
         "send_textbook_text": True,
         "models": {},  # provider -> tier -> model id (filled when a key is checked)
         "checked": {},  # provider -> {"at": time, "models": n} of the last key check

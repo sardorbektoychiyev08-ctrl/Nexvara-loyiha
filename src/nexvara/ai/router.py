@@ -272,6 +272,8 @@ class AiRouter:
             )
         tin = models.estimate_tokens(system + "".join(m["content"] for m in messages))
         tin += IMAGE_TOKENS * sum(len(m.get("images") or []) for m in messages)
+        # Gemini counts 32 tokens per second of audio; 16 kHz 16-bit WAV is 32 000 bytes a second
+        tin += sum(len(m["audio"]["data"]) * 3 // 4 // 1000 for m in messages if m.get("audio"))
         c = 0.0 if free else models.cost(model, provider, tin, expected_out,
                                          self.config().get("prices"))  # fmt: skip
         return Estimate(provider, model, tier, tin, expected_out, c, free)
@@ -346,6 +348,12 @@ class AiRouter:
             pass  # free mode never falls back to a paid provider
         elif cfg.get("fallback", False):  # off by default: a paid fallback never starts by itself
             chain += [p for p in self.connected() if p != first]
+        if any(m.get("audio") for m in messages):  # speech: only Gemini listens
+            if not self.keys.load(FREE_PROVIDER):
+                raise AiUnavailable("Ovozli buyruq uchun Gemini kaliti kerak (Sozlamalar → AI; "
+                                    "aistudio.google.com da bepul olinadi).")  # fmt: skip
+            chain = [FREE_PROVIDER]
+            first = FREE_PROVIDER
         if any(m.get("images") for m in messages):  # only providers that can read a picture
             from nexvara.ai.providers import VISION
 

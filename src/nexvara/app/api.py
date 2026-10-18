@@ -26,6 +26,7 @@ from nexvara.app.api_reading import ReadingApi
 from nexvara.app.api_sections import SectionsChatApi
 from nexvara.app.api_sync import SyncApi
 from nexvara.app.api_update import UpdateApi
+from nexvara.app.api_voice import VoiceApi
 from nexvara.app.api_workflows import WorkflowsApi
 from nexvara.core.task import TaskFn, TaskRunner
 
@@ -71,6 +72,7 @@ class Api(
     SyncApi,
     DrawingApi,
     CadApi,
+    VoiceApi,
     ReadingApi,
 ):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real

@@ -13,7 +13,7 @@ Order and status (Claude ticks these as it goes):
 - [x] Lesson plan («dars ishlanmasi», `knowledge/lessonplan.py`, `Api._chat_lesson`), Office test PASS.
 - [x] Weekly report (`weekly.py`, chat «… haftalik hisobot qil», workflow template Fri 17:00).
 - [x] 3D view (`app/ui/cad3d.js`, button «3D»).
-- [ ] Voice command on the PC (mic → WAV → Gemini transcription; needs the user's key + consent).
+- [x] Voice command on the PC (`app/api_voice.py`, `app/ui/voice.js`, Gemini `input_audio`; consent remembered in `ai.voice_consent`).
 - [ ] Full tests, PROGRESS entry, build/install APK.
 
 ## ▶ CURRENT TASK 2 (2026-10-18, Claude) — continue from here if Claude stopped
