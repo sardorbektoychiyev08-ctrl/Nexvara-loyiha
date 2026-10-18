@@ -4,6 +4,34 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (33) — Claude Code — Multi-AI router: yo‘nalishlar bo‘yicha AUTO/MANUAL, rasm va ovoz; Windows 1.3.0
+
+**Foydalanuvchi talabi:** OpenAI, Gemini, Claude, DeepSeek bitta tizimda; CHEAP/BALANCED/POWERFUL/SPECIALIST va AUTO; har yo‘nalish (matn, vision/OCR, rasm yaratish/tahrirlash, STT, TTS, jonli suhbat) uchun AUTO yoki qo‘lda tanlash, qo‘lda tanlangan model almashtirilmasin; chatda doim ko‘rinadigan 🎤 🔊 🖼️ 📷 ✨ 🧠; API va xarajat boshqaruvi; model nomlarini rasmiy hujjatdan tekshirish; pullik sinov faqat ruxsat bilan; Android tomonda Codex ishiga xalaqit bermaslik.
+
+**Qilindi** (tarmoq `claude/ai-multimodal`, `main` dan):
+- `ai/capabilities.py`: yo‘nalishlar reyestri (rasmiy sahifalar 2026-10-18: OpenAI pricing/image-generation/text-to-speech/speech-to-text; Gemini models/pricing/image-generation/speech-generation). Claude — faqat matn va vision, DeepSeek — faqat matn. Model faqat hisob ro‘yxatida topilsa taklif qilinadi (`ai.catalog`, kalit tekshiruvida yoziladi).
+- `ai/media.py`: OpenAI Image API (generations/edits), `/audio/speech`, `/audio/transcriptions`; Gemini Interactions API (rasm, TTS; PCM bo‘lsa WAV ga o‘raladi). Kalit hech qachon URL yoki xato matnida yo‘q.
+- Router: `candidates/media/set_capability/capabilities_status`. AUTO — avval bepul (Gemini bepul rejim), keyin eng arzon; band provayder (429/5xx/tarmoq) → keyingisi byudjet ichida; noto‘g‘ri kalit/mablag‘ yo‘q → fallback yo‘q. MANUAL — aynan tanlangan provayder+model, fallback va almashtirish yo‘q, imkoniyati yo‘q tanlov saqlashda rad etiladi. Matnda yaroqsiz javob (planner JSON) → bitta kuchliroq darajada qayta urinish (faqat AUTO, «avval so‘ra» chegarasidan oshmaydi).
+- Chat: 🎤 Gapirish (STT yo‘nalishi: Gemini yoki OpenAI; o‘zbek/rus/ingliz aytilgan tilda yoziladi, tarjima qilinmaydi), 🔊 Ovozli javob (TTS; shaxsiy ma’lumot «yashirin ma’lumot» deb o‘qiladi), 🖼️ Rasm (savol → vision, «Ha» dan keyin, EXIF/GPS o‘chiriladi), 📷 Kamera (WebView kamerasi → `D:\NEXVARA\Kamera`), ✨ Rasm yaratish/tahrirlash (narxi aytiladi, doim «Ha»; `D:\NEXVARA\AI rasmlar`), 🎧 Jonli suhbat (🎤 jimlikda o‘zi to‘xtaydi → javob → 🔊 → yana 🎤; provayderlarning streaming Realtime/Live API’si ishlatilmaydi), 🧠 AUTO/qo‘lda menyusi. Sozlamalar → AI ichida ham yo‘nalishlar ro‘yxati.
+- Telefon API (Android kodiga tegilmadi): `GET/POST /api/v1/ai/capabilities`, `POST /api/v1/ai/speak` (WAV fayl), telefondan ✨ so‘ralsa javobda `image.path` (`GET /api/v1/files`). `docs/api/openapi.yaml` yangilandi.
+- Tuzatildi: `settings.json` ni bir vaqtda o‘qish/yozishda Windows «ruxsat yo‘q» xatosi (qayta urinish); «rasmli taqdimot yarat» kabi Office buyruqlari rasm yaratishga ketmaydi.
+- Versiya 1.3.0. Hujjat: `docs/AI.md` «Directions» bo‘limi (yangi provayder qo‘shish yo‘li bilan).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| pytest to‘liq, haqiqiy Office va oyna testlari bilan | 585 PASS + 1 FAIL (`uzbek_ui`: «Matn va chat» inglizcha deb topildi) → «Matn va suhbat», qayta: `uzbek_ui` PASS (100%) |
+| Yangi: `test_ai_media.py` (24: reyestr, kalit tekshiruvi katalogi, AUTO bepul→arzon, rasm «Ha» dan keyin, fallback faqat band bo‘lsa, byudjet, MANUAL almashtirilmaydi va tekshiriladi, matn/vision MANUAL, eskalatsiya, OpenAI va Gemini HTTP shakllari, xato xabarlari, chat ✨/🖼️/🔊/🧠/📷), `test_voice` (OpenAI transkripsiya), telefon marshrutlari | PASS (soxta provayder, pul sarflanmadi) |
+| Oyna: `tests/ui_scripts/media_tools.py` (7 tugma ko‘rinadi, 🧠 menyu 7 qator, TTS qo‘lda OpenAI, 🔊, ✨ faqat «Ha» dan keyin va rasm chatda, 🖼️, Sozlamalarda yo‘nalishlar, JS xatosi yo‘q) | PASS |
+| Windows 1.3.0 yig‘ish, imzolab joylash, jim o‘rnatish | PASS — o‘rnatildi (`%LOCALAPPDATA%\Programs\NEXVARA`, 1.3.0), SHA-256 `1dd383caa9c9454ab299e9993e7b1eae3db146394d4965ada0073419d3813fdc`; zaxira `D:\NEXVARA-zaxira\auto\auto-20261018-210221`; o‘rnatilgan dastur selftesti `ok: true` |
+| 📷 haqiqiy veb-kamera, 🎤 haqiqiy mikrofon, 🎧 jonli suhbat | NOT TESTED — haqiqiy kalit va qurilma bilan egasi sinaydi |
+| Haqiqiy OpenAI/Gemini rasm, TTS, STT chaqiruvlari; o‘zbekcha ovoz sifati | NOT TESTED — pullik/kalit kerak, ruxsat kutilmoqda |
+
+**Keyingi qadam:** egasi kalitlarni ulaydi (Gemini — bepul matn, STT, TTS; rasm uchun OpenAI yoki Gemini pullik), ruxsat bilan har yo‘nalishni bittadan sinash; Codex: Android’da 🧠 va 🔊 uchun yangi marshrutlar (pastdagi HANDOFF eslatmasi); `main` ga merge va push — egasi tasdig‘i bilan.
+
+---
+
 ## 2026-10-18 (32) — Claude Code — Egasi ruxsati bilan: osilgan PowerPoint, telefon tekshiruvi, merge va push; Windows 1.2.1
 
 **Foydalanuvchi talabi:** «2, 3, 4 ni tugat va hisobot ber» (telefonni ko‘z bilan tekshirish; osilgan PowerPoint’ni yopish; main ga merge va push); «AutoCAD’da ranglarni ko‘rmayapman, ko‘rsat».

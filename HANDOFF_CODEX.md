@@ -2,6 +2,16 @@
 
 2026-10-18 Codex: CURRENT TASK 4 yakunlandi (`PROGRESS.md` (30)). Windows 1.1.1 o‘rnatildi va selftest PASS. Office sinovlari 83 PASS, 1 PowerPoint COM sinovi osilgani uchun chetga olindi. `main` ga merge/push qilinmadi. Quyidagi topshiriq 4 matni tarixiy izoh sifatida qoldirildi.
 
+## ▶ NOTE for Codex (2026-10-18 night, Claude) — Android: new AI routes are ready on the PC
+
+Branch `claude/ai-multimodal`. The PC has per-direction AI settings (text, vision, image, stt, tts,
+realtime; AUTO or MANUAL). Android can use them without new logic on the phone:
+`GET/POST /api/v1/ai/capabilities` (same settings as the PC 🧠 menu), `POST /api/v1/ai/speak`
+{text} → WAV `path` for `GET /api/v1/files` (🔊), and a ✨ picture asked in the phone chat comes
+back after `/api/v1/confirm` as `image.path`. A photo uploaded with `/api/v1/files` + a question
+in chat goes to the vision model after «Ha». Contract: `docs/api/openapi.yaml`. Claude did not
+touch `android/` in this task.
+
 ## ▶ CURRENT TASK 5 (2026-10-18 evening, Claude) — continue from here if Claude stopped
 
 Owner chose proposals 1, 2, 3, 5, 8, 9, then: review Codex's task-4 work and fix gaps, then
