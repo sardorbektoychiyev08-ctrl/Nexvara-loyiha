@@ -226,3 +226,65 @@ def test_powerpoint_commands(tmp_path):
     joined = " ".join(texts)
     assert "2025" not in joined and joined.count("2026") >= 3
     assert num == "3" and effect != 0
+
+
+# ---------------- «tekshir»: official rules (knowledge/office_guide.py) ----------------
+def test_excel_check_reports_and_changes_nothing(tmp_path):
+    from nexvara.agent.excel_exec import run_excel_plan
+    from nexvara.agent.parse import parse_command
+    from nexvara.skills.excel import ops
+    from nexvara.skills.excel.bridge import ExcelSession
+
+    src = tmp_path / "Xato.xlsx"
+    with ExcelSession(visible=False) as xl:
+        wb = xl.new_workbook()
+        ws = wb.Worksheets(1)
+        ops.write_rows(
+            ws,
+            [
+                ["Hudud", "Summa", "Soni"],
+                ["Toshkent", "'1200", 3],
+                ["Buxoro", "'800", 0],
+                ["", "", ""],
+                ["Samarqand", "'500", 2],
+            ],
+        )
+        ws.Range("D1:E1").Merge()
+        ws.Cells(2, 4).Formula = "=B2/C3"
+        xl.save_as(wb, src)
+        wb.Close(SaveChanges=False)
+        del ws, wb
+    before = digest(src)
+    res = ok(run(run_excel_plan, parse_command("Xato.xlsx ni tekshir"), src))
+    text = " ".join(res["report"])
+    for part in (
+        "varag‘iga tushunarli nom",
+        "matn sifatida",
+        "Xato formulalar",
+        "Birlashtirilgan kataklar",
+        "ikkiga bo‘lingan",
+    ):
+        assert part in text, text
+    assert digest(src) == before and not (tmp_path / "Xato_NEXVARA.xlsx").exists()
+
+
+def test_word_check_reports_official_rules(tmp_path):
+    from nexvara.agent.parse import parse_command
+    from nexvara.agent.word_exec import run_word_plan
+
+    src = make_messy_docx(tmp_path / "hisobot.docx")
+    before = digest(src)
+    res = ok(run(run_word_plan, parse_command("hisobot.docx ni tekshir"), src))
+    text = " ".join(res["report"])
+    assert "ikkita bo‘sh joy" in text and "11 pt" in text, text  # Normal style is 11 pt
+    assert digest(src) == before and not (tmp_path / "hisobot_NEXVARA.docx").exists()
+
+
+def test_powerpoint_check_reports_small_text(tmp_path):
+    from nexvara.agent.parse import parse_command
+    from nexvara.agent.ppt_exec import run_ppt_plan
+
+    src = make_deck(tmp_path / "dars.pptx")
+    res = ok(run(run_ppt_plan, parse_command("dars.pptx ni och va slaydlarni tekshir"), src))
+    text = " ".join(res["report"])
+    assert "kamida 18 pt" in text, text  # the table on slide 3 uses 14 pt

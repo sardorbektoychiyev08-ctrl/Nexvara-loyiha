@@ -217,6 +217,13 @@ def _execute(
             csv_path = out.with_suffix(".csv")
         beat()
 
+    if all(a.kind in ("open", "check") for a in plan.actions):  # a report: nothing to save
+        if not keep_open:
+            wb.Close(SaveChanges=False)
+        del ws, t
+        return {"path": str(source), "source": str(source), "pdf": "", "csv": "",
+                "report": report, "checks": checks, "unknown": plan.unknown}  # fmt: skip
+
     with task.step("Saqlash") as s:
         saved = xl.save_as(wb, out, overwrite=overwrite)  # backs up the original when overwriting
         if overwrite:
@@ -828,7 +835,70 @@ def _ex_replace(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
     return f"«{find}» → «{repl}»: {before} ta"
 
 
+_DEFAULT_SHEET = re.compile(r"^(sheet|лист|list|varaq)\s*\d+$", re.IGNORECASE)
+_NUMBER_TEXT = re.compile(r"^\s*-?\d[\d\s]*([.,]\d+)?\s*$")
+
+
+def _ex_check(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    """Official rules (knowledge/office_guide.py): a report, nothing is changed."""
+    problems: list[str] = []
+    wb = ws.Parent
+    for i in range(1, wb.Worksheets.Count + 1):
+        sh = wb.Worksheets(i)
+        name = str(sh.Name)
+        if _DEFAULT_SHEET.match(name):
+            problems.append(f"«{name}» varag‘iga tushunarli nom bering")
+        used = sh.UsedRange
+        if used.Count == 1 and used.Value in (None, ""):
+            problems.append(f"«{name}» varag‘i bo‘sh — o‘chirish kerak")
+        del used, sh
+    last = t.top + t.n_rows + len(t.footers)
+    full = ws.Range(ws.Cells(t.top, t.left), ws.Cells(last, t.left + len(t.headers) - 1))
+    if full.MergeCells is not False:  # True or mixed
+        merged = sorted({str(full.Cells(r, c).MergeArea.Address).replace("$", "")
+                         for r in range(1, min(full.Rows.Count, 300) + 1)
+                         for c in range(1, full.Columns.Count + 1)
+                         if full.Cells(r, c).MergeCells})  # fmt: skip
+        problems.append("Birlashtirilgan kataklar: " + ", ".join(merged[:6]))
+    empty_heads = [col_letter(t.left + i) for i, h in enumerate(t.headers) if not h]
+    if empty_heads:
+        problems.append("Sarlavhasiz ustunlar: " + ", ".join(empty_heads))
+    dup = sorted({h for h in t.headers if h and t.headers.count(h) > 1})
+    if dup:
+        problems.append("Takrorlangan sarlavhalar: " + ", ".join(dup))
+    blank_rows = [
+        t.top + 1 + i for i, row in enumerate(t.rows) if all(v in (None, "") for v in row)
+    ]
+    if blank_rows:
+        problems.append("Jadval ichida bo‘sh qatorlar: " + ", ".join(map(str, blank_rows[:8])))
+    # data again right under the table: a blank row cut it in two (Excel sees only the top part)
+    below = ws.Range(ws.Cells(last + 2, t.left), ws.Cells(last + 6, t.left + len(t.headers) - 1))
+    if any(v not in (None, "") for row in ops.read_range(below) for v in row):
+        problems.append(f"Jadval {last + 1}-qatordagi bo‘sh qator bilan ikkiga bo‘lingan — bo‘sh "
+                        "qatorni o‘chiring, aks holda saralash va filtr faqat yuqori qismga "
+                        "ishlaydi")  # fmt: skip
+    for c in range(1, len(t.headers) + 1):
+        vals = [v for v in t.column(c) if v not in (None, "")]
+        as_text = [v for v in vals if isinstance(v, str) and _NUMBER_TEXT.match(v)]
+        if vals and len(as_text) >= max(1, len(vals) // 2):
+            problems.append(f"«{t.headers[c - 1]}»: {len(as_text)} ta raqam matn sifatida yozilgan "
+                            "(yig‘indi va saralash noto‘g‘ri chiqadi)")  # fmt: skip
+    try:
+        errs = ws.UsedRange.SpecialCells(-4123, 16)  # xlCellTypeFormulas, xlErrors
+        problems.append("Xato formulalar: " + str(errs.Address).replace("$", "")[:80])
+        del errs
+    except Exception:  # Excel raises when there are none
+        pass
+    if nums and t.footers == [] and t.n_rows > 3:
+        problems.append("Jami qatori yo‘q (masalan: «jami qo‘sh»)")
+    check("Tekshiruv bajarildi", True)
+    if not problems:
+        return "Kamchilik topilmadi (Microsoft tavsiyalari bo‘yicha)"
+    return f"{len(problems)} ta tavsiya: " + "; ".join(problems)
+
+
 _EXTRA = {
+    "check": _ex_check,
     "highlight": _ex_highlight, "numfmt": _ex_numfmt, "autofit": _ex_autofit,
     "stats": _ex_stats, "formula": _ex_formula, "rename_sheet": _ex_rename_sheet,
     "delete_column": _ex_delete_column, "print_setup": _ex_print_setup, "font": _ex_font,

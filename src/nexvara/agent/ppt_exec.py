@@ -403,11 +403,54 @@ def _pp_slide_numbers(pres: Any, a: Any, ops: Any) -> tuple[str, bool]:
 
 
 def _pp_check(pres: Any, a: Any, ops: Any) -> tuple[str, bool]:
+    """Layout problems + Microsoft's rules (knowledge/office_guide.py): titles, 18 pt, bullets,
+    alt text. A report; nothing is changed."""
     problems = []
+    titles: dict[str, list[int]] = {}
     for i in range(1, pres.Slides.Count + 1):
-        for p in ops.layout_problems(pres.Slides(i)):
+        slide = pres.Slides(i)
+        for p in ops.layout_problems(slide):
             if NUM_NAME not in p:
                 problems.append(f"{i}-slayd: {p}")
+        title = ops.slide_title(slide).strip()
+        if not title:
+            problems.append(f"{i}-slayd: sarlavha yo‘q")
+        else:
+            titles.setdefault(title.lower(), []).append(i)
+        small, no_alt = 0.0, 0
+        for j in range(1, slide.Shapes.Count + 1):
+            sh = slide.Shapes(j)
+            if str(sh.Name) == NUM_NAME:
+                continue
+            if int(sh.Type) == 13 and not str(sh.AlternativeText).strip():  # msoPicture
+                no_alt += 1
+            if sh.HasTable:  # table cells are text too
+                tbl = sh.Table
+                for r in range(1, tbl.Rows.Count + 1):
+                    for c in range(1, tbl.Columns.Count + 1):
+                        cell = tbl.Cell(r, c).Shape.TextFrame.TextRange
+                        size = float(cell.Font.Size)
+                        if 0 < size < 18 and str(cell.Text).strip():
+                            small = size if not small else min(small, size)
+                del tbl
+            if sh.HasTextFrame and sh.TextFrame.HasText:
+                tr = sh.TextFrame.TextRange
+                for k in range(1, tr.Runs().Count + 1):
+                    size = float(tr.Runs(k).Font.Size)
+                    if 0 < size < 18 and str(tr.Runs(k).Text).strip():
+                        small = size if not small else min(small, size)
+                bullets = sum(1 for line in str(tr.Text).split("\r") if line.strip())
+                if bullets > 6 and j != 1:
+                    problems.append(f"{i}-slayd: {bullets} ta band — 6 tadan oshmasin")
+                del tr
+            del sh
+        if small:
+            problems.append(f"{i}-slayd: {small:g} pt matn — kamida 18 pt bo‘lsin")
+        if no_alt:
+            problems.append(f"{i}-slayd: {no_alt} ta rasmda izoh (alt matn) yo‘q")
+        del slide
+    problems += [f"{', '.join(map(str, ids))}-slaydlar: sarlavha bir xil"
+                 for ids in titles.values() if len(ids) > 1]  # fmt: skip
     if not problems:
         return f"{pres.Slides.Count} ta slayd: muammo topilmadi", True
     more = f" (yana {len(problems) - 8} ta)" if len(problems) > 8 else ""

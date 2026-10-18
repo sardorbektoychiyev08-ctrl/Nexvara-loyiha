@@ -34,13 +34,14 @@ belgila", "eng katta 3 ta Summani yashil bilan belgila", "Summa ustuniga rang sh
 "Soni ustuniga ma’lumot chiziqlari qo‘sh", "Ulush ustunini foiz formatida qil", \
 "Foyda = Daromad - Xarajat ustunini qo‘sh", "o‘rtacha qatorini qo‘sh", "eng katta va eng kichik \
 qiymat qatorlarini qo‘sh", "Izoh ustunini o‘chir", "varaq nomini «Hisobot» qil", \
-"ustunlar kengligini moslashtir", "albom qilib bir sahifaga sig‘dir", "shriftni Arial 12 qil"
+"ustunlar kengligini moslashtir", "albom qilib bir sahifaga sig‘dir", "shriftni Arial 12 qil", \
+"jadvalni tekshir", \n"jadvalni tekshir"
   Word: "Xat.docx ni och, «eski» so‘zini «yangi» ga almashtir, sarlavha qo‘sh, PDF qilib saqla"; \
 yana: "hujjatni rasmiy formatla", "matnni kenglik bo‘yicha tekisla", "sarlavhalarni markazga \
 tekisla", "yuqori kolontitulga «5-maktab» yoz", "sahifani albom qil", "chap chetini 3 sm qil", \
 "ortiqcha bo‘sh joylarni tozala", "so‘zlarni sana", "birinchi qatorni sarlavha qil", \
-"jadvallarni formatla", "sahifa raqamlarini qo‘y", "mundarija qo‘sh", "shriftni Times New Roman 14 \
-qil", "qator oralig‘ini 1,5 qil"
+"jadvallarni formatla", "hujjatni tekshir", "sahifa raqamlarini qo‘y", "mundarija qo‘sh", \
+"shriftni Times New Roman 14 qil", "qator oralig‘ini 1,5 qil"
   PowerPoint: "Taqdimot.pptx ni PDF qilib saqla"; yana: "«2025» ni «2026» ga almashtir", \
 "barcha slaydlarga o‘tish effekti qo‘sh", "slayd raqamlarini qo‘sh", "slaydlarni tekshir", \
 "shriftni Arial qil"
@@ -294,6 +295,9 @@ def chat_reply(router: AiRouter, text: str, approved: bool = False, facts=()) ->
         "fayllari bilan ishlaysan, maktab darsliklaridan mavzu chiqarasan, test va taqdimot "
         "tuzasan. O‘zbek tilida (lotin) qisqa va do‘stona javob ber."
     )
+    from nexvara.knowledge.office_guide import for_prompt
+
+    system += for_prompt(text)  # official rules when the request is about an office document
     r = router.complete(
         "chat", _with_facts(public(system), facts), [{"role": "user", "content": text}],
         max_tokens=2000, expected_out=300, approved=approved, effort="low",

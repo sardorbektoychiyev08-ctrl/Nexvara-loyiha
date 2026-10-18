@@ -3,6 +3,7 @@ says "ustiga saqla" (a backup is made first); results go to "<name>_NEXVARA.docx
 
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -142,6 +143,14 @@ def _execute(task, w, plan, source, out, overwrite, visible, pause, keep_open) -
                 raise CommandError(f"Word uchun bu buyruq hali qo‘llanmaydi: «{a.text}»")
             report.append(f"{title}: {s.detail}")
         beat()
+
+    if all(a.kind in ("open", "check", "count", "spelling") for a in plan.actions):
+        if not keep_open:  # a report only: the document is not copied or changed
+            w.disown(doc)
+            doc.Close(ops.WD_DO_NOT_SAVE)
+        del doc
+        return {"path": str(source), "source": str(source), "pdf": "", "report": report,
+                "checks": [{"name": "Tekshiruv", "ok": True}], "unknown": plan.unknown}  # fmt: skip
 
     with task.step("Saqlash") as s:
         if overwrite:
@@ -361,7 +370,74 @@ def _wd_tables(doc: Any, a: Any, ops: Any, expect: list) -> str:
     return f"{n} ta jadval: chegaralar, qalin sarlavha, sarlavha har sahifada"
 
 
+_ODD_DATE = re.compile(r"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4})\b")
+
+
+def _wd_check(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    """Official rules (knowledge/office_guide.py: Microsoft, VM 140-son qarori): a report."""
+    problems: list[str] = []
+    n = doc.Paragraphs.Count
+    pages = int(doc.ComputeStatistics(2))
+    heads = ops.outline(doc)
+    fake, empty_runs, run, sizes, fonts = [], 0, 0, set(), set()
+    for i in range(1, min(n, 1500) + 1):
+        p = doc.Paragraphs(i)
+        rng = p.Range
+        text = str(rng.Text).strip()
+        in_table = bool(rng.Information(12))
+        if not text and not in_table and rng.InlineShapes.Count == 0:
+            run += 1
+            if run == 2:
+                empty_runs += 1
+        else:
+            run = 0
+        if text and not in_table and int(p.OutlineLevel) == 10:
+            if len(text) < 80 and rng.Font.Bold == -1 and not text.endswith((".", ":", ",")):
+                fake.append(text[:40])  # looks like a heading but has no heading style
+            if rng.Font.Size and float(rng.Font.Size) < 900:  # 9999999 = mixed
+                sizes.add(float(rng.Font.Size))
+            if str(rng.Font.Name):
+                fonts.add(str(rng.Font.Name))
+        del rng, p
+    if fake:
+        problems.append("Sarlavhaga o‘xshash, lekin sarlavha uslubisiz qatorlar (mundarijaga "
+                        "kirmaydi): " + "; ".join(f"«{t}»" for t in fake[:4]))  # fmt: skip
+    if pages >= 3 and not heads:
+        problems.append("Uzun hujjatda sarlavha uslublari yo‘q — mundarija tuzib bo‘lmaydi")
+    if empty_runs:
+        problems.append(f"{empty_runs} joyda ketma-ket bo‘sh qatorlar (oraliq paragraf oralig‘i "
+                        "bilan beriladi)")  # fmt: skip
+    text_all = str(doc.Content.Text)
+    if "  " in text_all:
+        problems.append(f"{text_all.count('  ')} joyda ikkita bo‘sh joy («ortiqcha bo‘sh joylarni "
+                        "tozala»)")  # fmt: skip
+    if len(fonts) > 2:
+        problems.append("Asosiy matnda shriftlar aralash: " + ", ".join(sorted(fonts)[:4]))
+    if sizes and min(sizes) < 12:
+        problems.append(f"Asosiy matn {min(sizes):g} pt — rasmiy hujjat uchun 12–14 pt")
+    if pages >= 2 and doc.Sections(1).Footers(1).PageNumbers.Count == 0:
+        problems.append("Sahifa raqamlari yo‘q («sahifa raqamlarini qo‘y»)")
+    odd = sorted(set(_ODD_DATE.findall(text_all)))
+    if odd:
+        problems.append("Sana shakli: " + ", ".join(odd[:3]) + " — rasmiy hujjatda «2026-yil "
+                        "18-oktabr» yoki «18.10.26» (VM 140-son qarori, 16-band)")  # fmt: skip
+    for i in range(1, doc.Tables.Count + 1):
+        if not doc.Tables(i).Uniform:
+            problems.append(f"{i}-jadvalda birlashtirilgan kataklar bor")
+    no_alt = sum(1 for i in range(1, doc.InlineShapes.Count + 1)
+                 if not str(doc.InlineShapes(i).AlternativeText).strip())  # fmt: skip
+    if no_alt:
+        problems.append(f"{no_alt} ta rasmda izoh (alt matn) yo‘q")
+    spell = ops.spelling_error_count(doc)
+    if spell:
+        problems.append(f"{spell} ta imlo belgisi (o‘zbek lug‘ati bo‘lmasa ba’zilari xato emas)")
+    if not problems:
+        return "Kamchilik topilmadi (Microsoft va VM 140-son qarori talablari bo‘yicha)"
+    return f"{len(problems)} ta tavsiya: " + "; ".join(problems)
+
+
 _EXTRA = {
+    "check": _wd_check,
     "align": _wd_align, "header": _wd_header, "orientation": _wd_orientation,
     "margins": _wd_margins, "clean": _wd_clean, "count": _wd_count, "title": _wd_title,
     "tables": _wd_tables,

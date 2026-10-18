@@ -479,6 +479,13 @@ def _classify_extra(clause: str, f: str, app: str | None) -> Action | None:
         return Action("count", {}, clause)
     if app == "word" and _has(f, "jadval") and _has(f, "formatla", "chiroyli", "bezat", "chegara"):
         return Action("tables", {}, clause)
+    # "hujjatni tekshir", "jadvalni tekshir": official rules (knowledge/office_guide.py)
+    if (
+        app in ("excel", "word")
+        and _has(f, "tekshir", "nazorat qil")
+        and not _has(f, "imlo", "orfografiya")
+    ):
+        return Action("check", {}, clause)
     return None
 
 

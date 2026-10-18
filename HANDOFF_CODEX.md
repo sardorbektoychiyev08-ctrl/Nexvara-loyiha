@@ -19,9 +19,9 @@ Cyrillic); then API keys; propose new features.
 - [x] (commit 66812ac, APK 1.2.3 built — NOT installed: phone was disconnected) Android «Chizma» screen with hand drawing (Compose canvas: finger strokes → straightened
   into line/rect/circle/arc; pinch zoom; tools; send to PC as DXF via a new `/api/v1` route
   that calls `CadApi.cad_save`; open the PC's last drawing on the phone).
-- [ ] Office guidance from official sources (Microsoft support, O‘zDSt/«Davlat tilida ish
+- [x] (done) Office guidance from official sources (Microsoft support, O‘zDSt/«Davlat tilida ish
   yuritish») as `src/nexvara/knowledge/office_guide.py` used by AI prompts (`ai/features.py`).
-- [ ] Full test run (`test.ps1 -Office`), PROGRESS entry, then proposals to the owner.
+- [x] Full test run PASS (511), PROGRESS entry (28). Next: install APK 1.2.3 when the phone is connected; owner adds Gemini key.
 
 2026-10-18 Codex update: the textbook test-writing task is complete on
 `claude/android-v1`. The AI test prompt now carries the assessment rules and the

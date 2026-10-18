@@ -43,7 +43,10 @@ def run():
     try:
         ready.wait(90)
         js = win.evaluate_js
-        until("window.cad && document.getElementById('version').textContent.startsWith('NEXVARA v')", 90)
+        until(
+            "window.cad && document.getElementById('version').textContent.startsWith('NEXVARA v')",
+            90,
+        )
         js("document.querySelector('.nav-item[data-page=cad]').click()")
         until("document.getElementById('page-cad').classList.contains('active')")
 
@@ -78,7 +81,11 @@ def run():
         js("cad.pick(240, 0)")
         js("cad.pick(200, 40)")
         arcs = [e for e in doc() if e["type"] == "arc"]
-        res["fillet"] = [round(arcs[-1]["r"], 3), round(arcs[-1]["cx"], 3), round(arcs[-1]["cy"], 3)] if arcs else None
+        res["fillet"] = (
+            [round(arcs[-1]["r"], 3), round(arcs[-1]["cx"], 3), round(arcs[-1]["cy"], 3)]
+            if arcs
+            else None
+        )
         js("cad.setTool('select')")
 
         # 4) chamfer 4 mm
@@ -87,7 +94,11 @@ def run():
         ex("CHA", "D 4")
         js("cad.pick(340, 0)")
         js("cad.pick(300, 40)")
-        res["chamfer"] = any(e["type"] == "line" and abs(math.hypot(e["x2"] - e["x1"], e["y2"] - e["y1"]) - 4 * math.sqrt(2)) < 1e-3 for e in doc())
+        res["chamfer"] = any(
+            e["type"] == "line"
+            and abs(math.hypot(e["x2"] - e["x1"], e["y2"] - e["y1"]) - 4 * math.sqrt(2)) < 1e-3
+            for e in doc()
+        )
         js("cad.setTool('select')")
 
         # 5) circle + hatch inside a rectangle (the circle becomes a hole)
@@ -145,9 +156,7 @@ if target.exists():
 else:
     res["dxf_audit"] = ["file missing"]
 print(json.dumps(res, ensure_ascii=False, indent=1))
-ok = (
-    res.get("trim") == [(0.0, 50.0)] or res.get("trim") == [[0, 50]]
-)
+ok = res.get("trim") == [(0.0, 50.0)] or res.get("trim") == [[0, 50]]
 checks = {
     "trim": res.get("trim") in ([[0, 50]], [(0, 50)]),
     "extend": res.get("extend") == [80],

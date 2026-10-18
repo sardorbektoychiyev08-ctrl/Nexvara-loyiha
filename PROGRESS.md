@@ -4,6 +4,36 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (28) — Claude Code — Codex ishini tekshirish; Chizmalar 2.0; telefonda qo‘lda chizish; o‘zbekcha doim lotinda; Office rasmiy qoidalari
+
+**Foydalanuvchi talabi:** Codex qilgan ishlarni ko‘rib kamchiliklarni tuzatish; Office dasturlarida ishlashni rasmiy manbalardan o‘rgatish; AutoCAD Android ilovada ham bo‘lsin, qo‘lda chizish; chizma dasturini to‘liq funksiyali qilish; kirill harflari chiqmasin (AI’ga o‘rgatish); keyin API ulanadi; yangi funksiya takliflari.
+
+**Codex ishida topilgan kamchiliklar (tuzatildi):** polichiziq yoylari (bulge) to‘g‘ri chiziq bo‘lib chizilardi; chiziq turi/qalinligi ko‘rinmasdi; o‘lchamlarda strelka yo‘q edi; kesish/uzaytirish/yumaloqlash/faska/masshtab/massiv/shtrix yo‘q edi; bog‘lanish belgisi va kesishish/perpendikulyar bog‘lanish yo‘q edi; obyekt xususiyatlarini raqam bilan o‘zgartirib bo‘lmasdi; qatlam rangi/qulfi yo‘q edi.
+
+**Chizmalar 2.0** (`app/ui/cad.js` qayta yozildi, `app/api_cad.py`): ellips, ko‘pburchak, shtrix (to‘liq/ANSI31, ichki aylana — teshik), chiziqli (yotiq/tik)/qiya/radius/diametr o‘lchamlari, ko‘chirish, nusxa, burish, ko‘zgu, masshtab, parallel nusxa (polichiziq ham), kesish, uzaytirish, yumaloqlash (R), faska, qator va aylana massiv, bo‘laklash, grip (nuqtani sudrab o‘zgartirish), Ctrl+C/V/A, bog‘lanish: uchi/o‘rtasi/markaz/chorak/kesishish/perpendikulyar/yaqin (belgisi bilan), qatlam: rang, qalinlik, chiziq turi, qulf, nom, o‘chirish; xususiyatlar paneli (koordinata, radius, matn, uzunlik, yuza); masofa va yuza o‘lchash; oyna bilan kattalashtirish. DXF: `ldim`, `rdim`, `hatch`, obyekt rangi, qulflangan qatlam.
+
+**Telefonda Chizma** (Android 1.2.3; `Cad.kt`, `ui/CadScreen.kt`; PC: `remote_v1_cad.py`, `/api/v1/cad*`): aqlli qalam (qiyshiq chiziq → tekis chiziq, halqa → aylana, quti → aniq to‘rtburchak, egri → yoy), chiziq, to‘rtburchak, aylana, o‘lcham, matn, aniq o‘lcham kiritish, o‘chirgich, ikki barmoq bilan kattalashtirish, orqaga/qaytarish; kompyuterga AutoCAD DXF + PDF + PNG bo‘lib saqlanadi va kompyuterdagi Chizmalar oynasida ochiladi; kompyuterdagi chizmalarni telefonda ochish. Telefon faqat Chizmalar papkasidagi fayllarni o‘qiy oladi.
+
+**O‘zbekcha doim lotinda** (`knowledge/textnorm.py` `cyr_to_latin`, `ai/router.py` `LATIN_RULE`): har AI so‘roviga «faqat lotin» qoidasi; javobda kirill o‘zbekcha qolsa NEXVARA o‘zi lotinga o‘giradi (ruscha so‘ralganda tegmaydi); kirill yozuvidagi o‘zbekcha darsliklar endi lotinga o‘girilib qo‘shiladi (avval o‘tkazib yuborilardi), ruscha darsliklar avvalgidek chetda.
+
+**Office rasmiy qoidalari** (`knowledge/office_guide.py`, [docs/OFFICE_QOIDALARI.md](docs/OFFICE_QOIDALARI.md)): Microsoft’ning Excel/Word/PowerPoint tavsiyalari va VM 140-son qarori (sana, adresat, imzo, ilova, ijrochi, tasdiqlash). AI hujjat/ariza/jadval/taqdimot yozganda qoidalar ko‘rsatmaga qo‘shiladi. Yangi «tekshir» buyrug‘i (faylni o‘zgartirmaydi): Excel, Word, PowerPoint uchun tavsiyalar ro‘yxati.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| To‘liq: unit + haqiqiy Office (`NEXVARA_RUN_OFFICE=1`) | PASS — 511 passed (0 failed), 13 min 38 s |
+| Smoke (shu tarmoq kodi) | PASS — 13 bo‘lim, JS xatosi yo‘q |
+| Yangi: `tests/ui_scripts/cad_tools.py` (haqiqiy oyna, 12 tekshiruv), `test_latin.py`, `test_remote_cad.py`, `test_office_guide.py`, Office «tekshir» testlari | PASS |
+| Android `compileDebugKotlin`, `testDebugUnitTest` (CadTest 5/5), `assembleDebug` 1.2.3 | PASS |
+| APK 1.2.3 telefonga o‘rnatish | NOT TESTED — telefon uzilgan edi. APK `D:/NEXVARA/android/NEXVARA-Android-1.2.3-debug.apk` (SHA-256 `bcf9dc6a330b4aa88c01b1f3b04d8a3342780ab0ec0358c8e522483f7a65ff5e`) |
+| Telefonda barmoq bilan chizish (haqiqiy ekran) | NOT TESTED — telefon kerak |
+| Haqiqiy AI (Gemini bepul) | NOT TESTED — kalit kiritilmagan |
+
+**Keyingi qadam:** telefonni ulab 1.2.3 ni `adb install -r` bilan o‘rnatish va qo‘lda chizishni sinash; Gemini kalitini kiritib AI qismini sinash; `main` ga merge (egasi bilan).
+
+---
+
 ## 2026-10-18 (27) — Codex — test tuzish qoidalari rasmiy tavsiyalarga bog‘landi
 
 **Tarmoq:** `claude/android-v1`, `.worktrees/android`; `main`ga merge va push qilinmadi. Foydalanuvchi o‘quv testlarini rasmiy manbalardan o‘rganib, keyin AI ulansa shu qoidalar bilan tuzishni so‘radi.
