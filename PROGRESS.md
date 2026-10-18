@@ -4,6 +4,39 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (29) — Claude Code — AI bilan chizmani tuzatish, oltita taklif, Windows 1.1.0 va Android 1.2.5
+
+**Foydalanuvchi talabi:** taklif qilingan oltita funksiyaning hammasi; qo‘lda chizilgan chizmani «AI» tugmasi bilan to‘g‘ri chizish; chizma maydonini o‘ziga moslab katta/kichik qilish; telefon ulangan — yangilanishni o‘rnatish; API kalit ulashga tayyor bo‘lsin.
+
+**Qilindi:**
+- **AI bilan tuzatish** (`cad_ai.py`, `CadApi.cad_ai_fix`, `/api/v1/cad/ai`; PC tugmasi va telefonda sehrli tayoqcha): chizma JSON’i (rasm emas — matnlar odatdagidek yashiriladi) va «nima chizmoqchi edingiz» izohi AI’ga ketadi; javob `json_to_doc` bilan tekshiriladi (buzuq/xavfli javob rad etiladi). AI bo‘lmasa yoki xato bersa — NEXVARA o‘zi tekislaydi: uchlar bitta burchakka, deyarli yotiq/tik qirralar aniq (umumiy X/Y), o‘lchamlar yaxlit, aylanalar konsentrik. Orqaga (Ctrl+Z / «Orqaga») bilan eski eskizga qaytiladi.
+- **Maydon o‘lchami**: PC — «+», «−», «Ixcham» (asboblar faqat belgi, yon panel yashirin, tanlov eslab qolinadi), klaviatura +/−; telefon — kattalashtirish/kichiklashtirish tugmalari va «Maydon: kichik/o‘rta/katta/to‘liq».
+- **Shablonlar** (`cad_templates.py`, `/api/v1/cad/templates`): A4/A3 ramka va shtamp (GOST 2.301/2.104 soddalashtirilgan), bolt M6–M24 (ISO 4014), gayka (ISO 4032), shayba (ISO 7089), podshipnik 6200–6208; PC ro‘yxati va telefon oynasi.
+- **Kamchiliklarni tuzat** (`fix` amali): Excel — jadvalni bo‘lgan bo‘sh qatorlar, merge, matn-raqamlar, «Sheet1» nomi, bo‘sh varaqlar; Word — bo‘sh joy/qatorlar, qalin «sarlavhalar» → Sarlavha uslubi, mayda/aralash matn → TNR 14, sahifa raqami, sana → «2026-yil 18-oktabr»; PowerPoint — 18 pt dan kichik matn.
+- **Dars ishlanmasi** (`knowledge/lessonplan.py`): «7-sinf fizika … dars ishlanmasi» → Word (kartochka, 3 maqsad, 45 daqiqalik dars borishi jadvali, darslikdan tushunchalar va faktlar, mustahkamlash savollari javoblari bilan, uyga vazifa) + PowerPoint taqdimot; AI’siz.
+- **Haftalik hisobot** (`weekly.py`): «Hisobotlar papkasidagi Excel fayllardan haftalik hisobot qil» → shu hafta o‘zgargan .xlsx lar bitta PDF da (openpyxl + PyMuPDF, Excel ochilmaydi); ish jarayoni shabloni «Haftalik hisobot (har juma 17:00)».
+- **3D ko‘rinish** (`app/ui/cad3d.js`): yopiq shakllar qalinlikka cho‘ziladi, ichkisi teshik; ramka, o‘q, o‘lcham qatlamlari hisobga olinmaydi; sichqoncha bilan aylantirish.
+- **Ovozli buyruq (PC)** (`app/api_voice.py`, `app/ui/voice.js`): 🎤 → 16 kHz WAV → Gemini `input_audio` → o‘zbekcha lotin matn → buyruq bajariladi. Faqat Gemini (boshqa kalit bo‘lsa ham), birinchi marta rozilik so‘raladi va eslab qolinadi (`ai.voice_consent`).
+- **Tuzatildi**: telefonda «Bo‘limlar» ekrani yiqilardi (1.2.3 da yangi «Chizma» bandi qo‘shilganda ranglar ro‘yxati qisqa qolgan) — 1.2.4 dan tuzatilgan.
+- **Telefon**: 1.2.3 → 1.2.4 → 1.2.5 o‘rnatildi (`adb install -r`, ma’lumotlar saqlandi).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| To‘liq: unit + haqiqiy Office | 528/529 PASS; workflows_page UI testi shablon tartibi tufayli FAIL edi, yangi shablon oxiriga ko‘chirildi, qayta PASS |
+| Smoke | PASS (13 bo‘lim, v1.1.0, JS xatosi yo‘q) |
+| Yangi: `test_cad_ai.py`, `test_lessonplan.py`, `test_weekly.py`, `test_voice.py`; Office: tuzatish (3), dars ishlanmasi; oyna: `cad_tools.py` (AI tuzatish, shablon, 3D, zoom bilan) | PASS |
+| Android build + unit (CadTest 5/5) 1.2.5, telefonga o‘rnatildi, ekranlar ochildi, yiqilish yo‘q (logcat) | PASS |
+| Windows 1.1.0 o‘rnatish | PASS: jim o‘rnatish (LOCALAPPDATA/Programs/NEXVARA 1.1.0), yorliq yangi exe ga, mahalliy kanal D:/NEXVARA/releases ga imzolab joylandi (SHA-256 351ce9a2...ca593). Zaxira: D:/NEXVARA-zaxira/20261018-122735-1.1.0-oldidan. O‘rnatilgan dastur selftesti NOT TESTED (limit) |
+| Haqiqiy Gemini (AI tuzatish, ovoz) | NOT TESTED — kalit kiritilmagan (soxta provayder bilan PASS) |
+| Telefon ↔ kompyuter ulanishida chizma saqlash / AI | NOT TESTED — kompyuterdagi NEXVARA telefonga ulanmagan edi |
+| Mikrofon bilan haqiqiy ovoz | NOT TESTED — kalit va ovoz kerak |
+
+**Keyingi qadam (foydalanuvchi bilan):** Gemini kalitini kiritish (Sozlamalar → AI → «Buferdan kalitni saqlash»), telefon ulanishini yoqish (Qurilmalar), telefonda chizib «AI» ni sinash, 🎤 ni sinash.
+
+---
+
 ## 2026-10-18 (28) — Claude Code — Codex ishini tekshirish; Chizmalar 2.0; telefonda qo‘lda chizish; o‘zbekcha doim lotinda; Office rasmiy qoidalari
 
 **Foydalanuvchi talabi:** Codex qilgan ishlarni ko‘rib kamchiliklarni tuzatish; Office dasturlarida ishlashni rasmiy manbalardan o‘rgatish; AutoCAD Android ilovada ham bo‘lsin, qo‘lda chizish; chizma dasturini to‘liq funksiyali qilish; kirill harflari chiqmasin (AI’ga o‘rgatish); keyin API ulanadi; yangi funksiya takliflari.

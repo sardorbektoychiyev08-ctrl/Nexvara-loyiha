@@ -42,18 +42,18 @@ TEMPLATES: list[dict[str, Any]] = [
         "trigger": {"type": "folder", "folder": "", "ext": ".docx"},
     },
     {
-        "name": "Haftalik hisobot (har juma 17:00)",
-        "steps": [{"kind": "command",
-                   "text": "Hisobotlar papkasidagi Excel fayllardan haftalik hisobot qil"}],
-        "trigger": {"type": "weekly", "days": [4], "time": "17:00"},
-    },
-    {
         "name": "Haftalik test (tasdiq bilan)",
         "steps": [
             {"kind": "approve", "text": "Test tuzishni boshlaymi?"},
             {"kind": "command", "text": "7-sinf fizika 20 ta test 2 variant"},
         ],
         "trigger": {"type": "manual"},
+    },
+    {
+        "name": "Haftalik hisobot (har juma 17:00)",
+        "steps": [{"kind": "command",
+                   "text": "Hisobotlar papkasidagi Excel fayllardan haftalik hisobot qil"}],
+        "trigger": {"type": "weekly", "days": [4], "time": "17:00"},
     },
 ]  # fmt: skip
 

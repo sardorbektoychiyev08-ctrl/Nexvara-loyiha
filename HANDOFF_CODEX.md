@@ -14,7 +14,7 @@ Order and status (Claude ticks these as it goes):
 - [x] Weekly report (`weekly.py`, chat «… haftalik hisobot qil», workflow template Fri 17:00).
 - [x] 3D view (`app/ui/cad3d.js`, button «3D»).
 - [x] Voice command on the PC (`app/api_voice.py`, `app/ui/voice.js`, Gemini `input_audio`; consent remembered in `ai.voice_consent`).
-- [ ] Full tests, PROGRESS entry, build/install APK.
+- [x] Full tests PASS, PROGRESS (29), APK 1.2.5 and Windows 1.1.0 installed. NEXT for Codex: run the installed NEXVARA.exe --selftest-installed <temp dir> (opens Office; check report.json); merge claude/android-v1 to main only with the owner. Worktree .venv is a junction to ../../.venv (git-ignored).
 
 ## ▶ CURRENT TASK 2 (2026-10-18, Claude) — continue from here if Claude stopped
 
