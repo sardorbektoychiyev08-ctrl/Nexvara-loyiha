@@ -611,6 +611,8 @@ fun MemoryScreen(m: AppModel) {
 @Composable
 fun AiScreen(m: AppModel, act: PhoneActions) {
     val x = LocalExtra.current
+    // fresh numbers every time it opens, and again once the PC connection is up (cold start)
+    LaunchedEffect(m.connected) { m.loadAi(); m.loadAiDirections() }
     val ai = m.ai ?: m.overview?.ai
     SubScreen(m, "AI balans va xarajatlar", "Windows va telefon birgalikda (bitta hisob)",
         actions = { IconButton(onClick = { m.loadAi() }) { Icon(Icons.Default.Refresh, "Yangilash") } }) {
