@@ -69,7 +69,8 @@ def run():
         time.sleep(1.5)
         res["tts_manual"] = router.cap_settings()["tts"]
         js("document.querySelector('.caps-pop .btn').click()")
-        # 🔊 on, then a chat answer is spoken through the chosen TTS
+        # 🔊 on, then a chat answer is spoken through the chosen TTS (paid: «Ha» to the price)
+        js("window.confirm = () => true")
         js("document.getElementById('chat-speak').click()")
         time.sleep(0.8)
         res["speak_saved"] = router.config().get("speak_replies")
