@@ -176,7 +176,10 @@ def _column_ref(text: str) -> str | None:
 
 
 def _sort(clause: str, f: str) -> Action:
-    desc = _has(f, "kamay", "teskari", "kattadan", "yuqoridan", "z dan a", "desc")
+    desc = _has(f, "kamay", "teskari", "kattadan", "yuqoridan", "z dan a", "desc") or bool(
+        # «eng katta summadan boshlab» / «eng ko‘pidan» (live check 2026-10-19: sorted ascending)
+        re.search(r"\beng (katta|ko[‘’']?p|yuqori)\w*\b.*\bboshla", f)
+    )
     words = _strip_words(
         f,
         r"sarala|saralash|tartibla|tartiblash|sartirovka|sortirovka|sortla|kamay|o[‘’']?sish|o[‘’']?suvchi|teskari|kattadan|kichikdan|"

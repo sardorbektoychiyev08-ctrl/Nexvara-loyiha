@@ -75,6 +75,7 @@ class Table:
                 self.ws.Cells(top, first_col),
                 self.ws.Cells(used.Row + used.Rows.Count - 1, used.Column + max(nonempty)),
             )
+        full = self._past_blank_rows(full, used, ops)
         vals = ops.read_range(full)
         self.headers = [str(h).strip() if h is not None else "" for h in vals[0]]
         self.top = full.Row
@@ -107,6 +108,35 @@ class Table:
             self.ws.Cells(self.top, self.left),
             self.ws.Cells(last + len(self.footers), self.left + len(self.headers) - 1),
         )
+
+    def _past_blank_rows(self, full: Any, used: Any, ops: Any) -> Any:
+        """A stray empty row inside the data (live check 2026-10-19: «bo‘sh qatorni olib tashla»
+        saw only the rows above it, deduping then counted −30). Rows that continue below up to
+        two blank rows, filling at least half of the columns, belong to the same table; a
+        one-cell note under the table does not."""
+        width, left = int(full.Columns.Count), int(full.Column)
+        end = int(full.Row) + int(full.Rows.Count) - 1
+        last_used = int(used.Row) + int(used.Rows.Count) - 1
+        if last_used <= end + 1 or width < 2:
+            return full
+        below = ops.read_range(
+            self.ws.Range(self.ws.Cells(end + 1, left), self.ws.Cells(last_used, left + width - 1))
+        )
+        gap, new_end = 0, end
+        for i, row in enumerate(below):
+            filled = sum(v not in (None, "") for v in row)
+            if filled == 0:
+                gap += 1
+                if gap > 2:
+                    break
+            elif filled >= max(2, (width + 1) // 2):
+                new_end, gap = end + 1 + i, 0
+            else:
+                break
+        if new_end == end:
+            return full
+        return self.ws.Range(self.ws.Cells(int(full.Row), left),
+                             self.ws.Cells(new_end, left + width - 1))  # fmt: skip
 
     @property
     def n_rows(self) -> int:
@@ -333,7 +363,10 @@ def _execute(
         if overwrite:
             report.append("Asl fayl ustiga saqlandi (oldin .bak nusxasi olindi)")
         if pdf_path:
-            pdf_path = files.output_path(source, ".pdf") if not overwrite else pdf_path
+            if not overwrite:  # the PDF carries the workbook's own name («…_NEXVARA-2.pdf»)
+                same = Path(saved).with_suffix(".pdf")
+                pdf_path = same if not same.exists() else files.output_path(source, ".pdf")
+            _fit_for_pdf(ws)
             ops.export_pdf(ws, pdf_path)
         if csv_path:
             csv_path = files.output_path(source, ".csv") if not overwrite else csv_path
@@ -506,6 +539,12 @@ def _do(a, xl, ws, t, ops, format_table, freeze_header, TableSpec, col_letter, c
     if k == "total":
         if not nums:
             raise CommandError("Jadvalda raqamli ustun yo‘q")
+        # A sum of unit prices, rates, percents or years means nothing (live check 2026-10-19:
+        # «Jami: Narx»); they stay empty unless they are the only numbers.
+        rate = re.compile(r"\b(narx\w*|price|foiz\w*|%|stavka\w*|kurs\w*|yil\w*|tartib\w*)$")
+        rates = [c for c in nums if rate.search(fold(t.headers[c - 1]))]
+        if len(rates) < len(nums):
+            nums = [c for c in nums if c not in rates]
         r = t.top + t.n_rows + 1
         if "jami" in t.footers:
             r += t.footers.index("jami")
@@ -1122,17 +1161,43 @@ def _unique_sheet_name(wb: Any, base: str) -> str:
 
 
 def _summary(ws: Any, t: Table, cat: int, val: int, col_letter) -> Any:
-    """Unique categories + SUMIFS next to the table, for a readable chart of repeated rows."""
+    """Unique categories + SUMIFS for a readable chart of repeated rows — on their own sheet
+    («Diagramma ma’lumoti»): next to the table they were taken for part of it (live check
+    2026-10-19: the finishing pass drew 40 empty bordered rows beside the data)."""
     cats = list(dict.fromkeys(v for v in t.column(cat) if v not in (None, "")))[:30]
-    left = t.left + len(t.headers) + 1
-    c1, c2 = col_letter(left), col_letter(left + 1)
+    sheet = ws.Parent.Worksheets.Add(After=ws)
+    sheet.Name = _unique_sheet_name(ws.Parent, "Diagramma ma’lumoti")
     cat_l, val_l = col_letter(t.left + cat - 1), col_letter(t.left + val - 1)
     first, last = t.top + 1, t.top + t.n_rows
-    ws.Cells(t.top, left).Value = t.headers[cat - 1]
-    ws.Cells(t.top, left + 1).Value = t.headers[val - 1]
-    for i, c in enumerate(cats, start=1):
-        ws.Cells(t.top + i, left).Value = c
-        val_rng = f"${val_l}${first}:${val_l}${last}"
-        cat_rng = f"${cat_l}${first}:${cat_l}${last}"
-        ws.Cells(t.top + i, left + 1).Formula = f"=SUMIFS({val_rng},{cat_rng},{c1}{t.top + i})"
-    return ws.Range(f"{c1}{t.top}:{c2}{t.top + len(cats)}")
+    src = f"'{ws.Name}'!"
+    sheet.Cells(1, 1).Value = t.headers[cat - 1]
+    sheet.Cells(1, 2).Value = t.headers[val - 1]
+    for i, c in enumerate(cats, start=2):
+        sheet.Cells(i, 1).Value = c
+        val_rng = f"{src}${val_l}${first}:${val_l}${last}"
+        cat_rng = f"{src}${cat_l}${first}:${cat_l}${last}"
+        sheet.Cells(i, 2).Formula = f"=SUMIFS({val_rng},{cat_rng},A{i})"
+    sheet.Range("A1:B1").Font.Bold = True
+    sheet.Columns("A:B").AutoFit()
+    ws.Activate()  # the chart and the table stay on the data sheet
+    return sheet.Range(f"A1:B{len(cats) + 1}")
+
+
+def _fit_for_pdf(ws: Any) -> None:
+    """PDF: the table (and a chart beside it) one page wide, landscape when wide (live check
+    2026-10-19: a chart was cut at the page edge and the PDF ran to 3 pages)."""
+    try:
+        ps = ws.PageSetup
+        used = ws.UsedRange
+        right = float(used.Left) + float(used.Width)
+        for i in range(1, ws.ChartObjects().Count + 1):
+            co = ws.ChartObjects(i)
+            right = max(right, float(co.Left) + float(co.Width))
+        if right > 520:  # wider than an A4 portrait page (points)
+            ps.Orientation = 2
+        ps.Zoom = False
+        ps.FitToPagesWide = 1
+        ps.FitToPagesTall = False
+        del ps
+    except Exception:  # noqa: BLE001 - no printer driver: export as it is
+        pass
