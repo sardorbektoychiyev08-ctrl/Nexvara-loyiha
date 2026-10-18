@@ -1,5 +1,7 @@
 # HANDOFF → Codex (Windows side)
 
+2026-10-18 Codex: CURRENT TASK 4 yakunlandi (`PROGRESS.md` (30)). Windows 1.1.1 o‘rnatildi va selftest PASS. Office sinovlari 83 PASS, 1 PowerPoint COM sinovi osilgani uchun chetga olindi. `main` ga merge/push qilinmadi. Quyidagi topshiriq 4 matni tarixiy izoh sifatida qoldirildi.
+
 ## ▶ CURRENT TASK 4 (2026-10-18, for Codex) — Excel quality, then Word and PowerPoint
 
 Owner (Uzbek, non-programmer): «Excel’da jadval tuzishda xatolar bor va ramka chiziqlari yo‘q —

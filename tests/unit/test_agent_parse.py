@@ -85,6 +85,36 @@ def test_context_file_and_plain_chat():
     assert parse_command("rahmat") is None
 
 
+def test_new_excel_table_from_column_names():
+    plan = parse_command(
+        "Excel’da 5 ustunli o‘quvchilar jadvali tuz: F.I.Sh, Sinf, Sana, Baho, Izoh"
+    )
+    assert (plan.app, plan.file, kinds(plan)) == ("excel", None, ["create_table"])
+    assert plan.actions[0].args == {
+        "count": 5,
+        "title": "o‘quvchilar",
+        "headers": ["F.I.Sh", "Sinf", "Sana", "Baho", "Izoh"],
+    }
+
+
+def test_new_excel_table_chat_creates_a_named_task(tmp_path):
+    from nexvara.app.api import Api
+    from nexvara.core.task import TaskRunner
+
+    runner = TaskRunner()
+    api = Api(
+        runner,
+        output_dir=tmp_path,
+        overrides={
+            "command": lambda task: {"path": str(tmp_path / "new.xlsx")},
+        },
+    )
+    reply = api.chat("Excel’da 3 ustunli sinf jadvali tuz: Ism, Baho, Sana")
+    assert reply["task"]["title"].endswith(".xlsx")
+    assert "Ism, Baho, Sana" in reply["reply"]
+    assert runner.get(reply["task"]["id"]).wait(5)
+
+
 def test_unknown_clauses_are_reported():
     plan = parse_command("a.xlsx ni formatla va kosmosga uchir")
     assert kinds(plan) == ["format"] and plan.unknown == ["kosmosga uchir"]

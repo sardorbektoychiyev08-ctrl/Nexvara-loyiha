@@ -54,6 +54,7 @@ class Plan:
 DESCRIBE = {
     "open": "Faylni ochish",
     "new": "Yangi fayl yaratish",
+    "create_table": "Yangi Excel jadvali yaratish",
     "sort": "Saralash",
     "filter": "Filtr",
     "clear_filter": "Filtrni olib tashlash",
@@ -552,6 +553,9 @@ def _classify(clause: str, app: str | None) -> Action | None:
 
 def parse_command(text: str, context_file: str | None = None) -> Plan | None:
     """A plan when the text is an Office command; None for ordinary chat."""
+    created = _new_excel_table(text)
+    if created is not None:
+        return created
     f = fold(text)
     file = find_file(text)
     if file is None and re.search(r"\b(shu|ushbu|oxirgi|o[‘’']?sha|osha) fayl", f):
@@ -585,6 +589,27 @@ def parse_command(text: str, context_file: str | None = None) -> Plan | None:
     if app is None and file:
         app = _app_for(file)
     return Plan(app, file, actions, unknown)
+
+
+def _new_excel_table(text: str) -> Plan | None:
+    """A named blank workbook requested in chat, with its actual column headings."""
+    if not re.search(r"\b(?:excel|eksel)\w*", fold(text)) or find_file(text):
+        return None
+    m = re.search(
+        r"\b(?P<count>\d{1,2})\s*ustunli\s+(?P<title>.+?)\s+jadval\w*\s+"
+        r"(?:tuz|yarat)\w*\s*:\s*(?P<headers>.+)$",
+        text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if not m:
+        return None
+    headers = [h.strip() for h in re.split(r"[,;]", m.group("headers"))]
+    action = Action(
+        "create_table",
+        {"count": int(m.group("count")), "headers": headers, "title": m.group("title").strip()},
+        text,
+    )
+    return Plan("excel", None, [action])
 
 
 def _app_for(file: str) -> str | None:

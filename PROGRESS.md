@@ -4,6 +4,28 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (30) — Codex — Excel jadval sifati, Word/PowerPoint tekshiruvi, Windows 1.1.1
+
+**Davom ettirilgan ish:** `claude/android-v1` tarmog‘idagi tugallanmagan Office sifati vazifasi (`HANDOFF_CODEX.md`, topshiriq 4). Asl foydalanuvchi fayllari o‘zgartirilmadi; amaliy sinovlar vaqtinchalik fayllarda bajarildi.
+
+**Qilindi:** Excel buyruqlari tugagach sarlavha, ko‘rinadigan ramka, jami/statistika qatorlari, ustun kengligi va raqamlar joylashuvi bir xil yakunlanadi; bo‘sh ichki ustunli va yuqorida birlashtirilgan sarlavhali jadval aniqlanadi. Chatdan ustun nomlari bilan yangi Excel jadvali yaratish qo‘shildi. Word jadvali rasmiy formatlashda ramkalanadi. PowerPoint matni slaydga sig‘dirilib, saqlangandan keyin qayta tekshiriladi. Versiya 1.1.1.
+
+**Sinovlar:**
+
+| Sinov | Natija |
+|---|---|
+| `scripts/test.ps1` (lint, format, birlik, oyna smoke) | PASS — 453 passed, 84 skipped; 13 menyu bandi, JS xatosi yo‘q |
+| Yangi haqiqiy Office regressiyalari | PASS — 6/6 (Excel jami va PDF ramkasi, 2001 qator, yangi jadval, Word, PowerPoint) |
+| Haqiqiy Office to‘plami, bitta osilgan COM sinovisiz | PASS — 83 passed, 1 deselected |
+| `scripts/test.ps1 -Office` to‘liq | NOT TESTED — `test_session_never_closes_users_presentation` PowerPoint COM ichida bir necha daqiqa osildi; sinov jarayoni to‘xtatildi, Office jarayoni majburan yopilmadi |
+| Ma’lumotlar zaxirasi | PASS — `D:\NEXVARA-zaxira\20261018-154235`, 307 fayl, 8.01 GB, xesh xatosi 0 |
+| Windows 1.1.1 yig‘ish, imzolangan mahalliy kanal, jim yangilash | PASS — installer exit 0; SHA-256 `57f977eb766f218c0118455f530fa9a891a63e0cd8712153962e0aabc1d83168` |
+| O‘rnatilgan `NEXVARA.exe --selftest-installed` | PASS — `report.json` `ok: true`; Excel, dashboard, Word, PowerPoint, BI va sinxron shifri tekshirildi |
+
+**Keyingi qadam:** PowerPoint COM sinovining osilish sababini foydalanuvchi taqdimotiga tegmasdan alohida tekshirish. Haqiqiy Gemini sinovi uchun egasi kalitni ilovada o‘zi kiritishi kerak. `main` ga merge va push qilinmadi.
+
+---
+
 ## 2026-10-18 (29) — Claude Code — AI bilan chizmani tuzatish, oltita taklif, Windows 1.1.0 va Android 1.2.5
 
 **Foydalanuvchi talabi:** taklif qilingan oltita funksiyaning hammasi; qo‘lda chizilgan chizmani «AI» tugmasi bilan to‘g‘ri chizish; chizma maydonini o‘ziga moslab katta/kichik qilish; telefon ulangan — yangilanishni o‘rnatish; API kalit ulashga tayyor bo‘lsin.

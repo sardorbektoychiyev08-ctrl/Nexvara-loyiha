@@ -19,6 +19,8 @@ Bosqichlar [MASTER_SPEC.md](MASTER_SPEC.md) 26-bo'limidan olingan. Holat belgila
 | M12 | Windows-Mobile E2E | IN PROGRESS | API v1 + 27 bo‘lim marshruti, pauza/davom, telefon buyrug‘i PC oynasida, BI PC’da ochiladi, maxfiylik telefon so‘rovlarida ham, xarajat bitta hisobda: PASS (soxta AI, localhost HTTPS). Demo server bilan barcha bo‘limlar: PASS. Haqiqiy telefon + haqiqiy Agent E2E: NOT TESTED (foydalanuvchi bilan) |
 | M13 | Final Personal Release | TODO | |
 
+2026-10-18 yangilanishi (Codex): **M3** — barcha Excel buyruqlaridan so‘ng ramka va sarlavha yakunlanadi, jami qatori ham ramkalanadi; chatdan ustun nomlari bilan yangi jadval yaratiladi (haqiqiy Office 4/4 PASS). **M4** — Word jadvali ramkasi va PowerPoint matni sig‘ishi saqlab qayta ochilganda tekshirildi (haqiqiy Office 2/2 PASS). **M10** — Windows 1.1.1 yig‘ildi, imzolangan mahalliy kanalga joylandi, o‘rnatildi va o‘rnatilgan nusxa selftesti PASS. To‘liq Office to‘plamida 83 PASS, bir PowerPoint COM sinovi osilgani uchun chetga olindi.
+
 ## Yaqin navbat
 
 1. M11: Android 1.2.2 belgisini telefonda ko‘rib chiqish va qolgan qo‘l sinovlari — [ANDROID_HANDOFF.md](ANDROID_HANDOFF.md); sinxron uchun `/api/v1/sync` tayyor.

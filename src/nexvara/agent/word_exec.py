@@ -134,6 +134,8 @@ def _execute(task, w, plan, source, out, overwrite, visible, pause, keep_open) -
                 _set_body(doc, FirstLineIndent=ops.cm_to_pt(1.25), Alignment=WD_ALIGN_JUSTIFY)
                 s.detail = "rasmiy hujjat: A4, Times New Roman 14, 1,5 qator, xatboshi 1,25 sm"
                 expect.append(("font", {"name": "Times New Roman", "size": 14}))
+                if doc.Tables.Count:
+                    s.detail += "; " + _wd_tables(doc, a, ops, expect)
             elif k == "pdf":
                 pdf_path = True
                 s.detail = "saqlashda yaratiladi"
@@ -500,6 +502,10 @@ def _wd_fix(doc: Any, a: Any, ops: Any, expect: list) -> str:
         if new:
             ops.find_replace(doc, raw, new)
             done.append(f"sana «{raw}» → «{new}»")
+    if doc.Tables.Count and any(
+        not bool(doc.Tables(i).Borders.Enable) for i in range(1, doc.Tables.Count + 1)
+    ):
+        done.append(_wd_tables(doc, a, ops, expect))
     expect.append(("clean", None))
     return "; ".join(done) if done else "Tuzatiladigan kamchilik topilmadi"
 

@@ -549,6 +549,23 @@ class Api(
             from nexvara.memory.teach import apply_rules
 
             plan, taught = apply_rules(plan, mem)
+        if plan.app == "excel" and any(a.kind == "create_table" for a in plan.actions):
+            import uuid
+
+            from nexvara.knowledge.textnorm import fold
+
+            title = str(plan.actions[0].args["title"])
+            stem = re.sub(r"[^\w-]+", "_", fold(title)).strip("_")[:45] or "Jadval"
+            folder = self._output_dir or config.data_dir() / "Jadvallar"
+            target = folder / f"{stem}_NEXVARA_{uuid.uuid4().hex[:6]}.xlsx"
+            self._context_file = str(target)
+            snap = self.run_command_plan(plan, str(target), background=bool(bg))
+            return {
+                "reply": f"Yangi Excel jadvali: {target}\nUstunlar: "
+                + ", ".join(plan.actions[0].args["headers"]),
+                "task": snap,
+                "plan": plan.describe(),
+            }
         if not plan.file:
             what = {"excel": "Excel", "word": "Word", "powerpoint": "PowerPoint"}.get(
                 plan.app or "", "Office"

@@ -37,6 +37,13 @@ def _stem(w: str) -> str:
     return w[: max(3, len(w) - 3)] if len(w) > 4 else w
 
 
+def _wants_plain_table(plan: Plan) -> bool:
+    said = fold(" ".join([*(a.text for a in plan.actions), *plan.unknown]))
+    return bool(re.search(r"\b(?:ramkasiz|chegarasiz|formatlama|bezama)\b", said)) or bool(
+        re.search(r"\b(?:ramka|chegara|chiziq)\w*\s+(?:qoshma|kerak emas|bolmasin)", said)
+    )
+
+
 class Table:
     """The data block on the active sheet: header row + body, re-read after every change."""
 
@@ -56,7 +63,18 @@ class Table:
                 top = used.Row + i
                 break
         first_col = used.Column
+        # CurrentRegion correctly stops at a blank row (which the quality check
+        # reports). It does stop too early at an empty *interior* column, though.
+        # Extend only in that case; trailing notes/merged cells are not table data.
         full = self.ws.Cells(top, first_col).CurrentRegion
+        nonempty = [
+            j for j in range(len(values[0])) if any(row[j] not in (None, "") for row in values)
+        ]
+        if nonempty and any(j not in nonempty for j in range(min(nonempty), max(nonempty))):
+            full = self.ws.Range(
+                self.ws.Cells(top, first_col),
+                self.ws.Cells(used.Row + used.Rows.Count - 1, used.Column + max(nonempty)),
+            )
         vals = ops.read_range(full)
         self.headers = [str(h).strip() if h is not None else "" for h in vals[0]]
         self.top = full.Row
@@ -84,6 +102,10 @@ class Table:
         self.range = self.ws.Range(
             self.ws.Cells(self.top, self.left),
             self.ws.Cells(last, self.left + len(self.headers) - 1),
+        )
+        self.full_range = self.ws.Range(
+            self.ws.Cells(self.top, self.left),
+            self.ws.Cells(last + len(self.footers), self.left + len(self.headers) - 1),
         )
 
     @property
@@ -154,12 +176,81 @@ def run_excel_plan(
 
     if plan.app != "excel":
         raise CommandError("Bu reja Excel uchun emas")
+    if any(a.kind == "create_table" for a in plan.actions):
+        if len(plan.actions) != 1 or plan.actions[0].kind != "create_table":
+            raise CommandError("Yangi jadval yaratishni alohida buyruqda yozing")
+        with ExcelSession(visible=visible, keep_open=keep_open) as xl:
+            return _create_table(task, xl, plan, source, visible, pause, keep_open)
     overwrite = any(a.kind == "save" and a.args.get("overwrite") for a in plan.actions)
     out = source if overwrite and source.suffix.lower() == ".xlsx" else files.output_path(
         source, ".xlsx"
     )  # fmt: skip
     with ExcelSession(visible=visible, keep_open=keep_open) as xl:
         return _execute(task, xl, plan, source, out, overwrite, visible, pause, keep_open)
+
+
+def _create_table(task, xl, plan, out, visible, pause, keep_open) -> dict[str, Any]:
+    from nexvara.skills.excel.bridge import format_table, freeze_header
+    from nexvara.skills.excel.table import TableSpec
+
+    args = plan.actions[0].args
+    headers = [str(h).strip() for h in args["headers"]]
+    count = int(args["count"])
+    if not 2 <= count <= 26 or len(headers) != count or not all(headers):
+        raise CommandError(f"Ustunlar soni {count}, kiritilgan nomlar {len(headers)} ta. "
+                           "Har bir ustunga bittadan nom yozing (2–26 ta).")  # fmt: skip
+    if len({fold(h) for h in headers}) != count:
+        raise CommandError("Ustun nomlari takrorlanmasin")
+    if any(len(h) > 80 or any(c in h for c in "\r\n\t=") for h in headers):
+        raise CommandError("Ustun nomi 80 belgidan oshmasin va formulaga o‘xshamasin")
+    out = Path(out)
+    if out.exists():
+        raise CommandError(f"«{out.name}» fayli allaqachon bor")
+    with task.step("Yangi Excel jadvali") as s:
+        wb = xl.new_workbook()
+        ws = wb.ActiveSheet
+        title = re.sub(r"[\[\]:*?/\\]", "", str(args["title"])).strip(" '")[:31]
+        ws.Name = title or "Jadval"
+        ws.Range(ws.Cells(1, 1), ws.Cells(1, count)).Value = [headers]
+        full = ws.Range(ws.Cells(1, 1), ws.Cells(21, count))
+        format_table(ws, full, TableSpec(headers, [], []))
+        ws.Activate()
+        freeze_header(xl.app, 1)
+        xl.show()
+        s.detail = f"{count} ustun, 20 ta to‘ldirish qatori"
+    if visible and pause:
+        time.sleep(pause)
+    task.check_cancelled()
+    with task.step("Saqlash va qayta ochib tekshirish") as s:
+        saved = xl.save_as(wb, out)
+        wb.Close(SaveChanges=False)
+        del full, ws, wb
+        wb2 = xl.open_workbook(saved)
+        ws2 = wb2.ActiveSheet
+        actual = [str(ws2.Cells(1, c).Value or "") for c in range(1, count + 1)]
+        checks = [
+            {"name": "Ustun nomlari", "ok": actual == headers},
+            {"name": "Jadval ramkasi", "ok": int(ws2.Cells(21, count).Borders(9).LineStyle) == 1},
+            {"name": "Sarlavha", "ok": bool(ws2.Cells(1, 1).Font.Bold)},
+        ]
+        failed = [c["name"] for c in checks if not c["ok"]]
+        s.detail = f"{len(checks) - len(failed)}/{len(checks)} tekshiruv o‘tdi"
+        if failed:
+            raise CommandError("Tekshiruv o‘tmadi: " + ", ".join(failed))
+        if not keep_open:
+            wb2.Close(SaveChanges=False)
+        else:
+            xl.show()
+        del ws2, wb2
+    return {
+        "path": str(saved),
+        "source": "",
+        "pdf": "",
+        "csv": "",
+        "report": [f"{count} ustunli yangi jadval: {', '.join(headers)}"],
+        "checks": checks,
+        "unknown": plan.unknown,
+    }
 
 
 def _execute(
@@ -175,7 +266,7 @@ def _execute(
 ) -> dict[str, Any]:
     # COM objects live only in this frame, so they are released before Excel quits.
     from nexvara.skills.excel import ops
-    from nexvara.skills.excel.bridge import format_table, freeze_header
+    from nexvara.skills.excel.bridge import finish_table, format_table, freeze_header
     from nexvara.skills.excel.table import TableSpec, col_letter
 
     report: list[str] = []
@@ -224,6 +315,19 @@ def _execute(
         return {"path": str(source), "source": str(source), "pdf": "", "csv": "",
                 "report": report, "checks": checks, "unknown": plan.unknown}  # fmt: skip
 
+    finish = any(a.kind not in ("open", "save", "check", "csv") for a in plan.actions)
+    plain = _wants_plain_table(plan)
+    if finish and not plain:
+        with task.step("Jadvalni yakuniy formatlash") as s:
+            t.refresh()
+            finish_table(ws, t.full_range, t.numeric_columns(), t.top, t.left)
+            ws.Activate()
+            freeze_header(xl.app, t.top)
+            s.detail = (
+                f"{t.n_rows} qator va {len(t.footers)} yakuniy qator: ramka, sarlavha, kenglik"
+            )
+        beat()
+
     with task.step("Saqlash") as s:
         saved = xl.save_as(wb, out, overwrite=overwrite)  # backs up the original when overwriting
         if overwrite:
@@ -251,6 +355,30 @@ def _execute(
                 "detail": f"{t2.n_rows} qator",
             }
         )
+        if finish and not plain:
+            full = t2.full_range
+            first = wb2.ActiveSheet.Cells(t2.top, t2.left)
+            body = wb2.ActiveSheet.Cells(t2.top + 1, t2.left)
+            checks.append(
+                {
+                    "name": "Jadval ramkasi",
+                    "ok": (
+                        int(first.Borders(9).LineStyle) == 1 and int(body.Borders(9).LineStyle) == 1
+                    ),
+                    "detail": (
+                        f"{full.Rows.Count} qator; sarlavha="
+                        f"{first.Borders(9).LineStyle}, tana={body.Borders(9).LineStyle}"
+                    ),
+                }
+            )
+            if t2.footers:
+                foot = wb2.ActiveSheet.Cells(t2.top + t2.n_rows + len(t2.footers), t2.left)
+                checks.append(
+                    {
+                        "name": "Yakuniy qator ramkasi",
+                        "ok": int(foot.Borders(9).LineStyle) == 1,
+                    }
+                )
         if pdf_path:
             ok = pdf_path.is_file() and pdf_path.read_bytes()[:5] == b"%PDF-"
             checks.append({"name": "PDF", "ok": ok, "detail": pdf_path.name})
@@ -260,7 +388,10 @@ def _execute(
         s.detail = f"{len(checks) - len(failed)}/{len(checks)} tekshiruv o‘tdi"
         del t2
         if failed:
-            raise CommandError("Tekshiruv o‘tmadi: " + ", ".join(c["name"] for c in failed))
+            raise CommandError(
+                "Tekshiruv o‘tmadi: "
+                + ", ".join(f"{c['name']} ({c.get('detail', '')})" for c in failed)
+            )
         if not keep_open:
             wb2.Close(SaveChanges=False)
         else:
@@ -358,18 +489,7 @@ def _do(a, xl, ws, t, ops, format_table, freeze_header, TableSpec, col_letter, c
         return f"«{t.headers[col - 1]}» = {criteria}: {shown} ta qator ko‘rinadi"
 
     if k == "format":
-        spec = TableSpec(t.headers, t.rows, nums)
-        format_table(ws, t.range, spec, t.top, t.left)
-        for c in nums:
-            body = ops.column_range(t.range, c)
-            integer = all(float(v).is_integer() for v in t.column(c) if _is_num(v))
-            ops.set_number_format(body, "integer" if integer else "decimal")
-        if visible:
-            freeze_header(xl.app, t.top)
-        cell = ws.Cells(t.top + 1, t.left + nums[0] - 1) if nums else None
-        if cell is not None:
-            check("Raqamlar markazda", cell.HorizontalAlignment == -4108)
-        return f"sarlavha, chegaralar, {len(nums)} ta raqamli ustun markazda va formatda"
+        return "sarlavha, ramka va ustun kengligi barcha amallar tugagach qo‘llanadi"
 
     if k == "total":
         if not nums:

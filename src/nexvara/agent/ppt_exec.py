@@ -279,6 +279,13 @@ def run_ppt_plan(
             if visible and pause:
                 time.sleep(pause)
             task.check_cancelled()
+        if changes:
+            with task.step("Slayd matnini sig‘dirish") as s:
+                repaired = _repair_overflow(pres)
+                remaining = _overflow_problems(pres, ops)
+                s.detail = f"{repaired} ta matn bloki; qolgan muammo: {len(remaining)}"
+                if remaining:
+                    raise CommandError("Matn slaydga sig‘madi: " + "; ".join(remaining[:4]))
         saved = None
         if changes:
             with task.step("Saqlash") as s:
@@ -290,6 +297,22 @@ def run_ppt_plan(
                 else:
                     saved = pp.save_as(pres, out)
                 s.detail = saved.name
+            with task.step("Qayta ochib tekshirish") as s:
+                pp.disown(pres)
+                pres.Close()
+                del pres
+                pres = pp.open_presentation(saved)
+                remaining = _overflow_problems(pres, ops)
+                checks.append(
+                    {
+                        "name": "Slayd matni sig‘adi",
+                        "ok": not remaining,
+                        "detail": "; ".join(remaining[:4]),
+                    }
+                )
+                s.detail = "matn sig‘adi" if not remaining else "; ".join(remaining[:4])
+                if remaining:
+                    raise CommandError("Saqlangan taqdimotda matn sig‘madi: " + s.detail)
         if pdf is not None:
             with task.step("PDF qilib saqlash") as s:
                 ops.export_pdf(pres, pdf)
@@ -484,8 +507,37 @@ def _pp_fix(pres: Any, a: Any, ops: Any) -> tuple[str, bool]:
                         run.Font.Size = 18
                         fixed += 1
             del sh
+    fitted = _repair_overflow(pres)
     report, _ok = _pp_check(pres, a, ops)
-    return f"{fixed} ta matn bo‘lagi 18 pt ga kattalashtirildi. Qolgani: {report}", True
+    return (
+        f"{fixed} ta matn bo‘lagi 18 pt ga kattalashtirildi; {fitted} ta sig‘dirildi. {report}",
+        True,
+    )
+
+
+def _overflow_problems(pres: Any, ops: Any) -> list[str]:
+    return [
+        f"{i}-slayd: {p}"
+        for i in range(1, pres.Slides.Count + 1)
+        for p in ops.layout_problems(pres.Slides(i))
+        if "matn sig'madi" in p
+    ]
+
+
+def _repair_overflow(pres: Any) -> int:
+    """Ask PowerPoint to fit text inside its existing shape, without moving other content."""
+    count = 0
+    for i in range(1, pres.Slides.Count + 1):
+        shapes = pres.Slides(i).Shapes
+        for j in range(1, shapes.Count + 1):
+            sh = shapes(j)
+            if not sh.HasTextFrame or not sh.TextFrame.HasText:
+                continue
+            if float(sh.TextFrame.TextRange.BoundHeight) <= float(sh.Height):
+                continue
+            sh.TextFrame2.AutoSize = 2  # msoAutoSizeTextToFitShape
+            count += 1
+    return count
 
 
 _PPT = {
