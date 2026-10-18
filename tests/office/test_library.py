@@ -68,6 +68,8 @@ def test_ai_test_in_word_with_fake_provider(data_dir, tmp_path):
     """The whole "AI bilan test" path in real Word; the provider is a fake (no paid call)."""
     import json
 
+    import pymupdf
+
     from nexvara.ai.keys import MemoryKeyStore
     from nexvara.ai.providers import Provider, Reply
     from nexvara.ai.router import AiRouter, Ledger
@@ -75,11 +77,7 @@ def test_ai_test_in_word_with_fake_provider(data_dir, tmp_path):
     from nexvara.appdata import Settings
     from nexvara.core.task import TaskRunner
 
-    questions = [
-        {"q": f"AI savol {i}: kuch nimaga teng?", "options": [f"F=ma ({i})", "F=m/a", "F=a/m",
-         "F=m+a"], "answer": 0, "page": 1}
-        for i in range(10)
-    ]  # fmt: skip
+    questions = []
 
     class Fake(Provider):
         calls = 0
@@ -102,6 +100,15 @@ def test_ai_test_in_word_with_fake_provider(data_dir, tmp_path):
               overrides={"ai_router": router})  # fmt: skip
     assert runner.get(api.index_library()["id"]).wait(120)
 
+    from nexvara.knowledge.service import TestRequest, topic_material
+
+    _book, pages, _topic = topic_material(TestRequest(7, "Fizika", "kuch", 6, 1))
+    evidence = next(text for page, text in pages if page == 3).splitlines()[2]
+    questions = [
+        {"q": f"AI savol {i}: kuch qanday kattalik?", "options": ["Vektor", "Skalyar",
+         "O‘zgarmas", "O‘lchovsiz"], "answer": 0, "page": 3, "evidence": evidence}
+        for i in range(10)
+    ]  # fmt: skip
     reply = api.chat("AI bilan 7-sinf fizika kuch 6 ta test tuz")
     assert "task" in reply, reply
     task = runner.get(reply["task"]["id"])
@@ -113,6 +120,9 @@ def test_ai_test_in_word_with_fake_provider(data_dir, tmp_path):
     assert all(c["ok"] for c in res["checks"]), res["checks"]
     assert res["questions"] == 6 and Fake.calls == 1
     assert router.ledger.today() > 0
+    with pymupdf.open(res["pdf"]) as pdf:
+        text = "\n".join(page.get_text() for page in pdf)
+    assert "AI yordamida" in text and "AI ishlatilmasdan" not in text
 
 
 def test_missing_topic_is_reported_honestly(data_dir):

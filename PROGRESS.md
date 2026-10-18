@@ -4,6 +4,28 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (27) — Codex — test tuzish qoidalari rasmiy tavsiyalarga bog‘landi
+
+**Tarmoq:** `claude/android-v1`, `.worktrees/android`; `main`ga merge va push qilinmadi. Foydalanuvchi o‘quv testlarini rasmiy manbalardan o‘rganib, keyin AI ulansa shu qoidalar bilan tuzishni so‘radi.
+
+**Manbalar:** Bilim va malakalarni baholash agentligining [test topshiriqlarini ishlab chiqish va ekspertizadan o‘tkazish bo‘yicha metodik tavsiyasi](https://ejournal.uzbmb.uz/journal/article_view/290/), [matematika test varianti tafsiloti](https://uzbmb.uz/upload/file/pdf/mtt/Matematika.pdf), [ETS adolatli test qo‘llanmasi](https://www.ets.org/pdfs/about/fair-tests-and-communications.pdf). Qisqa xulosa [docs/TEST_TUZISH_QOIDALARI.md](docs/TEST_TUZISH_QOIDALARI.md) da. Bu umumiy darslik testlari; davlat sertifikati yoki rasmiy aprobatsiya deb ko‘rsatilmaydi.
+
+**O‘zgarishlar:** AI test so‘rovi sinf/fan/mavzuni va metodik qoidalarni doim oladi: bitta aniq bilim, qisqa va xolis savol, tushunish/qo‘llash, to‘rtta bir-biriga yaqin javob va yagona kalit. Har AI savoliga darslikdagi bet hamda aynan olingan dalil kerak; bet/dalil topilmasa savol rad qilinadi. Takror savol va bir xil javob variantlari tashlanadi. Yetarli savol qolmasa dastur sonini ochiq aytadi. Word javob kalitida AI ishlatilgani to‘g‘ri yoziladi va o‘qituvchi tekshiruvi eslatiladi. Haqiqiy javobning ilmiy to‘g‘riligini avtomatik isbotlash imkoni yo‘q — o‘qituvchi ko‘radi.
+
+**Sinovlar:**
+
+| Sinov | Natija |
+|---|---|
+| Soxta AI bilan yangi bet/dalil, takror va noto‘g‘ri javob tekshiruvlari | PASS — `test_ai.py` 16/16 |
+| Soxta AI → haqiqiy Word → PDF, to‘g‘ri AI izohi | PASS — alohida Office sinovi |
+| `.\scripts\test.ps1` lint + birlik + oyna smoke | PASS — 421 passed, 70 skipped; smoke PASS |
+| `.\scripts\test.ps1 -Office` barcha testlar + oyna smoke | PASS — 491 passed; smoke PASS |
+| Haqiqiy AI provayderi va real darslik bilan fan ekspertizasi | NOT TESTED — kalit ulanmagan, real darslik Git’da yo‘q |
+
+**Keyingi qadam:** foydalanuvchi AI kalitini o‘zi ulab yoqqanda real darslikdan chiqqan testni fan o‘qituvchisi ko‘rib chiqadi; xatolar shu tekshiruvga qo‘shiladi.
+
+---
+
 ## 2026-10-18 (26) — Codex — ariza va tayyor Word hujjatlaridagi xatolar tuzatildi
 
 **Tarmoq:** `claude/android-v1`, `.worktrees/android`; `main`ga merge va push qilinmadi. Foydalanuvchi hujjat ishlari, ayniqsa ariza yozilishidagi xatolarni tuzatishni va internetdagi ishonchli namunalarga tayangan holda mustaqil ishlashni so‘radi.

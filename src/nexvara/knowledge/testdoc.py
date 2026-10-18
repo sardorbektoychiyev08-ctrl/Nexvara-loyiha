@@ -59,7 +59,16 @@ def run_make_test(
     try:
         with WordSession(visible=visible, keep_open=keep_open) as w:
             checks = _write_and_verify(
-                task, w, book.label(), topic, quizzes, out, pdf, beat, keep_open
+                task,
+                w,
+                book.label(),
+                topic,
+                quizzes,
+                out,
+                pdf,
+                beat,
+                keep_open,
+                ai_generated=make is not None,
             )
     finally:
         # The cut-out pictures are embedded in the .docx now; drop the temp copies.
@@ -95,6 +104,8 @@ def _write_and_verify(
     pdf: Path,
     beat: Any,
     keep_open: bool,
+    *,
+    ai_generated: bool = False,
 ) -> list[dict[str, Any]]:
     # COM objects live only in this frame, so they are released before Word quits.
     from nexvara.skills.word import ops
@@ -152,10 +163,12 @@ def _write_and_verify(
             if len(quizzes) > 1:
                 ops.add_heading(doc, f"{v}-variant", 2)
             ops.add_table(doc, answer_key_rows(quiz), numeric_columns=(1, 2))
+        method = "AI yordamida" if ai_generated else "AI ishlatilmasdan"
         ops.add_paragraph(
             doc,
-            "Savollar darslik matni asosida avtomatik tuzildi (AI ishlatilmadi). "
-            "Iltimos, tarqatishdan oldin ko‘zdan kechiring.",
+            f"Savollar darslik matni asosida {method} avtomatik tuzildi. "
+            "Betlar javoblar kalitida ko‘rsatilgan. Mazmun va javoblarni tarqatishdan "
+            "oldin o‘qituvchi tekshirsin.",
             size=9,
         )
     beat()

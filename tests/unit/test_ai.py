@@ -144,6 +144,37 @@ def test_parse_questions_validates():
     assert qs[1].options[0] == "bir" and qs[1].answer == "C"
 
 
+def test_ai_questions_require_real_page_evidence_and_unique_answers():
+    pages = [(5, "Kuch jismlarning o‘zaro ta’sirini ifodalaydi va uning birligi nyutondir.")]
+    evidence = "Kuch jismlarning o‘zaro ta’sirini ifodalaydi"
+    good = {
+        "q": "Kuch birligi qaysi?",
+        "options": ["A) Nyuton", "B) Joul", "C) Vatt", "D) Paskal"],
+        "answer": 0,
+        "page": 5,
+        "evidence": evidence,
+    }
+    wrong_page = {**good, "q": "Boshqa savol?", "page": 6}
+    invented = {
+        **good,
+        "q": "Uchinchi savol?",
+        "evidence": "Darslikda yo‘q, o‘ylab topilgan uzun dalil matni",
+    }
+    duplicate = {**good, "q": "  KUCH BIRLIGI QAYSI?  "}
+    same_options = {
+        **good,
+        "q": "To‘rtinchi savol?",
+        "options": ["A) Nyuton", "B) Nyuton", "C) Vatt", "D) Paskal"],
+    }
+    no_evidence = {**good, "q": "Beshinchi savol?", "evidence": ""}
+    qs = features.parse_questions(
+        [good, wrong_page, invented, duplicate, same_options, no_evidence], pages
+    )
+    assert len(qs) == 1
+    assert qs[0].options == ["Nyuton", "Joul", "Vatt", "Paskal"]
+    assert qs[0].source == "5-bet"
+
+
 def test_ai_quizzes_variants(router, monkeypatch):
     from nexvara.knowledge import service
     from nexvara.knowledge.store import Book
@@ -159,6 +190,7 @@ def test_ai_quizzes_variants(router, monkeypatch):
             "options": [f"t{i}", f"x{i}", f"y{i}", f"z{i}"],
             "answer": 0,
             "page": 5,
+            "evidence": "matn " * 5,
         }
         for i in range(8)
     ]
@@ -171,6 +203,37 @@ def test_ai_quizzes_variants(router, monkeypatch):
         assert q.options["ABCD".index(q.answer)].startswith("t")
     assert {q.text for q in quizzes[0].questions} != {q.text for q in quizzes[1].questions}
     assert "[5-bet]" in router.fake.calls[-1]["messages"][0]["content"]
+    assert "Sinf: 7; fan: Fizika; mavzu: Kuch" in router.fake.calls[-1]["messages"][0]["content"]
+    assert "ekspertizadan" in router.fake.calls[-1]["system"]
+
+
+def test_ai_quizzes_reject_untraceable_answer(router, monkeypatch):
+    from nexvara.knowledge import service
+    from nexvara.knowledge.store import Book
+
+    book = Book(1, "x.pdf", "Fizika", 7, "Fizika", 2022, 100, "ok", "")
+    monkeypatch.setattr(
+        service,
+        "topic_material",
+        lambda req: (book, [(5, "Kuch jismlarning o‘zaro ta’sirini ifodalaydi.")], "Kuch"),
+    )
+    router.save_key("anthropic", "sk-ant-test-1234567890")
+    router.settings.update({"ai": {"enabled": True}})
+    router.fake.replies = [
+        json.dumps(
+            [
+                {
+                    "q": "Kuch qaysi birlikda o‘lchanadi?",
+                    "options": ["Nyuton", "Joul", "Vatt", "Paskal"],
+                    "answer": 0,
+                    "page": 99,
+                    "evidence": "Kitobda umuman bo‘lmagan to‘qima dalil matni",
+                }
+            ]
+        )
+    ]
+    with pytest.raises(AiError, match="dalili tekshirilgan"):
+        features.make_ai_quizzes(router, service.TestRequest(7, "Fizika", "Kuch", count=1))
 
 
 class _Resp(io.BytesIO):

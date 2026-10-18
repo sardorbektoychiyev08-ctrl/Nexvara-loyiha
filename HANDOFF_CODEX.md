@@ -1,5 +1,13 @@
 # HANDOFF → Codex (Windows side)
 
+2026-10-18 Codex update: the textbook test-writing task is complete on
+`claude/android-v1`. The AI test prompt now carries the assessment rules and the
+requested grade/subject/topic; returned questions require an exact excerpt from
+the claimed textbook page. Duplicate questions/options are filtered. The Word
+answer key says whether AI was used. See PROGRESS entry (27) and
+`docs/TEST_TUZISH_QOIDALARI.md`. `test.ps1` PASS (421 passed, 70 skipped),
+`test.ps1 -Office` PASS (491 passed). Real paid AI was not called. No merge or push.
+
 2026-10-18 Codex update: the later document-template task is complete on
 `claude/android-v1` (general/leave/job applications, formal Word layout, eight real Word
 DOCX/PDF tests). See PROGRESS entry (26) and `docs/HUJJAT_SHABLONLARI.md`. The CAD task
