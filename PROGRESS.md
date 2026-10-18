@@ -4,6 +4,35 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (34) — Claude Code — Codex limiti tugagach davom: Codex ishi saqlandi va tekshirildi, Android 1.4.0, Windows 1.3.1
+
+**Holat:** Codex `codex/auto-model-router` (worktree `.worktrees/auto-model-router`) da AI katalogi ustida ishlab, limiti tugagan; 27 fayl commit qilinmagan, oxirgi testi 21:34 da PASS (505). Egasi: «kelgan joyidan davom et», «Android’ga ham yangilanish bo‘lsa bajar», «hamma kamchiliklarni tuzat, AI bilan test ertaga».
+
+**Codex qilgani (51b64bf, Claude saqladi):** hisobdagi modellar katalogi (24 soatda, qo‘lda «Hozir yangilash», eskirgan/o‘chgan/deprecated belgilari), narxi tasdiqlanmagan model AUTO’da chaqirilmaydi, **har bir pullik so‘rov narx bilan «Ha» kutadi** (TTS/STT ham), chatda model/FREE/PAID/narx satri, Gemini bepul darajasi faqat egasi «AI Studio’da Free Tier ekanini tekshirdim» belgisini qo‘ysa hisoblanadi, DeepSeek Flash vision (rasmiy narx sahifasida tasdiqlandi).
+
+**Claude qilgani:**
+- `claude/ai-multimodal` dagi media fallback tuzatishi bilan birlashtirildi (ziddiyat: Codex qoidasi + «bepul rejimda pullikka o‘zi o‘tmaydi»).
+- To‘liq Office/oyna sinovida 5 FAIL tahlil qilindi: 3 tasi tasodifiy Office (qayta: PASS); 2 tasi Codex qoidalari bilan eski testlar — soxta provayder model ro‘yxati, pullik AI test va 🔊 avval «Ha» — testlar moslandi.
+- Telefon 🔊 marshruti: pullik ovoz → `{needs_approval, text}`, telefon «Ha» dan keyin `approved=true` bilan qayta so‘raydi.
+- **Android 1.4.0** (versionCode 11): «AI balans» sahifasida 🧠 AI modeli (6 yo‘nalish, AUTO/qo‘lda, provayder va model chiplari, AUTO hozir nimani tanlashi; kompyuter bilan bitta sozlama), chat sarlavhasida 🧠, Sozlamalar → «AI ovozi» (javobni kompyuterdagi AI o‘qiydi; pullik bo‘lsa chatda narx va «Ha»), telefondan so‘ralgan ✨ rasm telefonda ochiladi; sahifa aloqa o‘rnatilgach o‘zi yuklanadi (sovuq ishga tushishda bo‘sh qolardi — tuzatildi). `AiParseTest`.
+- Windows 1.3.1.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| pytest to‘liq (Office + oyna), birlashtirishdan keyin | 587 PASS, 5 FAIL → yuqoridagicha tuzatildi, 5/5 qayta PASS |
+| pytest unit (oxirgi o‘zgarishlardan keyin) | 507 PASS |
+| Smoke v1.3.1, `media_tools.py`, `uzbek_ui.py` (100%) | PASS |
+| Android `assembleDebug` + 9 test to‘plami (AiParseTest bilan) | PASS |
+| Telefonga 1.4.0 `adb install -r` (ma’lumotlar saqlandi), 🧠 sahifa haqiqiy telefonda kompyuter ma’lumotlari bilan ochildi, sovuq ishga tushishda o‘zi yuklandi, crash yo‘q | PASS — APK SHA-256 `ec2fb43e49d8264c4e17971ff736138bad280bd5244aeb87aac83083123ba4dd`, `D:\NEXVARA\android\NEXVARA-Android-1.4.0-debug.apk` |
+| Zaxira `D:\NEXVARA-zaxira\auto\auto-20261018-222011`; Windows 1.3.1 yig‘ish, imzolab joylash, jim o‘rnatish; o‘rnatilgan selftest | PASS — SHA-256 `e04d338fb9484dca12f09f47b5e3e5fb3c546ed9d51e9ffc2256bed60ede7911`, `ok: true` |
+| Haqiqiy OpenAI/Gemini chaqiruvlari (matn, rasm, ovoz, STT), kamera, mikrofon, jonli suhbat | NOT TESTED — egasi bilan ertaga |
+
+**Ertaga (egasi bilan):** Sozlamalar → AI da «AI Studio hisobimda Free Tier ekanini tekshirdim» belgisini egasi o‘zi tekshirib qo‘yadi (aks holda Gemini pullik deb hisoblanadi; hozir AUTO STT OpenAI’ni tanlayapti); keyin har yo‘nalishni bittadan, narx va ruxsat bilan sinash. `codex/auto-model-router` → `main` merge va push — egasi tasdig‘i bilan.
+
+---
+
 ## 2026-10-18 (33) — Claude Code — Multi-AI router: yo‘nalishlar bo‘yicha AUTO/MANUAL, rasm va ovoz; Windows 1.3.0
 
 **Foydalanuvchi talabi:** OpenAI, Gemini, Claude, DeepSeek bitta tizimda; CHEAP/BALANCED/POWERFUL/SPECIALIST va AUTO; har yo‘nalish (matn, vision/OCR, rasm yaratish/tahrirlash, STT, TTS, jonli suhbat) uchun AUTO yoki qo‘lda tanlash, qo‘lda tanlangan model almashtirilmasin; chatda doim ko‘rinadigan 🎤 🔊 🖼️ 📷 ✨ 🧠; API va xarajat boshqaruvi; model nomlarini rasmiy hujjatdan tekshirish; pullik sinov faqat ruxsat bilan; Android tomonda Codex ishiga xalaqit bermaslik.
