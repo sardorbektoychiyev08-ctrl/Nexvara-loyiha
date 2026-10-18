@@ -593,6 +593,7 @@ class Api(
             webview.OPEN_DIALOG,
             file_types=(
                 "Office fayllar (*.xlsx;*.xlsm;*.xls;*.csv;*.docx;*.doc;*.pptx;*.ppt)",
+                "AutoCAD chizmalar (*.dxf;*.dwg)",
                 "Barcha fayllar (*.*)",
             ),
         )

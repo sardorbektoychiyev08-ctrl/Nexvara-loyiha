@@ -102,7 +102,10 @@ def test_drawing_edit_and_dxf(tmp_path, monkeypatch):
 
     dxf = drawing.to_dxf(SPEC)
     assert (
-        dxf.startswith("0\nSECTION") and "CIRCLE" in dxf and "ARC" in dxf and dxf.endswith("EOF\n")
+        dxf.lstrip().startswith("0\nSECTION")
+        and "CIRCLE" in dxf
+        and "ARC" in dxf
+        and dxf.rstrip().endswith("EOF")
     )
     lines = dxf.splitlines()  # code/value pairs only: a text cannot inject DXF codes
     assert len(lines) % 2 == 0 and all(c.strip().isdigit() for c in lines[0::2])

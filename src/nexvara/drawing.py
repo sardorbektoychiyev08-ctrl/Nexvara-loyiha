@@ -316,52 +316,10 @@ def render_svg(spec: dict[str, Any]) -> str:
 
 
 def to_dxf(spec: dict[str, Any]) -> str:
-    """The same drawing as AutoCAD R12 DXF (mm; y flipped because DXF y grows upwards)."""
-    s = validate(spec)
-    hgt = s["height"]
-    out: list[str] = ["0", "SECTION", "2", "ENTITIES"]
+    """The same drawing as an AutoCAD DXF (R2010, mm, layers, real dimensions): see cad.py."""
+    from nexvara import cad
 
-    def ent(kind: str, *pairs: tuple[int, Any]) -> None:
-        out.extend([("0"), kind, "8", "0"])
-        for code, val in pairs:
-            out.extend([str(code), _f(val) if isinstance(val, float | int) else str(val)])
-
-    def line(x1: float, y1: float, x2: float, y2: float) -> None:
-        ent("LINE", (10, x1), (20, hgt - y1), (11, x2), (21, hgt - y2))
-
-    def text(x: float, y: float, value: str, size: float) -> None:
-        clean = "".join(ch if ord(ch) < 128 else "?" for ch in value)  # R12 is ASCII
-        ent("TEXT", (10, x), (20, hgt - y), (40, size), (1, clean))
-
-    for c in s["shapes"]:
-        t = c["type"]
-        if t == "circle":
-            ent("CIRCLE", (10, c["cx"]), (20, hgt - c["cy"]), (40, c["r"]))
-        elif t == "arc":  # SVG angles run clockwise on screen; DXF counter-clockwise
-            ent("ARC", (10, c["cx"]), (20, hgt - c["cy"]), (40, c["r"]),
-                (50, (-c["end"]) % 360), (51, (-c["start"]) % 360))  # fmt: skip
-        elif t == "text":
-            text(c["x"], c["y"], c["text"], c["size"])
-        elif t == "dim":
-            x1, y1, x2, y2, off = c["x1"], c["y1"], c["x2"], c["y2"], c["offset"]
-            length = math.hypot(x2 - x1, y2 - y1)
-            if length:
-                nx, ny = -(y2 - y1) / length, (x2 - x1) / length
-                ax, ay, bx, by = x1 + nx * off, y1 + ny * off, x2 + nx * off, y2 + ny * off
-                line(x1, y1, ax, ay)
-                line(x2, y2, bx, by)
-                line(ax, ay, bx, by)
-                text((ax + bx) / 2, (ay + by) / 2 - 1, c["label"] or _f(round(length, 1)), 3.5)
-        else:
-            shape = _outline(c)
-            if shape:
-                pts, closed = shape
-                if closed:
-                    pts = [*pts, pts[0]]
-                for (xa, ya), (xb, yb) in zip(pts, pts[1:], strict=False):
-                    line(xa, ya, xb, yb)
-    out.extend(["0", "ENDSEC", "0", "EOF"])
-    return "\n".join(out) + "\n"
+    return cad.to_string(cad.build(spec))
 
 
 def export(spec: dict[str, Any], folder: Path, name: str = "") -> dict[str, str]:
@@ -375,7 +333,7 @@ def export(spec: dict[str, Any], folder: Path, name: str = "") -> dict[str, str]
     svg_p, pdf_p, png_p = (folder / f"{stem}{ext}" for ext in (".svg", ".pdf", ".png"))
     svg_p.write_text(svg, encoding="utf-8")
     dxf_p = folder / f"{stem}.dxf"
-    dxf_p.write_text(to_dxf(spec), encoding="ascii")
+    dxf_p.write_text(to_dxf(spec), encoding="utf-8")
     doc = fitz.open(stream=svg.encode("utf-8"), filetype="svg")
     try:
         pdf_p.write_bytes(doc.convert_to_pdf())
