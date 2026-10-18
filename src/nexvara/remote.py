@@ -39,6 +39,50 @@ MAX_BAD_CODES = 5
 TOKEN_ROTATE_DAYS = 7
 TOKEN_MAX_DAYS = 30  # a token not rotated for this long stops working (re-pair)
 MAX_UPLOAD = 50 * 1024 * 1024
+# Files a phone may never put on this PC: programs, scripts, shortcuts, installers, add-ins
+# that run by double-click. Documents, PDFs, pictures, archives and data files are fine.
+BLOCKED_UPLOADS = (
+    ".exe",
+    ".com",
+    ".scr",
+    ".pif",
+    ".bat",
+    ".cmd",
+    ".ps1",
+    ".psm1",
+    ".psd1",
+    ".vbs",
+    ".vbe",
+    ".js",
+    ".jse",
+    ".wsf",
+    ".wsh",
+    ".hta",
+    ".msi",
+    ".msp",
+    ".msix",
+    ".appx",
+    ".lnk",
+    ".url",
+    ".reg",
+    ".dll",
+    ".sys",
+    ".cpl",
+    ".jar",
+    ".inf",
+    ".scf",
+    ".application",
+    ".msc",
+    ".chm",
+    ".iso",
+    ".img",
+    ".vhd",
+    ".vhdx",
+    ".xll",
+    ".ppam",
+    ".xlam",
+    ".settingcontent-ms",
+)
 UI_FILE = Path(__file__).parent / "app" / "ui" / "mobile.html"
 
 _SCHEMA = """
@@ -58,11 +102,54 @@ _MIGRATIONS = {
     "platform": "TEXT NOT NULL DEFAULT 'browser'",
     "app_version": "TEXT NOT NULL DEFAULT ''",
     "install_id": "TEXT NOT NULL DEFAULT ''",
+    "google_email": "TEXT NOT NULL DEFAULT ''",  # set when the phone proved it is the owner
 }
 
 
 def _hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+_TAILNET = ipaddress.ip_network("100.64.0.0/10")  # Tailscale (WireGuard) addresses
+
+
+def allowed_client(ip: str) -> bool:
+    """Only the home/work network, this PC, or a private Tailscale network may connect. A
+    request from a public internet address (e.g. after a router port-forward) is refused."""
+    try:
+        a = ipaddress.ip_address(ip.split("%")[0])
+    except ValueError:
+        return False
+    if isinstance(a, ipaddress.IPv6Address) and a.ipv4_mapped:
+        a = a.ipv4_mapped
+    if a.is_loopback or a.is_link_local:
+        return True
+    if isinstance(a, ipaddress.IPv4Address) and a in _TAILNET:
+        return True
+    return a.is_private and not a.is_global
+
+
+def addresses() -> list[dict[str, str]]:
+    """This PC's IPv4 addresses the phone may try, best first: the local network, then
+    Tailscale (works from any Wi-Fi or mobile data when both devices are in one tailnet)."""
+    found: list[str] = []
+    try:
+        found.append(lan_ip())
+    except OSError:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            found.append(str(info[4][0]))
+    except OSError:
+        pass
+    out, seen = [], set()
+    for ip in found:
+        if ip in seen or ip.startswith("127.") or not allowed_client(ip):
+            continue
+        seen.add(ip)
+        kind = "tailscale" if ipaddress.ip_address(ip) in _TAILNET else "lan"
+        out.append({"ip": ip, "kind": kind})
+    return sorted(out, key=lambda x: x["kind"] != "lan")
 
 
 def lan_ip() -> str:
@@ -142,6 +229,15 @@ class DeviceStore:
             )
         return token
 
+    def set_google(self, device_id: int, email: str) -> None:
+        with self._lock, self._db() as db:
+            db.execute("UPDATE devices SET google_email = ? WHERE id = ?", (email[:120], device_id))
+
+    def google_email(self, device_id: int) -> str:
+        with self._db() as db:
+            r = db.execute("SELECT google_email FROM devices WHERE id = ?", (device_id,)).fetchone()
+        return r[0] if r else ""
+
     def revoke(self, device_id: int) -> None:
         with self._lock, self._db() as db:
             db.execute("DELETE FROM devices WHERE id = ?", (device_id,))
@@ -154,6 +250,13 @@ class DeviceStore:
             ).fetchall()
         return [{"id": r[0], "name": r[1], "created": r[2], "last_seen": r[3], "last_ip": r[4],
                  "platform": r[5], "app_version": r[6]} for r in rows]  # fmt: skip
+
+
+def blocked_upload(name: str) -> bool:
+    """A program/script name, also behind trailing dots/spaces or a double extension such as
+    "hisobot.pdf.exe"."""
+    clean = name.strip().rstrip(". ").lower()
+    return clean.endswith(BLOCKED_UPLOADS)
 
 
 def server_id() -> str:
@@ -199,7 +302,9 @@ class RateLimiter:
 
 
 def ensure_certificate(folder: Path, ip: str) -> tuple[Path, Path]:
-    """A self-signed certificate for this PC (made once, renewed when the IP changes)."""
+    """A self-signed certificate for this PC, made once and kept: the phone trusts it by its
+    SHA-256 (from the QR code), so it must not change when the PC moves to another Wi-Fi or
+    network. Old installs made it per IP; such a certificate is simply kept."""
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import ec
@@ -207,7 +312,7 @@ def ensure_certificate(folder: Path, ip: str) -> tuple[Path, Path]:
 
     folder.mkdir(parents=True, exist_ok=True)
     cert_p, key_p, ip_p = folder / "cert.pem", folder / "key.pem", folder / "ip.txt"
-    if cert_p.is_file() and key_p.is_file() and ip_p.is_file() and ip_p.read_text() == ip:
+    if cert_p.is_file() and key_p.is_file():
         return cert_p, key_p
     key = ec.generate_private_key(ec.SECP256R1())
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "NEXVARA " + socket.gethostname())])
@@ -236,6 +341,17 @@ def ensure_certificate(folder: Path, ip: str) -> tuple[Path, Path]:
     return cert_p, key_p
 
 
+class _QuietServer(ThreadingHTTPServer):
+    """A phone that goes away mid-request (app closed, Wi-Fi lost) is normal: no traceback."""
+
+    def handle_error(self, request: Any, client_address: Any) -> None:
+        import sys
+
+        if isinstance(sys.exc_info()[1], ConnectionError | ssl.SSLError | TimeoutError):
+            return
+        super().handle_error(request, client_address)
+
+
 class RemoteServer:
     """HTTPS server for paired phones; `api` is the app's Api (chat, tasks...)."""
 
@@ -255,6 +371,7 @@ class RemoteServer:
         self.fingerprint = ""
         self.limiter = RateLimiter(240)  # requests per minute per address
         self.pair_limiter = RateLimiter(10)
+        self.bad_auth = RateLimiter(20)  # wrong/unknown tokens per minute per address
 
     # ----- lifecycle -----
     @property
@@ -265,7 +382,7 @@ class RemoteServer:
         if self.httpd is not None:
             return
         handler = type("Handler", (_Handler,), {"server_ref": self})
-        httpd = ThreadingHTTPServer((self.host, self.port), handler)
+        httpd = _QuietServer((self.host, self.port), handler)
         httpd.daemon_threads = True
         if self.use_tls:
             cert, key = ensure_certificate(config.data_dir() / "remote", lan_ip())
@@ -376,6 +493,8 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -398,6 +517,9 @@ class _Handler(BaseHTTPRequestHandler):
         return None if dev is None or dev.get("expired") else dev
 
     def _limited(self) -> bool:
+        if not allowed_client(self.client_address[0]):
+            self._send(403, b'{"error": "network"}', "application/json")
+            return True
         if self.server_ref.limiter.allow(self.client_address[0]):
             return False
         self._send(429, b'{"error": "rate limited"}', "application/json", {"Retry-After": "30"})
@@ -495,6 +617,10 @@ class _Handler(BaseHTTPRequestHandler):
 
                 name = Path(unquote(self.headers.get("X-Filename", "fayl"))).name
                 name = "".join(c for c in name if c not in '<>:"/\\|?*').strip() or "fayl"
+                if blocked_upload(name):
+                    self._json({"error": "Bu turdagi fayl (dastur yoki skript) qabul qilinmaydi"},
+                               400)  # fmt: skip
+                    return
                 body = self._body(MAX_UPLOAD)
                 folder = config.data_dir() / "Telefondan"
                 folder.mkdir(parents=True, exist_ok=True)

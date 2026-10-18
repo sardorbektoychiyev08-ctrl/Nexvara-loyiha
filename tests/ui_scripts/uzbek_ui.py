@@ -87,6 +87,6 @@ print(json.dumps({k: v for k, v in res.items() if k != "english"}, ensure_ascii=
 for page, text in sorted(unique):
     print("INGLIZCHA:", page, "|", text)
 ok = (not res["english"] and not res.get("errors") and res.get("theme_dark") == "dark"
-      and res.get("theme_light") == "light" and len(res["pages"]) == 12)  # fmt: skip
+      and res.get("theme_light") == "light" and len(res["pages"]) == 13)  # fmt: skip
 print("E2E", "PASS" if ok else "FAIL")
 sys.exit(0 if ok else 1)

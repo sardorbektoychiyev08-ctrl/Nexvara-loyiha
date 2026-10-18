@@ -3,6 +3,7 @@ says "ustiga saqla" (a backup is made first); results go to "<name>_NEXVARA.docx
 
 from __future__ import annotations
 
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -133,13 +134,25 @@ def _execute(task, w, plan, source, out, overwrite, visible, pause, keep_open) -
                 _set_body(doc, FirstLineIndent=ops.cm_to_pt(1.25), Alignment=WD_ALIGN_JUSTIFY)
                 s.detail = "rasmiy hujjat: A4, Times New Roman 14, 1,5 qator, xatboshi 1,25 sm"
                 expect.append(("font", {"name": "Times New Roman", "size": 14}))
+                if doc.Tables.Count:
+                    s.detail += "; " + _wd_tables(doc, a, ops, expect)
             elif k == "pdf":
                 pdf_path = True
                 s.detail = "saqlashda yaratiladi"
+            elif k in _EXTRA:
+                s.detail = _EXTRA[k](doc, a, ops, expect)
             else:
                 raise CommandError(f"Word uchun bu buyruq hali qo‘llanmaydi: «{a.text}»")
             report.append(f"{title}: {s.detail}")
         beat()
+
+    if all(a.kind in ("open", "check", "count", "spelling") for a in plan.actions):
+        if not keep_open:  # a report only: the document is not copied or changed
+            w.disown(doc)
+            doc.Close(ops.WD_DO_NOT_SAVE)
+        del doc
+        return {"path": str(source), "source": str(source), "pdf": "", "report": report,
+                "checks": [{"name": "Tekshiruv", "ok": True}], "unknown": plan.unknown}  # fmt: skip
 
     with task.step("Saqlash") as s:
         if overwrite:
@@ -182,6 +195,8 @@ def _execute(task, w, plan, source, out, overwrite, visible, pause, keep_open) -
                 checks.append({"name": "Sahifa raqamlari", "ok": n >= 1})
             elif kind == "toc":
                 checks.append({"name": "Mundarija", "ok": doc2.TablesOfContents.Count >= 1})
+            else:
+                checks.append(_verify(doc2, kind, arg, ops))
         if pdf_path:
             ok = Path(pdf_path).is_file() and Path(pdf_path).read_bytes()[:5] == b"%PDF-"
             checks.append({"name": "PDF", "ok": ok, "detail": Path(pdf_path).name})
@@ -226,3 +241,312 @@ def _first_body(doc: Any) -> Any:
         ):
             return p
     return doc.Paragraphs(1)
+
+
+# ---------------- professional commands ----------------
+def _headings(doc: Any) -> list[Any]:
+    return [doc.Paragraphs(i) for i in range(1, doc.Paragraphs.Count + 1)
+            if 1 <= int(doc.Paragraphs(i).OutlineLevel) <= 9]  # fmt: skip
+
+
+def _wd_align(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    how = a.args.get("how", "justify")
+    value = ops.ALIGN[how]
+    if a.args.get("target") == "headings":
+        heads = _headings(doc)
+        if not heads:
+            raise CommandError("Hujjatda sarlavha uslubidagi qator yo‘q")
+        for p in heads:
+            p.Alignment = value
+        expect.append(("align_headings", value))
+        return f"{len(heads)} ta sarlavha: {_ALIGN_UZ[how]}"
+    _set_body(doc, Alignment=value)
+    expect.append(("align", value))
+    return f"asosiy matn: {_ALIGN_UZ[how]}"
+
+
+_ALIGN_UZ = {"left": "chapga", "center": "markazga", "right": "o‘ngga",
+             "justify": "kenglik bo‘yicha (ikki tomonga)"}  # fmt: skip
+
+
+def _wd_header(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    text, where = a.args["text"], a.args.get("where", "header")
+    for i in range(1, doc.Sections.Count + 1):
+        sec = doc.Sections(i)
+        hf = sec.Footers(1) if where == "footer" else sec.Headers(1)
+        rng = hf.Range
+        if where == "footer" and hf.PageNumbers.Count and str(rng.Text).strip():
+            rng.InsertBefore(text + "\t")  # keep the page number that is already there
+        else:
+            rng.Text = text
+            rng.ParagraphFormat.Alignment = ops.ALIGN["center" if where == "footer" else "right"]
+            rng.Font.Size = 10
+        del rng, hf, sec
+    expect.append((where, text))
+    return f"{'pastki' if where == 'footer' else 'yuqori'} kolontitul: «{text}»"
+
+
+def _wd_orientation(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    value = ops.ORIENTATION["landscape" if a.args.get("landscape") else "portrait"]
+    for i in range(1, doc.Sections.Count + 1):
+        doc.Sections(i).PageSetup.Orientation = value
+    expect.append(("orientation", value))
+    return "albom (yotiq)" if value == 1 else "kitob (tik)"
+
+
+def _wd_margins(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    names = {"top": "TopMargin", "right": "RightMargin", "bottom": "BottomMargin",
+             "left": "LeftMargin"}  # fmt: skip
+    uz = {"top": "yuqori", "right": "o‘ng", "bottom": "past", "left": "chap"}
+    for i in range(1, doc.Sections.Count + 1):
+        ps = doc.Sections(i).PageSetup
+        for side, cm in a.args.items():
+            setattr(ps, names[side], ops.cm_to_pt(cm))
+        del ps
+    expect.append(("margins", dict(a.args)))
+    return ", ".join(f"{uz[s]} {str(v).replace('.', ',').removesuffix(',0')} sm"
+                     for s, v in a.args.items())  # fmt: skip
+
+
+def _wd_clean(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    """Double spaces, spaces before punctuation, empty paragraphs (outside tables)."""
+    fixed = 0
+    for find, repl in (("  ", " "), (" ,", ","), (" .", "."), (" ;", ";"), (" :", ":"),
+                       (" !", "!"), (" ?", "?")):  # fmt: skip
+        for _ in range(30):  # "    " needs several passes
+            n = str(doc.Content.Text).count(find)
+            if not n:
+                break
+            # One pass turns "    " into "  "; find_replace would call that a failure.
+            ops._find_execute(doc.Content, find, True, repl, ops.WD_REPLACE_ALL)
+            fixed += n
+    empty = 0
+    for i in range(doc.Paragraphs.Count, 1, -1):
+        p = doc.Paragraphs(i)
+        rng = p.Range
+        if (str(rng.Text).strip() == "" and not rng.Information(12)
+                and rng.InlineShapes.Count == 0 and rng.ShapeRange.Count == 0):  # fmt: skip
+            prev = str(doc.Paragraphs(i - 1).Range.Text).strip()
+            if prev == "" or i == doc.Paragraphs.Count:
+                rng.Delete()
+                empty += 1
+        del rng, p
+    expect.append(("clean", None))
+    return f"{fixed} ta ortiqcha bo‘sh joy, {empty} ta bo‘sh qator olib tashlandi"
+
+
+def _wd_count(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    words, chars, pages = (int(doc.ComputeStatistics(k)) for k in (0, 3, 2))
+    paras = int(doc.ComputeStatistics(4))
+    return f"{words} so‘z, {chars} belgi, {paras} xatboshi, {pages} sahifa"
+
+
+def _wd_title(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    for i in range(1, doc.Paragraphs.Count + 1):
+        p = doc.Paragraphs(i)
+        text = str(p.Range.Text).strip()
+        if text and not p.Range.Information(12):
+            p.Style = ops.STYLE_HEADING[1]
+            p.Alignment = ops.ALIGN["center"]
+            expect.append(("title", text))
+            return f"«{text[:60]}» — 1-darajali sarlavha (mundarijaga kiradi)"
+    raise CommandError("Hujjatda matn yo‘q")
+
+
+def _wd_tables(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    from nexvara.skills.excel.table import excel_color
+
+    n = doc.Tables.Count
+    if not n:
+        raise CommandError("Hujjatda jadval yo‘q")
+    for i in range(1, n + 1):
+        t = doc.Tables(i)
+        t.Borders.Enable = True
+        head = t.Rows(1)
+        head.Range.Font.Bold = True
+        head.HeadingFormat = -1  # repeat the header row on every page
+        head.Shading.BackgroundPatternColor = excel_color("#E0E7FF")
+        t.AutoFitBehavior(ops.WD_AUTOFIT_WINDOW)
+        del head, t
+    expect.append(("tables", n))
+    return f"{n} ta jadval: chegaralar, qalin sarlavha, sarlavha har sahifada"
+
+
+_ODD_DATE = re.compile(r"\b(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{2,4})\b")
+
+
+def _wd_check(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    """Official rules (knowledge/office_guide.py: Microsoft, VM 140-son qarori): a report."""
+    problems: list[str] = []
+    n = doc.Paragraphs.Count
+    pages = int(doc.ComputeStatistics(2))
+    heads = ops.outline(doc)
+    fake, empty_runs, run, sizes, fonts = [], 0, 0, set(), set()
+    for i in range(1, min(n, 1500) + 1):
+        p = doc.Paragraphs(i)
+        rng = p.Range
+        text = str(rng.Text).strip()
+        in_table = bool(rng.Information(12))
+        if not text and not in_table and rng.InlineShapes.Count == 0:
+            run += 1
+            if run == 2:
+                empty_runs += 1
+        else:
+            run = 0
+        if text and not in_table and int(p.OutlineLevel) == 10:
+            if len(text) < 80 and rng.Font.Bold == -1 and not text.endswith((".", ":", ",")):
+                fake.append(text[:40])  # looks like a heading but has no heading style
+            if rng.Font.Size and float(rng.Font.Size) < 900:  # 9999999 = mixed
+                sizes.add(float(rng.Font.Size))
+            if str(rng.Font.Name):
+                fonts.add(str(rng.Font.Name))
+        del rng, p
+    if fake:
+        problems.append("Sarlavhaga o‘xshash, lekin sarlavha uslubisiz qatorlar (mundarijaga "
+                        "kirmaydi): " + "; ".join(f"«{t}»" for t in fake[:4]))  # fmt: skip
+    if pages >= 3 and not heads:
+        problems.append("Uzun hujjatda sarlavha uslublari yo‘q — mundarija tuzib bo‘lmaydi")
+    if empty_runs:
+        problems.append(f"{empty_runs} joyda ketma-ket bo‘sh qatorlar (oraliq paragraf oralig‘i "
+                        "bilan beriladi)")  # fmt: skip
+    text_all = str(doc.Content.Text)
+    if "  " in text_all:
+        problems.append(f"{text_all.count('  ')} joyda ikkita bo‘sh joy («ortiqcha bo‘sh joylarni "
+                        "tozala»)")  # fmt: skip
+    if len(fonts) > 2:
+        problems.append("Asosiy matnda shriftlar aralash: " + ", ".join(sorted(fonts)[:4]))
+    if sizes and min(sizes) < 12:
+        problems.append(f"Asosiy matn {min(sizes):g} pt — rasmiy hujjat uchun 12–14 pt")
+    if pages >= 2 and doc.Sections(1).Footers(1).PageNumbers.Count == 0:
+        problems.append("Sahifa raqamlari yo‘q («sahifa raqamlarini qo‘y»)")
+    odd = sorted(set(_ODD_DATE.findall(text_all)))
+    if odd:
+        problems.append("Sana shakli: " + ", ".join(odd[:3]) + " — rasmiy hujjatda «2026-yil "
+                        "18-oktabr» yoki «18.10.26» (VM 140-son qarori, 16-band)")  # fmt: skip
+    for i in range(1, doc.Tables.Count + 1):
+        if not doc.Tables(i).Uniform:
+            problems.append(f"{i}-jadvalda birlashtirilgan kataklar bor")
+    no_alt = sum(1 for i in range(1, doc.InlineShapes.Count + 1)
+                 if not str(doc.InlineShapes(i).AlternativeText).strip())  # fmt: skip
+    if no_alt:
+        problems.append(f"{no_alt} ta rasmda izoh (alt matn) yo‘q")
+    spell = ops.spelling_error_count(doc)
+    if spell:
+        problems.append(f"{spell} ta imlo belgisi (o‘zbek lug‘ati bo‘lmasa ba’zilari xato emas)")
+    if not problems:
+        return "Kamchilik topilmadi (Microsoft va VM 140-son qarori talablari bo‘yicha)"
+    return f"{len(problems)} ta tavsiya: " + "; ".join(problems)
+
+
+_UZ_MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr",
+              "oktabr", "noyabr", "dekabr"]  # fmt: skip
+
+
+def _uz_date(raw: str) -> str | None:
+    """2026-10-18 or 18/10/2026 -> «2026-yil 18-oktabr» (VM 140-son qarori, 16-band)."""
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", raw) or None
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    else:
+        m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{2,4})", raw)
+        if not m:
+            return None
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        y += 2000 if y < 100 else 0
+    if not (1 <= mo <= 12 and 1 <= d <= 31):
+        return None
+    return f"{y}-yil {d}-{_UZ_MONTHS[mo - 1]}"
+
+
+def _wd_fix(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    """Fix what «tekshir» finds: spaces and empty lines, bold lines without a heading style,
+    small or mixed body text, page numbers, non-standard dates."""
+    done: list[str] = []
+    cleaned = _wd_clean(doc, a, ops, [])
+    if not cleaned.startswith("0 ta ortiqcha bo‘sh joy, 0"):
+        done.append(cleaned)
+    heads = 0
+    for i in range(1, min(doc.Paragraphs.Count, 1500) + 1):
+        p = doc.Paragraphs(i)
+        rng = p.Range
+        text = str(rng.Text).strip()
+        if (text and int(p.OutlineLevel) == 10 and not rng.Information(12) and len(text) < 80
+                and rng.Font.Bold == -1 and not text.endswith((".", ":", ","))):  # fmt: skip
+            p.Style = ops.STYLE_HEADING[1 if heads == 0 else 2]
+            heads += 1
+        del rng, p
+    if heads:
+        done.append(f"{heads} ta qator sarlavha uslubiga o‘tkazildi (mundarijaga kiradi)")
+    sizes, fonts = set(), set()
+    for i in range(1, min(doc.Paragraphs.Count, 1500) + 1):
+        p = doc.Paragraphs(i)
+        if int(p.OutlineLevel) == 10 and not p.Range.Information(12) and str(p.Range.Text).strip():
+            if p.Range.Font.Size and float(p.Range.Font.Size) < 900:
+                sizes.add(float(p.Range.Font.Size))
+            fonts.add(str(p.Range.Font.Name))
+        del p
+    if (sizes and min(sizes) < 12) or len(fonts) > 2:
+        for i in range(1, min(doc.Paragraphs.Count, 1500) + 1):
+            p = doc.Paragraphs(i)
+            if int(p.OutlineLevel) == 10 and not p.Range.Information(12):
+                p.Range.Font.Name, p.Range.Font.Size = "Times New Roman", 14
+            del p
+        done.append("asosiy matn: Times New Roman 14")
+        expect.append(("font", {"name": "Times New Roman", "size": 14}))
+    if int(doc.ComputeStatistics(2)) >= 2 and doc.Sections(1).Footers(1).PageNumbers.Count == 0:
+        doc.Sections(1).Footers(1).PageNumbers.Add(ops.WD_PAGE_NUMBER_CENTER, True)
+        done.append("sahifa raqamlari qo‘yildi")
+        expect.append(("page_numbers", None))
+    for raw in sorted(set(_ODD_DATE.findall(str(doc.Content.Text)))):
+        new = _uz_date(raw)
+        if new:
+            ops.find_replace(doc, raw, new)
+            done.append(f"sana «{raw}» → «{new}»")
+    if doc.Tables.Count and any(
+        not bool(doc.Tables(i).Borders.Enable) for i in range(1, doc.Tables.Count + 1)
+    ):
+        done.append(_wd_tables(doc, a, ops, expect))
+    expect.append(("clean", None))
+    return "; ".join(done) if done else "Tuzatiladigan kamchilik topilmadi"
+
+
+_EXTRA = {
+    "check": _wd_check,
+    "fix": _wd_fix,
+    "align": _wd_align, "header": _wd_header, "orientation": _wd_orientation,
+    "margins": _wd_margins, "clean": _wd_clean, "count": _wd_count, "title": _wd_title,
+    "tables": _wd_tables,
+}  # fmt: skip
+
+
+def _verify(doc: Any, kind: str, arg: Any, ops: Any) -> dict[str, Any]:
+    """Re-read one property of the saved document."""
+    if kind == "align":
+        return {"name": "Tekislash", "ok": int(_first_body(doc).Alignment) == arg}
+    if kind == "align_headings":
+        return {"name": "Sarlavhalar", "ok": all(int(p.Alignment) == arg for p in _headings(doc))}
+    if kind in ("header", "footer"):
+        sec = doc.Sections(1)
+        hf = sec.Footers(1) if kind == "footer" else sec.Headers(1)
+        return {"name": "Kolontitul", "ok": arg in str(hf.Range.Text)}
+    if kind == "orientation":
+        return {"name": "Sahifa yo‘nalishi", "ok": int(doc.PageSetup.Orientation) == arg}
+    if kind == "margins":
+        names = {"top": "TopMargin", "right": "RightMargin", "bottom": "BottomMargin",
+                 "left": "LeftMargin"}  # fmt: skip
+        ps = doc.PageSetup
+        ok = all(abs(getattr(ps, names[s]) - ops.cm_to_pt(v)) < 0.6 for s, v in arg.items())
+        return {"name": "Chetlar", "ok": ok}
+    if kind == "indent":
+        got = float(_first_body(doc).FirstLineIndent)
+        return {"name": "Xatboshi", "ok": abs(got - ops.cm_to_pt(arg)) < 0.6, "detail": f"{got}"}
+    if kind == "clean":
+        text = str(doc.Content.Text)
+        return {"name": "Ortiqcha bo‘sh joy yo‘q", "ok": "  " not in text}
+    if kind == "title":
+        heads = [str(p.Range.Text).strip() for p in _headings(doc)]
+        return {"name": "Sarlavha", "ok": arg in heads}
+    if kind == "tables":
+        ok = all(bool(doc.Tables(i).Borders.Enable) for i in range(1, doc.Tables.Count + 1))
+        return {"name": "Jadvallar", "ok": ok and doc.Tables.Count == arg}
+    return {"name": kind, "ok": True}

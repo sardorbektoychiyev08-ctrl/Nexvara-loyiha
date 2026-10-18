@@ -21,12 +21,21 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "test_count": 20,
     "test_variants": 1,
     "keep_office_open": True,
-    "remote": {"enabled": False, "port": 8765},  # phone access over the local network
+    # phone access over the local network; screen_view: the paired phone may see the screen
+    "remote": {"enabled": False, "port": 8765, "screen_view": True, "control": False},
     # Private release channel: a folder or an https:// URL with a signed latest.json.
     "update": {"channel": "", "auto_check": True},
     # Settings, memory and Teach rules between devices (sync.py). The passphrase is in
     # Credential Manager (NEXVARA/sync/passphrase), never here.
     "sync": {"enabled": False, "folder": "", "google_drive": False, "last": 0.0},
+    # Google on the phone: the "Web application" OAuth client ID (public, not a secret) that
+    # Android puts into the ID token's audience; the PC checks the phone's token against it.
+    "google": {"android_web_client_id": ""},
+    # What the AI may recall: the last `recent_turns` messages and older matching ones
+    # from the last `chat_days` days (all of it stays in app.db on this PC).
+    "memory": {"chat_days": 30, "recent_turns": 15},
+    # Weekly copy of the small user data (databases, settings, dashboards; not textbooks).
+    "backup": {"auto": True, "keep": 4, "folder": "", "last": 0.0},
     "ai": {
         "enabled": False,
         "provider": "",  # openai | anthropic | gemini | deepseek
@@ -36,6 +45,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "task_limit_usd": 0.50,  # a single request estimated above this is refused
         "limits": {},  # provider -> {"daily_usd": x, "monthly_usd": y} (optional, own caps)
         "fallback": False,  # busy/down provider -> another one; off: no paid call by itself
+        # With a Gemini key: everything goes to Gemini's free tier (Flash/Flash-Lite) at $0.
+        "free_mode": True,
+        "voice_consent": False,  # spoken commands go to Gemini only after the user agreed
+        "self_repair": True,  # a failed command: the AI reads the error and tries again (2x)
         "send_textbook_text": True,
         "models": {},  # provider -> tier -> model id (filled when a key is checked)
         "checked": {},  # provider -> {"at": time, "models": n} of the last key check
@@ -106,6 +119,12 @@ def _validate(s: dict[str, Any]) -> None:
     ch = str(s["update"]["channel"]).strip()
     if ch.startswith("http://"):
         raise ValueError("yangilanish kanali: faqat https:// yoki papka")
+    if not 1 <= int(s["memory"]["chat_days"]) <= 365:
+        raise ValueError("suhbat xotirasi 1–365 kun")
+    if not 0 <= int(s["memory"]["recent_turns"]) <= 40:
+        raise ValueError("oxirgi xabarlar 0–40")
+    if not 1 <= int(s["backup"]["keep"]) <= 20:
+        raise ValueError("zaxiralar soni 1–20")
     ai = s["ai"]
     if ai["provider"] not in ("", "openai", "anthropic", "gemini", "deepseek"):
         raise ValueError("noma’lum AI provayder")

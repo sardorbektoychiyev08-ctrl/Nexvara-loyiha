@@ -8,9 +8,9 @@ window.addEventListener("unhandledrejection", (e) => window.__errors.push(String
 const $ = (sel) => document.querySelector(sel);
 const STATUS_LABEL = {
   pending: i18n("status.pending"), running: i18n("status.running"), succeeded: i18n("status.succeeded"),
-  failed: i18n("status.failed"), cancelled: i18n("status.cancelled"),
+  failed: i18n("status.failed"), cancelled: i18n("status.cancelled"), paused: i18n("status.paused"),
 };
-const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows", "bi", "devices"]);
+const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows", "bi", "cad", "devices"]);
 
 let currentTaskId = null;
 let pollTimer = null;
@@ -28,6 +28,7 @@ function el(tag, cls, text) {
 
 // ---- navigation ----
 function show(page) {
+  document.body.classList.toggle("cad-mode", page === "cad");
   document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
   if (PAGES.has(page)) {
@@ -48,6 +49,7 @@ function show(page) {
   if (page === "workflows") renderWorkflows();
   if (page === "bi") renderBi();
   if (page === "devices") renderDevices();
+  if (page === "cad") renderCad();
 }
 
 $("#nav").addEventListener("click", (e) => {
@@ -88,6 +90,7 @@ function handleReply(r) {
   if (r.open_bi) biOpenSource(r.open_bi);
   if (r.theme) setTheme(r.theme, false);
   if (r.bi_ui) biFromChat(r.bi_ui);
+  if (r.dxf) addCadOpen(r.dxf);
 }
 
 // A paid AI request waits for the user's answer; nothing is sent before "Ha".
@@ -171,6 +174,11 @@ function renderTask(t) {
     const b = el("button", "btn", "Faylni ko'rsatish");
     b.addEventListener("click", () => api().reveal_file(t.result.path));
     row.appendChild(b);
+    if (t.result.sheet) {
+      const sh = el("button", "btn", "Javob varaqasi (PDF)");
+      sh.addEventListener("click", () => api().reveal_file(t.result.sheet));
+      row.appendChild(sh);
+    }
     if (t.result.excerpt) {
       const ex = el("button", "btn", "Asl sahifalar (PDF)");
       ex.addEventListener("click", () => api().reveal_file(t.result.excerpt));
@@ -185,8 +193,13 @@ function renderTask(t) {
   }
   res.hidden = !res.childElementCount;
 
-  const running = t.status === "running" || t.status === "pending";
+  const running = t.status === "running" || t.status === "pending" || t.status === "paused";
   $("#task-cancel").disabled = !running || t.cancel_requested;
+  // Pause stops at the next step (never inside an Office call); paused time is not a timeout.
+  const pause = $("#task-pause");
+  pause.disabled = !running || t.cancel_requested;
+  pause.textContent = t.pause_requested ? i18n("task.resume") : i18n("task.pause");
+  pause.dataset.paused = t.pause_requested ? "1" : "";
   document.querySelectorAll(".run-task").forEach((b) => { b.disabled = running; });
 }
 
@@ -200,6 +213,7 @@ async function poll() {
     pollTimer = null;
     refreshCount();
     if (chatTasks.has(t.id)) { chatTasks.delete(t.id); addMsg(summary(t), false); }
+    if (t.status === "succeeded" && t.result && t.result.dxf) addCadOpen(t.result.dxf);
     if ($("#page-library").classList.contains("active")) renderLibrary();
   }
 }
@@ -221,6 +235,57 @@ document.querySelectorAll(".run-task").forEach((btn) => btn.addEventListener("cl
   if (!btn.dataset.api) return;
   track(await api()[btn.dataset.api]());
 }));
+
+$("#task-pause").addEventListener("click", async () => {
+  if (!currentTaskId) return;
+  if ($("#task-pause").dataset.paused) await api().resume_task(currentTaskId);
+  else await api().pause_task(currentTaskId);
+  poll();
+});
+
+// The phone is looking at this screen: say so (it is turned off in settings.json if unwanted).
+function showPhoneBadge(text) {
+  let b = document.getElementById("phone-badge");
+  if (!b) {
+    b = el("div", "phone-badge", "");
+    b.id = "phone-badge";
+    b.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:50;padding:8px 14px;border-radius:12px;" +
+      "background:#6366F1;color:#fff;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25)";
+    document.body.appendChild(b);
+  }
+  b.textContent = text || i18n("phone.screen");
+  b.hidden = false;
+  clearTimeout(showPhoneBadge.t);
+  showPhoneBadge.t = setTimeout(() => { b.hidden = true; }, 35000);
+}
+
+// Commands sent from the phone show up here too: the message, its task, the dashboard.
+async function phoneEvents() {
+  if (!api() || !api().ui_events) return;
+  let events = [];
+  try { events = await api().ui_events(); } catch (_) { return; }
+  for (const ev of events) {
+    if (ev.kind === "phone_chat") {
+      addMsg(i18n("phone.prefix") + ev.text, true);
+      handleReply(ev.reply || {});
+    } else if (ev.kind === "nexvara_reply" && ev.reply) {
+      handleReply(ev.reply);  // e.g. the AI fixed a failed command and tried again
+    } else if (ev.kind === "phone_file") {
+      addMsg(i18n("phone.file") + ev.name, false);
+      showContext(ev.path);
+    } else if (ev.kind === "task" && ev.task) {
+      track(ev.task, false);
+    } else if (ev.kind === "phone_screen") {
+      showPhoneBadge();
+    } else if (ev.kind === "phone_control") {
+      showPhoneBadge(i18n("phone.control"));
+    } else if (ev.kind === "cad_open" && ev.path) {
+      if (cadConfirmDirty()) { show("cad"); cadLoad(await api().cad_open(ev.path)); }
+    } else if (ev.kind === "bi_open" && ev.file) {
+      biFromChat({ open: ev.file, state: ev.state && Object.keys(ev.state).length ? ev.state : null });
+    }
+  }
+}
 
 $("#task-cancel").addEventListener("click", async () => {
   if (currentTaskId) await api().cancel_task(currentTaskId);
@@ -745,6 +810,18 @@ async function renderAi(status) {
   $("#ai-confirm").value = st.confirm_over_usd;
   $("#ai-task").value = st.task_limit_usd ?? "";
   $("#ai-fallback").checked = st.fallback;
+  $("#ai-free").checked = st.free_mode;
+  const gem = st.providers.gemini;
+  $("#ai-free-note").textContent = !gem.has_key
+    ? "Bepul rejim uchun Gemini kalitini kiriting (aistudio.google.com saytidan bepul kalit oling). " +
+      "Kalit kiritilgach, hamma AI ishlari Gemini Flash orqali bepul bajariladi."
+    : (st.free_active
+      ? `Bepul rejim ishlayapti: bugun ${st.free_requests_today} ta bepul so‘rov. Google bepul darajada ` +
+        "kunlik so‘rovlar sonini cheklaydi — tugasa, keyinroq qayta urinasiz (pullik provayderga o‘tilmaydi). " +
+        "Eslatma: bepul darajada Google so‘rovlarni o‘z xizmatlarini yaxshilash uchun ishlatishi mumkin; " +
+        "NEXVARA ism, telefon, pasport kabi shaxsiy ma’lumotlarni yuborishdan oldin yashiradi. " +
+        "AI Studio’da to‘lov (Billing) yoqilmagan bo‘lsin — aks holda Google haq oladi."
+      : "Bepul rejim o‘chiq: so‘rovlar tanlangan provayderga ketadi va pul sarflanadi.");
   $("#ai-send-text").checked = st.send_textbook_text;
   $("#ai-spent").textContent =
     `${i18n("ai.estimated")}: bugun ${money(st.spent_today)} / ${money(st.daily_budget_usd)}, shu oy ${money(st.spent_month)} / ${money(st.monthly_budget_usd)}. Narxlar taxminiy — provayder hisobidagi summa asosiy.` +
@@ -772,7 +849,7 @@ $("#ai-form").addEventListener("submit", async (e) => {
     daily_budget_usd: Number($("#ai-daily").value), monthly_budget_usd: Number($("#ai-monthly").value),
     confirm_over_usd: Number($("#ai-confirm").value), send_textbook_text: $("#ai-send-text").checked,
     task_limit_usd: $("#ai-task").value === "" ? null : Number($("#ai-task").value),
-    fallback: $("#ai-fallback").checked,
+    fallback: $("#ai-fallback").checked, free_mode: $("#ai-free").checked,
   } });
   $("#ai-error").hidden = r.ok; $("#ai-error").textContent = r.ok ? "" : r.error;
   $("#ai-saved").textContent = r.ok ? "Saqlandi ✓" : "";
@@ -1313,6 +1390,7 @@ $("#wf-form").addEventListener("submit", async (e) => {
 // ---- devices ----
 let devTimer = null;
 async function renderDevices() {
+  renderDeviceOptions();
   if (!api()) return;
   drawDevices(await api().devices_status());
   clearInterval(devTimer);
@@ -1360,6 +1438,27 @@ function drawDevices(st) {
   });
 }
 
+// What a paired phone may do: see the screen, control mouse/keyboard, NEXVARA at sign-in.
+async function renderDeviceOptions() {
+  if (!api() || !api().devices_options) return;
+  const o = await api().devices_options();
+  for (const k of ["screen_view", "control", "autostart"]) {
+    const box = $("#opt-" + k);
+    if (box) box.checked = !!o[k];
+  }
+}
+for (const k of ["screen_view", "control", "autostart"]) {
+  const box = document.getElementById("opt-" + k);
+  if (box) box.addEventListener("change", async () => {
+    if (k === "control" && box.checked && !confirm("Telefon bu kompyuterning sichqonchasi va klaviaturasini boshqara oladi. Yoqilsinmi?")) {
+      box.checked = false;
+      return;
+    }
+    await api().devices_set_option(k, box.checked);
+    renderDeviceOptions();
+  });
+}
+
 $("#dev-toggle").addEventListener("click", async () => {
   const st = await api().devices_status();
   const r = st.running ? await api().devices_stop() : await api().devices_start();
@@ -1385,4 +1484,5 @@ window.addEventListener("pywebviewready", async () => {
   setTheme(settings.theme, false);
   applySettings();
   refreshCount();
+  setInterval(phoneEvents, 1500);
 });

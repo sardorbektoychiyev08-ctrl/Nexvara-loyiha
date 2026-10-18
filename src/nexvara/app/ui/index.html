@@ -8,7 +8,7 @@
 </head>
 <body>
   <aside class="sidebar">
-    <div class="brand"><span class="logo">N</span><span>NEXVARA</span></div>
+    <div class="brand"><img class="logo" src="brand.svg" alt=""><span>NEXVARA</span></div>
     <nav id="nav">
       <button class="nav-item active" data-page="home" data-i18n="nav.home">Bosh sahifa</button>
       <button class="nav-item" data-page="chat" data-i18n="nav.chat">AI suhbat</button>
@@ -16,6 +16,7 @@
       <button class="nav-item" data-page="library" data-i18n="nav.library">Darsliklar va testlar</button>
       <button class="nav-item" data-page="files" data-milestone="M5" data-i18n="nav.files">Fayllar</button>
       <button class="nav-item" data-page="bi" data-milestone="M8" data-i18n="nav.bi">NEXVARA BI</button>
+      <button class="nav-item" data-page="cad" data-i18n="nav.cad">Chizmalar</button>
       <button class="nav-item" data-page="workflows" data-milestone="M6" data-i18n="nav.workflows">Ish jarayonlari</button>
       <button class="nav-item" data-page="teach" data-milestone="M6" data-i18n="nav.teach">NEXVARA’ga o‘rgatish</button>
       <button class="nav-item" data-page="memory" data-milestone="M6" data-i18n="nav.memory">Xotira</button>
@@ -84,6 +85,7 @@
       <form class="chat-input" id="chat-form">
         <button class="btn" id="chat-attach" type="button" title="Fayl tanlash">📎</button>
         <input id="chat-text" type="text" placeholder="Masalan: 7-sinf fizika Nyuton qonunlari 20 ta test" autocomplete="off">
+        <button class="btn" id="chat-mic" type="button" title="Ovoz bilan buyruq: bosing, gapiring, yana bosing (Gemini)">🎤</button>
         <button class="btn primary" type="submit">Yuborish</button>
       </form>
     </section>
@@ -309,6 +311,9 @@
         <form id="ai-form">
           <div class="form-grid">
             <label class="check-label"><input id="ai-enabled" type="checkbox"> AI yoqilgan</label>
+            <label class="check-label wide-field"><input id="ai-free" type="checkbox">
+              Bepul rejim: hamma ish Gemini’ning bepul darajasida (pul sarflanmaydi)</label>
+            <div class="free-note wide-field" id="ai-free-note"></div>
             <label>Asosiy provayder <select id="ai-provider"></select></label>
             <label>Kunlik limit, $ <input id="ai-daily" type="number" min="0" step="0.1"></label>
             <label>Oylik limit, $ <input id="ai-monthly" type="number" min="0" step="0.5"></label>
@@ -582,6 +587,108 @@
       <div class="bi-tip" id="bi-tip" hidden></div>
     </section>
 
+    <section class="page" id="page-cad">
+      <div class="cad-head">
+        <div>
+          <h1>Chizmalar</h1>
+          <p class="muted small">NEXVARA’ning o‘z chizma dasturi: AutoCAD o‘rnatish shart emas. Fayllar
+            AutoCAD formatida (DXF, mm) saqlanadi va AutoCAD’da ham ochiladi.</p>
+        </div>
+        <div class="cad-file muted small" id="cad-file">Yangi chizma</div>
+      </div>
+      <div class="cad-toolbar" id="cad-toolbar" role="toolbar" aria-label="Chizma asboblari">
+        <div class="cad-group" data-group="Fayl">
+          <button class="cad-btn" data-cad="new" title="Yangi chizma">Yangi</button>
+          <button class="cad-btn" data-cad="open" title="DXF faylni ochish">Ochish</button>
+          <button class="cad-btn" data-cad="last" title="NEXVARA chizgan oxirgi chizma">Oxirgi</button>
+          <button class="cad-btn" data-cad="save" title="Saqlash (Ctrl+S)">Saqlash</button>
+          <button class="cad-btn" data-cad="saveas" title="Boshqa nom bilan saqlash">Nomini o‘zgartirib</button>
+          <button class="cad-btn" data-cad="pdf" title="Chop etish uchun PDF">PDF</button>
+          <button class="cad-btn" data-cad="png" title="Rasm (PNG)">PNG</button>
+        </div>
+        <div class="cad-group" data-group="Chizish">
+          <button class="cad-btn tool" data-tool="line" title="Chiziq (L)">Chiziq</button>
+          <button class="cad-btn tool" data-tool="polyline" title="Ko‘p bo‘g‘inli chiziq (PL)">Polichiziq</button>
+          <button class="cad-btn tool" data-tool="rect" title="To‘rtburchak (REC)">To‘rtburchak</button>
+          <button class="cad-btn tool" data-tool="circle" title="Aylana: markaz va radius (C)">Aylana</button>
+          <button class="cad-btn tool" data-tool="arc" title="Yoy: markaz, boshi, oxiri (A)">Yoy</button>
+          <button class="cad-btn tool" data-tool="ellipse" title="Ellips (EL)">Ellips</button>
+          <button class="cad-btn tool" data-tool="polygon" title="Muntazam ko‘pburchak (POL)">Ko‘pburchak</button>
+          <button class="cad-btn tool" data-tool="text" title="Matn (T)">Matn</button>
+          <button class="cad-btn tool" data-tool="hatch" title="Shtrixlash: yopiq shakl ichiga bosing (H)">Shtrix</button>
+          <button class="cad-btn cad-color-tool" id="cad-color" data-cad="color" title="Rang (COLOR): yangi obyektlar rangi; tanlangan obyektlarni ham bo‘yaydi">🎨 Rang: <span class="cad-swatch bylayer"></span><span class="cad-color-name">Qatlam bo‘yicha</span></button>
+          <select class="cad-template" id="cad-template" aria-label="Shablonlar" title="Tayyor shablonlar: ramka, bolt, gayka…">
+            <option value="">Shablon…</option>
+          </select>
+        </div>
+        <div class="cad-group" data-group="O‘lchamlar">
+          <button class="cad-btn tool" data-tool="dim" title="Chiziqli o‘lcham: yotiq yoki tik (DIM)">Chiziqli</button>
+          <button class="cad-btn tool" data-tool="dimali" title="Qiya o‘lcham (DAL)">Qiya</button>
+          <button class="cad-btn tool" data-tool="dimrad" title="Radius (DRA)">Radius</button>
+          <button class="cad-btn tool" data-tool="dimdia" title="Diametr (DDI)">Diametr</button>
+        </div>
+        <div class="cad-group" data-group="Tahrir">
+          <button class="cad-btn tool" data-tool="select" title="Tanlash (Esc)">Tanlash</button>
+          <button class="cad-btn tool" data-tool="move" title="Ko‘chirish (M)">Ko‘chirish</button>
+          <button class="cad-btn tool" data-tool="copy" title="Nusxa (CO)">Nusxa</button>
+          <button class="cad-btn tool" data-tool="rotate" title="Burish (RO)">Burish</button>
+          <button class="cad-btn tool" data-tool="mirror" title="Ko‘zgu (MI)">Ko‘zgu</button>
+          <button class="cad-btn tool" data-tool="scale" title="Masshtab (SC)">Masshtab</button>
+          <button class="cad-btn tool" data-tool="offset" title="Parallel nusxa (O)">Parallel</button>
+          <button class="cad-btn tool" data-tool="trim" title="Kesish: ortiqcha qismni bosing (TR)">Kesish</button>
+          <button class="cad-btn tool" data-tool="extend" title="Uzaytirish (EX)">Uzaytirish</button>
+          <button class="cad-btn tool" data-tool="fillet" title="Burchakni yumaloqlash (F)">Yumaloqlash</button>
+          <button class="cad-btn tool" data-tool="chamfer" title="Faska (CHA)">Faska</button>
+          <button class="cad-btn tool" data-tool="array" title="Qator massiv (AR)">Massiv</button>
+          <button class="cad-btn tool" data-tool="parray" title="Aylana bo‘ylab massiv (ARP)">Aylana massiv</button>
+          <button class="cad-btn tool" data-tool="explode" title="Bo‘laklash (X)">Bo‘laklash</button>
+          <button class="cad-btn" data-cad="erase" title="Tanlangan obyektlarni o‘chirish (Del)">O‘chirish</button>
+          <button class="cad-btn" data-cad="undo" title="Bekor qilish (Ctrl+Z)">Orqaga</button>
+          <button class="cad-btn" data-cad="redo" title="Qaytarish (Ctrl+Y)">Oldinga</button>
+        </div>
+        <div class="cad-group" data-group="AI">
+          <button class="cad-btn ai-btn" data-cad="ai" title="Qo‘lda chizilgan chizmani AI to‘g‘ri chizib beradi (AI ulanmagan bo‘lsa — NEXVARA o‘zi tekislaydi)">AI bilan tuzatish</button>
+        </div>
+        <div class="cad-group" data-group="Ko‘rinish va o‘lchash">
+          <button class="cad-btn" data-cad="zoomin" title="Kattalashtirish (+)">+</button>
+          <button class="cad-btn" data-cad="zoomout" title="Kichiklashtirish (−)">−</button>
+          <button class="cad-btn" data-cad="compact" title="Ixcham ko‘rinish: chizma maydoni kattaroq">Ixcham</button>
+          <button class="cad-btn" data-cad="extents" title="Hammasini ko‘rsatish (Z)">Hammasi</button>
+          <button class="cad-btn" data-cad="view3d" title="Detalni 3D ko‘rish (yopiq shakllar qalinlikka cho‘ziladi)">3D</button>
+          <button class="cad-btn tool" data-tool="zoomwin" title="Oyna bilan kattalashtirish (ZW)">Oyna</button>
+          <button class="cad-btn tool" data-tool="measure" title="Masofa va burchak (DI)">Masofa</button>
+          <button class="cad-btn tool" data-tool="area" title="Yuza va perimetr (AA)">Yuza</button>
+        </div>
+      </div>
+      <div class="cad-main">
+        <div class="cad-canvas-wrap" id="cad-wrap">
+          <canvas id="cad-canvas" tabindex="0" aria-label="Chizma maydoni"></canvas>
+          <div class="cad-hint" id="cad-hint"></div>
+        </div>
+        <aside class="cad-side">
+          <div class="cad-side-title">Qatlamlar <button class="cad-mini" id="cad-layer-add" type="button" title="Yangi qatlam">+</button></div>
+          <div class="cad-layers" id="cad-layers"></div>
+          <div class="cad-side-title">Xususiyatlar</div>
+          <div class="cad-props" id="cad-props"><span class="muted small">Obyekt tanlanmagan</span></div>
+        </aside>
+      </div>
+      <div class="cad-cmd">
+        <div class="cad-log mono" id="cad-log"></div>
+        <form class="cad-cmd-row" id="cad-cmd-form">
+          <span class="cad-prompt" id="cad-prompt">Buyruq:</span>
+          <input id="cad-cmd" type="text" autocomplete="off" spellcheck="false"
+            placeholder="masalan: L, keyin 0,0 va @100,0 yoki 100 (uzunlik)">
+        </form>
+        <div class="cad-status">
+          <span class="mono" id="cad-xy">X 0 · Y 0</span>
+          <button class="cad-toggle on" data-toggle="snap" type="button" title="Nuqtalarga bog‘lanish (F3)">Bog‘lanish</button>
+          <button class="cad-toggle on" data-toggle="grid" type="button" title="To‘r (F7)">To‘r</button>
+          <button class="cad-toggle" data-toggle="ortho" type="button" title="Faqat tik va yotiq (F8)">Orto</button>
+          <span class="muted small" id="cad-count"></span>
+        </div>
+      </div>
+    </section>
+
     <section class="page" id="page-devices">
       <h1>Qurilmalar</h1>
       <p class="muted">NEXVARA'ni telefoningizdan boshqaring: buyruq yozing, fayl yoki rasm yuboring,
@@ -618,6 +725,13 @@
         </div>
       </div>
       <div class="card wide">
+        <div class="card-label">Telefonga ruxsatlar</div>
+        <label class="row"><input type="checkbox" id="opt-screen_view"> Telefon kompyuter ekranini ko‘rishi mumkin</label>
+        <label class="row"><input type="checkbox" id="opt-control"> Telefon sichqoncha va klaviaturani boshqarishi mumkin (ehtiyot bo‘ling)</label>
+        <label class="row"><input type="checkbox" id="opt-autostart"> NEXVARA Windows bilan birga ishga tushsin (telefon kompyuter yoqilganda ham ulanadi)</label>
+        <div class="muted small">Ekran ko‘rilganda yoki boshqarilganda shu oynada «📱» belgisi chiqadi.</div>
+      </div>
+      <div class="card wide">
         <div class="card-label">Bog‘langan qurilmalar</div>
         <div id="dev-list"></div>
       </div>
@@ -643,6 +757,7 @@
       <div id="task-error" class="error" hidden></div>
       <div id="task-result" hidden></div>
       <div class="row">
+        <button class="btn" id="task-pause" data-i18n="task.pause">Pauza</button>
         <button class="btn" id="task-cancel">Bekor qilish</button>
       </div>
     </div>
@@ -651,5 +766,9 @@
   <script src="i18n.js"></script>
   <script src="app.js"></script>
   <script src="bi.js"></script>
+  <script src="cad.js"></script>
+  <script src="cad3d.js"></script>
+  <script src="voice.js"></script>
+  <script src="icons.js"></script>
 </body>
 </html>

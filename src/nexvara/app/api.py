@@ -17,12 +17,16 @@ from nexvara import __version__, config
 from nexvara.app.api_account import AccountApi
 from nexvara.app.api_agent import AgentApi, looks_like_secret
 from nexvara.app.api_bi import BiApi
+from nexvara.app.api_cad import CadApi
 from nexvara.app.api_devices import DevicesApi
+from nexvara.app.api_drawing import DrawingApi
 from nexvara.app.api_files import FilesApi
 from nexvara.app.api_memory import MemoryApi
+from nexvara.app.api_reading import ReadingApi
 from nexvara.app.api_sections import SectionsChatApi
 from nexvara.app.api_sync import SyncApi
 from nexvara.app.api_update import UpdateApi
+from nexvara.app.api_voice import VoiceApi
 from nexvara.app.api_workflows import WorkflowsApi
 from nexvara.core.task import TaskFn, TaskRunner
 
@@ -66,6 +70,10 @@ class Api(
     UpdateApi,
     SectionsChatApi,
     SyncApi,
+    DrawingApi,
+    CadApi,
+    VoiceApi,
+    ReadingApi,
 ):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
@@ -104,6 +112,7 @@ class Api(
             elif prev_hook is not None:
                 prev_hook(t)
             self._ctx.task_done(snap)  # its output becomes "uni" / "natija"
+            self._repair_task(snap)  # a failed chat command: the AI may fix and retry
 
         self._runner.on_finish = on_finish
         if excel_demo:
@@ -169,7 +178,13 @@ class Api(
         if mem is not None:
             mem.log_chat("user", text)
         self._ctx.add_turn("user", text)
-        out = self._chat_inner(self._expand_aliases(text))
+        self._repair_origin = [text, 0]  # a new message: its failures may be repaired again
+        forget = self._chat_forget(text)
+        out = forget if forget is not None else self._chat_inner(self._expand_aliases(text))
+        if out.get("error") and not out.get("confirm") and self._self_repair_on():
+            fixed = self._repair(text, out.get("reply", ""))
+            if fixed is not None:
+                out = fixed
         if mem is not None:
             mem.log_chat("nexvara", out.get("reply", ""))
         self._ctx.add_turn("nexvara", out.get("reply", ""))
@@ -185,6 +200,15 @@ class Api(
         teach = self._chat_teach(text)
         if teach is not None:
             return teach
+        read = self._chat_read(text)  # "shu rasmdagi matnni o‘qi" (offline OCR or AI)
+        if read is not None:
+            return read
+        drawn = self._chat_drawing(text)  # "... chizib ber", a photo of a hand-drawn sketch
+        if drawn is not None:
+            return drawn
+        weekly = self._chat_weekly(text)  # "Hisobotlar papkasidan haftalik hisobot qil"
+        if weekly is not None:
+            return weekly
         text = self._bind_refs(text)  # "uni PDF qil" -> the file the last step produced
         agent = self._chat_agent(text, _use_ai)  # several tasks; Files/BI/Workflows/Settings
         if agent is not None:
@@ -203,6 +227,11 @@ class Api(
             command = self._chat_command(text)
             if command is not None:
                 return command
+        from nexvara.knowledge.lessonplan import parse_lesson_request
+
+        lesson = parse_lesson_request(text)  # «… dars ishlanmasi»: plan + slides from the book
+        if lesson is not None:
+            return self._chat_lesson(lesson)
         req = parse_test_request(text)
         if req is not None:
             what = " ".join(
@@ -234,7 +263,9 @@ class Api(
             return {
                 "reply": (
                     f"Tushundim: {what or 'darslik'}{topic}, {req.count} ta savol, "
-                    f"{req.variants} ta variant. {by}Word'da tuzyapman — jarayon o‘ng panelda."
+                    f"{req.variants} ta variant. {by}Word'da tuzyapman — jarayon o‘ng panelda. "
+                    "Variantlar A, B, C… harflari bilan; javob varaqasi (PDF) ham tayyorlanadi, "
+                    "to‘ldirilganini telefonda suratga olib tekshirasiz."
                 ),
                 "task": snap,
             }
@@ -373,8 +404,9 @@ class Api(
         try:
             facts = mem.relevant_facts(text) if mem is not None else []
             rules = [f"{r.label()}: {r.text}" for r in mem.rules(enabled_only=True)] if mem else []
+            recall = self._recall(text)
             p = features.plan(router, text, agent_tools.catalog(), self._ctx.snapshot(),
-                              list(self._ctx.turns)[:-1], facts, rules, approved)  # fmt: skip
+                              recall.turns, facts, rules, approved, recall.older)  # fmt: skip
             if p.kind == "tools":
                 calls = [agent_tools.ToolCall(str(c["tool"]), dict(c.get("args") or {}))
                          for c in p.calls]  # fmt: skip
@@ -390,10 +422,16 @@ class Api(
                     return out
             if intent.kind == "question":
                 ans = features.answer_question(
-                    router, text, approved, intent.grade, intent.subject or None, facts=facts
+                    router,
+                    text,
+                    approved,
+                    intent.grade,
+                    intent.subject or None,
+                    facts=facts,
+                    recall=recall,
                 )
             else:
-                ans = features.chat_reply(router, text, approved, facts=facts)
+                ans = features.chat_reply(router, text, approved, facts=facts, recall=recall)
         except NeedsConfirmation as e:
             ask = self._ask("chat", text, e.estimate)
             return {"reply": ask["text"], "confirm": ask["token"]}
@@ -429,6 +467,10 @@ class Api(
             return self._start_chain(payload, approved=True)
         if kind == "chat":
             return self._chat_ai(payload, approved=True)
+        if kind == "drawing":
+            return self._run_drawing(payload)
+        if kind == "read":
+            return self._run_read(payload)
         snap = self.make_test({**payload, "approved": True})
         if "id" not in snap:
             return {"reply": snap.get("error") or "Test boshlanmadi"}
@@ -523,6 +565,23 @@ class Api(
             from nexvara.memory.teach import apply_rules
 
             plan, taught = apply_rules(plan, mem)
+        if plan.app == "excel" and any(a.kind == "create_table" for a in plan.actions):
+            import uuid
+
+            from nexvara.knowledge.textnorm import fold
+
+            title = str(plan.actions[0].args["title"])
+            stem = re.sub(r"[^\w-]+", "_", fold(title)).strip("_")[:45] or "Jadval"
+            folder = self._output_dir or config.data_dir() / "Jadvallar"
+            target = folder / f"{stem}_NEXVARA_{uuid.uuid4().hex[:6]}.xlsx"
+            self._context_file = str(target)
+            snap = self.run_command_plan(plan, str(target), background=bool(bg))
+            return {
+                "reply": f"Yangi Excel jadvali: {target}\nUstunlar: "
+                + ", ".join(plan.actions[0].args["headers"]),
+                "task": snap,
+                "plan": plan.describe(),
+            }
         if not plan.file:
             what = {"excel": "Excel", "word": "Word", "powerpoint": "PowerPoint"}.get(
                 plan.app or "", "Office"
@@ -542,6 +601,7 @@ class Api(
         self._context_file = str(source)
         self._ctx.command = text
         snap = self.run_command_plan(plan, str(source), background=bool(bg))
+        self._chat_task = snap.get("id", "")
         steps = "\n".join(f"• {d}" for d in plan.describe())
         reply = f"Fayl: {source}\nBajaraman:\n{steps}"
         if taught:
@@ -579,6 +639,7 @@ class Api(
             webview.OPEN_DIALOG,
             file_types=(
                 "Office fayllar (*.xlsx;*.xlsm;*.xls;*.csv;*.docx;*.doc;*.pptx;*.ppt)",
+                "AutoCAD chizmalar (*.dxf;*.dwg)",
                 "Barcha fayllar (*.*)",
             ),
         )
@@ -598,6 +659,67 @@ class Api(
         return self._context_file or ""
 
     # ----- lesson presentation from a textbook topic -----
+    def _chat_weekly(self, text: str) -> dict[str, Any] | None:
+        """A PDF summary of the week's Excel files in a folder (see nexvara/weekly.py)."""
+        import re
+
+        from nexvara import config
+        from nexvara.agent.nlu import locations
+        from nexvara.knowledge.textnorm import fold
+
+        f = fold(text)
+        if not re.search(r"\bhaftalik\s+hisobot\w*|\bhafta\w*\s+(?:uchun\s+)?hisobot\w*", f):
+            return None
+        folder = next((Path(p) for p in locations(text) if Path(p).is_dir()), None)
+        if folder is None:
+            m = re.search(r"([\w‘’'-]+)\s+papka", text, re.IGNORECASE)
+            name = m.group(1) if m else "Hisobotlar"
+            home = Path.home()
+            for root in (config.data_dir(), home / "Documents", home / "Desktop", Path("D:/")):
+                if (root / name).is_dir():
+                    folder = root / name
+                    break
+        if folder is None:
+            folder = config.data_dir() / "Hisobotlar"
+            folder.mkdir(parents=True, exist_ok=True)
+        out_dir = self._output_dir or (config.data_dir() / "Hisobotlar" / "Haftalik")
+        from nexvara import weekly
+
+        def fn(task: Any) -> dict[str, Any]:
+            with task.step(f"Excel fayllarni o‘qish: {folder}") as s:
+                res = weekly.build(folder, out_dir)
+                s.detail = f"{res['files']} ta fayl"
+            return res
+
+        snap = self._runner.start(f"Haftalik hisobot: {folder.name}", fn).snapshot()
+        return {"reply": f"«{folder}» papkasidagi shu hafta o‘zgargan Excel fayllardan PDF hisobot "
+                "tayyorlayapman (Excel ochilmaydi). Har juma avtomatik bo‘lishi uchun: Ish "
+                "jarayonlari → shablon «Haftalik hisobot».", "task": snap}  # fmt: skip
+
+    def _chat_lesson(self, req: Any) -> dict[str, Any]:
+        from nexvara.knowledge.topicdoc import lookup
+
+        if not self.library_info()["books"]:
+            return {"reply": "Dars ishlanmasi uchun avval darsliklarni «Darsliklar» bo‘limida "
+                    "qo‘shing."}  # fmt: skip
+        try:
+            topic = lookup(req)
+        except (LookupError, ValueError) as e:
+            return {"reply": str(e)}
+        if "lesson" in self._overrides:
+            fn = self._overrides["lesson"]
+        else:
+            from nexvara.knowledge.lessonplan import run_lesson
+
+            def fn(task: Any) -> dict[str, Any]:
+                return run_lesson(task, req, self._output_dir, keep_open=self._keep_open())
+
+        snap = self._runner.start(f"Dars ishlanmasi: {topic.title}", fn).snapshot()
+        return {"reply": f"{topic.book.label()}, {topic.pages_label}: «{topic.title}» bo‘yicha "
+                "dars ishlanmasini (maqsadlar, 45 daqiqalik dars borishi, tushunchalar, "
+                "mustahkamlash savollari, uyga vazifa) Word’da va dars taqdimotini PowerPoint’da "
+                "tayyorlayapman.", "task": snap}  # fmt: skip
+
     def _chat_presentation(self, req: Any) -> dict[str, Any]:
         from nexvara.knowledge.topicdoc import lookup
 
@@ -874,7 +996,8 @@ class Api(
 
                     book, _pages, topic = topic_material(req)
                     out = self._output_dir / default_test_path(book, topic).name
-                return run_make_test(task, req, out, keep_open=self._keep_open(), make=make)
+                res = run_make_test(task, req, out, keep_open=self._keep_open(), make=make)
+                return _with_answer_sheet(task, res)
 
         what = " ".join(
             x for x in (f"{req.grade}-sinf" if req.grade else "", req.subject or "") if x
@@ -905,6 +1028,35 @@ class Api(
             return False
         task.cancel()
         return True
+
+    def pause_task(self, task_id: str) -> bool:
+        """Stop at the next step boundary (never inside an Office call)."""
+        task = self._runner.get(task_id)
+        return bool(task and task.pause())
+
+    def resume_task(self, task_id: str) -> bool:
+        task = self._runner.get(task_id)
+        return bool(task and task.resume())
+
+    # ----- events for the PC window (a command from the phone shows up on the PC too) -----
+    def ui_push(self, event: dict[str, Any]) -> None:
+        import collections
+        import threading
+
+        if not hasattr(self, "_ui_queue"):
+            self._ui_queue = collections.deque(maxlen=50)
+            self._ui_lock = threading.Lock()
+        with self._ui_lock:
+            self._ui_queue.append(event)
+
+    def ui_events(self) -> list[dict[str, Any]]:
+        """Polled by the PC window: events since the last call (phone chat, open a dashboard)."""
+        if not hasattr(self, "_ui_queue"):
+            return []
+        with self._ui_lock:
+            out = list(self._ui_queue)
+            self._ui_queue.clear()
+        return out
 
     def list_tasks(self) -> list[dict[str, Any]]:
         live = [t.snapshot() for t in self._runner.list()]
@@ -969,6 +1121,25 @@ class Api(
         if os.name == "nt":
             subprocess.Popen(["explorer", "/select,", str(p)])
         return True
+
+
+def _with_answer_sheet(task: Any, res: dict[str, Any]) -> dict[str, Any]:
+    """Every A/B/C/D test gets a printable answer sheet with its keys: the filled sheets are
+    then checked by a phone photo («Javob varaqalari»)."""
+    from nexvara import omr
+
+    answers = res.get("answers") or []
+    n = len(answers[0]) if answers else 0
+    if not res.get("sheet_ready") or not 1 <= n <= omr.MAX_Q or not 1 <= len(answers) <= 4:
+        return res
+    with task.step("Javob varaqasi (chop etish uchun)") as s:
+        title = f"{res.get('book', 'Test')}: {res.get('topic', '')}".strip(": ")
+        keys = {str(i + 1): k for i, k in enumerate(answers)}
+        sheet = omr.create_set(title, n, len(answers), keys)
+        res["sheet"] = sheet["pdf"]
+        res["sheet_id"] = sheet["id"]
+        s.detail = f"{n} savol, {len(answers)} variant; kalitlar saqlandi"
+    return res
 
 
 def _clipboard(clear: bool = False) -> str:

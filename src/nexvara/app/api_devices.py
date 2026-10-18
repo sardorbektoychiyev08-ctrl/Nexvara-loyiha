@@ -37,6 +37,32 @@ class DevicesApi:
             return {**info, "available": False, "running": False, "devices": []}
         return {**info, "available": True, **srv.status()}
 
+    # ----- what a paired phone may do (Devices page switches) -----
+    def devices_options(self) -> dict[str, Any]:
+        from nexvara import pcpower
+
+        r = self.get_settings().get("remote", {})
+        try:
+            auto = pcpower.autostart_enabled()
+        except Exception:
+            auto = False
+        return {
+            "screen_view": bool(r.get("screen_view", True)),
+            "control": bool(r.get("control", False)),
+            "autostart": auto,
+        }
+
+    def devices_set_option(self, name: str, value: bool) -> dict[str, Any]:
+        if name in ("screen_view", "control"):
+            self.save_settings({"remote": {name: bool(value)}})
+        elif name == "autostart":
+            from nexvara import pcpower
+
+            pcpower.set_autostart(bool(value))
+        else:
+            raise ValueError(name)
+        return self.devices_options()
+
     def devices_start(self) -> dict[str, Any]:
         srv = self._server()
         if srv is None:

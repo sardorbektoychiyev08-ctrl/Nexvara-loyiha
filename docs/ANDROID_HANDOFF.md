@@ -1,8 +1,60 @@
-# Android app — handoff for Codex
+# Android app — handoff (Claude → Codex)
+
+## 2026-10-17 (kech) — Claude: Android V1 qayta dizayn va to‘liq bo‘limlar
+
+**Egasi o‘zgardi:** foydalanuvchi Android’ni Claude’ga topshirdi. Tarmoq: `claude/android-v1`
+(worktree `D:\Nexvara loyiha\.worktrees\android`, `codex/android-mobile` + `main` ustiga).
+Codex limit bo‘lsa shu tarmoqdan davom etadi (PROGRESS.md dagi oxirgi yozuv).
+
+**Build:** `.\scripts\android_build.ps1` (JDK/SDK/Gradle `.tools` da, Git’da emas) →
+`android/app/build/outputs/apk/debug/app-debug.apk`, nusxasi `D:\NEXVARA\android\`.
+
+**Kod tuzilishi** (`android/app/src/main/java/uz/nexvara/mobile/`):
+- `AppModel.kt` — butun holat va barcha `/api/v1` chaqiruvlari (ViewModel, coroutines);
+- `Model.kt` — server JSON → Kotlin (`Parse`), o‘zbekcha format (`Fmt`);
+- `WindowsApi.kt` (TLS pin), `SecureSession.kt` (Keystore AES-GCM), `TransferChecks.kt`;
+- `ui/Theme.kt` (brend ranglari, qorong‘i/yorug‘), `ui/Components.kt`,
+  `ui/MainScreens.kt` (qulf, ulanish, Bosh sahifa, Suhbat, Vazifalar, Bo‘limlar),
+  `ui/SectionScreens.kt` (Office+Chizma, Darsliklar, Fayllar, BI, Workflow, Teach, Xotira,
+  AI xarajat, Kompyuterlar+Google, Sozlamalar);
+- `MainActivity.kt` — QR, fayl/rasm/PDF/kamera, ovoz (SpeechRecognizer + TTS),
+  bildirishnoma, BiometricPrompt qulf, Credential Manager (Google).
+
+**1.1.0 (2026-10-17 kechasi):** kompyuter ekrani (jonli, faqat ko‘rish), PC fayl qidirish /
+ochish / telefonga olish, «Tayyor buyruqlar» (o‘qituvchi, ofis, hujjat, chizma), Tailscale
+orqali boshqa tarmoq (manzillar `session` dan, pin bo‘yicha ishonch), chizmani tuzatish + DXF,
+«Ulashish → NEXVARA», WorkManager bilan fon xabarlari (`Notifier.kt`), skrinshot taqiqi.
+Telefonda (Xiaomi, Android 16) adb bilan E2E qilindi — skriptlar scratchpad’da edi; qayta
+qilish uchun: `adb reverse tcp:8766 tcp:8766`, vaqtinchalik `NEXVARA_DATA` bilan Agent,
+havolani `127.0.0.1` ga almashtirib qo‘lda joylash, uiautomator dump + `input tap`.
+
+**Qolgan ish (keyingi agent uchun):** 1) haqiqiy telefon + haqiqiy Windows Agent E2E
+(foydalanuvchi bilan); 2) release imzo kaliti `D:\NEXVARA\android\release.jks` (foydalanuvchi
+tasdig‘i bilan yaratiladi) va `-Release` build; 3) Google: foydalanuvchi Google Cloud’da
+Android + Web client yaratadi ([GOOGLE_LOGIN.md](GOOGLE_LOGIN.md) § Android), Web client ID
+`settings.json → google.android_web_client_id`; 4) fon bildirishnomalari uchun WorkManager
+(hozir ilova jarayoni tirik paytda ishlaydi).
+
+## 2026-10-17 — Codex: vaqtinchalik to‘xtash (tarix)
+
+Foydalanuvchi ko‘rsatmasi: Windows NEXVARA PERSONAL to‘liq tugamaguncha Android ishlab chiqilishi davom ettirilmaydi. Claude Windows versiyasini yakunlaydi; Codex uning ishchi papkasi va fayllariga tegmaydi. Android kodi faqat `D:\Nexvara loyiha\.worktrees\android` va `codex/android-mobile` tarmog‘ida.
+
+Hozirgi holat: Kotlin/Compose ilova, QR pairing, TLS pin, token saqlash, Home/Chat/Tasks/Devices, foreground task watcher, cancel, fayl yuborish/olish kodi, kamera va shifrlangan chat tarixi. Debug APK build va 8/8 Android unit test **PASS**. Oldingi APK bilan Android 16 telefonda pairing, chat, chat tarixi, oddiy fayl yuborish va kamera oynasini ochish **PASS**. Oxirgi kodli APK qurilmada sinovdan o‘tmagan: ADB avtomatik ruxsati rad etildi. Windows oynasini avtomatik boshqarish ham rad etildi. `scripts/test.ps1` uchun alohida worktree'da `.venv` yo‘q.
+
+Windows versiyasi yakunlanib, foydalanuvchi Android ishini qayta boshlashni aytgach qolgan vazifalar:
+
+1. Oxirgi APK’ni Android 16 telefonga o‘rnatish; kamera bilan rasm olib Windows Agent’ga yuborish va SHA-256 natijasini tekshirish.
+2. Windows NEXVARA Devices QR kodi bilan **haqiqiy** Agent’ga pairing; demo server natijasini haqiqiy Agent natijasi deb belgilamaslik.
+3. Telefondan deterministik Excel, Word, PowerPoint vazifalarini yuborish; task ID, progress/qadamlar, cancel va tayyor faylni telefonga yuklab olishni E2E tekshirish. Office oynalari ochilishi kerak; haqiqiy foydalanuvchi hujjatlariga tegmaslik.
+4. Chat tarixi va Memory sinxronlashuvini Windows API paydo bo‘lgach amalga oshirish. Pause/resume ham Windows `TaskRunner` va `/api/v1` endpointlari tayyor bo‘lgach qo‘shiladi. Aniq server talabi: [ANDROID_WINDOWS_API_GAPS.md](ANDROID_WINDOWS_API_GAPS.md).
+5. Android 16 real sinovini yakunlash: kamera, mikrofon, fayl download, reconnect/offline queue, cancel, bir nechta PC va UI. Fon bildirishnomalari, biometrik qulf, Google OAuth va qolgan mobil bo‘limlar hali tugallanmagan. Google uchun Android OAuth client ID va signing SHA kerak.
+6. Build, unit/UI/API contract testlari, `scripts/test.ps1`, xavfsizlik tekshiruvi; PASS/PARTIAL/NOT TESTED/BLOCKED holatlarini yangilash. Pushdan oldin PRIVATE GitHub va maxfiy ma’lumot yo‘qligini qayta tasdiqlash.
+
+Oxirgi build fayli: `android/app/build/outputs/apk/debug/app-debug.apk` (Git’ga kiritilmaydi), SHA-256 `8c02e7d8a346d43e6a3b9f46e273f464a3ca2b6894ead7d58646afdb4ea81f9c`. Ish jurnali: [ANDROID_PROGRESS.md](ANDROID_PROGRESS.md).
 
 Goal: a native Android app (MASTER_SPEC §18) that controls the NEXVARA Windows Agent over the
 local network. The Windows side is done and tested; this document is everything needed to
-build the APK against it. Owner: **Codex**, branch `codex/android-mobile`, folder `android/`.
+build the APK against it. Owner now: **Claude**, branch `claude/android-v1`, folder `android/`.
 
 Read first: [api/MOBILE_API.md](api/MOBILE_API.md) (protocol) and [api/openapi.yaml](api/openapi.yaml)
 (contract). Do not change the Windows API without a matching change in `remote_v1.py`,

@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 
 HEADER_FILL = "#6366F1"
 HEADER_FONT = "#FFFFFF"
-BORDER_COLOR = "#CBD5E1"
+BORDER_COLOR = "#64748B"  # visible in Excel and on a printed/PDF page
 
 
 class ExcelSession:
@@ -128,7 +128,7 @@ def format_table(ws: Any, rng: Any, spec: TableSpec, top: int = 1, left: int = 1
     rng.VerticalAlignment = XL_CENTER
     rng.Borders.LineStyle = XL_CONTINUOUS
     rng.Borders.Color = excel_color(BORDER_COLOR)
-
+    rng.Borders.Weight = 2  # xlThin
     for c in spec.numeric_columns:
         body = ws.Range(ws.Cells(top + 1, left + c - 1), ws.Cells(top + n_rows - 1, left + c - 1))
         body.HorizontalAlignment = XL_CENTER
@@ -139,6 +139,37 @@ def format_table(ws: Any, rng: Any, spec: TableSpec, top: int = 1, left: int = 1
     for i in range(1, rng.Columns.Count + 1):
         col = rng.Columns(i)
         col.ColumnWidth = col.ColumnWidth + 3
+
+
+def finish_table(ws: Any, rng: Any, numeric_columns: list[int], top: int, left: int) -> None:
+    """Finish an existing table without replacing currency/date/percent formats."""
+    header = rng.Rows(1)
+    header.Font.Bold = True
+    header.Font.Color = excel_color(HEADER_FONT)
+    header.Interior.Color = excel_color(HEADER_FILL)
+    header.HorizontalAlignment = XL_CENTER
+    rng.VerticalAlignment = XL_CENTER
+    rng.Borders.LineStyle = XL_CONTINUOUS
+    rng.Borders.Color = excel_color(BORDER_COLOR)
+    rng.Borders.Weight = 2  # xlThin
+    # Excel may skip hidden rows when a filter is active. Address those rows
+    # directly so clearing the filter later still reveals a complete table.
+    if ws.FilterMode:
+        for r in range(top + 1, top + rng.Rows.Count):
+            if ws.Rows(r).Hidden:
+                hidden = ws.Range(ws.Cells(r, left), ws.Cells(r, left + rng.Columns.Count - 1))
+                hidden.Borders.LineStyle = XL_CONTINUOUS
+                hidden.Borders.Color = excel_color(BORDER_COLOR)
+                hidden.Borders.Weight = 2
+    last = top + rng.Rows.Count - 1
+    for c in numeric_columns:
+        if last > top:
+            body = ws.Range(ws.Cells(top + 1, left + c - 1), ws.Cells(last, left + c - 1))
+            body.HorizontalAlignment = XL_CENTER
+    rng.Columns.AutoFit()
+    for i in range(1, rng.Columns.Count + 1):
+        col = rng.Columns(i)
+        col.ColumnWidth = min(float(col.ColumnWidth) + 2, 60)
 
 
 def freeze_header(app: Any, row: int = 1) -> None:

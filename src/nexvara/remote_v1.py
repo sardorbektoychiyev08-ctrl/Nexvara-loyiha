@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import socket
 import time
@@ -15,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from nexvara import __version__, config
+from nexvara import __version__, config, remote_v1_cad, remote_v1_school, remote_v1_sections
 from nexvara.protocol import MIN_CLIENT_PROTOCOL, PROTOCOL, ApiError, ok, task_dto
 
 # (method, path pattern, needs a device token)
@@ -35,7 +36,11 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("GET", "/api/v1/files", True),
     ("GET", "/api/v1/sync", True),
     ("POST", "/api/v1/sync", True),
+    *remote_v1_sections.ROUTES,  # Home, AI spend, Memory, Teach, Workflows, BI, textbooks...
+    *remote_v1_school.ROUTES,  # answer sheets, journal, documents, OCR, preview, control
+    *remote_v1_cad.ROUTES,  # drawings from the phone (DXF / PDF / PNG on the PC)
 ]
+log = logging.getLogger(__name__)
 WATCH_MAX = 25.0  # seconds a long-poll may hang
 _ID = re.compile(r"^[0-9a-f]{6,32}$")
 
@@ -67,6 +72,10 @@ def handle(h: Any, method: str) -> None:
     u = urlparse(h.path)
     q = parse_qs(u.query)
     try:
+        from nexvara.remote import allowed_client
+
+        if not allowed_client(h.client_address[0]):
+            raise ApiError("AUTH_REQUIRED", "Faqat uy/ish tarmog‘i yoki Tailscale orqali")
         if not srv.limiter.allow(h.client_address[0]):
             raise ApiError("RATE_LIMITED")
         client = h.headers.get("X-Nexvara-Protocol", "")
@@ -82,6 +91,9 @@ def handle(h: Any, method: str) -> None:
             token = auth[7:] if auth.startswith("Bearer ") else ""
             dev = srv.store.check(token, h.client_address[0])
             if dev is None:
+                limiter = getattr(srv, "bad_auth", None)
+                if limiter is not None and not limiter.allow(h.client_address[0]):
+                    raise ApiError("RATE_LIMITED")  # someone is guessing tokens
                 raise ApiError("AUTH_REQUIRED")
             if dev.get("expired"):
                 raise ApiError("TOKEN_EXPIRED")
@@ -105,6 +117,13 @@ def handle(h: Any, method: str) -> None:
         err = ApiError("BAD_REQUEST", f"So‘rov noto‘g‘ri: {e}")
         h._send(err.status, json.dumps(err.body(), ensure_ascii=False).encode("utf-8"),
                 "application/json; charset=utf-8")  # fmt: skip
+    except (ConnectionError, TimeoutError):
+        return  # the phone went away (app closed, Wi-Fi lost): nothing to answer
+    except Exception:  # never drop the connection: the phone gets a retryable INTERNAL
+        log.exception("phone API %s %s failed", method, h.path.split("?")[0])
+        err = ApiError("INTERNAL")
+        h._send(err.status, json.dumps(err.body(), ensure_ascii=False).encode("utf-8"),
+                "application/json; charset=utf-8")  # fmt: skip
 
 
 def _json_body(h: Any) -> dict[str, Any]:
@@ -113,6 +132,32 @@ def _json_body(h: Any) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError("JSON obyekt kerak")
     return data
+
+
+def _addresses() -> list[dict[str, str]]:
+    from nexvara.remote import addresses
+
+    try:
+        return addresses()
+    except Exception:
+        return []
+
+
+_WAKE: dict[str, Any] = {"at": 0.0, "info": None}
+
+
+def _wake() -> dict[str, str] | None:
+    """Cached for 10 minutes: `ipconfig /all` is not run on every phone refresh."""
+    from nexvara.pcpower import wake_info
+    from nexvara.remote import lan_ip
+
+    if time.time() - _WAKE["at"] > 600:
+        try:
+            _WAKE["info"] = wake_info(lan_ip())
+        except Exception:
+            _WAKE["info"] = None
+        _WAKE["at"] = time.time()
+    return _WAKE["info"]
 
 
 def _session(srv: Any, dev: dict[str, Any]) -> dict[str, Any]:
@@ -126,6 +171,9 @@ def _session(srv: Any, dev: dict[str, Any]) -> dict[str, Any]:
         "server_id": server_id(),
         "token_expires_at": dev["token_created"] + TOKEN_MAX_DAYS * 86400,
         "rotate_recommended": age > TOKEN_ROTATE_DAYS * 86400,
+        "port": srv.port,
+        "addresses": _addresses(),  # the phone keeps them to reconnect from another network
+        "wake": _wake(),  # MAC + broadcast: the phone can wake this PC (Wake-on-LAN)
     }
 
 
@@ -134,6 +182,15 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
     from nexvara.remote import MAX_UPLOAD, TOKEN_MAX_DAYS, server_id
 
     api = srv.api
+    if route in remote_v1_cad.HANDLED:
+        assert dev is not None
+        return remote_v1_cad.route(h, srv, route, args, q, dev, lambda: _json_body(h))
+    if route in remote_v1_school.HANDLED:
+        assert dev is not None
+        return remote_v1_school.route(h, srv, route, args, q, dev, lambda: _json_body(h))
+    if route in remote_v1_sections.HANDLED:
+        assert dev is not None
+        return remote_v1_sections.route(h, srv, route, args, q, dev, lambda: _json_body(h))
     if route == "/api/v1/info":
         return {
             "protocol": PROTOCOL,
@@ -144,6 +201,8 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
             "server_id": server_id(),
             "pairing_open": bool(srv.code) and time.time() < srv.code_expires,
             "max_upload_bytes": MAX_UPLOAD,
+            "port": srv.port,
+            "addresses": _addresses(),
         }
     if route == "/api/v1/pair":
         if not srv.pair_limiter.allow(h.client_address[0]):
@@ -178,10 +237,16 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
         text = str(_json_body(h).get("text", "")).strip()[:4000]
         if not text:
             raise ApiError("BAD_REQUEST", "Matn bo‘sh")
-        return _chat_reply(api.chat(text))
+        out = api.chat(text)
+        # The PC window shows the phone's message and follows its task / opens the dashboard.
+        api.ui_push({"kind": "phone_chat", "text": text, "reply": out})
+        return _chat_reply(out)
     if route == "/api/v1/confirm":
         body = _json_body(h)
-        return _chat_reply(api.confirm_ai(str(body.get("token", "")), bool(body.get("yes"))))
+        out = api.confirm_ai(str(body.get("token", "")), bool(body.get("yes")))
+        api.ui_push({"kind": "phone_chat", "text": "Ha" if body.get("yes") else "Yo‘q",
+                     "reply": out})  # fmt: skip
+        return _chat_reply(out)
     if route == "/api/v1/tasks":
         limit = max(1, min(int((q.get("limit") or ["20"])[0]), 100))
         tasks = api.list_tasks()[:limit]
@@ -215,7 +280,8 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
     if route == "/api/v1/files":
         path = (q.get("path") or [""])[0]
         p = Path(path)
-        if path not in _allowed_files(api) or not p.is_file():
+        shared = dev is not None and remote_v1_sections.granted(srv, dev, path)
+        if (path not in _allowed_files(api) and not shared) or not p.is_file():
             raise ApiError("NOT_FOUND", "Fayl topilmadi")
         data = p.read_bytes()
         name = p.name.encode("ascii", "replace").decode()
@@ -255,6 +321,11 @@ def _upload(h: Any, api: Any, limit: int) -> dict[str, Any]:
         raise ApiError("PAYLOAD_TOO_LARGE")
     name = Path(unquote(h.headers.get("X-Filename", "fayl"))).name
     name = "".join(c for c in name if c not in '<>:"/\\|?*' and ord(c) >= 32).strip() or "fayl"
+    from nexvara.remote import blocked_upload
+
+    if blocked_upload(name):
+        raise ApiError("BAD_REQUEST", "Bu turdagi fayl (dastur, skript yoki yorliq) qabul "
+                       "qilinmaydi. Hujjat, PDF, rasm yoki arxiv yuboring.")  # fmt: skip
     body = h._body(limit)
     want = h.headers.get("X-Content-SHA256", "").lower()
     digest = hashlib.sha256(body).hexdigest()
@@ -265,4 +336,5 @@ def _upload(h: Any, api: Any, limit: int) -> dict[str, Any]:
     target = free_name(folder / name)
     target.write_bytes(body)
     api.set_context_file(str(target))
+    api.ui_push({"kind": "phone_file", "name": target.name, "path": str(target)})
     return {"path": str(target), "name": target.name, "size": len(body), "sha256": digest}

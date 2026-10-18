@@ -90,3 +90,65 @@ def is_cyrillic(text: str, threshold: float = 0.3) -> bool:
         return False
     cyr = sum("Ѐ" <= ch <= "ӿ" for ch in letters)
     return cyr / len(letters) >= threshold
+
+
+# ---------------- Uzbek Cyrillic -> Latin (the official alphabet: o‘, g‘, sh, ch) ----------------
+_UZ_ONLY = set("ўқғҳЎҚҒҲ")
+_UZ_WORDS = {"ва", "учун", "билан", "бу", "ҳам", "бўлади", "эди", "деб", "қилиш", "кейин", "ўз",
+             "бир", "нима", "қандай", "ёки", "керак", "мумкин", "эмас", "бўлиб"}  # fmt: skip
+_RU_WORDS = {"и", "в", "не", "что", "это", "на", "как", "для", "по", "из", "от", "его", "который",
+             "при", "был", "или", "так", "все", "она", "они", "мы", "вы", "же"}  # fmt: skip
+_CYR_RUN = re.compile(r"[Ѐ-ӿ]")
+_VOWELS = set("аеёиоуэюяўАЕЁИОУЭЮЯЎ")
+_MAP = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "ё": "yo", "ж": "j", "з": "z", "и": "i",
+    "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r", "с": "s",
+    "т": "t", "у": "u", "ф": "f", "х": "x", "ч": "ch", "ш": "sh", "щ": "sh", "ъ": "’", "ы": "i",
+    "ь": "", "э": "e", "ю": "yu", "я": "ya", "ў": "o‘", "қ": "q", "ғ": "g‘", "ҳ": "h",
+}  # fmt: skip
+
+
+def has_cyrillic(text: str) -> bool:
+    return bool(_CYR_RUN.search(text or ""))
+
+
+def is_uzbek_cyrillic(text: str) -> bool:
+    """Cyrillic text in Uzbek (ў қ ғ ҳ, Uzbek words), not Russian."""
+    if not has_cyrillic(text):
+        return False
+    if sum(ch in _UZ_ONLY for ch in text) >= 2:
+        return True
+    words = re.findall(r"[Ѐ-ӿ]+", text.lower())
+    uz = sum(w in _UZ_WORDS for w in words)
+    ru = sum(w in _RU_WORDS for w in words)
+    return uz > ru
+
+
+def cyr_to_latin(text: str) -> str:
+    """Uzbek Cyrillic -> Uzbek Latin. Latin letters, digits and punctuation stay as they are."""
+    out: list[str] = []
+    n = len(text)
+    for i, ch in enumerate(text):
+        low = ch.lower()
+        if low not in _MAP and low not in ("е", "ц"):
+            out.append(ch)
+            continue
+        prev = text[i - 1] if i else ""
+        start = not prev.isalpha()
+        if low == "е":  # "ye" at the start of a word and after a vowel or ъ/ь
+            lat = "ye" if start or prev in _VOWELS or prev.lower() in ("ъ", "ь") else "e"
+        elif low == "ц":  # "s" at the start and after a consonant, "ts" after a vowel
+            lat = "ts" if prev in _VOWELS else "s"
+        else:
+            lat = _MAP[low]
+        if ch != low and lat:  # an upper-case letter: "Ш" -> "Sh", or "SH" inside a CAPS word
+            nxt = text[i + 1] if i + 1 < n else ""
+            caps = (nxt.isalpha() and nxt.isupper()) or (prev.isalpha() and prev.isupper())
+            lat = lat.upper() if caps else lat[0].upper() + lat[1:]
+        out.append(lat)
+    return "".join(out)
+
+
+def to_latin_if_uzbek(text: str) -> str:
+    """Uzbek written in Cyrillic becomes Latin; Russian and Latin text are left alone."""
+    return cyr_to_latin(text) if is_uzbek_cyrillic(text) else text

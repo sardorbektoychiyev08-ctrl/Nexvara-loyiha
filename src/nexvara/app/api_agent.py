@@ -257,6 +257,126 @@ class AgentApi:
             return self._run_calls(calls)
         return None
 
+    # ----- a month of conversation for the AI (recent turns + matching older ones) -----
+    def _recall(self, text: str):
+        from nexvara.ai.features import Recall
+
+        mem = self._mem()
+        if mem is None:
+            return Recall(list(self._ctx.turns)[:-1])
+        try:
+            st = self.get_settings().get("memory") or {}
+        except Exception:
+            st = {}
+        days, n = int(st.get("chat_days", 30)), int(st.get("recent_turns", 15))
+        turns = mem.recent_turns(n + 1, days) if n else []
+        if turns and turns[-1]["role"] == "user" and turns[-1]["text"].strip() == text.strip():
+            turns = turns[:-1]  # chat() logged the current message already
+        turns = turns[-n:] if n else []
+        return Recall(
+            turns, mem.recall(text, days, skip_last=n + 1), mem.day_summaries(min(days, 7))
+        )
+
+    def _chat_forget(self, text: str) -> dict[str, Any] | None:
+        """«buni unut» (the last exchange), «Savdo hisoboti haqidagi gaplarni unut»."""
+        f = fold(text).strip(" .!")
+        if not re.search(r"\bunut(ib yubor|gin|ing)?$", f) or re.search(r"\bunutma", f):
+            return None
+        mem = self._mem()
+        if mem is None:
+            return {"reply": "Suhbat xotirasi bu rejimda yo‘q."}
+        if re.fullmatch(r"(buni|shuni|oxirgisini|oxirgi gapni|bu gapni) unut\w*", f):
+            n = mem.forget_last(3)  # the earlier question, its answer and this message
+            self._ctx.turns.clear()
+            return {"reply": f"Unutdim: oxirgi suhbatdan {n} ta xabar o‘chirildi."}
+        if re.search(r"\b(hamma|barcha|butun)\w* (suhbat|gap|xabar)", f):
+            return {"reply": "Butun suhbatni o‘chirish uchun «Xotira» bo‘limida «Suhbatni "
+                    "tozalash» tugmasini bosing (qaytarib bo‘lmaydi)."}  # fmt: skip
+        m = re.fullmatch(
+            r"(.+?)\s+(haqidagi|haqida|to.?g.?risidagi|bilan bog.?liq)?\s*"
+            r"(gaplarni|gapni|suhbatni|xabarlarni|narsalarni)?\s*(ni )?unut\w*",
+            f,
+        )
+        what = (m.group(1) if m else "").strip()
+        what = re.sub(r"\b(ni|ga|haqida)$", "", what).strip()
+        if len(what) < 3:
+            return None
+        n = mem.forget_chat(what)
+        self._ctx.turns.clear()
+        if not n:
+            return {"reply": "Bu mavzuda suhbatda hech narsa topilmadi."}
+        # The phrase itself is not repeated: the reply is logged and would be found again.
+        return {"reply": f"Unutdim: shu mavzudagi {n} ta xabar suhbat xotirasidan o‘chirildi. "
+                "Eslab qolingan faktlar va qoidalar o‘zgarmadi («Xotira» bo‘limida)."}  # fmt: skip
+
+    # ----- self-repair: the AI reads the error of a failed command and tries again -----
+    def _self_repair_on(self) -> bool:
+        if not self._ai_ready():
+            return False
+        try:
+            return bool(self._router().config().get("self_repair", True))
+        except Exception:
+            return True
+
+    def _repair(self, text: str, error: str, tries: int = 2) -> dict[str, Any] | None:
+        """Re-plan with the error message (max `tries`). Steps that change something still
+        wait for «Ha» (`from_ai`). None when the AI could not help: the error stays."""
+        from nexvara.agent import tools as agent_tools
+        from nexvara.ai import features
+        from nexvara.ai.router import NeedsConfirmation
+        from nexvara.core.task import UserError
+
+        router = self._router()
+        mem = self._mem()
+        recall = self._recall(text)
+        facts = mem.relevant_facts(text) if mem is not None else []
+        for attempt in range(1, tries + 1):
+            try:
+                p = features.plan(router, text, agent_tools.catalog(), self._ctx.snapshot(),
+                                  recall.turns, facts, (), False, recall.older,
+                                  error=error)  # fmt: skip
+            except NeedsConfirmation:
+                return None  # a repair never spends above the "ask first" limit on its own
+            except UserError:
+                return None
+            if p.kind != "tools" or not p.calls:
+                return None
+            calls = [agent_tools.ToolCall(str(c["tool"]), dict(c.get("args") or {}))
+                     for c in p.calls]  # fmt: skip
+            intro = (f"🔧 Birinchi urinish bajarilmadi: {error[:300]}\n"
+                     f"AI xatoni o‘qib, tuzatilgan rejani tuzdi ({attempt}-urinish)"
+                     + (f": {p.say}" if p.say else "") + "\n\n")  # fmt: skip
+            out = self._run_calls(calls, intro=intro, from_ai=True)
+            if not out.get("error"):
+                out["repaired"] = attempt
+                return out
+            error = out.get("reply", "") or error
+        return {"reply": f"AI {tries} marta tuzatib ko‘rdi, bo‘lmadi. Oxirgi xato: {error[:400]}"
+                "\n\nBuyruqni boshqacharoq yozib ko‘ring.", "error": True}  # fmt: skip
+
+    def _repair_task(self, snap: dict[str, Any]) -> None:
+        """An Office task started from chat failed: try a corrected plan in the background
+        and show the result in the chat."""
+        if snap.get("status") != "failed" or snap.get("id") != getattr(self, "_chat_task", ""):
+            return
+        self._chat_task = ""
+        origin = getattr(self, "_repair_origin", None) or [self._ctx.command, 0]
+        if not origin[0] or origin[1] >= 2 or not self._self_repair_on():
+            return
+        origin[1] += 1  # the user's own message is repaired at most twice in all
+        self._repair_origin = origin
+        error = str(snap.get("error") or "xato")
+
+        def work() -> None:
+            try:
+                out = self._repair(origin[0], error, tries=1)
+            except Exception:
+                out = None
+            if out is not None:
+                self.ui_push({"kind": "nexvara_reply", "reply": out})
+
+        threading.Thread(target=work, daemon=True).start()
+
     def _ai_has_key(self) -> bool:
         if self._history is None and "ai_router" not in self._overrides:
             return False

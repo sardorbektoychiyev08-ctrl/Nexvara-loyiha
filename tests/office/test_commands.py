@@ -118,7 +118,7 @@ def test_word_command(tmp_path):
     t = run(run_word_plan, plan, src)
     snap = t.snapshot()
     assert snap["status"] == "succeeded", (snap["error"], snap["steps"])
-    assert len(snap["result"]["checks"]) == 7 and all(c["ok"] for c in snap["result"]["checks"])
+    assert len(snap["result"]["checks"]) == 8 and all(c["ok"] for c in snap["result"]["checks"])
     assert digest(src) == before
     assert (tmp_path / "ariza_NEXVARA.pdf").is_file()
 

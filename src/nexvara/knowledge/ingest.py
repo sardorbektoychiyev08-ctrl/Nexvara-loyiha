@@ -11,7 +11,7 @@ from pathlib import Path
 from nexvara.knowledge import ocr
 from nexvara.knowledge.catalog import describe
 from nexvara.knowledge.store import Library
-from nexvara.knowledge.textnorm import is_cyrillic, normalize
+from nexvara.knowledge.textnorm import cyr_to_latin, is_cyrillic, is_uzbek_cyrillic, normalize
 
 log = logging.getLogger(__name__)
 
@@ -131,7 +131,9 @@ def ingest_folder(root: Path, lib: Library, progress=None, use_ocr: bool = True)
             if known and known[1] == sha:
                 book = known[0]
                 retry_ocr = book.status == "no_text" and ocr_langs and OCR_TRIED not in book.note
-                if not retry_ocr:
+                # Uzbek books in Cyrillic used to be skipped; now they are converted to Latin.
+                retry_cyr = book.status == "cyrillic" and "faqat lotin" in book.note
+                if not retry_ocr and not retry_cyr:
                     if book.status == "ok" and (book.grade is None or book.subject is None):
                         _refresh_meta(lib, book, path, root)  # the subject list may have grown
                     report.unchanged.append(path.name)
@@ -165,8 +167,13 @@ def ingest_folder(root: Path, lib: Library, progress=None, use_ocr: bool = True)
                 status = "no_text"
                 report.no_text.append(path.name)
             elif is_cyrillic(" ".join(text_pages[:10])):
-                status, note = "cyrillic", "Kirill yozuvi: hozircha faqat lotin yozuvi"
-                report.cyrillic.append(path.name)
+                if is_uzbek_cyrillic(" ".join(text_pages[:10])):
+                    pages = [cyr_to_latin(p) for p in pages]
+                    note = (note + "; " if note else "") + "Kirill yozuvidan lotinga o‘girildi"
+                    info = describe(path, "\n".join(pages[:4]), root)
+                else:
+                    status, note = "cyrillic", "Rus tilidagi darslik: test faqat o‘zbek tilida"
+                    report.cyrillic.append(path.name)
             if status == "ok" and (info.grade is None or info.subject is None):
                 report.unknown_meta.append(path.name)
             lib.add_book(

@@ -1,5 +1,178 @@
 # HANDOFF → Codex (Windows side)
 
+2026-10-18 Codex: CURRENT TASK 4 yakunlandi (`PROGRESS.md` (30)). Windows 1.1.1 o‘rnatildi va selftest PASS. Office sinovlari 83 PASS, 1 PowerPoint COM sinovi osilgani uchun chetga olindi. `main` ga merge/push qilinmadi. Quyidagi topshiriq 4 matni tarixiy izoh sifatida qoldirildi.
+
+## ▶ CURRENT TASK 5 (2026-10-18 evening, Claude) — continue from here if Claude stopped
+
+Owner chose proposals 1, 2, 3, 5, 8, 9, then: review Codex's task-4 work and fix gaps, then
+install the update on the PC (Windows 1.2.0) and the phone (APK 1.3.0), API keys ready.
+DONE 2026-10-18 18:20 (PROGRESS (31)); also CAD colours added on request. Left for the owner: Gemini key, unlock the phone to try the new buttons, permission to close the hung hidden POWERPNT (PID 15432). Branch `claude/android-v1`, worktree `.worktrees/android`. Claude ticks these as it goes:
+- [x] 1 Month-long chat memory: AI chat/QA/planner get the last 15 turns (from app.db, survive
+  restarts) + matching chat lines of the last 30 days (FTS, `memory.chat_days` setting) +
+  per-day short summaries (local, no AI). «buni unut …» deletes matching chat lines.
+- [x] 2 Self-repair: a failed command (tool error) with AI ready → the planner gets the error
+  and re-plans, max 2 tries; changing steps still ask «Ha».
+- [x] 3 Morning summary on the phone: `/api/v1/morning` (today's lessons, unfinished tasks,
+  reminders, workflows today); phone daily notification at a set time (default 07:30).
+- [x] 5 Weekly auto-backup of small user data (dbs, settings, dashboards, workflows; not
+  textbook PDFs) to `D:\NEXVARA-zaxira\auto`, keep last 4.
+- [x] 8 Tests: variants lettered A/B/C…, a printable OMR answer sheet + keys made with every
+  test (omr.create_set), mention in the reply.
+- [x] 9 Photo → Excel/Word: OCR text (or AI table) → .xlsx (table rows) or .docx; chat on PC
+  («shu rasmni Excel qil») and phone buttons on the OCR screen (`/api/v1/ocr/convert`).
+- [x] Review Codex commit 478ff8e (Excel finish pass, new table command, Word borders, PPT
+  fit) + the hanging PowerPoint COM test; fix.
+- [x] Tests, PROGRESS (31), build/install Windows 1.2.0 and APK 1.3.0.
+
+## ▶ CURRENT TASK 4 (2026-10-18, for Codex) — Excel quality, then Word and PowerPoint
+
+Owner (Uzbek, non-programmer): «Excel’da jadval tuzishda xatolar bor va ramka chiziqlari yo‘q —
+o‘zi ko‘rib, to‘liq tuzatsin; qolganlarini (Word, PowerPoint) ham tekshirib, xato bo‘lsa
+tuzatsin». Branch `claude/android-v1`, worktree `D:\Nexvara loyiha\.worktrees\android`
+(`.venv` there is a junction to `..\..\.venv`). Office tests: `NEXVARA_RUN_OFFICE=1` (the owner
+allows throwaway test files only).
+
+What Claude found (start here):
+1. Borders are drawn only by the `format` action (`skills/excel/bridge.py:format_table`,
+   `rng.Borders` on `Table.range`, which EXCLUDES footer rows). So:
+   - rows added later — JAMI (`total`), O‘RTACHA/MAKSIMUM… (`stats`) — have no borders;
+   - a formula column (`formula`) gets borders only if the cell left of it had one;
+   - any command without «formatla» (sort, filter, numfmt, highlight…) leaves a plain table.
+   Fix: every Excel command that writes or changes a table ends with a «finish the table» pass
+   (thin borders on the whole table incl. footers, bold header with fill, numbers right/centre,
+   AutoFit, freeze header) unless the user said not to; verify borders on reopen
+   (`Borders(xlEdgeBottom/xlInsideHorizontal).LineStyle` on header, a body cell, the footer).
+2. Check `BORDER_COLOR` is visible on paper (PDF export) — a very light colour looks like «no
+   lines». Use a mid grey/black for print.
+3. «Jadval tuzishda xatolar»: test real requests end to end in Excel and fix what fails, e.g.
+   «Savdo.xlsx ni och, jami qo‘sh, formatla», «formatla, jami qo‘sh» (both orders), headers in
+   row 2 or 3, merged title in row 1, empty columns, dates and money columns, 2 000+ rows,
+   Russian Office. There is no «create a new table from my words» command yet
+   (e.g. «Excel’da 5 ustunli o‘quvchilar jadvali tuz: F.I.Sh, sinf, …») — add it
+   (`agent/parse.py` + new executor step), real Excel test included.
+4. Then the same review for Word (`agent/word_exec.py`) and PowerPoint (`agent/ppt_exec.py`):
+   run every command in `tests/office/test_commands*.py` style on realistic files, open the
+   results, fix what looks wrong (tables without borders in Word too, layout overflow).
+5. Rules: originals never change (`_NEXVARA` copies); Uzbek Latin messages; `test.ps1 -Office`
+   PASS; PROGRESS entry; commit; no merge/push without the owner. Rebuild Windows installer
+   (`scripts\build.ps1`, then `python -m nexvara.updater publish dist\installer\NEXVARA-Setup-<v>.exe
+   <v> D:\NEXVARA\releases "<notes>"`, bump `__version__` to 1.1.1) and install silently
+   (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`) after backing up `D:\NEXVARA\*.db`,
+   `settings.json`. Also run the installed `NEXVARA.exe --selftest-installed <temp dir>`.
+
+## ▶ CURRENT TASK 3 (2026-10-18 noon, Claude) — continue from here if Claude stopped
+
+Owner: "do all six proposals; an AI button that redraws my rough sketch correctly; install the
+update on the phone; be ready for API keys". APK 1.2.3 is installed on the phone (11:57).
+Order and status (Claude ticks these as it goes):
+- [x] (APK 1.2.4 installed) AI fix of a rough drawing: `src/nexvara/cad_ai.py` (AI prompt → editor JSON validated by
+  `api_cad.json_to_doc`; offline `beautify()` when no AI), `CadApi.cad_ai_fix`, phone route
+  `POST /api/v1/cad/ai`, PC toolbar button, phone «AI» button (CadScreen.kt). Android 1.2.4.
+- [x] Drawing templates (`cad_templates.py`, PC select + phone dialog, `/api/v1/cad/templates`).
+- [x] Auto-fix documents («kamchiliklarni tuzat», action `fix` in *_exec.py), Office tests PASS.
+- [x] Lesson plan («dars ishlanmasi», `knowledge/lessonplan.py`, `Api._chat_lesson`), Office test PASS.
+- [x] Weekly report (`weekly.py`, chat «… haftalik hisobot qil», workflow template Fri 17:00).
+- [x] 3D view (`app/ui/cad3d.js`, button «3D»).
+- [x] Voice command on the PC (`app/api_voice.py`, `app/ui/voice.js`, Gemini `input_audio`; consent remembered in `ai.voice_consent`).
+- [x] Full tests PASS, PROGRESS (29), APK 1.2.5 and Windows 1.1.0 installed. NEXT for Codex: run the installed NEXVARA.exe --selftest-installed <temp dir> (opens Office; check report.json); merge claude/android-v1 to main only with the owner. Worktree .venv is a junction to ../../.venv (git-ignored).
+
+## ▶ CURRENT TASK 2 (2026-10-18, Claude) — continue from here if Claude stopped
+
+Owner asked: review Codex's work and fix gaps; Office "taught from official sources";
+CAD on Android with hand drawing; CAD "full functionality"; Uzbek always in Latin (no
+Cyrillic); then API keys; propose new features.
+
+- [x] CAD 2.0 (commit 1643b22): `app/ui/cad.js` rewritten (hatch, ellipse, polygon, linear/
+  aligned/radius/diameter dims, trim, extend, fillet, chamfer, scale, rect/polar array, explode,
+  grips, osnaps end/mid/center/quad/int/perp/near with markers, layer colour/weight/linetype/
+  lock/rename/delete, properties panel, area/distance, zoom window, Ctrl+C/V/A).
+  `api_cad.py`: new JSON kinds `ldim`, `rdim`, `hatch`, entity `color`, layer `locked`.
+  Real-window test `tests/ui_scripts/cad_tools.py` PASS.
+- [x] Latin only: `textnorm.cyr_to_latin / to_latin_if_uzbek`; router adds `LATIN_RULE` to every
+  system prompt and converts Cyrillic-Uzbek answers (not when the user asks for Russian);
+  Uzbek Cyrillic textbooks are converted at indexing (Russian ones stay skipped).
+  Tests `tests/unit/test_latin.py`.
+- [x] (commit 66812ac, APK 1.2.3 built — NOT installed: phone was disconnected) Android «Chizma» screen with hand drawing (Compose canvas: finger strokes → straightened
+  into line/rect/circle/arc; pinch zoom; tools; send to PC as DXF via a new `/api/v1` route
+  that calls `CadApi.cad_save`; open the PC's last drawing on the phone).
+- [x] (done) Office guidance from official sources (Microsoft support, O‘zDSt/«Davlat tilida ish
+  yuritish») as `src/nexvara/knowledge/office_guide.py` used by AI prompts (`ai/features.py`).
+- [x] Full test run PASS (511), PROGRESS entry (28). Next: install APK 1.2.3 when the phone is connected; owner adds Gemini key.
+
+2026-10-18 Codex update: the textbook test-writing task is complete on
+`claude/android-v1`. The AI test prompt now carries the assessment rules and the
+requested grade/subject/topic; returned questions require an exact excerpt from
+the claimed textbook page. Duplicate questions/options are filtered. The Word
+answer key says whether AI was used. See PROGRESS entry (27) and
+`docs/TEST_TUZISH_QOIDALARI.md`. `test.ps1` PASS (421 passed, 70 skipped),
+`test.ps1 -Office` PASS (491 passed). Real paid AI was not called. No merge or push.
+
+2026-10-18 Codex update: the later document-template task is complete on
+`claude/android-v1` (general/leave/job applications, formal Word layout, eight real Word
+DOCX/PDF tests). See PROGRESS entry (26) and `docs/HUJJAT_SHABLONLARI.md`. The CAD task
+below is historical. No merge or push.
+
+## ▶ CURRENT TASK (2026-10-18) — completed on `claude/android-v1` by Codex
+
+Branch: **`claude/android-v1`**, worktree `D:\Nexvara loyiha\.worktrees\android` (no `.venv`
+there: use `..\..\.venv\Scripts\python.exe`; for subprocess/smoke set
+`PYTHONPATH=<worktree>\src`, otherwise the `main` copy is tested). Newest PROGRESS entry = what
+is done. The owner (Uzbek, non-programmer) asked for 4 things on 2026-10-18:
+
+| # | Task | Status | Where / how |
+|---|---|---|---|
+| A | **Built-in CAD ("AutoCAD inside NEXVARA")**: the user must not need AutoCAD. A «Chizma» page in the Windows app: open DXF, view (pan/zoom), draw line/polyline/rect/circle/arc/text/dimension, layers, snap/ortho, undo/redo, save DXF (R2010 via `cad.py`), export PDF/PNG; chat drawings open in it | DONE: API and real window test PASS | `src/nexvara/cad.py` (DXF read/write, render), `drawing.py`/`drawing_offline.py` (spec), new `app/api_cad.py` + `app/ui/cad.js` |
+| B | **Gemini free tier first** so costs stay ~0: «Bepul rejim» — all purposes go to Gemini Flash/Flash-Lite (no Pro), cost recorded as 0, no paid fallback, clear message on 429 (free daily limit), privacy note (free tier data may be used by Google) | DONE by Claude | `ai/router.py`, `ai/models.py`, `appdata.py` defaults, Settings UI (`index.html`, `app.js`) |
+| C | Handoff (this section) kept up to date | ongoing | — |
+| D | **Professional design**: app icon (Windows .ico + Android adaptive launcher icon), consistent UI icons, polished look | DONE: APK 1.2.2 built and installed | `src/nexvara/app/ui/`, `installer/`, `android/app/src/main/res/` |
+
+Codex completion note (2026-10-18): `cad.js`, `test_cad_api.py`, `cad_page.py`, chat-to-CAD
+button, sidebar/CAD toolbar icons, shared brand SVG/Windows icon/Android adaptive icon done.
+`test.ps1` PASS (405 passed, 62 Office tests skipped); `test.ps1 -Office` first run
+465 passed, 2 Uzbek UI text failures; both fixed and separately rerun PASS (including
+real-window Uzbek UI at 100%). Android assembleDebug + unit PASS, version 1.2.2 (code 6)
+installed with `adb install -r`. See newest PROGRESS for details. No merge or push.
+
+Historical Claude plan below (its unchecked items were completed by Codex):
+- [x] B Gemini free mode — DONE (router `free_active()`, settings `ai.free_mode` default true, UI checkbox + note, chat «bepul rejimni yoq/o‘chir», tests in test_ai_router.py)
+- [ ] A CAD page — IN PROGRESS (Claude stopped here, limit). Done and committed as WIP:
+  - `src/nexvara/app/api_cad.py` (CadApi, mixed into Api): `cad_open(path)` DXF→JSON
+    (`doc_to_json`, explodes blocks, splines→polylines), `cad_save(drawing, path)` JSON→DXF
+    (`json_to_doc`, validated, audited, old file backed up), `cad_export(drawing, "pdf"|"png")`,
+    `cad_last_drawing()`, `_cad_dialog` (override key `cad_dialog` for tests). JSON format in
+    the module docstring (y up, mm, arc angles CCW degrees, dim offset = left of p1→p2).
+  - `index.html`: nav item `data-page="cad"` («Chizmalar», i18n `nav.cad`), section
+    `#page-cad` (toolbar `data-cad=` actions / `data-tool=` tools, `#cad-canvas`, layers
+    `#cad-layers`, props `#cad-props`, command line `#cad-cmd`, status toggles
+    `data-toggle=snap|grid|ortho`), `<script src="cad.js">`. Tests updated to 13 nav items.
+  - NOT DONE (next steps, in order):
+    1. Write `src/nexvara/app/ui/cad.js` (file does not exist yet!) — canvas editor: pan
+       (middle drag), wheel zoom at cursor, grid, layers panel, select (click, window L→R /
+       crossing R→L), tools line/polyline/rect/circle/arc(center,start,end)/text/dim/move/copy/
+       rotate/mirror/offset/measure, erase, undo/redo (JSON snapshots), osnap (end, mid,
+       center, quadrant) + grid snap + ortho, AutoCAD-like command line (L, PL, REC, C, A, T,
+       DIM, M, CO, RO, MI, O, E, U, Z; input `x,y`, `@dx,dy`, `@len<ang`, plain number =
+       distance), keys F3/F7/F8, Esc, Enter/space, Delete, Ctrl+Z/Y/S. Calls `api().cad_open`,
+       `cad_save`, `cad_export`, `cad_last_drawing`. Expose `window.cad = {exec, doc, load}` for
+       UI tests. Register: add "cad" to `PAGES` in app.js and `if (page === "cad") renderCad();`;
+       add `body.cad-mode` (hide right panel) CSS + `.cad-*` styles in app.css.
+    2. Unit test `tests/unit/test_cad_api.py`: cad.build(spec) → save DXF → `cad_open` →
+       entities by type; `cad_save` round trip (audit clean, counts equal); bad JSON rejected.
+    3. UI script `tests/ui_scripts/cad_page.py` (pattern: files_page.py): open page, run
+       `cad.exec("L"); cad.exec("0,0"); cad.exec("@100,0")…`, save via override, check DXF.
+    4. Chat: after «… chizib ber» offer «Chizmalar’da ochish» (api_drawing result has `dxf`).
+    5. Smoke + `.\scripts	est.ps1 -Office`, PROGRESS entry, ROADMAP.
+- [ ] D icons/design — NOT STARTED: Windows app icon (.ico for installer/shortcut, sidebar
+  logo SVG instead of letter «N»), Android adaptive launcher icon
+  (`android/app/src/main/res/mipmap-*`, `drawable/ic_launcher_foreground.xml`), SVG icons on
+  nav items and CAD toolbar; keep dark/light themes. Then rebuild APK (1.2.2, versionCode 6)
+  with `ANDROID_USER_HOME=.toolsndroid-home` and `adb install -r`.
+
+Rules for this task: tests stay green (`.\scripts\test.ps1`, Office with `-Office`); Uzbek UI
+text only (i18n test); phone APK must be built with `ANDROID_USER_HOME=.tools\android-home`
+(the project debug key — another key makes the phone refuse the update); install with
+`adb install -r` (keeps the user's data). Do not push or merge to `main` without the owner.
+
 Written by Claude Code on 2026-10-17 so that Codex can continue the **Windows** work if
 Claude's limit runs out. Android has its own document: [docs/ANDROID_HANDOFF.md](docs/ANDROID_HANDOFF.md)
 (Codex already works there on `codex/android-mobile` in `.worktrees/android` — Claude never

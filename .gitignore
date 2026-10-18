@@ -23,6 +23,7 @@ __pycache__/
 venv/
 
 # Android
+.tools/
 .gradle/
 **/build/
 *.apk

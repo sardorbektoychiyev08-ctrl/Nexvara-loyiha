@@ -1,0 +1,7 @@
+<!-- The PC's self-signed certificate is trusted only through the SHA-256 pin from the QR code
+     (WindowsApi). No user-installed CAs, no cleartext. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors><certificates src="system" /></trust-anchors>
+    </base-config>
+</network-security-config>

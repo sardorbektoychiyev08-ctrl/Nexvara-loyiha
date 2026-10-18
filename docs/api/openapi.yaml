@@ -145,6 +145,554 @@ paths:
       responses:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/SyncEnvelope"}}}}
         "400": {$ref: "#/components/responses/Error"}
+  /api/v1/overview:
+    get:
+      summary: "Home screen: PC, last tasks, section counts, AI spend panel, sync and Google state"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/chat/history:
+    get:
+      summary: "PC chat history (same log as the PC window). Query limit (1-200), after (message id)"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/tasks/{id}/pause:
+    post:
+      summary: "Ask a task to pause at its next step boundary (never inside an Office call). Status becomes paused there; paused time is not a timeout"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/tasks/{id}/resume:
+    post:
+      summary: "Resume a paused task"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/ai:
+    get:
+      summary: "AI spend panel: OpenAI, Gemini, Claude, DeepSeek - spent today/month, NEXVARA limits and what is left, real balance if known, official billing URLs, 30-day series. From the PC's single ledger, so phone requests are never counted twice. Keys are never included"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/ai/{provider}/balance:
+    post:
+      summary: "Refresh the real balance where the provider has an official balance API (DeepSeek). No model is called (free). Others return {supported:false}"
+      parameters:
+        - {name: provider, in: path, required: true, schema: {type: string, enum: [openai, gemini, anthropic, deepseek]}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/memory:
+    get:
+      summary: "Memory facts"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "Add a fact {text}"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {text: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/memory/search:
+    get:
+      summary: "Search memory, chat and task titles. Query q"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/memory/{id}:
+    post:
+      summary: "Edit a fact {text}"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {text: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/memory/{id}/delete:
+    post:
+      summary: "Delete a fact"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/teach:
+    get:
+      summary: "Teach NEXVARA rules and app labels"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "Add a rule {app, text}; with preview=true only checks it and returns the actions"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {app: {}, text: {}, preview: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/teach/{id}:
+    post:
+      summary: "Change a rule {text?, enabled?}"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {text: {}, enabled: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/teach/{id}/delete:
+    post:
+      summary: "Delete a rule"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/workflows:
+    get:
+      summary: "Workflows, templates, active runs, last runs"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "Create or edit a workflow (same JSON as the PC)"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {workflow: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/workflows/{id}/run:
+    post:
+      summary: "Run a workflow now; {file} may only be a file the phone uploaded"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {file: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/workflows/{id}/delete:
+    post:
+      summary: "Delete a workflow"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/workflows/runs/{id}/{action}:
+    post:
+      summary: "approve | pause | resume a workflow run"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {name: action, in: path, required: true, schema: {type: string, enum: [approve, pause, resume]}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/bi:
+    get:
+      summary: "Saved NEXVARA BI dashboards"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/bi/open:
+    post:
+      summary: "Open a saved dashboard {file, state?, show_on_pc=true}: returns compact widgets for the phone and opens it in the PC window"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {file: {}, state: {}, show_on_pc: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/library:
+    get:
+      summary: "Textbooks on the PC and the grade -> subjects catalog"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/library/test:
+    post:
+      summary: "Make a test from the textbooks {grade, subject, topic, count, variants, ai}. A paid AI test first returns confirm (answer with /confirm)"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {grade: {}, subject: {}, topic: {}, count: {}, variants: {}, ai: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/office/{kind}:
+    post:
+      summary: "Run a ready Office task on the PC screen: excel_demo | excel_dashboard | word_report | presentation"
+      parameters:
+        - {name: kind, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/account:
+    get:
+      summary: "Google state: the PC owner account and this phone's link (web_client_id is public)"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/account/link:
+    post:
+      summary: "Link this phone to the PC owner's Google account {id_token} from Android Credential Manager; accepted only for the Web client ID audience and the owner's sub"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {id_token: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/screen:
+    get:
+      summary: "The PC screen as JPEG (view only). Off when settings.json remote.screen_view is false; the PC shows that the phone is watching"
+      responses:
+        "200": {description: JPEG bytes, content: {image/jpeg: {schema: {type: string, format: binary}}}}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/files/search:
+    get:
+      summary: "Search the PC's user folders by name (q, ext). Results may be opened or shared for 10 minutes; keys, databases and NEXVARA secrets are never listed"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+  /api/v1/files/share:
+    post:
+      summary: "Allow downloading a found file with GET /api/v1/files?path= for 30 minutes"
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {path: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/files/open:
+    post:
+      summary: "Open a found document on the PC screen (programs and scripts are refused)"
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {path: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/omr:
+    get:
+      summary: "Answer-sheet sets (title, questions, variants, keys, last results) and whether the last generated test has answer keys"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "Make a printable answer sheet (PDF opens on the PC): {title, questions 1-60, variants 1-4, keys {variant: ABCD..}, copies} or {from_last_test: true}"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {title: {}, questions: {}, variants: {}, keys: {}, copies: {}, from_last_test: {}, open_on_pc: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/omr/{id}/keys:
+    post:
+      summary: "Set the correct answers {keys: {variant: ABCD..}}"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {keys: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/omr/{id}/grade:
+    post:
+      summary: "Grade a photographed sheet {path (uploaded photo), student}: answers, right, percent, mark (2-5), wrong questions; the Excel results file is updated"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {path: {}, student: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/cad:
+    get:
+      summary: "Drawings in the PC's Chizmalar folder (newest first, up to 30): name, path, modified, size"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "Save a drawing made on the phone {name, drawing (same JSON as the PC editor: layers, entities line/polyline/circle/arc/ellipse/text/dim/ldim/rdim/hatch, mm, y up), open_on_pc}: AutoCAD DXF + PDF + PNG on the PC, files shared with the phone"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {name: {}, drawing: {}, open_on_pc: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/cad/drawing:
+    get:
+      summary: "One drawing from the Chizmalar folder as editor JSON (query path=; at most 5000 entities, truncated flag)"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/cad/ai:
+    post:
+      summary: "«AI bilan tuzatish» {drawing (editor JSON), note (what the user meant), approved}: a clean drawing back {drawing, by: ai|offline, reply}; {confirm: text} when the AI request costs more than the user's limit (send again with approved=true); without AI the PC tidies the sketch itself"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {drawing: {}, note: {}, approved: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/cad/templates:
+    get:
+      summary: "Drawing templates: A4/A3 sheet with frame and title block, bolt, nut, washer, bearing {templates: [{id, title, ask}]}"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "One template {name, size (e.g. M10x50, 6204)} as editor JSON {drawing}"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {name: {}, size: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/cad/open:
+    post:
+      summary: "Open a drawing from the Chizmalar folder {path} in the PC's own editor"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {path: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/journal:
+    get:
+      summary: "Class journal: classes with student counts"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "Add a class {name}"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {name: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/journal/{id}:
+    get:
+      summary: "A class: students, last grades, averages, subjects (query subject=)"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/journal/{id}/students:
+    post:
+      summary: "Add students {names: one per line}"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {names: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/journal/{id}/delete:
+    post:
+      summary: "Delete a class with its students and grades"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/journal/{id}/export:
+    post:
+      summary: "Excel journal (one sheet per subject); opens on the PC, downloadable for 30 minutes"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {open_on_pc: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/journal/grade:
+    post:
+      summary: "Add a grade {student_id, grade 1-5, subject, day YYYY-MM-DD, note}"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {student_id: {}, grade: {}, subject: {}, day: {}, note: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/journal/grade/{id}/delete:
+    post:
+      summary: "Delete a grade"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/doctemplates:
+    get:
+      summary: "Document templates (ariza, tushuntirish xati, ma'lumotnoma, xizmat xati, buyruq, tavsifnoma) with their fields"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/doctemplates/{id}:
+    post:
+      summary: "Write the document in Word on the PC screen (DOCX + PDF) {fields, background}"
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {fields: {}, background: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/ocr:
+    post:
+      summary: "Text of an uploaded photo (Windows OCR, offline) {path, lang uz|ru|''}; saved as .txt and becomes the chat's file"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {path: {}, lang: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/morning:
+    get:
+      summary: "The morning summary the phone shows at its set time: {date, weekday, lines[] (short Uzbek lines: failed tasks since yesterday, workflows waiting for «Ha», today's scheduled workflows, old backup), failed, running, waiting, scheduled, backup_days}; the phone adds today's lessons itself"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "401": {$ref: "#/components/responses/Error"}
+  /api/v1/ocr/convert:
+    post:
+      summary: "A photo's text → Excel table (sync: {path, rows, cols}, shared to the phone) or Word document (a task) {path (uploaded photo or its .txt), to excel|word, text (optional, the edited OCR text), lang, background}"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {path: {}, to: {}, text: {}, lang: {}, background: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/files/preview:
+    get:
+      summary: "A file to view in the app: PDF as is, Office files converted to PDF in a temp folder, pictures and text as is (query path=; task results or shared files only)"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/control:
+    post:
+      summary: "Mouse/keyboard of the PC {action click|double|right|move|scroll|type|key, x, y (0..1), dy, text, key}; refused unless settings remote.control is on"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {action: {}, x: {}, y: {}, dy: {}, text: {}, key: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/autostart:
+    get:
+      summary: "Does NEXVARA start with Windows"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "Start NEXVARA with Windows {on}"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {on: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
 components:
   securitySchemes:
     deviceToken: {type: http, scheme: bearer, description: Token from /api/v1/pair. Store it in Android Keystore-backed storage.}
@@ -230,7 +778,7 @@ components:
         detail: {type: string}
     TaskStatus:
       type: string
-      enum: [pending, running, succeeded, failed, cancelled]
+      enum: [pending, running, paused, succeeded, failed, cancelled]
     Task:
       type: object
       required: [id, title, status, error, created_at, finished_at, steps, files, report]
@@ -238,6 +786,8 @@ components:
         id: {type: string}
         title: {type: string}
         status: {$ref: "#/components/schemas/TaskStatus"}
+        pause_requested: {type: boolean, description: "Pause asked; the task stops at its next step"}
+        cancel_requested: {type: boolean}
         error: {type: string}
         created_at: {type: number}
         finished_at: {type: [number, "null"]}

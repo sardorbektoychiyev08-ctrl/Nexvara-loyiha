@@ -25,6 +25,11 @@ class VerificationError(Exception):
     pass
 
 
+def variant_label(v: int) -> str:
+    """1 -> «A variant», 2 -> «B variant» (the same letters as on the answer sheet)."""
+    return f"{'ABCDEF'[v - 1]} variant" if 1 <= v <= 6 else f"{v}-variant"
+
+
 def run_make_test(
     task: Task,
     req: TestRequest,
@@ -59,7 +64,16 @@ def run_make_test(
     try:
         with WordSession(visible=visible, keep_open=keep_open) as w:
             checks = _write_and_verify(
-                task, w, book.label(), topic, quizzes, out, pdf, beat, keep_open
+                task,
+                w,
+                book.label(),
+                topic,
+                quizzes,
+                out,
+                pdf,
+                beat,
+                keep_open,
+                ai_generated=make is not None,
             )
     finally:
         # The cut-out pictures are embedded in the .docx now; drop the temp copies.
@@ -80,6 +94,9 @@ def run_make_test(
         "variants": len(quizzes),
         "note": notes[0] if notes else "",
         "pictures": pictures,
+        # Answer keys per variant ("ABDC…"), so answer sheets can be checked by photo.
+        "answers": ["".join(x.answer for x in q.questions) for q in quizzes],
+        "sheet_ready": all(x.kind == "mcq" for q in quizzes for x in q.questions),
     }
 
 
@@ -93,6 +110,8 @@ def _write_and_verify(
     pdf: Path,
     beat: Any,
     keep_open: bool,
+    *,
+    ai_generated: bool = False,
 ) -> list[dict[str, Any]]:
     # COM objects live only in this frame, so they are released before Word quits.
     from nexvara.skills.word import ops
@@ -107,10 +126,10 @@ def _write_and_verify(
     beat()
 
     for v, quiz in enumerate(quizzes, start=1):
-        with task.step(f"{v}-variant") as s:
+        with task.step(variant_label(v)) as s:
             title = f"{book_label}: «{topic}» — test"
             if len(quizzes) > 1:
-                title += f" ({v}-variant)"
+                title += f" ({variant_label(v)})"
             p = ops.add_paragraph(doc, title, ops.STYLE_HEADING[1], align="center")
             if v > 1:
                 p.PageBreakBefore = True
@@ -148,12 +167,14 @@ def _write_and_verify(
         p.PageBreakBefore = True
         for v, quiz in enumerate(quizzes, start=1):
             if len(quizzes) > 1:
-                ops.add_heading(doc, f"{v}-variant", 2)
+                ops.add_heading(doc, variant_label(v), 2)
             ops.add_table(doc, answer_key_rows(quiz), numeric_columns=(1, 2))
+        method = "AI yordamida" if ai_generated else "AI ishlatilmasdan"
         ops.add_paragraph(
             doc,
-            "Savollar darslik matni asosida avtomatik tuzildi (AI ishlatilmadi). "
-            "Iltimos, tarqatishdan oldin ko‘zdan kechiring.",
+            f"Savollar darslik matni asosida {method} avtomatik tuzildi. "
+            "Betlar javoblar kalitida ko‘rsatilgan. Mazmun va javoblarni tarqatishdan "
+            "oldin o‘qituvchi tekshirsin.",
             size=9,
         )
     beat()

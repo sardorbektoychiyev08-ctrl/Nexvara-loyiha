@@ -261,6 +261,25 @@ class GoogleAccount:
         except (urllib.error.URLError, TimeoutError, ValueError) as e:
             raise AuthError(f"Google kalitlarini olib bo‘lmadi: {e}") from e
 
+    # ----- the phone (Android "Sign in with Google") -----
+    def verify_phone(self, id_token: str, web_client_id: str) -> dict[str, Any]:
+        """The phone sends the ID token Android Credential Manager gave it. It is accepted
+        only if Google signed it for our Web client ID and it is the PC owner's account (same
+        `sub`). Nothing is stored except the email on the paired device's row."""
+        if not web_client_id:
+            raise AuthError("Telefon uchun Google sozlanmagan: Web client ID kiritilmagan "
+                            "(docs/GOOGLE_LOGIN.md → Android).")  # fmt: skip
+        owner = self.keys.load("owner_sub")
+        if not owner:
+            raise AuthError("Avval kompyuterda Google bilan kiring va «Ha, bu mening hisobim» "
+                            "deb tasdiqlang.")  # fmt: skip
+        claims = verify_id_token(str(id_token or ""), self._jwks(), web_client_id, "")
+        if not claims.get("email_verified", False):
+            raise AuthError("Google e-pochtasi tasdiqlanmagan")
+        if not secrets.compare_digest(str(claims.get("sub", "")), owner):
+            raise AuthError("Bu Google hisobi kompyuter egasiniki emas")
+        return {"email": str(claims.get("email", "")), "name": str(claims.get("name", ""))}
+
     # ----- login -----
     def login(self, timeout: float = LOGIN_TIMEOUT, drive: bool = False) -> dict[str, Any]:
         """Blocking: opens the browser, waits for the redirect, verifies, saves.

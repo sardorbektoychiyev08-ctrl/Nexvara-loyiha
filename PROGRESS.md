@@ -4,6 +4,373 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (32) — Claude Code — Egasi ruxsati bilan: osilgan PowerPoint, telefon tekshiruvi, merge va push; Windows 1.2.1
+
+**Foydalanuvchi talabi:** «2, 3, 4 ni tugat va hisobot ber» (telefonni ko‘z bilan tekshirish; osilgan PowerPoint’ni yopish; main ga merge va push); «AutoCAD’da ranglarni ko‘rmayapman, ko‘rsat».
+
+**Qilindi:**
+- Osilgan yashirin POWERPNT (PID 15432, 15:20 dan) egasi ruxsati bilan yopildi; ilgari qotgan `test_session_never_closes_users_presentation` endi o‘tadi (`tests/office/test_powerpoint.py` 4/4 PASS).
+- Rang tugmasi ko‘zga tashlanadigan qilindi: PC asboblar panelida «🎨 Rang: …» (ajratilgan ramka), telefonda yuqori qatorning boshida «Rang». Kompyuterda rangli chizma va ochiq palitra rasmi olindi.
+- Telefonda bildirishnoma ruxsati yo‘q edi (hech qanday NEXVARA xabari chiqmasdi): Sozlamalar → Ertalabki xulosa ostida ogohlantirish va «Ruxsat berish» tugmasi qo‘shildi; egasi ertalabki xulosani so‘ragani uchun ruxsat adb bilan yoqildi. «Hozir ko‘rsat» → «Xayrli tong! Bugun Yakshanba · Bugun 1 ta dars» xabari keldi.
+- Telefon kompyuterga ulanmayotgan edi: 17-oktabr 13:24 da (eski versiya) PC sertifikati qayta yaratilgan, telefon eski izni saqlagan — himoya to‘g‘ri rad etgan. Telefon havola orqali qayta bog‘landi (yangi qurilma yozuvi id 2; eski id 1 yozuvi o‘chirilmadi). Telefonga yangi imkoniyat: ma’lum manzillar javob bermasa, telefon o‘z mahalliy tarmoqlaridan (USB/hotspot/Wi‑Fi, faqat xususiy /24) kompyuterni qidiradi, daqiqasiga 1 marta; sertifikat izi baribir tekshiriladi. Hozir PC telefonga USB orqali ulangan (172.30.96.202).
+- Windows 1.2.1 yig‘ildi, mahalliy kanalga imzolab joylandi va o‘rnatildi (SHA-256 `bb3b37ae3f9610978158f01b0d1a0d83b081ba31b7b0532dacd74faa44e595bf`). Android 1.3.0 qayta o‘rnatildi (SHA-256 `ce2882c82615dee06bd32412a998d76e9a6f846337b665501773bede6606011c`).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| pytest (Office’siz) | 475 passed, 84 skipped |
+| Oyna smoke v1.2.1 | PASS |
+| `tests/ui_scripts/cad_tools.py` (ranglar bilan) | PASS |
+| Android unit (DiscoveryTest, MorningTest, CadColorTest va eskilari), assembleDebug | PASS |
+| Telefon: Chizma → Rang palitrasi ochildi; Sozlamalar → Ertalabki xulosa, ogohlantirish, «Hozir ko‘rsat» xabari; Bosh sahifa «Ulangan» | PASS (haqiqiy telefon, skrinshotlar) |
+| Ertalabki xulosaning kompyuter qismi haqiqiy telefonda | NOT TESTED (xabar PC ulanmagan paytda yuborilgan; marshrut unit testda PASS) |
+
+**Keyingi qadam:** egasi Gemini kalitini kiritadi va yozadi → haqiqiy AI sinovi (xotira, o‘zini tuzatish, rasm AI bilan).
+
+---
+
+## 2026-10-18 (31) — Claude Code — Suhbat xotirasi, AI o‘zi tuzatadi, ertalabki xulosa, haftalik zaxira, javob varaqasi, rasm → Excel/Word, chizma ranglari; Windows 1.2.0, Android 1.3.0
+
+**Foydalanuvchi talabi:** takliflardan 1, 2, 3, 5, 8, 9 (bir oylik suhbat xotirasi, xatoni AI o‘zi tuzatishi, ertalabki xulosa, avtomatik zaxira, test variantlari va javob varaqasi, telefon kamerasi → Excel/Word); keyin «AutoCAD’ga ranglar»; Codex ishini tekshirib tuzatish; hammasi telefonda ham bo‘lsin; telefon va kompyuterni yangilash; API qo‘shishga tayyor. Telefon ekranini o‘chirmaslik (egasi yonida bo‘lmaydi).
+
+**Qilindi** (tarmoq `claude/android-v1`):
+- **Suhbat xotirasi** (`memory/store.py`, `ai/features.py`, `app/api_agent.py`): AI suhbat/savol/reja oxirgi 15 xabarni `app.db` dan oladi (qayta ochilganda ham), 30 kun ichidagi mos suhbatlarni (FTS) va oldingi 7 kunning qisqa mahalliy xulosasini. Hammasi maxfiylik qoravuli orqali. «… haqidagi gaplarni unut», «buni unut». Sozlamalar: `memory.chat_days`, `memory.recent_turns`.
+- **AI o‘zi tuzatadi** (`ai.self_repair`, sukutda yoqiq, faqat AI tayyor bo‘lsa): buyruq xato bersa (asbob xatosi yoki chatdan boshlangan Office vazifasi yiqilsa) xato matni rejalashtiruvchiga qaytadi, ko‘pi bilan 2 marta; o‘zgartiradigan qadam baribir «Ha» kutadi; fon tuzatishi chatga `nexvara_reply` hodisasi bilan chiqadi.
+- **Haftalik avtomatik zaxira** (`autobackup.py`): bazalar (SQLite backup), sozlamalar, dashboardlar va boshqa kichik fayllar → `D:\NEXVARA-zaxira\auto\auto-<vaqt>`, SHA-256 manifest, oxirgi 4 tasi; darsliklar, 100 MB dan katta (darslik indeksi), loglar, installerlar kirmaydi; Credential Manager sirlari hech qachon. Chatda «zaxira qil», «zaxira holati», «avtomatik zaxirani o‘chir/yoq» (fayl zaxirasi buyruqlariga xalaqit bermaydi).
+- **Testlar**: variantlar A/B/C… harflari bilan (Word, javob varaqasi, telefon); har A/B/C/D testga chop etiladigan javob varaqasi PDF va kalitlar avtomatik (`omr.create_set`), natija panelida «Javob varaqasi (PDF)».
+- **Rasm → Excel/Word** (`photodoc.py`, `api_reading.py`, `POST /api/v1/ocr/convert`): OCR (yoki «AI bilan» — rozilikdan keyin) matnidan ramkali, sarlavhali, raqamlari haqiqiy son bo‘lgan .xlsx yoki Word hujjat; rasm o‘zgarmaydi. PC chatda «shu rasmni Excel qil», telefonda «Rasmdan matn» ostida «Excel» / «Word».
+- **Ertalabki xulosa** (`morning.py`, `GET /api/v1/morning`, Android `Morning.kt`): har kuni (sukut 07:30, Sozlamalarda vaqt, o‘chirish, «Hozir ko‘rsat») bugungi darslar (telefon jadvalidan) va kompyuterda kutayotganlar: kecha bajarilmagan ishlar, «Ha» kutayotgan workflowlar, bugungi avtomatik ishlar, eski zaxira. Kompyuter o‘chiq bo‘lsa — shuni yozadi.
+- **Chizma ranglari**: AutoCAD ACI palitrasi (1–9, 10–249, kulranglar 250–255), asboblar panelida «Rang» (yangi obyektlar rangi; tanlanganlarni ham bo‘yaydi), `COLOR`/`RANG` buyrug‘i, qatlam va obyekt rangi palitra oynasi bilan; PDF/PNG endi rangli (oq/7 qora chiqadi). Telefonda ham rang tanlash, rang DXF ga o‘tadi.
+- **Codex ishi (478ff8e) tekshirildi**: ramka/yakuniy formatlash yaxshi; regressiya tuzatildi — «formatla» raqam formatini qo‘ymay qo‘ygan edi (endi faqat «General» ustunlarga); yangi jadval buyrug‘i ustun sonisiz va «ustunlari:» bilan ham ishlaydi; `features.py` dagi buzuq satr («\n"jadvalni tekshir"») tozalandi. Osilgan PowerPoint testi sababi: 15:20 dan beri yashirin osilgan POWERPNT jarayoni (PID 15432) — ruxsatsiz to‘xtatilmadi, test chetga olindi.
+- Versiyalar: Windows 1.2.0, Android 1.3.0 (versionCode 10). Telefonda `svc power stayon usb` — USB ulanganda ekran yoniq turadi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff check + format --check | PASS |
+| pytest to‘liq, haqiqiy Office bilan (`NEXVARA_RUN_OFFICE=1`), `test_session_never_closes_users_presentation` chetda | **558 passed**, 1 deselected |
+| Oyna smoke (13 bo‘lim, v1.2.0, JS xatosi yo‘q) | PASS |
+| Yangi unit: `test_ai_memory` (7), `test_autobackup` (4), `test_answer_sheet_auto` (2), `test_photodoc` (5), `test_morning` (1), `test_school` (+2 marshrut), `test_agent_parse` (+1) | PASS |
+| Haqiqiy oyna: `tests/ui_scripts/cad_tools.py` (ranglar bilan: COLOR 1, palitra 256 katak, tanlanganni 30 ga bo‘yash, DXF da rang 30) | PASS |
+| Android `compileDebugKotlin` + `testDebugUnitTest` (MorningTest 2, CadColorTest 2 va eskilari), `assembleDebug` | PASS |
+| Telefonga 1.3.0 `adb install -r` (loyiha sinov kaliti `ANDROID_USER_HOME=.tools/android-home`, ma’lumotlar saqlandi), ilova ishga tushdi, crash logi bo‘sh | PASS. APK SHA-256 `6afe18af60f699873fb0b7d9cc3b619c8b45287b7b3327bc89304d992f0d54fb`, nusxa `D:\NEXVARA\android\NEXVARA-Android-1.3.0-debug.apk` |
+| Telefon ekranlarini ko‘z bilan tekshirish | NOT TESTED — telefon qulf ekranida, qulf ochilmadi |
+| Zaxira (o‘rnatishdan oldin) `D:\NEXVARA-zaxira\auto\auto-20261018-180431` (11 fayl, xato 0) + bugungi to‘liq zaxira 15:42 | PASS |
+| Windows 1.2.0 yig‘ish, mahalliy kanalga imzolab joylash, jim o‘rnatish (`%LOCALAPPDATA%\Programs\NEXVARA`, ProductVersion 1.2.0, dastur o‘zi ochildi) | PASS — SHA-256 `656ed0d6e6435cb1672aa0218d25d7af7745b2e86a3f2889ae247a83da4ed2c2` |
+| O‘rnatilgan `NEXVARA.exe --selftest-installed` | PASS — `report.json` `ok: true`, v1.2.0: 12 sahifa, Google, sinxron, AI, yangilanish, Excel/dashboard/Word/PowerPoint, BI |
+| Haqiqiy AI (xotira, o‘zini tuzatish, rasm AI bilan) | NOT TESTED — kalit kiritilmagan (soxta provayder bilan PASS) |
+| Ertalabki bildirishnoma haqiqiy telefonda 07:30 da | NOT TESTED — ertaga ertalab ko‘rinadi |
+
+**Keyingi qadam (egasi bilan):** Gemini kalitini kiritish (Sozlamalar → AI → «Buferdan kalitni saqlash»); telefonda qulfni ochib yangi tugmalarni (Rasmdan matn → Excel/Word, Chizma → rang, Sozlamalar → Ertalabki xulosa → «Hozir ko‘rsat») sinash; osilgan yashirin PowerPoint (PID 15432) ni yopishga ruxsat — keyin chetga olingan test qayta; `main` ga merge va push faqat egasining roziligi bilan.
+
+---
+
+## 2026-10-18 (30) — Codex — Excel jadval sifati, Word/PowerPoint tekshiruvi, Windows 1.1.1
+
+**Davom ettirilgan ish:** `claude/android-v1` tarmog‘idagi tugallanmagan Office sifati vazifasi (`HANDOFF_CODEX.md`, topshiriq 4). Asl foydalanuvchi fayllari o‘zgartirilmadi; amaliy sinovlar vaqtinchalik fayllarda bajarildi.
+
+**Qilindi:** Excel buyruqlari tugagach sarlavha, ko‘rinadigan ramka, jami/statistika qatorlari, ustun kengligi va raqamlar joylashuvi bir xil yakunlanadi; bo‘sh ichki ustunli va yuqorida birlashtirilgan sarlavhali jadval aniqlanadi. Chatdan ustun nomlari bilan yangi Excel jadvali yaratish qo‘shildi. Word jadvali rasmiy formatlashda ramkalanadi. PowerPoint matni slaydga sig‘dirilib, saqlangandan keyin qayta tekshiriladi. Versiya 1.1.1.
+
+**Sinovlar:**
+
+| Sinov | Natija |
+|---|---|
+| `scripts/test.ps1` (lint, format, birlik, oyna smoke) | PASS — 453 passed, 84 skipped; 13 menyu bandi, JS xatosi yo‘q |
+| Yangi haqiqiy Office regressiyalari | PASS — 6/6 (Excel jami va PDF ramkasi, 2001 qator, yangi jadval, Word, PowerPoint) |
+| Haqiqiy Office to‘plami, bitta osilgan COM sinovisiz | PASS — 83 passed, 1 deselected |
+| `scripts/test.ps1 -Office` to‘liq | NOT TESTED — `test_session_never_closes_users_presentation` PowerPoint COM ichida bir necha daqiqa osildi; sinov jarayoni to‘xtatildi, Office jarayoni majburan yopilmadi |
+| Ma’lumotlar zaxirasi | PASS — `D:\NEXVARA-zaxira\20261018-154235`, 307 fayl, 8.01 GB, xesh xatosi 0 |
+| Windows 1.1.1 yig‘ish, imzolangan mahalliy kanal, jim yangilash | PASS — installer exit 0; SHA-256 `57f977eb766f218c0118455f530fa9a891a63e0cd8712153962e0aabc1d83168` |
+| O‘rnatilgan `NEXVARA.exe --selftest-installed` | PASS — `report.json` `ok: true`; Excel, dashboard, Word, PowerPoint, BI va sinxron shifri tekshirildi |
+
+**Keyingi qadam:** PowerPoint COM sinovining osilish sababini foydalanuvchi taqdimotiga tegmasdan alohida tekshirish. Haqiqiy Gemini sinovi uchun egasi kalitni ilovada o‘zi kiritishi kerak. `main` ga merge va push qilinmadi.
+
+---
+
+## 2026-10-18 (29) — Claude Code — AI bilan chizmani tuzatish, oltita taklif, Windows 1.1.0 va Android 1.2.5
+
+**Foydalanuvchi talabi:** taklif qilingan oltita funksiyaning hammasi; qo‘lda chizilgan chizmani «AI» tugmasi bilan to‘g‘ri chizish; chizma maydonini o‘ziga moslab katta/kichik qilish; telefon ulangan — yangilanishni o‘rnatish; API kalit ulashga tayyor bo‘lsin.
+
+**Qilindi:**
+- **AI bilan tuzatish** (`cad_ai.py`, `CadApi.cad_ai_fix`, `/api/v1/cad/ai`; PC tugmasi va telefonda sehrli tayoqcha): chizma JSON’i (rasm emas — matnlar odatdagidek yashiriladi) va «nima chizmoqchi edingiz» izohi AI’ga ketadi; javob `json_to_doc` bilan tekshiriladi (buzuq/xavfli javob rad etiladi). AI bo‘lmasa yoki xato bersa — NEXVARA o‘zi tekislaydi: uchlar bitta burchakka, deyarli yotiq/tik qirralar aniq (umumiy X/Y), o‘lchamlar yaxlit, aylanalar konsentrik. Orqaga (Ctrl+Z / «Orqaga») bilan eski eskizga qaytiladi.
+- **Maydon o‘lchami**: PC — «+», «−», «Ixcham» (asboblar faqat belgi, yon panel yashirin, tanlov eslab qolinadi), klaviatura +/−; telefon — kattalashtirish/kichiklashtirish tugmalari va «Maydon: kichik/o‘rta/katta/to‘liq».
+- **Shablonlar** (`cad_templates.py`, `/api/v1/cad/templates`): A4/A3 ramka va shtamp (GOST 2.301/2.104 soddalashtirilgan), bolt M6–M24 (ISO 4014), gayka (ISO 4032), shayba (ISO 7089), podshipnik 6200–6208; PC ro‘yxati va telefon oynasi.
+- **Kamchiliklarni tuzat** (`fix` amali): Excel — jadvalni bo‘lgan bo‘sh qatorlar, merge, matn-raqamlar, «Sheet1» nomi, bo‘sh varaqlar; Word — bo‘sh joy/qatorlar, qalin «sarlavhalar» → Sarlavha uslubi, mayda/aralash matn → TNR 14, sahifa raqami, sana → «2026-yil 18-oktabr»; PowerPoint — 18 pt dan kichik matn.
+- **Dars ishlanmasi** (`knowledge/lessonplan.py`): «7-sinf fizika … dars ishlanmasi» → Word (kartochka, 3 maqsad, 45 daqiqalik dars borishi jadvali, darslikdan tushunchalar va faktlar, mustahkamlash savollari javoblari bilan, uyga vazifa) + PowerPoint taqdimot; AI’siz.
+- **Haftalik hisobot** (`weekly.py`): «Hisobotlar papkasidagi Excel fayllardan haftalik hisobot qil» → shu hafta o‘zgargan .xlsx lar bitta PDF da (openpyxl + PyMuPDF, Excel ochilmaydi); ish jarayoni shabloni «Haftalik hisobot (har juma 17:00)».
+- **3D ko‘rinish** (`app/ui/cad3d.js`): yopiq shakllar qalinlikka cho‘ziladi, ichkisi teshik; ramka, o‘q, o‘lcham qatlamlari hisobga olinmaydi; sichqoncha bilan aylantirish.
+- **Ovozli buyruq (PC)** (`app/api_voice.py`, `app/ui/voice.js`): 🎤 → 16 kHz WAV → Gemini `input_audio` → o‘zbekcha lotin matn → buyruq bajariladi. Faqat Gemini (boshqa kalit bo‘lsa ham), birinchi marta rozilik so‘raladi va eslab qolinadi (`ai.voice_consent`).
+- **Tuzatildi**: telefonda «Bo‘limlar» ekrani yiqilardi (1.2.3 da yangi «Chizma» bandi qo‘shilganda ranglar ro‘yxati qisqa qolgan) — 1.2.4 dan tuzatilgan.
+- **Telefon**: 1.2.3 → 1.2.4 → 1.2.5 o‘rnatildi (`adb install -r`, ma’lumotlar saqlandi).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| To‘liq: unit + haqiqiy Office | 528/529 PASS; workflows_page UI testi shablon tartibi tufayli FAIL edi, yangi shablon oxiriga ko‘chirildi, qayta PASS |
+| Smoke | PASS (13 bo‘lim, v1.1.0, JS xatosi yo‘q) |
+| Yangi: `test_cad_ai.py`, `test_lessonplan.py`, `test_weekly.py`, `test_voice.py`; Office: tuzatish (3), dars ishlanmasi; oyna: `cad_tools.py` (AI tuzatish, shablon, 3D, zoom bilan) | PASS |
+| Android build + unit (CadTest 5/5) 1.2.5, telefonga o‘rnatildi, ekranlar ochildi, yiqilish yo‘q (logcat) | PASS |
+| Windows 1.1.0 o‘rnatish | PASS: jim o‘rnatish (LOCALAPPDATA/Programs/NEXVARA 1.1.0), yorliq yangi exe ga, mahalliy kanal D:/NEXVARA/releases ga imzolab joylandi (SHA-256 351ce9a2...ca593). Zaxira: D:/NEXVARA-zaxira/20261018-122735-1.1.0-oldidan. O‘rnatilgan dastur selftesti NOT TESTED (limit) |
+| Haqiqiy Gemini (AI tuzatish, ovoz) | NOT TESTED — kalit kiritilmagan (soxta provayder bilan PASS) |
+| Telefon ↔ kompyuter ulanishida chizma saqlash / AI | NOT TESTED — kompyuterdagi NEXVARA telefonga ulanmagan edi |
+| Mikrofon bilan haqiqiy ovoz | NOT TESTED — kalit va ovoz kerak |
+
+**Keyingi qadam (foydalanuvchi bilan):** Gemini kalitini kiritish (Sozlamalar → AI → «Buferdan kalitni saqlash»), telefon ulanishini yoqish (Qurilmalar), telefonda chizib «AI» ni sinash, 🎤 ni sinash.
+
+---
+
+## 2026-10-18 (28) — Claude Code — Codex ishini tekshirish; Chizmalar 2.0; telefonda qo‘lda chizish; o‘zbekcha doim lotinda; Office rasmiy qoidalari
+
+**Foydalanuvchi talabi:** Codex qilgan ishlarni ko‘rib kamchiliklarni tuzatish; Office dasturlarida ishlashni rasmiy manbalardan o‘rgatish; AutoCAD Android ilovada ham bo‘lsin, qo‘lda chizish; chizma dasturini to‘liq funksiyali qilish; kirill harflari chiqmasin (AI’ga o‘rgatish); keyin API ulanadi; yangi funksiya takliflari.
+
+**Codex ishida topilgan kamchiliklar (tuzatildi):** polichiziq yoylari (bulge) to‘g‘ri chiziq bo‘lib chizilardi; chiziq turi/qalinligi ko‘rinmasdi; o‘lchamlarda strelka yo‘q edi; kesish/uzaytirish/yumaloqlash/faska/masshtab/massiv/shtrix yo‘q edi; bog‘lanish belgisi va kesishish/perpendikulyar bog‘lanish yo‘q edi; obyekt xususiyatlarini raqam bilan o‘zgartirib bo‘lmasdi; qatlam rangi/qulfi yo‘q edi.
+
+**Chizmalar 2.0** (`app/ui/cad.js` qayta yozildi, `app/api_cad.py`): ellips, ko‘pburchak, shtrix (to‘liq/ANSI31, ichki aylana — teshik), chiziqli (yotiq/tik)/qiya/radius/diametr o‘lchamlari, ko‘chirish, nusxa, burish, ko‘zgu, masshtab, parallel nusxa (polichiziq ham), kesish, uzaytirish, yumaloqlash (R), faska, qator va aylana massiv, bo‘laklash, grip (nuqtani sudrab o‘zgartirish), Ctrl+C/V/A, bog‘lanish: uchi/o‘rtasi/markaz/chorak/kesishish/perpendikulyar/yaqin (belgisi bilan), qatlam: rang, qalinlik, chiziq turi, qulf, nom, o‘chirish; xususiyatlar paneli (koordinata, radius, matn, uzunlik, yuza); masofa va yuza o‘lchash; oyna bilan kattalashtirish. DXF: `ldim`, `rdim`, `hatch`, obyekt rangi, qulflangan qatlam.
+
+**Telefonda Chizma** (Android 1.2.3; `Cad.kt`, `ui/CadScreen.kt`; PC: `remote_v1_cad.py`, `/api/v1/cad*`): aqlli qalam (qiyshiq chiziq → tekis chiziq, halqa → aylana, quti → aniq to‘rtburchak, egri → yoy), chiziq, to‘rtburchak, aylana, o‘lcham, matn, aniq o‘lcham kiritish, o‘chirgich, ikki barmoq bilan kattalashtirish, orqaga/qaytarish; kompyuterga AutoCAD DXF + PDF + PNG bo‘lib saqlanadi va kompyuterdagi Chizmalar oynasida ochiladi; kompyuterdagi chizmalarni telefonda ochish. Telefon faqat Chizmalar papkasidagi fayllarni o‘qiy oladi.
+
+**O‘zbekcha doim lotinda** (`knowledge/textnorm.py` `cyr_to_latin`, `ai/router.py` `LATIN_RULE`): har AI so‘roviga «faqat lotin» qoidasi; javobda kirill o‘zbekcha qolsa NEXVARA o‘zi lotinga o‘giradi (ruscha so‘ralganda tegmaydi); kirill yozuvidagi o‘zbekcha darsliklar endi lotinga o‘girilib qo‘shiladi (avval o‘tkazib yuborilardi), ruscha darsliklar avvalgidek chetda.
+
+**Office rasmiy qoidalari** (`knowledge/office_guide.py`, [docs/OFFICE_QOIDALARI.md](docs/OFFICE_QOIDALARI.md)): Microsoft’ning Excel/Word/PowerPoint tavsiyalari va VM 140-son qarori (sana, adresat, imzo, ilova, ijrochi, tasdiqlash). AI hujjat/ariza/jadval/taqdimot yozganda qoidalar ko‘rsatmaga qo‘shiladi. Yangi «tekshir» buyrug‘i (faylni o‘zgartirmaydi): Excel, Word, PowerPoint uchun tavsiyalar ro‘yxati.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| To‘liq: unit + haqiqiy Office (`NEXVARA_RUN_OFFICE=1`) | PASS — 511 passed (0 failed), 13 min 38 s |
+| Smoke (shu tarmoq kodi) | PASS — 13 bo‘lim, JS xatosi yo‘q |
+| Yangi: `tests/ui_scripts/cad_tools.py` (haqiqiy oyna, 12 tekshiruv), `test_latin.py`, `test_remote_cad.py`, `test_office_guide.py`, Office «tekshir» testlari | PASS |
+| Android `compileDebugKotlin`, `testDebugUnitTest` (CadTest 5/5), `assembleDebug` 1.2.3 | PASS |
+| APK 1.2.3 telefonga o‘rnatish | NOT TESTED — telefon uzilgan edi. APK `D:/NEXVARA/android/NEXVARA-Android-1.2.3-debug.apk` (SHA-256 `bcf9dc6a330b4aa88c01b1f3b04d8a3342780ab0ec0358c8e522483f7a65ff5e`) |
+| Telefonda barmoq bilan chizish (haqiqiy ekran) | NOT TESTED — telefon kerak |
+| Haqiqiy AI (Gemini bepul) | NOT TESTED — kalit kiritilmagan |
+
+**Keyingi qadam:** telefonni ulab 1.2.3 ni `adb install -r` bilan o‘rnatish va qo‘lda chizishni sinash; Gemini kalitini kiritib AI qismini sinash; `main` ga merge (egasi bilan).
+
+---
+
+## 2026-10-18 (27) — Codex — test tuzish qoidalari rasmiy tavsiyalarga bog‘landi
+
+**Tarmoq:** `claude/android-v1`, `.worktrees/android`; `main`ga merge va push qilinmadi. Foydalanuvchi o‘quv testlarini rasmiy manbalardan o‘rganib, keyin AI ulansa shu qoidalar bilan tuzishni so‘radi.
+
+**Manbalar:** Bilim va malakalarni baholash agentligining [test topshiriqlarini ishlab chiqish va ekspertizadan o‘tkazish bo‘yicha metodik tavsiyasi](https://ejournal.uzbmb.uz/journal/article_view/290/), [matematika test varianti tafsiloti](https://uzbmb.uz/upload/file/pdf/mtt/Matematika.pdf), [ETS adolatli test qo‘llanmasi](https://www.ets.org/pdfs/about/fair-tests-and-communications.pdf). Qisqa xulosa [docs/TEST_TUZISH_QOIDALARI.md](docs/TEST_TUZISH_QOIDALARI.md) da. Bu umumiy darslik testlari; davlat sertifikati yoki rasmiy aprobatsiya deb ko‘rsatilmaydi.
+
+**O‘zgarishlar:** AI test so‘rovi sinf/fan/mavzuni va metodik qoidalarni doim oladi: bitta aniq bilim, qisqa va xolis savol, tushunish/qo‘llash, to‘rtta bir-biriga yaqin javob va yagona kalit. Har AI savoliga darslikdagi bet hamda aynan olingan dalil kerak; bet/dalil topilmasa savol rad qilinadi. Takror savol va bir xil javob variantlari tashlanadi. Yetarli savol qolmasa dastur sonini ochiq aytadi. Word javob kalitida AI ishlatilgani to‘g‘ri yoziladi va o‘qituvchi tekshiruvi eslatiladi. Haqiqiy javobning ilmiy to‘g‘riligini avtomatik isbotlash imkoni yo‘q — o‘qituvchi ko‘radi.
+
+**Sinovlar:**
+
+| Sinov | Natija |
+|---|---|
+| Soxta AI bilan yangi bet/dalil, takror va noto‘g‘ri javob tekshiruvlari | PASS — `test_ai.py` 16/16 |
+| Soxta AI → haqiqiy Word → PDF, to‘g‘ri AI izohi | PASS — alohida Office sinovi |
+| `.\scripts\test.ps1` lint + birlik + oyna smoke | PASS — 421 passed, 70 skipped; smoke PASS |
+| `.\scripts\test.ps1 -Office` barcha testlar + oyna smoke | PASS — 491 passed; smoke PASS |
+| Haqiqiy AI provayderi va real darslik bilan fan ekspertizasi | NOT TESTED — kalit ulanmagan, real darslik Git’da yo‘q |
+
+**Keyingi qadam:** foydalanuvchi AI kalitini o‘zi ulab yoqqanda real darslikdan chiqqan testni fan o‘qituvchisi ko‘rib chiqadi; xatolar shu tekshiruvga qo‘shiladi.
+
+---
+
+## 2026-10-18 (26) — Codex — ariza va tayyor Word hujjatlaridagi xatolar tuzatildi
+
+**Tarmoq:** `claude/android-v1`, `.worktrees/android`; `main`ga merge va push qilinmadi. Foydalanuvchi hujjat ishlari, ayniqsa ariza yozilishidagi xatolarni tuzatishni va internetdagi ishonchli namunalarga tayangan holda mustaqil ishlashni so‘radi.
+
+**Manbalar:** Hukumat portalidagi [ishga qabul va ta’til arizalari](https://gov.uz/oz/vobkent/sections/view/117086), [Davlat tilida ish yuritish qo‘llanmasi](https://ebook.tsue.uz/public/ebooks/davlat-tilida-ish-yuritish/download/4d6a41774d413d). Xulosa va shablon tartibi [docs/HUJJAT_SHABLONLARI.md](docs/HUJJAT_SHABLONLARI.md) da.
+
+**Tuzatishlar:** umumiy ariza qo‘shildi (jami 8 shablon); ta’til arizasida ta’til turi va imzo yonidagi F.I.Sh. alohida kiritiladi; ishga qabul arizasida ham arizachi ismi ko‘rsatiladi. Sana `kun.oy.yil` shaklida va ta’til kunlari soni tekshiriladi. «20.10.2026 dan» kabi xato birikma o‘rniga «2026-yil 20-oktabrdan» yoziladi; lavozim so‘zi ikki marta takrorlanmaydi. Kiritilmagan maydon `None` bo‘lib chiqmaydi. Tushuntirish xatidagi asossiz avtomatik va’da olib tashlandi. Word’da A4, Times New Roman, 1,5 qator, to‘g‘ri chetlar va sana/imzo joylashuvi berildi; buyruq bandlari ketma-ket raqamlanadi. Telefon API’da bir xil nomli fayl ustiga yozilmasligi uchun bo‘sh nom tanlanadi.
+
+**Sinovlar:**
+
+| Sinov | Natija |
+|---|---|
+| Ariza matni/sana/bo‘sh maydon birlik testlari | PASS |
+| 8 shablon haqiqiy Word 2016’da DOCX va PDF | PASS — 8/8, har biri 1 sahifa |
+| Ta’til arizasi PDF sahifasini ko‘z bilan tekshirish | PASS — matn va imzo joylashuvi toza |
+| `test.ps1 -Office`: lint, barcha testlar, oyna smoke | PASS — pytest 489/489, smoke PASS; jurnalga yo‘naltirilgan tashqi PowerShell chaqiruvi ogohlantirishni xato kodi sifatida qaytardi, skriptning o‘zi `NATIJA: PASS` yozdi |
+| `test.ps1` oddiy chaqiruv | PASS — 419 passed, 70 Office skipped; smoke PASS, chiqish kodi 0 |
+| Foydalanuvchining o‘z real arizasi bilan solishtirish | NOT TESTED — namuna berilmagan |
+
+**Keyingi qadam:** foydalanuvchi real hujjatdagi muayyan xatoni ko‘rsatsa, shu holatni ham regressiya sinoviga qo‘shish. Maxfiy foydalanuvchi hujjatlari ochilmadi yoki o‘zgartirilmadi.
+
+---
+
+## 2026-10-18 (25) — Codex — ichki CAD sahifasi, yagona belgi va Android 1.2.2
+
+**Tarmoq:** `claude/android-v1`, `.worktrees/android`. Claude’ning `f5093f5` WIP ishini foydalanuvchi topshirig‘i bilan shu tarmoqda davom ettirdim. `main` ga merge ham, push ham qilinmadi.
+
+**Chizmalar:** `cad.js` yozildi: DXFni ochish va ko‘rish (surish, kattalashtirish, to‘r), chiziq/polichiziq/to‘rtburchak/aylana/yoy/matn/o‘lcham, tanlash (oyna va kesishuv), qatlamlar, nuqtaga va to‘rga bog‘lanish, orto, ko‘chirish/nusxa/burish/ko‘zgu/parallel nusxa/masofa, orqaga va oldinga qaytarish, klaviatura hamda buyruq satri. DXF saqlash, PDF/PNG chiqarish ulandi. Suhbatda yaratilgan DXF natijasi uchun «Chizmalarda ochish» tugmasi qo‘shildi. CAD sahifasi uchun joylashuv va mavzu ranglari qo‘shildi.
+
+**Belgi va dizayn:** yon menyu uchun `brand.svg`, menyu va CAD asboblari uchun bir uslubdagi SVG piktogrammalar; Windows `.ico` generatorida shu NEXVARA belgisi; Android moslashuvchan belgisi. Telefon ilovasi `1.2.2` (`versionCode 6`) bo‘ldi. APK loyiha sinov kaliti bilan yig‘ildi va ulangan Xiaomi Android 16 telefoniga `adb install -r` orqali foydalanuvchi ma’lumotlarini saqlab o‘rnatildi; telefonda versiya `1.2.2` tekshirildi. APK SHA-256: `95ef83270828a7370cd2266d4c0bbad6171850a60624dafd677dd6d62438ce4e`.
+
+**Testlar:**
+
+| Sinov | Natija |
+|---|---|
+| `test_cad_api.py` — DXF→JSON→DXF, audit, noto‘g‘ri ma’lumot | PASS — 6/6 |
+| `cad_page.py` haqiqiy oyna — chizish, undo/redo, saqlash, ochish, PDF | PASS |
+| `test.ps1` — ruff, unit, oyna smoke | PASS — 405 passed, 62 Office skipped; smoke 13 sahifa, JS xatosiz |
+| `test.ps1 -Office` birinchi to‘liq yugurish | FAIL — 465 passed, 2 ta inglizcha UI matni tekshiruvi; ikkalasi tuzatildi |
+| Tuzatilgan 2 tekshiruv: `test_uzbek_ui.py` va `uzbek_ui.py` haqiqiy oyna | PASS — UI matn 100% o‘zbekcha; to‘liq Office to‘plami qayta yugurilmadi |
+| Android `assembleDebug` + `testDebugUnitTest` | PASS |
+| APK telefonga o‘rnatish va versiyani tekshirish | PASS |
+| DXFni AutoCAD dasturining o‘zida ochish | NOT TESTED — AutoCAD o‘rnatilmagan |
+
+**Keyingi qadam:** foydalanuvchi CADni o‘zi ishlatib ko‘radi; AutoCAD bor kompyuterda DXFni ochish va telefondagi qolgan qo‘l sinovlari. Windows installer yangi belgi bilan alohida build qilinmagan. Merge/push faqat foydalanuvchi topshirsa.
+
+---
+
+## 2026-10-18 (24) — Claude Code — Chizma (AutoCAD DXF) va Office buyruqlari professional darajada; Android 1.2.1
+
+**Foydalanuvchi talabi:** hammasini qayta tekshirish, kamchiliklarni tuzatish; AutoCAD (chizma) mukammal va qulay ishlasin; Office dasturlarini «professional, xatosiz» darajaga yetkazish; o‘zi qatnashmasdan qilinadigan hamma ishni qilish. Telefon yangilash uchun ulangan.
+
+**Chizma / AutoCAD** (`cad.py` yangi, `drawing_offline.py` yangi, `app/api_drawing.py`):
+- DXF endi `ezdxf` bilan: AutoCAD 2010 (R2010, Unicode), mm ($INSUNITS=4), qatlamlar (KONTUR, INGICHKA, YASHIRIN, SHTRIX, OQ_CHIZIQ, OLCHAM, MATN, RAMKA) rang/qalinlik/chiziq turi bilan, LWPOLYLINE (yumaloq burchak — bulge), ELLIPSE, haqiqiy DIMENSION (o‘lcham yozuvi doim o‘qiladigan tomonda), ramka va shtamp. Avval R12: faqat chiziqlar, «?» harflar, shtrix yo‘q edi.
+- Har chizmadan keyin DXF qayta o‘qilib AutoCAD auditidan o‘tkaziladi (xato bo‘lsa vazifa FAIL).
+- AI’siz aniq chizish (bepul, tasdiqsiz): plastina/kvadrat (markaziy teshik, burchakda 4 teshik, R burchak), doira, flanes (bolt teshiklari aylana bo‘ylab), halqa/shayba, uchburchak (3 tomon / asos+balandlik), ko‘pburchak/gayka (kalit o‘lchami), ellips; katta detal masshtabda, o‘lcham yozuvi haqiqiy qiymatda; «oxirgi chizmani o‘zgartir: teshik 10 mm» faqat aytilganini o‘zgartiradi. Tushunilmagan detal → AI (kalit bo‘lsa).
+- «Chizma.dxf ni PDF qil» / «shu DXF faylni ko‘rsat»: istalgan DXF → PDF + PNG (ezdxf + PyMuPDF). DWG — yopiq format, «DXF qilib saqlang» deyiladi.
+- Tuzatildi: izohlar shtamp ramkasidan tashqariga chiqardi.
+- Yangi bog‘liqliklar: `ezdxf`, `pillow` (pyproject, installer spec). Asosiy `.venv` ga o‘rnatildi.
+
+**Office buyruqlari** (`agent/parse.py`, `excel_exec.py`, `word_exec.py`, `ppt_exec.py`; har biri qayta ochib tekshiriladi):
+- Excel: shartli formatlash (shart, eng katta/kichik N, rang shkalasi, ma’lumot chiziqlari — `DisplayFormat` bilan haqiqatan tekshiriladi), pul/foiz/dollar/kasr/butun/sana formati (15 kabi foiz qiymatlar 1500% bo‘lib ketmaydi), formula ustun (`Foyda = Daromad - Xarajat`, «ko‘paytir/minus» so‘zlari; natija Python’da qayta hisoblanadi), o‘rtacha/maksimum/minimum/soni/mediana qatorlari (JAMI bilan birga, saralashda jadval ostida qoladi), ustunni o‘chirish, varaq nomi, kenglikni moslashtirish, chop etish (albom, bir sahifa eniga, sarlavha har sahifada), shrift, almashtirish. Ustun harf bilan ham («C ustunni pul formatiga»). «sartirovka» ham tushuniladi.
+- Word: tekislash (matn/sarlavhalar), yuqori/pastki kolontitul (sahifa raqami saqlanadi), albom/kitob, chetlar (har tomon alohida), ortiqcha bo‘sh joy va bo‘sh qatorlarni tozalash, birinchi qatorni sarlavha, jadvallarni formatlash, statistika; xatboshi endi qayta tekshiriladi.
+- PowerPoint (mavjud fayl): almashtirish (guruh va jadval ichida ham, formatlash saqlanadi), shrift nomi, o‘tish effekti, slayd raqamlari (har qanday maketda), sifat tekshiruvi (sig‘magan matn, ustma-ust), PDF; natija `_NEXVARA.pptx`.
+- AI yo‘naltiruvchi (`ai/features.py`) yangi buyruq namunalarini biladi.
+
+**Android 1.2.1:** tayyor buyruqlarga AI’siz chizma va yangi Office namunalari (+ rus tarjimasi). Loyihaning sinov kaliti (`ANDROID_USER_HOME=.tools/android-home`) bilan yig‘ildi — boshqa kalit bilan telefon o‘rnatishni rad etadi. Telefondagi 1.2.0 ustiga ma’lumot o‘chmasdan o‘rnatildi. APK `D:/NEXVARA/android/NEXVARA-Android-1.2.1-debug.apk` (SHA-256 `1eb9933c779898cada3f72643dc66b089d2173380b320bc43a1f7c0029dcc60f`).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| Unit + haqiqiy Office (`NEXVARA_RUN_OFFICE=1`, to‘liq) | 453/454; `test_word_command` tekshiruvlar soni 7→8 (xatboshi endi tekshiriladi) — test yangilandi, qayta PASS |
+| Yangi: `tests/unit/test_cad.py`, parse testlari, `tests/office/test_commands_pro.py` (Excel 15 bosqichli zanjir, Word 13, PowerPoint 6 — haqiqiy Office) | PASS |
+| Smoke (shu tarmoq kodi bilan, `PYTHONPATH=src`) + 10 ta oyna UI testi | PASS |
+| Android `assembleDebug` + `testDebugUnitTest` | PASS |
+| Telefonga o‘rnatish (Android 16), ilova ochiladi, crash yo‘q | PASS |
+| DXF’ni AutoCAD dasturining o‘zida ochish | NOT TESTED — kompyuterda AutoCAD yo‘q (ezdxf auditi va qayta o‘qish PASS) |
+| Telefon ↔ kompyuter ulanishi bilan chizma/Office | NOT TESTED — sinov paytida kompyuterdagi NEXVARA telefonga ulanmagan edi |
+
+**Eslatma:** `.worktrees/android` da `.venv` yo‘q; `../../.venv` ishlatiladi. U yerdagi `nexvara` paketi asosiy papkaga o‘rnatilgan — subprocess/smoke uchun `PYTHONPATH=<worktree>/src` qo‘ying, aks holda `main` kodi sinaladi.
+
+**Keyingi qadam (foydalanuvchi bilan):** DXF’ni AutoCAD’da ochib ko‘rish (AutoCAD bor kompyuterda); telefon ulanganda chizma va Office buyruqlarini telefondan sinash; oldingi yozuvdagi qo‘l sinovlari (kamera bilan varaq, ovoz, barmoq izi, vidjet); keyin `claude/android-v1` → `main` merge.
+
+---
+
+## 2026-10-18 (23) — Claude Code — Android 1.2.0: o‘qituvchi va ofis uchun 14 ta yangi imkoniyat, aqlli OCR va ovoz, telefonda E2E
+
+**Foydalanuvchi talabi:** taklif qilingan barcha qulayliklar: javob varaqalari, jurnal, rasmdan matn, dars jadvali, hujjat shablonlari, skaner, majlis yozuvi, ilovada ko‘rish, kompyuterni yoqish, vidjet, haftalik jadval, sevimlilar, kompyuterni boshqarish, rus tili; «hammasi aqlli ishlasin, ayniqsa rasmni o‘qish va ovozni matnga aylantirish».
+
+**Windows (yangi modullar):** `omr.py` (javob varaqasi PDF; rasmda 4 burchak → gomografiya → doirachalar; Otsu chegara; Excel natijalar), `journal.py` (app.db, Excel jurnal), `doctemplates.py` (7 shablon, Word jonli, DOCX+PDF), `knowledge/ocr.ocr_image` (tiniqlashtirish, lotin/kirill eng yaxshisi, `tidy`), `app/api_reading.py` (suhbatda «rasmdagi matnni o‘qi»: oflayn yoki «AI bilan» — qo‘lyozma, ruxsat bilan), `control.py` (sichqoncha/klaviatura; sukut bo‘yicha o‘chiq, PC’da yoqiladi), `pcpower.py` (Windows bilan ishga tushish, Wake-on-LAN ma’lumoti), haftalik workflow, testlar javob kaliti natijada, `remote_v1_school.py` (+19 marshrut), Qurilmalar sahifasida «Telefonga ruxsatlar».
+
+**Android 1.2.0:** Javob varaqalari, Sinf jurnali, Hujjat shablonlari, Dars jadvali + eslatma (AlarmManager, qayta yuklashdan keyin ham), Majlis yozuvi (uzluksiz SpeechRecognizer, til tanlash, Android 13+ tinish belgilari, AI tahrir/bayonnoma), Rasmdan matn (+ «Qo‘lyozma: AI bilan»), ML Kit skaner → PDF, ilovada PDF/Word/rasm/matn ko‘rish, kompyuterni boshqarish (barmoq izi bilan), Wake-on-LAN, bosh ekran vidjeti, sevimli/oxirgi buyruqlar, haftalik jadval, rus tili (`ui/I18n.kt`; buyruq namunalari ataylab o‘zbekcha).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff, Windows unit | PASS — 342 passed, 56 skipped |
+| Windows oyna smoke + 9 ta haqiqiy oyna UI skripti | PASS |
+| Javob varaqasi: −30°…+30° burilgan 60 savol/4 variant | PASS (61 holat) |
+| Haqiqiy Windows OCR: past kontrast lotin, kirill (avto tanlov) | PASS (rus OCR «қ/ҳ» ni «к/х» o‘qiydi — cheklov) |
+| Android build + 16 unit test | PASS — APK `D:\NEXVARA\android\NEXVARA-Android-1.2.0-debug.apk` |
+| Telefonda E2E (Android 16, haqiqiy Agent, vaqtinchalik ma’lumot, AI kalitsiz): jurnal (sinf, o‘quvchi, baho, Excel PC’da) | PASS 4/4 |
+| Hujjat shabloni → haqiqiy Word DOCX+PDF; Word hujjatini ilova ichida ko‘rish | PASS |
+| Javob varaqasi yaratish (PDF PC’da), ilovada PDF ko‘rish | PASS |
+| Galereyadagi to‘ldirilgan varaq rasmi → «baho 4 — 8/10» | PASS (avval FAIL: oq rasmda chegara 255 → Otsu bilan tuzatildi + regressiya testi) |
+| Galereyadagi sahifa rasmi → matn (internetsiz) | PASS |
+| Dars jadvali + Bosh sahifada «Bugungi darslar» | PASS |
+| Majlis yozuvi: mikrofon ruxsati, tinglash, jimlikda uzilmasligi | PASS; nutqning matnga aylanishi — NOT TESTED (tirik ovoz kerak) |
+| Rus tili ↔ o‘zbek tili | PASS (til tugmalari tarjima bo‘lib qolgani topildi → tuzatildi) |
+| ML Kit skaner ochilishi; Wake-on-LAN tugmasi va signal | PASS |
+| Kompyuterni boshqarish (telefon UI) | NOT TESTED — barmoq izi kerak (API testlari PASS) |
+| Vidjet, dars eslatmasi bildirishnomasi | NOT TESTED — qo‘l bilan |
+| AI bilan qo‘lyozma, bayonnoma, chizma | NOT TESTED — kalit yo‘q (soxta AI bilan PASS) |
+
+**Tozalash:** telefon `stay_on_while_plugged_in` = 0 ga qaytarildi, sinov rasmlari va sinov kompyuteri o‘chirildi, sinov Word hujjati yopildi. NEXVARA’ga mikrofon ruxsati berildi (telefon sozlamalaridan olib tashlash mumkin).
+
+**Keyingi qadam:** foydalanuvchi bilan: haqiqiy qog‘oz varaqni kamera bilan, ovoz, barmoq izi bilan boshqarish, vidjet; AI kaliti bilan qo‘lyozma va bayonnoma; keyin `main` ga merge.
+
+---
+
+## 2026-10-17 (22) — Claude Code — Android 1.1.0: barcha qulayliklar, boshqa tarmoq, telefonda haqiqiy E2E
+
+**Foydalanuvchi talabi:** Android’da hamma ishni tugatish (o‘qituvchidan ofisgacha barcha imkoniyatlar, juda qulay), har xil Wi-Fi’da xavfsiz ishlash, taklif qilingan barcha qulayliklar; API kalitsiz Android va Windows’ni o‘zim sinash — telefon USB bilan ulab qo‘yildi, foydalanuvchi uxladi.
+
+**Qo‘shildi (Windows):** `/api/v1/screen` (kompyuter ekrani, faqat ko‘rish, PC’da «📱 Telefon ekranni ko‘rmoqda», `remote.screen_view` bilan o‘chadi); fayl qidirish / PC’da ochish / telefonga berish (10/30 daqiqalik ruxsat, kalit va bazalar hech qachon, dastur ochilmaydi); `info`/`session` da manzillar (LAN + Tailscale); sertifikat tarmoq almashganda o‘zgarmaydi; internetdan to‘g‘ridan-to‘g‘ri so‘rov rad etiladi; chizma DXF (AutoCAD) va «oxirgi chizmani o‘zgartir»; uzilgan ulanish logni ifloslamaydi.
+
+**Qo‘shildi (Android 1.1.0):** Kompyuter ekrani (jonli, kattalashtirish, ostida buyruq maydoni), Fayllar → kompyuterdan qidirish, «Tayyor buyruqlar» (o‘qituvchi: test, mavzu, taqdimot, dars rejasi, uyga vazifa, e’lon, baholar; ofis; hujjatlar; chizma; xotira), Darsliklar → Mavzu matni / Taqdimot / Dars rejasi, chizmani tuzatish tugmasi, Tailscale kartasi (manzillar o‘zi saqlanadi, avtomatik almashadi), «Ulashish → NEXVARA», fon xabarlari (WorkManager, 15 daqiqa), skrinshot taqiqi, Bosh sahifada 8 tezkor amal.
+
+**Telefonda haqiqiy sinov (Xiaomi 24115RA8EG, Android 16, adb; Agent shu tarmoq kodi, vaqtinchalik ma’lumot papkasi, AI kalitsiz):**
+| Sinov | Natija |
+|---|---|
+| Codex 0.1.0 ustidan o‘rnatish, saqlangan kompyuter yo‘qolmadi | PASS |
+| Birinchi ishga tushirishda yiqilish (bildirishnoma ruxsati erta so‘ralgan) | TOPILDI → tuzatildi → PASS |
+| Havola bilan ulash (USB `adb reverse`), ikki kompyuter, nom berish | PASS |
+| Bosh sahifa ulangan, AI panel 4 provayder | PASS |
+| Suhbat: buyruq → javob; PC oynasiga «📱 Telefondan» hodisasi | PASS |
+| Kompyuterdan fayl qidirish → «Buyruq» → haqiqiy Excel bilan bajarildi | PASS (kursor xatosi topildi → tuzatildi) |
+| Natijani telefonga saqlash (tizim «Saqlash»), SHA-256 PC nusxasi bilan bir xil | PASS |
+| Word hisobot (haqiqiy Word): Pauza → «Pauzada» → Davom → Bajarildi | PASS |
+| BI panel telefonda (KPI, chiziq, ustun) + PC’da ochilish hodisasi | PASS |
+| Xotira: PC eslatmasi ko‘rindi, telefondan qo‘shildi | PASS |
+| Teach: tekshirish → saqlash | PASS (noto‘g‘ri namuna matni topildi → tuzatildi) |
+| Workflow shablondan yaratildi | PASS |
+| Darsliklar sahifasi, AI xarajat sahifasi (4 karta, «To‘ldirish») | PASS |
+| Kompyuter ekrani telefonda jonli | PASS |
+| Tayyor buyruq → suhbat maydoni; «Ulashish» matni → suhbat | PASS |
+| Chizma AI kalitisiz → to‘g‘ri tushuntirish | PASS |
+| Yorug‘/qorong‘i mavzu; tizim panellari rangi | PASS (panel rangi tuzatildi) |
+| Fon xabarlari (WorkManager), barmoq izi qulfi, ovoz, kamera, QR kamera bilan | NOT TESTED — qo‘l bilan |
+| Tailscale orqali boshqa tarmoq | NOT TESTED — Tailscale o‘rnatilmagan |
+| Haqiqiy AI (chizma, rasmdan chizma, AI test) | NOT TESTED — kalit yo‘q, pul sarflanmadi |
+
+**Windows testlari:** ruff PASS; unit 326 PASS; Office bilan to‘liq (`NEXVARA_RUN_OFFICE=1`): PASS — 381 passed + devices_page qayta: 1 passed (birinchi urinishda konsol kodirovkasi tufayli yiqildi; test ishga tushiruvchisi UTF-8 ga o‘tkazildi), jami 382/382; oyna smoke PASS (oldingi bosqichda).
+
+**APK:** `D:\NEXVARA\android\NEXVARA-Android-1.1.0-debug.apk`. Telefonda «ekran o‘chmasin» (`stay_on_while_plugged_in`) sinov uchun yoqilgan edi va asl qiymatga (0) qaytarildi.
+
+**Keyingi qadam:** foydalanuvchi bilan qo‘l sinovlari (QR kamera, ovoz, barmoq izi, fon xabari), Tailscale, AI kaliti bilan chizma; keyin `main` ga merge.
+
+---
+
+## 2026-10-17 (21) — Claude Code — Android V1: yangi dizayn, barcha bo‘limlar, chizma, xavfsizlik
+
+**Foydalanuvchi talabi:** Codex’ning Android ishini Claude oladi (Codex dizayni yoqmadi), Windows 1.0.1 ni buzmasdan Android V1 ni yakunlash: 12 bo‘lim, AI yozish/ovoz, Office jonli, BI, darsliklardan test, fayl/PDF/rasm/kamera, natijani yuklash, Memory/Teach, Workflow, pauza/davom, ish/uy kompyuteri, Google, NEXVARA-SYNC, AI balans paneli (4 provayder), maxfiylik telefon so‘rovlarida ham, pullik chaqiruvsiz. Qo‘shimcha (yo‘l-yo‘lakay): xavfsizlik maksimal; «chizib ber» va qo‘lda chizilgan chala chizma rasmini mukammal chizish.
+
+**Tarmoq:** `claude/android-v1` (= `codex/android-mobile` f0311f3 + `main` 1.0.1). Worktree `.worktrees/android`. `main` ga merge qilinmadi.
+
+**Windows (Claude):**
+- `core/task.py`: kooperativ pauza/davom — faqat qadam chegarasida (Office chaqiruvi o‘rtasida emas), pauza vaqti 10 daqiqalik watchdog’ga kirmaydi; PC oynasida «Pauza/Davom ettirish» tugmasi.
+- `remote_v1_sections.py`: telefon uchun 27 marshrut (overview, chat tarixi, AI xarajat/balans, Memory, Teach, Workflow, BI, darsliklar, Office, Google, pauza/davom). AI kaliti (hatto yashirilgani ham) telefonga yuborilmaydi. Xarajat bitta `ai_usage` jadvalidan — ikki marta hisoblanmaydi.
+- Telefon buyrug‘i PC chatida «📱 Telefondan: …» bo‘lib chiqadi, vazifasi PC panelida, BI dashboard PC oynasida ochiladi (`Api.ui_events`).
+- Google telefonda: `account.verify_phone` — ID token imzosi, Web client auditoriyasi, tasdiqlangan email va PC egasining `sub` i tekshiriladi.
+- **Chizma** (`drawing.py`, `app/api_drawing.py`): AI faqat qat’iy tekshiriladigan JSON shakllar ro‘yxatini beradi, SVG’ni NEXVARA o‘zi chizadi (AI kodi kira olmaydi); SVG + PDF + PNG, PDF PC ekranida ochiladi. Rasmdan: EXIF/GPS o‘chiriladi, kichraytiriladi, har safar alohida ruxsat; DeepSeek rasm o‘qimaydi — OpenAI/Gemini/Claude. Provayderlarga rasm yuborish qo‘shildi.
+- **Xavfsizlik:** telefondan dastur/skript/yorliq fayllari (.exe, .bat, .ps1, .lnk, «x.pdf.exe»…) qabul qilinmaydi; noto‘g‘ri token bilan urinish daqiqasiga 20 tadan oshsa bloklanadi; `X-Frame-Options`, `Referrer-Policy`; kutilmagan xatoda ulanish uzilmaydi (INTERNAL).
+- Demo server barcha bo‘limlar bilan; `scripts/android_build.ps1`.
+
+**Android (Claude, yangi dizayn):** Kotlin/Compose, ViewModel + coroutines; brend ranglari, qorong‘i/yorug‘/tizim mavzusi, 100% o‘zbekcha. Bosh sahifa (kompyuter holati, tezkor amallar, AI balans paneli, vazifalar, holat), AI suhbat (fayl/PDF/rasm/kamera biriktirish, «Fonda bajar», ovozli buyruq, ovozli suhbat rejimi — javob TTS bilan), Vazifalar (progress, pauza/davom, bekor, natija yuklash va ichida ko‘rish), Bo‘limlar: Office + Chizma, Darsliklar (sinf/fan/mavzu/son/variant/AI), Fayllar, NEXVARA BI (KPI, ustunli, chiziqli grafik, jadval; PC’da ochish), Workflow (yaratish/tahrir/ishga tushirish/tasdiq/pauza/o‘chirish), Teach (tekshirish → saqlash, yoqish/o‘chirish), Xotira (qidiruv, qo‘shish/tahrir/o‘chirish), AI xarajatlari (4 provayder, qolgan limit, haqiqiy balans DeepSeek, «To‘ldirish» rasmiy billing brauzerda), Kompyuterlar (ish/uy, nom berish, tanlash, chiqish), Google bog‘lash, Sozlamalar. Ilova qulfi (barmoq izi/yuz/PIN, 1 daqiqadan keyin qayta qulf), bildirishnoma (telefondan boshlangan vazifa tugaganda), PC chat tarixini olish, offline navbat. Zaxira nusxa olinmaydi (Keystore kalitli ma’lumot). Versiya 1.0.0 (versionCode 2).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff check + format | PASS |
+| Windows unit (`pytest`) | PASS — 322 passed, 56 skipped (Office testlari ruxsatsiz o‘tkazilmadi) |
+| Yangi: telefon bo‘limlari (11), chizma + xavfsizlik (11) | PASS |
+| Windows oyna smoke (`--smoke`) | PASS — 12 bo‘lim, JS xato yo‘q |
+| Demo server orqali barcha yangi GET/POST bo‘limlar | PASS |
+| Android `assembleDebug` + 12 unit test | PASS — APK SHA-256 `6848e14b10eeabf4f5e3509eccb271d07fdae7e82556f2d74b9595d05f4fe233`, nusxa `D:\NEXVARA\android\NEXVARA-Android-1.0.0-debug.apk` |
+| Chizma renderi (namunaviy flanes, shtrix/o‘q chiziqlari, o‘lchamlar) | PASS — PNG ko‘zda tekshirildi |
+| Haqiqiy telefon, haqiqiy Windows Agent E2E, kamera, ovoz, qulf, bildirishnoma | NOT TESTED — foydalanuvchi bilan |
+| Haqiqiy AI (chizma, rasm) | NOT TESTED — kalit ertaga, pullik chaqiruv qilinmadi |
+| Google telefonda | BLOCKED — Android + Web OAuth client kerak (docs/GOOGLE_LOGIN.md § Android) |
+| `.\scripts\test.ps1 -Office` | NOT TESTED — Office kodi o‘zgarmadi |
+| Release APK imzo | BLOCKED — `release.jks` hali yaratilmagan |
+
+**Keyingi qadam:** foydalanuvchi bilan: APK’ni telefonga o‘rnatish, haqiqiy QR pairing, Office/BI/test/chizma E2E; AI kaliti bilan chizma sinovi; Google client; release kaliti; keyin `main` ga merge.
+
+---
+
 ## 2026-10-17 (20) — Claude Code — Windows V1: to'liq o'rnatish va yangilanish (1.0.1 o'rnatildi)
 
 **Foydalanuvchi talabi:** barcha bo'limlarni bitta Windows installerga yig'ish; mavjud o'rnatishni aniqlab xavfsiz yangilash; Google, OneDrive NEXVARA-SYNC, Memory/Teach, darsliklar, dashboardlar, API sozlamalari, imzo kaliti va rollback yo'qolmasin — avval zaxira va tiklash sinovi; o'zbekcha UI, yorliq, Start menyu; AI ulanishi qulay (rasmiy OAuth bo'lsa), kalitlar faqat Windows himoyalangan xotirasida; yangilanish xabari va «Yangilash»; o'rnatilgan dasturni haqiqatda ochib tekshirish; Codex Android'ga tegmaslik; private push.
@@ -214,6 +581,37 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 **Keyingi qadam:** foydalanuvchi — Google client JSON import va o'zi kirishi; Codex — Android'da `/api/v1/sync`; Claude — BI ETL chatdan, tarix sinxroni.
 
 ---
+
+---
+
+## 2026-10-17 — Codex — Android vaqtincha to‘xtatildi
+
+- Foydalanuvchi ko‘rsatmasiga ko‘ra Windows NEXVARA PERSONAL to‘liq tugamaguncha Android ishlab chiqilishi to‘xtaydi. Qolgan ishlar `docs/ANDROID_HANDOFF.md` ga yozildi. Claude Windows ishchi papkasi va fayllariga tegilmadi.
+- Oxirgi Android build va 8/8 unit test **PASS**; yangi APK telefonda **NOT TESTED** (ADB ruxsati rad etildi). Haqiqiy Windows Agent E2E **NOT TESTED**; pause/resume hamda chat/Memory sync **BLOCKED** (API yo‘q).
+- `codex/android-mobile` tarmog‘ida mahalliy commit va PRIVATE GitHub push so‘raldi; natija quyidagi yakuniy ish holatida aniqlanadi.
+
+## 2026-10-17 — Codex — Android V1 fayl va kamera tekshiruvlari
+
+- Ish faqat `codex/android-mobile` worktree'da. Kamera URI qayta yaratilganda saqlanadi; upload javobi va download fayli SHA-256 bilan tekshiriladi; vazifa watcherining takrorlanishi tuzatildi. Pause/resume, chat tarixi va Memory API talablari `docs/ANDROID_WINDOWS_API_GAPS.md` ga yozildi.
+- **PASS:** Android debug APK build, 8/8 unit test; Windows ruff check va format. Oldingi APK bilan Android 16 pairing, chat, chat tarixi, oddiy fayl upload va kamera oynasini ochish PASS holatida.
+- **BLOCKED/NOT TESTED:** yangi APK’ni telefonga o‘rnatish ADB avtomatik ruxsatida rad etildi; Windows NEXVARA oynasini avtomatik boshqarish ham rad etildi. Shu sabab haqiqiy Agent pairing, Office vazifalari/progress/cancel, kamera suratini yuborish va natija faylini olish tasdiqlanmadi. `scripts/test.ps1` uchun worktree'da `.venv` yo‘q; boshqa venv bilan pytest ham sandboxda rad etildi. Windows chat/Memory sync va pause/resume uchun API yo‘q.
+- **Push BLOCKED:** diff maxfiy ma’lumot naqshlariga tekshirildi, APK va lokal sozlamalar ignore qilingan. GitHub tarmoq ulanishi sandboxda ishlamadi, eskalatsiya avtomatik rad etildi. PRIVATE holat masofadan tasdiqlanmadi; lokal commit saqlanadi.
+- Keyingi qadam: qurilma/UI ruxsati mavjud bo‘lganda haqiqiy Agent bilan E2E; Office kodi o‘zgartirilmadi.
+
+## 2026-10-17 — Codex — Android chat tarixi va fayl sinovi
+
+- `codex/android-mobile` worktree'da har bir PC uchun so‘nggi 200 chat xabari shifrlangan xotiraga yoziladigan qilindi. Ilova qayta ochilganda tarix tiklanadi.
+- **PASS:** Android APK build, 3/3 QR unit test; Android 16 telefonda ilova majburan to‘xtatilib qayta ochilgach chat tarixi ko‘rindi; 41 baytli sun’iy fayl demo Windows API'ga yuborildi; kamera oynasi ochildi va ilovaga qaytildi.
+- **FAIL/BLOCKED:** `scripts/test.ps1` bu worktree'da `.venv` bo‘lmagani uchun ishlamadi. **NOT TESTED:** suratga olish/yuborish, faylni olish, haqiqiy Windows agenti vazifalari, fon bildirishnomalari. Office testlari ruxsatsiz ishga tushirilmadi.
+- Keyingi qadam: Windows agenti bilan vazifalar va faylni olish sinovi; qolgan mobil bo‘limlar va fon ishlashi.
+
+## 2026-10-17 — Codex — Android V1 telefon sinovi
+
+- Ish faqat alohida `.worktrees/android` worktree va `codex/android-mobile` tarmog‘ida bajarildi. `main` dagi telefon API v1 shu tarmoqqa merge qilindi; Claude ishchi papkasi va tarmog‘i almashtirilmadi.
+- Android chat tasdig‘i, vazifalar long-poll, ko‘p PC, shifrlangan offline navbat, kamera va release signing sozlamalari qo‘shildi. Klaviatura chat maydonini berkitishi haqiqiy telefonda topilib tuzatildi.
+- **PASS:** Android APK build, 3/3 QR unit test, Android 16 telefonga o‘rnatish va ishga tushirish, QR pairing, demo Windows API bilan chat so‘rovi va javobi, klaviatura tuzatishining qurilmadagi sinovi.
+- **FAIL/BLOCKED:** `scripts/test.ps1` Android worktree'da `.venv` yo‘qligi sababli ishga tushmadi. **NOT TESTED:** kamera, fayl almashinuvi, haqiqiy Windows agenti vazifalari, Office testlari, fon bildirishnomalari. Google Android OAuth va pause/resume uchun tashqi sozlama/API kerak.
+- Keyingi qadam: haqiqiy Windows agenti bilan vazifa, kamera va fayl almashinuvini sinash; fon sinxronizatsiyasi va bildirishnomalar.
 
 ## 2026-10-17 (13) — Claude Code — Windows Agent integratsiyalari: telefon API v1, Google login, installer/updater, bo'limlar auditi
 

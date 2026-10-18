@@ -6,7 +6,8 @@ ROOT = SPECPATH + "\\.."
 datas = collect_data_files("nexvara", includes=["app/ui/*"])
 binaries = []
 hiddenimports = collect_submodules("nexvara") + ["win32timezone"]
-for pkg in ("webview", "pymupdf", "segno", "winrt", "telethon", "anthropic", "openpyxl"):
+for pkg in ("webview", "pymupdf", "segno", "winrt", "telethon", "anthropic", "openpyxl",
+            "ezdxf", "PIL"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b

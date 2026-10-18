@@ -17,6 +17,11 @@ from typing import Any
 from nexvara.core.task import UserError
 
 TIMEOUT = 180.0
+VISION = ("openai", "gemini", "anthropic")  # DeepSeek's API reads text only
+
+
+def _images(messages: list[dict[str, Any]]) -> bool:
+    return any(m.get("images") for m in messages)
 
 
 @dataclass
@@ -103,11 +108,23 @@ class AnthropicProvider(Provider):
         return AiError(f"Anthropic: {e}")
 
     def complete(self, model, system, messages, max_tokens, effort="medium") -> Reply:
+        sdk_messages = []
+        for m in messages:  # a photo goes as a base64 image block before the text
+            if m.get("images"):
+                blocks: list[dict[str, Any]] = [
+                    {"type": "image", "source": {"type": "base64", "media_type": i["mime"],
+                                                 "data": i["data"]}}
+                    for i in m["images"]
+                ]  # fmt: skip
+                blocks.append({"type": "text", "text": m["content"]})
+                sdk_messages.append({"role": m["role"], "content": blocks})
+            else:
+                sdk_messages.append({"role": m["role"], "content": m["content"]})
         kwargs: dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
             "system": system,
-            "messages": messages,
+            "messages": sdk_messages,
             "output_config": {"effort": effort},
         }
         try:
@@ -207,9 +224,35 @@ class ChatCompletionsProvider(Provider):
         raise AiError(f"{label}: javob olinmadi")
 
     def complete(self, model, system, messages, max_tokens, effort="medium") -> Reply:
+        if _images(messages) and self.name not in VISION:
+            label = _LABEL.get(self.name, self.name)
+            raise AiError(
+                f"{label} rasmni o‘qiy olmaydi: OpenAI, Gemini yoki Claude kalitini ulang."
+            )
+        if any(m.get("audio") for m in messages) and self.name != "gemini":
+            raise AiError(
+                f"{_LABEL.get(self.name, self.name)} ovozni tinglay olmaydi: Gemini kerak."
+            )
+        wire = []
+        for m in messages:
+            if m.get("audio"):  # Gemini (OpenAI-compatible endpoint): a spoken command
+                a = m["audio"]
+                fmt = "wav" if "wav" in a["mime"] else a["mime"].split("/")[-1]
+                wire.append({"role": m["role"], "content": [
+                    {"type": "text", "text": m["content"]},
+                    {"type": "input_audio", "input_audio": {"data": a["data"], "format": fmt}},
+                ]})  # fmt: skip
+            elif m.get("images"):
+                parts: list[dict[str, Any]] = [{"type": "text", "text": m["content"]}]
+                parts += [{"type": "image_url",
+                           "image_url": {"url": f"data:{i['mime']};base64,{i['data']}"}}
+                          for i in m["images"]]  # fmt: skip
+                wire.append({"role": m["role"], "content": parts})
+            else:
+                wire.append({"role": m["role"], "content": m["content"]})
         body: dict[str, Any] = {
             "model": model,
-            "messages": [{"role": "system", "content": system}, *messages],
+            "messages": [{"role": "system", "content": system}, *wire],
         }
         if self.name == "openai":
             body["max_completion_tokens"] = max_tokens
