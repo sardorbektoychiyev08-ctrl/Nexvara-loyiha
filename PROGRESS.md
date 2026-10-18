@@ -4,6 +4,42 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (31) — Claude Code — Suhbat xotirasi, AI o‘zi tuzatadi, ertalabki xulosa, haftalik zaxira, javob varaqasi, rasm → Excel/Word, chizma ranglari; Windows 1.2.0, Android 1.3.0
+
+**Foydalanuvchi talabi:** takliflardan 1, 2, 3, 5, 8, 9 (bir oylik suhbat xotirasi, xatoni AI o‘zi tuzatishi, ertalabki xulosa, avtomatik zaxira, test variantlari va javob varaqasi, telefon kamerasi → Excel/Word); keyin «AutoCAD’ga ranglar»; Codex ishini tekshirib tuzatish; hammasi telefonda ham bo‘lsin; telefon va kompyuterni yangilash; API qo‘shishga tayyor. Telefon ekranini o‘chirmaslik (egasi yonida bo‘lmaydi).
+
+**Qilindi** (tarmoq `claude/android-v1`):
+- **Suhbat xotirasi** (`memory/store.py`, `ai/features.py`, `app/api_agent.py`): AI suhbat/savol/reja oxirgi 15 xabarni `app.db` dan oladi (qayta ochilganda ham), 30 kun ichidagi mos suhbatlarni (FTS) va oldingi 7 kunning qisqa mahalliy xulosasini. Hammasi maxfiylik qoravuli orqali. «… haqidagi gaplarni unut», «buni unut». Sozlamalar: `memory.chat_days`, `memory.recent_turns`.
+- **AI o‘zi tuzatadi** (`ai.self_repair`, sukutda yoqiq, faqat AI tayyor bo‘lsa): buyruq xato bersa (asbob xatosi yoki chatdan boshlangan Office vazifasi yiqilsa) xato matni rejalashtiruvchiga qaytadi, ko‘pi bilan 2 marta; o‘zgartiradigan qadam baribir «Ha» kutadi; fon tuzatishi chatga `nexvara_reply` hodisasi bilan chiqadi.
+- **Haftalik avtomatik zaxira** (`autobackup.py`): bazalar (SQLite backup), sozlamalar, dashboardlar va boshqa kichik fayllar → `D:\NEXVARA-zaxira\auto\auto-<vaqt>`, SHA-256 manifest, oxirgi 4 tasi; darsliklar, 100 MB dan katta (darslik indeksi), loglar, installerlar kirmaydi; Credential Manager sirlari hech qachon. Chatda «zaxira qil», «zaxira holati», «avtomatik zaxirani o‘chir/yoq» (fayl zaxirasi buyruqlariga xalaqit bermaydi).
+- **Testlar**: variantlar A/B/C… harflari bilan (Word, javob varaqasi, telefon); har A/B/C/D testga chop etiladigan javob varaqasi PDF va kalitlar avtomatik (`omr.create_set`), natija panelida «Javob varaqasi (PDF)».
+- **Rasm → Excel/Word** (`photodoc.py`, `api_reading.py`, `POST /api/v1/ocr/convert`): OCR (yoki «AI bilan» — rozilikdan keyin) matnidan ramkali, sarlavhali, raqamlari haqiqiy son bo‘lgan .xlsx yoki Word hujjat; rasm o‘zgarmaydi. PC chatda «shu rasmni Excel qil», telefonda «Rasmdan matn» ostida «Excel» / «Word».
+- **Ertalabki xulosa** (`morning.py`, `GET /api/v1/morning`, Android `Morning.kt`): har kuni (sukut 07:30, Sozlamalarda vaqt, o‘chirish, «Hozir ko‘rsat») bugungi darslar (telefon jadvalidan) va kompyuterda kutayotganlar: kecha bajarilmagan ishlar, «Ha» kutayotgan workflowlar, bugungi avtomatik ishlar, eski zaxira. Kompyuter o‘chiq bo‘lsa — shuni yozadi.
+- **Chizma ranglari**: AutoCAD ACI palitrasi (1–9, 10–249, kulranglar 250–255), asboblar panelida «Rang» (yangi obyektlar rangi; tanlanganlarni ham bo‘yaydi), `COLOR`/`RANG` buyrug‘i, qatlam va obyekt rangi palitra oynasi bilan; PDF/PNG endi rangli (oq/7 qora chiqadi). Telefonda ham rang tanlash, rang DXF ga o‘tadi.
+- **Codex ishi (478ff8e) tekshirildi**: ramka/yakuniy formatlash yaxshi; regressiya tuzatildi — «formatla» raqam formatini qo‘ymay qo‘ygan edi (endi faqat «General» ustunlarga); yangi jadval buyrug‘i ustun sonisiz va «ustunlari:» bilan ham ishlaydi; `features.py` dagi buzuq satr («\n"jadvalni tekshir"») tozalandi. Osilgan PowerPoint testi sababi: 15:20 dan beri yashirin osilgan POWERPNT jarayoni (PID 15432) — ruxsatsiz to‘xtatilmadi, test chetga olindi.
+- Versiyalar: Windows 1.2.0, Android 1.3.0 (versionCode 10). Telefonda `svc power stayon usb` — USB ulanganda ekran yoniq turadi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff check + format --check | PASS |
+| pytest to‘liq, haqiqiy Office bilan (`NEXVARA_RUN_OFFICE=1`), `test_session_never_closes_users_presentation` chetda | **558 passed**, 1 deselected |
+| Oyna smoke (13 bo‘lim, v1.2.0, JS xatosi yo‘q) | PASS |
+| Yangi unit: `test_ai_memory` (7), `test_autobackup` (4), `test_answer_sheet_auto` (2), `test_photodoc` (5), `test_morning` (1), `test_school` (+2 marshrut), `test_agent_parse` (+1) | PASS |
+| Haqiqiy oyna: `tests/ui_scripts/cad_tools.py` (ranglar bilan: COLOR 1, palitra 256 katak, tanlanganni 30 ga bo‘yash, DXF da rang 30) | PASS |
+| Android `compileDebugKotlin` + `testDebugUnitTest` (MorningTest 2, CadColorTest 2 va eskilari), `assembleDebug` | PASS |
+| Telefonga 1.3.0 `adb install -r` (loyiha sinov kaliti `ANDROID_USER_HOME=.tools/android-home`, ma’lumotlar saqlandi), ilova ishga tushdi, crash logi bo‘sh | PASS. APK SHA-256 `6afe18af60f699873fb0b7d9cc3b619c8b45287b7b3327bc89304d992f0d54fb`, nusxa `D:\NEXVARA\android\NEXVARA-Android-1.3.0-debug.apk` |
+| Telefon ekranlarini ko‘z bilan tekshirish | NOT TESTED — telefon qulf ekranida, qulf ochilmadi |
+| Zaxira (o‘rnatishdan oldin) `D:\NEXVARA-zaxira\auto\auto-20261018-180431` (11 fayl, xato 0) + bugungi to‘liq zaxira 15:42 | PASS |
+| Windows 1.2.0 yig‘ish, mahalliy kanalga imzolab joylash, jim o‘rnatish (`%LOCALAPPDATA%\Programs\NEXVARA`, ProductVersion 1.2.0, dastur o‘zi ochildi) | PASS — SHA-256 `656ed0d6e6435cb1672aa0218d25d7af7745b2e86a3f2889ae247a83da4ed2c2` |
+| O‘rnatilgan `NEXVARA.exe --selftest-installed` | PASS — `report.json` `ok: true`, v1.2.0: 12 sahifa, Google, sinxron, AI, yangilanish, Excel/dashboard/Word/PowerPoint, BI |
+| Haqiqiy AI (xotira, o‘zini tuzatish, rasm AI bilan) | NOT TESTED — kalit kiritilmagan (soxta provayder bilan PASS) |
+| Ertalabki bildirishnoma haqiqiy telefonda 07:30 da | NOT TESTED — ertaga ertalab ko‘rinadi |
+
+**Keyingi qadam (egasi bilan):** Gemini kalitini kiritish (Sozlamalar → AI → «Buferdan kalitni saqlash»); telefonda qulfni ochib yangi tugmalarni (Rasmdan matn → Excel/Word, Chizma → rang, Sozlamalar → Ertalabki xulosa → «Hozir ko‘rsat») sinash; osilgan yashirin PowerPoint (PID 15432) ni yopishga ruxsat — keyin chetga olingan test qayta; `main` ga merge va push faqat egasining roziligi bilan.
+
+---
+
 ## 2026-10-18 (30) — Codex — Excel jadval sifati, Word/PowerPoint tekshiruvi, Windows 1.1.1
 
 **Davom ettirilgan ish:** `claude/android-v1` tarmog‘idagi tugallanmagan Office sifati vazifasi (`HANDOFF_CODEX.md`, topshiriq 4). Asl foydalanuvchi fayllari o‘zgartirilmadi; amaliy sinovlar vaqtinchalik fayllarda bajarildi.

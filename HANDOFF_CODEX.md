@@ -6,23 +6,23 @@
 
 Owner chose proposals 1, 2, 3, 5, 8, 9, then: review Codex's task-4 work and fix gaps, then
 install the update on the PC (Windows 1.2.0) and the phone (APK 1.3.0), API keys ready.
-Branch `claude/android-v1`, worktree `.worktrees/android`. Claude ticks these as it goes:
-- [ ] 1 Month-long chat memory: AI chat/QA/planner get the last 15 turns (from app.db, survive
+DONE 2026-10-18 18:20 (PROGRESS (31)); also CAD colours added on request. Left for the owner: Gemini key, unlock the phone to try the new buttons, permission to close the hung hidden POWERPNT (PID 15432). Branch `claude/android-v1`, worktree `.worktrees/android`. Claude ticks these as it goes:
+- [x] 1 Month-long chat memory: AI chat/QA/planner get the last 15 turns (from app.db, survive
   restarts) + matching chat lines of the last 30 days (FTS, `memory.chat_days` setting) +
   per-day short summaries (local, no AI). «buni unut …» deletes matching chat lines.
-- [ ] 2 Self-repair: a failed command (tool error) with AI ready → the planner gets the error
+- [x] 2 Self-repair: a failed command (tool error) with AI ready → the planner gets the error
   and re-plans, max 2 tries; changing steps still ask «Ha».
-- [ ] 3 Morning summary on the phone: `/api/v1/morning` (today's lessons, unfinished tasks,
+- [x] 3 Morning summary on the phone: `/api/v1/morning` (today's lessons, unfinished tasks,
   reminders, workflows today); phone daily notification at a set time (default 07:30).
-- [ ] 5 Weekly auto-backup of small user data (dbs, settings, dashboards, workflows; not
+- [x] 5 Weekly auto-backup of small user data (dbs, settings, dashboards, workflows; not
   textbook PDFs) to `D:\NEXVARA-zaxira\auto`, keep last 4.
-- [ ] 8 Tests: variants lettered A/B/C…, a printable OMR answer sheet + keys made with every
+- [x] 8 Tests: variants lettered A/B/C…, a printable OMR answer sheet + keys made with every
   test (omr.create_set), mention in the reply.
-- [ ] 9 Photo → Excel/Word: OCR text (or AI table) → .xlsx (table rows) or .docx; chat on PC
+- [x] 9 Photo → Excel/Word: OCR text (or AI table) → .xlsx (table rows) or .docx; chat on PC
   («shu rasmni Excel qil») and phone buttons on the OCR screen (`/api/v1/ocr/convert`).
-- [ ] Review Codex commit 478ff8e (Excel finish pass, new table command, Word borders, PPT
+- [x] Review Codex commit 478ff8e (Excel finish pass, new table command, Word borders, PPT
   fit) + the hanging PowerPoint COM test; fix.
-- [ ] Tests, PROGRESS (31), build/install Windows 1.2.0 and APK 1.3.0.
+- [x] Tests, PROGRESS (31), build/install Windows 1.2.0 and APK 1.3.0.
 
 ## ▶ CURRENT TASK 4 (2026-10-18, for Codex) — Excel quality, then Word and PowerPoint
 

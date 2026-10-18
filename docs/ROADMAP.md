@@ -19,6 +19,8 @@ Bosqichlar [MASTER_SPEC.md](MASTER_SPEC.md) 26-bo'limidan olingan. Holat belgila
 | M12 | Windows-Mobile E2E | IN PROGRESS | API v1 + 27 bo‘lim marshruti, pauza/davom, telefon buyrug‘i PC oynasida, BI PC’da ochiladi, maxfiylik telefon so‘rovlarida ham, xarajat bitta hisobda: PASS (soxta AI, localhost HTTPS). Demo server bilan barcha bo‘limlar: PASS. Haqiqiy telefon + haqiqiy Agent E2E: NOT TESTED (foydalanuvchi bilan) |
 | M13 | Final Personal Release | TODO | |
 
+2026-10-18 kechki yangilanish (Claude): **M7** — AI bir oylik suhbat xotirasi va buyruq xatosini o‘zi tuzatishi (soxta provayder bilan PASS). **M5** — chizma ranglari (ACI palitra, PDF rangli), rasm → Excel/Word. **M11** — Android 1.3.0: ertalabki xulosa, rasm → Excel/Word, chizmada rang; telefonga o‘rnatildi (ekranlarni ko‘z bilan tekshirish NOT TESTED — qulf). **M10** — Windows 1.2.0 o‘rnatildi, selftest PASS; haftalik avtomatik zaxira. Testlar: 558 PASS (Office bilan), 1 PowerPoint testi osilgan yashirin jarayon sabab chetda.
+
 2026-10-18 yangilanishi (Codex): **M3** — barcha Excel buyruqlaridan so‘ng ramka va sarlavha yakunlanadi, jami qatori ham ramkalanadi; chatdan ustun nomlari bilan yangi jadval yaratiladi (haqiqiy Office 4/4 PASS). **M4** — Word jadvali ramkasi va PowerPoint matni sig‘ishi saqlab qayta ochilganda tekshirildi (haqiqiy Office 2/2 PASS). **M10** — Windows 1.1.1 yig‘ildi, imzolangan mahalliy kanalga joylandi, o‘rnatildi va o‘rnatilgan nusxa selftesti PASS. To‘liq Office to‘plamida 83 PASS, bir PowerPoint COM sinovi osilgani uchun chetga olindi.
 
 ## Yaqin navbat
