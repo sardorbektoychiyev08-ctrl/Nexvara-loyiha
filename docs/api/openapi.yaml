@@ -467,6 +467,41 @@ paths:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "400": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/v1/cad:
+    get:
+      summary: "Drawings in the PC's Chizmalar folder (newest first, up to 30): name, path, modified, size"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "Save a drawing made on the phone {name, drawing (same JSON as the PC editor: layers, entities line/polyline/circle/arc/ellipse/text/dim/ldim/rdim/hatch, mm, y up), open_on_pc}: AutoCAD DXF + PDF + PNG on the PC, files shared with the phone"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {name: {}, drawing: {}, open_on_pc: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/cad/drawing:
+    get:
+      summary: "One drawing from the Chizmalar folder as editor JSON (query path=; at most 5000 entities, truncated flag)"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/cad/open:
+    post:
+      summary: "Open a drawing from the Chizmalar folder {path} in the PC's own editor"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {path: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
   /api/v1/journal:
     get:
       summary: "Class journal: classes with student counts"

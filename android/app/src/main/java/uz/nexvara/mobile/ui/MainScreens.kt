@@ -112,6 +112,7 @@ fun AppRoot(m: AppModel, act: PhoneActions) {
                 Screen.Dictation -> DictationScreen(m, act)
                 Screen.Preview -> PreviewScreen(m, act)
                 Screen.Templates -> TemplatesScreen(m)
+                Screen.Cad -> CadScreen(m)
                 Screen.Office -> OfficeScreen(m, act)
                 Screen.Library -> LibraryScreen(m)
                 Screen.Files -> FilesScreen(m, act)
@@ -255,7 +256,7 @@ fun HomeScreen(m: AppModel, act: PhoneActions) {
             val quick = listOf(
                 Triple(Icons.Default.TableChart, "Office", Screen.Office), Triple(Icons.Default.School, "Test tuzish", Screen.Library),
                 Triple(Icons.Default.Insights, "BI panellar", Screen.Bi), Triple(Icons.Default.UploadFile, "Fayllar", Screen.Files),
-                Triple(Icons.Default.Monitor, "Ekran", Screen.PcScreen), Triple(Icons.Default.Architecture, "Chizma", Screen.Office),
+                Triple(Icons.Default.Monitor, "Ekran", Screen.PcScreen), Triple(Icons.Default.Architecture, "Chizma", Screen.Cad),
                 Triple(Icons.Default.Bolt, "Tayyor buyruq", Screen.Templates), Triple(Icons.Default.Bookmarks, "Xotira", Screen.Memory),
             )
             val tints = listOf(Color(0xFF16A34A), Brand.Indigo, Brand.Cyan, Color(0xFFF59E0B), Color(0xFF0EA5E9), Color(0xFF8B5CF6),
@@ -566,6 +567,7 @@ fun SectionsScreen(m: AppModel) {
         Triple(Screen.Schedule, Icons.Default.Event, "Darslar va eslatma"),
         Triple(Screen.Dictation, Icons.Default.RecordVoiceOver, "Ovozdan bayonnoma"),
         Triple(Screen.PcScreen, Icons.Default.Monitor, "Jonli ko‘rish"),
+        Triple(Screen.Cad, Icons.Default.Architecture, "Qo‘lda chizish → AutoCAD"),
         Triple(Screen.Office, Icons.Default.Description, "Excel, Word, PowerPoint, chizma"),
         Triple(Screen.Library, Icons.Default.School, "Darslikdan test tuzish"),
         Triple(Screen.Files, Icons.Default.Folder, "Yuborish va natijalar"),

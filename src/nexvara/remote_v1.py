@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from nexvara import __version__, config, remote_v1_school, remote_v1_sections
+from nexvara import __version__, config, remote_v1_cad, remote_v1_school, remote_v1_sections
 from nexvara.protocol import MIN_CLIENT_PROTOCOL, PROTOCOL, ApiError, ok, task_dto
 
 # (method, path pattern, needs a device token)
@@ -38,6 +38,7 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("POST", "/api/v1/sync", True),
     *remote_v1_sections.ROUTES,  # Home, AI spend, Memory, Teach, Workflows, BI, textbooks...
     *remote_v1_school.ROUTES,  # answer sheets, journal, documents, OCR, preview, control
+    *remote_v1_cad.ROUTES,  # drawings from the phone (DXF / PDF / PNG on the PC)
 ]
 log = logging.getLogger(__name__)
 WATCH_MAX = 25.0  # seconds a long-poll may hang
@@ -181,6 +182,9 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
     from nexvara.remote import MAX_UPLOAD, TOKEN_MAX_DAYS, server_id
 
     api = srv.api
+    if route in remote_v1_cad.HANDLED:
+        assert dev is not None
+        return remote_v1_cad.route(h, srv, route, args, q, dev, lambda: _json_body(h))
     if route in remote_v1_school.HANDLED:
         assert dev is not None
         return remote_v1_school.route(h, srv, route, args, q, dev, lambda: _json_body(h))

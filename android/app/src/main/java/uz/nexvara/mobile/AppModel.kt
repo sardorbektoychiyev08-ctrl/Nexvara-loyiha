@@ -23,7 +23,7 @@ enum class Screen(val title: String) {
     Home("Bosh sahifa"), Chat("AI suhbat"), Tasks("Vazifalar"), Sections("Bo‘limlar"),
     PcScreen("Kompyuter ekrani"), Templates("Tayyor buyruqlar"), AnswerSheets("Javob varaqalari"),
     Journal("Sinf jurnali"), Documents("Hujjat shablonlari"), Schedule("Dars jadvali"),
-    Dictation("Majlis yozuvi"), Preview("Ko‘rish"),
+    Dictation("Majlis yozuvi"), Preview("Ko‘rish"), Cad("Chizma"),
     Office("Office yordamchisi"), Library("Darsliklar va testlar"), Files("Fayllar"),
     Bi("NEXVARA BI"), Workflows("Ish jarayonlari"), Teach("NEXVARA’ga o‘rgatish"),
     Memory("Xotira"), Ai("AI balans va xarajatlar"), Devices("Kompyuterlar"), Settings("Sozlamalar"),
@@ -86,6 +86,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     var afterUpload: String? = null  // a command to send once the picked photo is on the PC
     var onUploaded: ((String) -> Unit)? = null  // a tool waiting for the uploaded file's PC path
     val tools = Tools()
+    val cad = CadState()
     val schedule = Schedule(app)
     var favorites by mutableStateOf(secure.favorites()); private set
     fun toggleFavorite(text: String) {

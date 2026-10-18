@@ -20,8 +20,8 @@ android {
         applicationId = "uz.nexvara.mobile"
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.2.2"
+        versionCode = 7
+        versionName = "1.2.3"
     }
     signingConfigs {
         if (releaseStore != null) create("nexvaraRelease") {
@@ -59,7 +59,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("androidx.biometric:biometric:1.1.0")  // app lock
     implementation("androidx.work:work-runtime-ktx:2.10.1")  // "task finished" while the app is closed
-    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")  // paper → PDF
+    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")  // paper â†’ PDF
     // Google sign-in on the phone (Credential Manager); the PC verifies the ID token.
     implementation("androidx.credentials:credentials:1.5.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.5.0")

@@ -272,6 +272,8 @@ async function phoneEvents() {
       showPhoneBadge();
     } else if (ev.kind === "phone_control") {
       showPhoneBadge(i18n("phone.control"));
+    } else if (ev.kind === "cad_open" && ev.path) {
+      if (cadConfirmDirty()) { show("cad"); cadLoad(await api().cad_open(ev.path)); }
     } else if (ev.kind === "bi_open" && ev.file) {
       biFromChat({ open: ev.file, state: ev.state && Object.keys(ev.state).length ? ev.state : null });
     }
