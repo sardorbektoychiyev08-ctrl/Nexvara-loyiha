@@ -31,7 +31,7 @@ win.events.loaded += lambda: ready.set()
 res = {}
 
 
-def wait_for(js, timeout=20):
+def wait_for(js, timeout=40):
     end = time.monotonic() + timeout
     while time.monotonic() < end:
         v = win.evaluate_js(js)

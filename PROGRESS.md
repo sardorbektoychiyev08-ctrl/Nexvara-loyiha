@@ -4,6 +4,46 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-19 (35) — Claude Code — Haqiqiy AI bilan jonli sinov (≈$0.10), Office/chizma/telefon; topilgan 20+ xato tuzatildi; Windows 1.3.3
+
+**Egasi ruxsati:** «o‘zing test qilaver, AI ishlat ozroq», keyin «Office’ni AI yordamida kuchli test qil, AutoCAD ham, $2 gacha, telefon orqali ham». Kalitlar: OpenAI + Gemini (egasi ulagan). Sinovlar vaqtinchalik fayllarda; chat xotirasi vaqtinchalik bazada; haqiqiy sarf egasining hisobiga yozildi.
+
+**Haqiqiy natijalar (PASS):** matn suhbat (o‘zbekcha, maxfiylik — «Sardor» va boshqalar yashirildi), xotira (oldingi gapni esladi), vision («NEXVARA 2026» + qizil to‘rtburchak), OpenAI rasm (gpt-image-1-mini, 15 s), TTS→STT aylanma, AI rejalashtiruvchi (fayl qidirish + «ulardan» kontekst), Excel (chalkash jadval: bo‘sh qator, takror, saralash, jami, format; hududlar diagrammasi + PDF), Word (rasmiy ariza + PDF; AI notanish gapni ilova buyruqlariga aylantirdi), PowerPoint (mayda yozuv 18 pt, slayd raqamlari), yangi Excel jadval, chizma (andoza plastinka; AI L-kronshteyn, DXF tekshiruvi), **telefon orqali:** AI savol-javob «Ha» bilan, ✨ rasm telefonda ochildi, «AI ovozi» telefonda ijro etildi.
+
+**Topilgan va tuzatilgan xatolar:**
+1. AUTO matn katalogiga rasm/TTS modellari kirib qolgan (`gemini-…-image`, `-tts`) — chiqarildi.
+2. «Eslab qol degan emasman» eslatma bo‘lib saqlanardi — rad etish tanildi.
+3. Gemini rasm faqat JPEG qaytaradi (400) — `image/jpeg`, fayl turi rasmdan aniqlanadi.
+4. Bepul darajada yo‘q model (429 «limit: 0») — aniq xabar, behuda qayta urinishsiz.
+5. OpenAI STT o‘zbekchani qirg‘izcha kirillda yozardi — o‘zbek lotin ko‘rsatmasi, kirill→lotin: endi «Assalomu alaykum. Bugun yettinchi sinfda fizika darsi soat toqqizda boshlanadi.»
+6. Chat javoblarida `**` — tozalanadi.
+7–9. **Maxfiylik himoyasi o‘zini bloklab qo‘yardi:** vaqt belgili fayl nomlari (`rasm-20261019-025804.png`), ISO sanalar (`[2026-10-19]` xotira, model nomlari), NEXVARA’ning o‘z ogohlantirishi xotiradan qaytib «raqami» kalit so‘zi bilan — tuzatildi (qiymat faqat o‘z qatorida; xizmat xabarlari xotiraga olinmaydi). Haqiqiy uzun raqam hamon bloklanadi.
+10. AI papka yo‘liga «papkasi» qo‘shardi — topiladi. 11. «Excel fayllari xlsx» qidiruv so‘zi — fayl turi deb tushuniladi. 12. AI «sen» deb murojaat qilardi — «siz».
+13. **Excel:** jadval ichidagi bo‘sh qator jadvalni bo‘lardi (tozalash ko‘rmasdi, dublikat −30) — jadval bo‘sh qatordan keyin ham o‘qiladi; «tekshir» xabar qiladi, «kamchiliklarni tuzat» o‘chiradi.
+14. «Eng katta summadan boshlab» o‘sish tartibida saralardi — kamayish. 15. «Jami» Narx ustunini ham qo‘shardi — narx/foiz/yil qo‘shilmaydi.
+16. Diagramma yig‘indilari jadval yonida — 40 qator bo‘sh ramka; endi alohida «Diagramma ma’lumoti» varag‘ida (`Worksheets.Add` pozitsion argument bilan — nomli argument e’tiborsiz qolib, varaq birinchi bo‘lib qolardi; pivot ham). 17. PDF’da diagramma kesilardi — eni bir sahifaga, kerak bo‘lsa albom; PDF nomi Excel bilan bir xil.
+18. Fayl nomli buyruqning tushunilmagan qismi jim tashlanardi — AI’ga beriladi; AI rejasi faqat ilova iboralaridan tuziladi; notanish qism xato bo‘lib qaytadi (o‘zini tuzatish ishlaydi). «Rasmiy … ko‘rinishiga keltir», «mayda yozuvlarni kattalashtir» tanildi; Word’da «Hujjatni rasmiy formatlash» nomi.
+19. AI chizma: $0.051 uchun «Ha» so‘rab, keyin $0.05 limit to‘xtatardi — limit oldin; kuchli sig‘masa muvozanatli (ochiq aytiladi).
+20. **Telefon:** OpenAI WAV hajmi 0xFFFFFFFF — Android ijro etmasdi; haqiqiy hajm yoziladi (endi telefonda eshitildi). 21. AI rasmlari oq fonda (shaffof fon telefonda xira edi).
+
+**Sarf:** jami ≈$0.098 (OpenAI: rejalashtirish 14×, savol 4×, suhbat 3×, rasm 2×, chizma 1×, TTS 4×, STT 2×, vision 1×). Gemini: $0 — Google javobi kalit **Free Tier** ekanini ko‘rsatdi (rasm modellari «limit: 0 … on Free Tier»).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| pytest unit | 521 PASS |
+| To‘liq Office + oyna (oxirgi Excel tuzatishlaridan oldin) | 602 PASS, 3 FAIL → tuzatildi; Excel Office fayllari qayta 28/28 + 19/19 PASS |
+| Smoke v1.3.3, `uzbek_ui` (100%), `cad_tools`, `media_tools` (1-marta vaqt tugadi, qayta PASS; kutish 40 s ga uzaytirildi) | PASS |
+| Jonli AI (yuqoridagi ro‘yxat) | PASS |
+| Windows 1.3.3 o‘rnatildi (SHA-256 `3198dcc16639378c94aef63ef1b40a291e3322829082105e625550a070cf055b`), zaxira `auto-20261019-035456` | PASS |
+| Gemini STT/TTS haqiqiy | NOT TESTED — «Free Tier tekshirdim» belgisi egasining qarori |
+| Kamera, mikrofon, jonli suhbat (qo‘lda) | NOT TESTED — egasi bilan |
+
+**Egasi uchun:** telefonda sinov uchun yoqilgan «Ovozli suhbat» va «AI ovozi» qaytadan o‘chirildi. Merge/push — ruxsat bilan.
+
+---
+
 ## 2026-10-18 (34) — Claude Code — Codex limiti tugagach davom: Codex ishi saqlandi va tekshirildi, Android 1.4.0, Windows 1.3.1
 
 **Holat:** Codex `codex/auto-model-router` (worktree `.worktrees/auto-model-router`) da AI katalogi ustida ishlab, limiti tugagan; 27 fayl commit qilinmagan, oxirgi testi 21:34 da PASS (505). Egasi: «kelgan joyidan davom et», «Android’ga ham yangilanish bo‘lsa bajar», «hamma kamchiliklarni tuzat, AI bilan test ertaga».
