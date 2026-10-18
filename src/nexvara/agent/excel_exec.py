@@ -591,7 +591,7 @@ def _do(a, xl, ws, t, ops, format_table, freeze_header, TableSpec, col_letter, c
         vals = [c for c in (t.find_column(w) for w in tokens) if c in nums] or nums[:3]
         if row_col is None or not vals:
             raise CommandError("Pivot uchun matnli va raqamli ustun kerak")
-        sheet = ws.Parent.Worksheets.Add(After=ws)
+        sheet = ws.Parent.Worksheets.Add(None, ws)  # positional: (Before, After)
         sheet.Name = _unique_sheet_name(ws.Parent, "Pivot")
         values = [
             (t.headers[c - 1], "sum", f"Jami {t.headers[c - 1]}") for c in dict.fromkeys(vals)
@@ -1040,8 +1040,10 @@ def _ex_check(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
     blank_rows = [
         t.top + 1 + i for i, row in enumerate(t.rows) if all(v in (None, "") for v in row)
     ]
-    if blank_rows:
-        problems.append("Jadval ichida bo‘sh qatorlar: " + ", ".join(map(str, blank_rows[:8])))
+    if blank_rows:  # the table continues below them (Table._past_blank_rows)
+        problems.append(f"Jadval {', '.join(map(str, blank_rows[:8]))}-qatordagi bo‘sh qator bilan "
+                        "ikkiga bo‘lingan — bo‘sh qatorni o‘chiring, aks holda Excel’ning o‘z "
+                        "saralash va filtri faqat yuqori qismga ishlaydi")  # fmt: skip
     # data again right under the table: a blank row cut it in two (Excel sees only the top part)
     below = ws.Range(ws.Cells(last + 2, t.left), ws.Cells(last + 6, t.left + len(t.headers) - 1))
     if any(v not in (None, "") for row in ops.read_range(below) for v in row):
@@ -1082,6 +1084,12 @@ def _ex_fix(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
         ws.Rows(last + 1).Delete()
         done.append(f"{last + 1}-qatordagi bo‘sh qator o‘chirildi")
         t.refresh()
+    # 1b) blank rows inside the table (it is read past them now), bottom up
+    for i in range(len(t.rows) - 1, -1, -1):
+        if all(v in (None, "") for v in t.rows[i]):
+            ws.Rows(t.top + 1 + i).Delete()
+            done.append(f"{t.top + 1 + i}-qatordagi bo‘sh qator o‘chirildi")
+    t.refresh()
     # 2) merged cells inside the table: unmerge (the value stays in the first cell)
     last = t.top + t.n_rows + len(t.footers)
     full = ws.Range(ws.Cells(t.top, t.left), ws.Cells(last, t.left + len(t.headers) - 1))
@@ -1165,7 +1173,7 @@ def _summary(ws: Any, t: Table, cat: int, val: int, col_letter) -> Any:
     («Diagramma ma’lumoti»): next to the table they were taken for part of it (live check
     2026-10-19: the finishing pass drew 40 empty bordered rows beside the data)."""
     cats = list(dict.fromkeys(v for v in t.column(cat) if v not in (None, "")))[:30]
-    sheet = ws.Parent.Worksheets.Add(After=ws)
+    sheet = ws.Parent.Worksheets.Add(None, ws)  # positional: (Before, After)
     sheet.Name = _unique_sheet_name(ws.Parent, "Diagramma ma’lumoti")
     cat_l, val_l = col_letter(t.left + cat - 1), col_letter(t.left + val - 1)
     first, last = t.top + 1, t.top + t.n_rows
