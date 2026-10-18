@@ -320,6 +320,10 @@ def test_phone_ai_directions_speech_and_pictures(env):
     router.settings.update({"ai": {"enabled": True}})
     log: list = []
     router.media_factory = lambda n, k: MediaFake(n, log)
+    # this test checks the real «Ha» rule (the fixture approves everything for older tests)
+    from nexvara.ai.router import AiRouter
+
+    router.check_budget = AiRouter.check_budget.__get__(router)
     st = j(call(srv, "GET", "/api/v1/ai/capabilities", token=token))["data"]
     assert set(st["capabilities"]) == {"text", "vision", "image", "stt", "tts", "realtime"}
     assert "sk-test" not in json.dumps(st)
@@ -337,7 +341,10 @@ def test_phone_ai_directions_speech_and_pictures(env):
         token,
     )
     assert ok[0] == 200 and router.cap_settings()["tts"]["provider"] == "openai"  # the PC sees it
-    sp = j(post(srv, "/api/v1/ai/speak", {"text": "Salom, dars 9 da"}, token))["data"]
+    ask = j(post(srv, "/api/v1/ai/speak", {"text": "Salom, dars 9 da"}, token))["data"]
+    assert ask["needs_approval"] and "$" in ask["text"] and not log  # paid: price first
+    sp = j(post(srv, "/api/v1/ai/speak", {"text": "Salom, dars 9 da", "approved": True},
+                token))["data"]  # fmt: skip
     assert sp["path"].endswith(".wav") and sp["provider"] == "openai"
     assert call(srv, "GET", f"/api/v1/files?path={quote(sp['path'])}", token=token)[0] == 200
     api._ai_ready = lambda: True

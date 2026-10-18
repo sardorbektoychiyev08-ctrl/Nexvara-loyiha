@@ -203,11 +203,11 @@ paths:
         "400": {$ref: "#/components/responses/Error"}
   /api/v1/ai/speak:
     post:
-      summary: "🔊 Text → speech on the TTS direction (Gemini free tier first in AUTO). {text} → {path (WAV, downloadable with GET /api/v1/files), provider, model, cost}. Personal data is replaced before sending; budget limits apply"
+      summary: "🔊 Text → speech on the TTS direction (Gemini free tier first in AUTO). {text, approved, live} → {path (WAV, downloadable with GET /api/v1/files), provider, model, cost}; a paid voice not yet approved → {needs_approval: true, text (price)} and the phone repeats with approved=true after «Ha». Personal data is replaced before sending; budget limits apply"
       parameters:
         - {$ref: "#/components/parameters/RequestId"}
       requestBody:
-        content: {application/json: {schema: {type: object, properties: {text: {}}}}}
+        content: {application/json: {schema: {type: object, properties: {text: {}, approved: {}, live: {}}}}}
       responses:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "400": {$ref: "#/components/responses/Error"}
