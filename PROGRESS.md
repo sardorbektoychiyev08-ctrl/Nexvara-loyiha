@@ -4,6 +4,32 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (32) — Claude Code — Egasi ruxsati bilan: osilgan PowerPoint, telefon tekshiruvi, merge va push; Windows 1.2.1
+
+**Foydalanuvchi talabi:** «2, 3, 4 ni tugat va hisobot ber» (telefonni ko‘z bilan tekshirish; osilgan PowerPoint’ni yopish; main ga merge va push); «AutoCAD’da ranglarni ko‘rmayapman, ko‘rsat».
+
+**Qilindi:**
+- Osilgan yashirin POWERPNT (PID 15432, 15:20 dan) egasi ruxsati bilan yopildi; ilgari qotgan `test_session_never_closes_users_presentation` endi o‘tadi (`tests/office/test_powerpoint.py` 4/4 PASS).
+- Rang tugmasi ko‘zga tashlanadigan qilindi: PC asboblar panelida «🎨 Rang: …» (ajratilgan ramka), telefonda yuqori qatorning boshida «Rang». Kompyuterda rangli chizma va ochiq palitra rasmi olindi.
+- Telefonda bildirishnoma ruxsati yo‘q edi (hech qanday NEXVARA xabari chiqmasdi): Sozlamalar → Ertalabki xulosa ostida ogohlantirish va «Ruxsat berish» tugmasi qo‘shildi; egasi ertalabki xulosani so‘ragani uchun ruxsat adb bilan yoqildi. «Hozir ko‘rsat» → «Xayrli tong! Bugun Yakshanba · Bugun 1 ta dars» xabari keldi.
+- Telefon kompyuterga ulanmayotgan edi: 17-oktabr 13:24 da (eski versiya) PC sertifikati qayta yaratilgan, telefon eski izni saqlagan — himoya to‘g‘ri rad etgan. Telefon havola orqali qayta bog‘landi (yangi qurilma yozuvi id 2; eski id 1 yozuvi o‘chirilmadi). Telefonga yangi imkoniyat: ma’lum manzillar javob bermasa, telefon o‘z mahalliy tarmoqlaridan (USB/hotspot/Wi‑Fi, faqat xususiy /24) kompyuterni qidiradi, daqiqasiga 1 marta; sertifikat izi baribir tekshiriladi. Hozir PC telefonga USB orqali ulangan (172.30.96.202).
+- Windows 1.2.1 yig‘ildi, mahalliy kanalga imzolab joylandi va o‘rnatildi (SHA-256 `bb3b37ae3f9610978158f01b0d1a0d83b081ba31b7b0532dacd74faa44e595bf`). Android 1.3.0 qayta o‘rnatildi (SHA-256 `ce2882c82615dee06bd32412a998d76e9a6f846337b665501773bede6606011c`).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| pytest (Office’siz) | 475 passed, 84 skipped |
+| Oyna smoke v1.2.1 | PASS |
+| `tests/ui_scripts/cad_tools.py` (ranglar bilan) | PASS |
+| Android unit (DiscoveryTest, MorningTest, CadColorTest va eskilari), assembleDebug | PASS |
+| Telefon: Chizma → Rang palitrasi ochildi; Sozlamalar → Ertalabki xulosa, ogohlantirish, «Hozir ko‘rsat» xabari; Bosh sahifa «Ulangan» | PASS (haqiqiy telefon, skrinshotlar) |
+| Ertalabki xulosaning kompyuter qismi haqiqiy telefonda | NOT TESTED (xabar PC ulanmagan paytda yuborilgan; marshrut unit testda PASS) |
+
+**Keyingi qadam:** egasi Gemini kalitini kiritadi va yozadi → haqiqiy AI sinovi (xotira, o‘zini tuzatish, rasm AI bilan).
+
+---
+
 ## 2026-10-18 (31) — Claude Code — Suhbat xotirasi, AI o‘zi tuzatadi, ertalabki xulosa, haftalik zaxira, javob varaqasi, rasm → Excel/Word, chizma ranglari; Windows 1.2.0, Android 1.3.0
 
 **Foydalanuvchi talabi:** takliflardan 1, 2, 3, 5, 8, 9 (bir oylik suhbat xotirasi, xatoni AI o‘zi tuzatishi, ertalabki xulosa, avtomatik zaxira, test variantlari va javob varaqasi, telefon kamerasi → Excel/Word); keyin «AutoCAD’ga ranglar»; Codex ishini tekshirib tuzatish; hammasi telefonda ham bo‘lsin; telefon va kompyuterni yangilash; API qo‘shishga tayyor. Telefon ekranini o‘chirmaslik (egasi yonida bo‘lmaydi).
