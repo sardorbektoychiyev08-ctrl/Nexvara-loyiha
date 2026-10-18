@@ -25,7 +25,7 @@ from typing import Any
 
 CAPABILITIES = ("text", "vision", "image", "stt", "tts", "realtime")
 CAP_LABELS = {
-    "text": "Matn va chat",
+    "text": "Matn va suhbat",
     "vision": "Rasmni ko‘rish (Vision/OCR)",
     "image": "Rasm yaratish va tahrirlash",
     "stt": "Ovoz → matn (STT)",

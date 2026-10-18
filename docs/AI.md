@@ -58,6 +58,44 @@ Outdated ids found in the check: `gemini-3.5-flash` (no longer listed), `deepsee
 Every request is masked locally first and restored locally after — see [PRIVACY.md](PRIVACY.md).
 Unreliable detection blocks the request. Applies to all providers and to a fallback provider.
 
+## Directions: AUTO / MANUAL per capability (2026-10-18)
+
+`ai/capabilities.py` (registry), `ai/media.py` (official HTTPS APIs), `AiRouter.candidates /
+media / set_capability / capabilities_status`, UI: chat 🧠 menu and Settings → AI.
+
+| Direction | OpenAI | Gemini | Claude | DeepSeek |
+|---|---|---|---|---|
+| Text (tiers cheap/balanced/powerful/special) | ✓ | ✓ (Flash free) | ✓ | ✓ |
+| Vision / OCR | ✓ | ✓ | ✓ | — |
+| Image make/edit | gpt-image-1-mini, gpt-image-2, gpt-image-2.5-flare/-sunburst (Image API) | gemini-3.1-flash-lite-image, gemini-nano-banana-2.1, gemini-3.1-flash-image, gemini-3-pro-image (Interactions API, no free tier) | — | — |
+| STT | gpt-4o-mini-transcribe, gpt-transcribe, whisper-1 | Flash/Flash-Lite with audio input (free) | — | — |
+| TTS | gpt-4o-mini-tts | gemini-3.8-flash-lite-tts, gemini-3.8-flash-tts (free tier) | — | — |
+| Realtime | STT → chat → TTS turn by turn | same | — | — |
+
+Checked on 2026-10-18 against developers.openai.com/api/docs (pricing, image-generation,
+text-to-speech, speech-to-text) and ai.google.dev/gemini-api/docs (models, pricing,
+image-generation, speech-generation). A model is offered only if the key check found it in the
+account's model list (`ai.catalog`). Uzbek is not listed by OpenAI TTS/STT docs; Gemini TTS lists
+«Northern Uzbek» — real quality is NOT TESTED until the owner's key.
+
+- **AUTO**: free first (Gemini free tier while «Bepul rejim» is on), then the cheapest; a busy
+  provider (429/5xx/network) falls back to the next one inside the budget; a wrong key or no
+  credit never falls back. For text an unusable answer (e.g. the planner's JSON) is retried once
+  on the next stronger tier, never above the «ask first» limit.
+- **MANUAL**: exactly the chosen provider+model, no fallback, no swapping; a choice the provider
+  cannot do is refused when saved, and a missing key gives a clear message.
+- **Money**: every media call goes through the same daily/monthly/provider/task limits and the
+  ledger; ✨ pictures are never free and always ask «Ha» with the price; TTS/STT under the
+  «ask first» limit run directly. 🔊 never sends personal data: found items are spoken as
+  «yashirin ma’lumot».
+- **Realtime**: the providers' streaming Realtime/Live APIs are not used (cost, complexity);
+  🎧 chains 🎤 (silence ends a turn) → chat → 🔊 → 🎤.
+- **New provider**: add it to `models.PROVIDERS` (tiers, prices, pages), a text adapter in
+  `providers.make_provider`, and if it has media models a row in `capabilities.MEDIA` plus a
+  client in `media.media_client`. Router, menu, budget and phone API pick it up from there.
+- **Phone** (`docs/api/openapi.yaml`): `GET/POST /api/v1/ai/capabilities`, `POST
+  /api/v1/ai/speak`; ✨ from the phone chat returns `image.path` for `GET /api/v1/files`.
+
 ## Conversation memory and self-repair (2026-10-18)
 
 - **Memory**: chat, questions and the planner get the last `memory.recent_turns` (15) messages
