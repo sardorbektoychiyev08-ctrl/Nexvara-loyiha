@@ -198,6 +198,13 @@ class ChatCompletionsProvider(Provider):
                     raise AiError(f"{label} API kaliti noto‘g‘ri yoki ruxsat yo‘q.") from e
                 if e.code == 402:
                     raise AiError(f"{label} hisobida mablag‘ yetarli emas.") from e
+                if e.code == 429 and "limit: 0" in detail:  # the model has no free tier
+                    raise AiError(
+                        f"{label}: bu model hisobingizning bepul darajasida (Free Tier) "
+                        "ishlamaydi — limit 0. Pullik model uchun AI Studio → Billing kerak; "
+                        "NEXVARA boshqa ulangan AI’dan foydalanishi mumkin.",
+                        retryable=True,
+                    ) from e
                 if (e.code == 429 or e.code >= 500) and attempt < 2:
                     wait = e.headers.get("retry-after") if e.headers else None
                     try:

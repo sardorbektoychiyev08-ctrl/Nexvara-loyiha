@@ -45,6 +45,13 @@ def _http(opener, url: str, headers: dict[str, str], data: bytes | None, label: 
                               f"{detail}".strip()) from e  # fmt: skip
             if e.code == 402:
                 raise AiError(f"{label} hisobida mablag‘ yetarli emas.") from e
+            if e.code == 429 and "limit: 0" in detail:  # the model has no free tier
+                raise AiError(
+                    f"{label}: bu model hisobingizning bepul darajasida (Free Tier) ishlamaydi — "
+                    "limit 0. Pullik model uchun AI Studio → Billing kerak; NEXVARA boshqa ulangan "
+                    "AI’dan foydalanishi mumkin.",
+                    retryable=True,
+                ) from e
             if (e.code == 429 or e.code >= 500) and attempt < 2:
                 time.sleep(2**attempt)
                 continue
@@ -192,7 +199,7 @@ class GeminiMedia:
     def _image(self, model: str, parts: list[dict], aspect: str = "1:1") -> bytes:
         data = self._interact({
             "model": model, "input": parts,
-            "response_format": {"type": "image", "mime_type": "image/png", "aspect_ratio": aspect,
+            "response_format": {"type": "image", "mime_type": "image/jpeg", "aspect_ratio": aspect,
                                 "image_size": "1K"},
         })  # fmt: skip
         block = _find_block(data, "image")

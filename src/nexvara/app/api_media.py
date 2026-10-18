@@ -297,13 +297,19 @@ class MediaApi:
             return {"reply": self._media_error(e)["error"], "error": True}
         folder = config.data_dir() / "AI rasmlar"
         folder.mkdir(parents=True, exist_ok=True)
-        out = folder / f"rasm-{time.strftime('%Y%m%d-%H%M%S')}.png"
+        # the format comes from the picture itself (OpenAI sends PNG, Gemini JPEG)
+        ext, mime = ("png", "image/png")
+        if png[:2] == b"\xff\xd8":
+            ext, mime = ("jpg", "image/jpeg")
+        elif png[8:12] == b"WEBP":
+            ext, mime = ("webp", "image/webp")
+        out = folder / f"rasm-{time.strftime('%Y%m%d-%H%M%S')}.{ext}"
         out.write_bytes(png)
         self._context_file = str(out)  # «uni yana o‘zgartir» works on the new picture
         price = "bepul" if est.free else f"≈${est.cost:.3f}"
         return {"reply": f"✨ Tayyor ({est.model}, {price}). Fayl: {out}\n«Shu rasmni … qilib "
                 "o‘zgartir» deb yana tahrirlash mumkin.", "image": str(out),
-                "image_data": "data:image/png;base64," + base64.b64encode(png).decode(),
+                "image_data": f"data:{mime};base64," + base64.b64encode(png).decode(),
                 "files": [str(out)]}  # fmt: skip
 
     def _ask_vision(self, question: str, image: str) -> dict[str, Any]:

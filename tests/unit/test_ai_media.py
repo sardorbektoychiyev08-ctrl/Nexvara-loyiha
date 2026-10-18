@@ -448,3 +448,38 @@ def test_fallback_off_or_free_mode_never_moves_to_another_paid_provider(tmp_path
     with pytest.raises(AiError):
         r.media("tts", 0.2, lambda c, m: c.speak(m, "salom"))
     assert [x[0] for x in r.log] == ["gemini", "gemini"]  # both free Gemini voices, no OpenAI
+
+
+def test_gemini_picture_is_jpeg_and_saved_as_jpg(tmp_path, monkeypatch):
+    """Live check 2026-10-19: Gemini image models accept only response mime image/jpeg."""
+    jpg = b"\xff\xd8\xff\xe0" + b"\0" * 32
+    net = Net({"/interactions": {"steps": [{"content": [
+        {"type": "image", "data": base64.b64encode(jpg).decode()}]}]}})  # fmt: skip
+    out = GeminiMedia("AIza-test-gemini-1234567", opener=net).generate_image(
+        "gemini-3.1-flash-lite-image", "x"
+    )
+    assert json.loads(net.bodies[0])["response_format"]["mime_type"] == "image/jpeg"
+    api, r = _api(tmp_path, monkeypatch)
+    r.set_capability("image", "manual", "gemini", "gemini-3.1-flash-lite-image")
+    r.media_factory = lambda n, k: type("M", (), {"generate_image": lambda self, m, p: out})()
+    ask = api.chat("rasm yarat: olma")
+    done = api.confirm_ai(ask["confirm"], True)
+    assert done["image"].endswith(".jpg") and done["image_data"].startswith("data:image/jpeg")
+
+
+def test_model_without_free_tier_gets_a_clear_message():
+    """Live check 2026-10-19: a Free Tier key gets 429 «limit: 0» for Gemini image models."""
+
+    class Limit0(Net):
+        def __call__(self, req, timeout):
+            self.urls.append(req.full_url)
+            msg = "Rate limit exceeded for model x (limit: 0 input tokens per minute on Free Tier)."
+            body = json.dumps({"error": {"message": msg}}).encode()
+            raise urllib.error.HTTPError(req.full_url, 429, "x", {}, io.BytesIO(body))
+
+    net = Limit0({})
+    with pytest.raises(AiError, match="bepul darajasida") as e:
+        GeminiMedia("AIza-test-gemini-1234567", opener=net).generate_image(
+            "gemini-3.1-flash-image", "x"
+        )
+    assert e.value.retryable and len(net.urls) == 1  # no pointless retries
