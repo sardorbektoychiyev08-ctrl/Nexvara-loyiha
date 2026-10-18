@@ -1,5 +1,21 @@
 # HANDOFF → Codex (Windows side)
 
+## ▶ CURRENT TASK 3 (2026-10-18 noon, Claude) — continue from here if Claude stopped
+
+Owner: "do all six proposals; an AI button that redraws my rough sketch correctly; install the
+update on the phone; be ready for API keys". APK 1.2.3 is installed on the phone (11:57).
+Order and status (Claude ticks these as it goes):
+- [ ] AI fix of a rough drawing: `src/nexvara/cad_ai.py` (AI prompt → editor JSON validated by
+  `api_cad.json_to_doc`; offline `beautify()` when no AI), `CadApi.cad_ai_fix`, phone route
+  `POST /api/v1/cad/ai`, PC toolbar button, phone «AI» button (CadScreen.kt). Android 1.2.4.
+- [ ] Drawing templates (GOST A4/A3 frame + title block, bolt, nut, washer, bearing).
+- [ ] Auto-fix documents («kamchiliklarni tuzat») for Excel/Word/PowerPoint.
+- [ ] Lesson plan from a textbook topic («dars ishlanmasi»): plan (Word) + questions + slides.
+- [ ] Weekly report workflow template (every Friday: Excel → PDF → phone).
+- [ ] 3D view of a drawing (extrude closed shapes) in the PC editor.
+- [ ] Voice command on the PC (mic → WAV → Gemini transcription; needs the user's key + consent).
+- [ ] Full tests, PROGRESS entry, build/install APK.
+
 ## ▶ CURRENT TASK 2 (2026-10-18, Claude) — continue from here if Claude stopped
 
 Owner asked: review Codex's work and fix gaps; Office "taught from official sources";
