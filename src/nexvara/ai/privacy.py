@@ -306,7 +306,15 @@ class Guard:
                         "ishonchli aniqlab bo‘lmadi. Uni matndan olib tashlang yoki "
                         "«[yashirilgan]» deb yozing."
                     )
-        for m in re.finditer(r"\d[\d\s\-]{7,}\d", masked):
+        # File names and paths NEXVARA itself writes carry a timestamp («rasm-20261019-025804.png»,
+        # «D:\NEXVARA\Kamera\kamera-20261019-…»): they are not document numbers. Live check
+        # 2026-10-19: after one picture every later AI request was blocked because of it.
+        scan = re.sub(r"(?i)[A-Z]:[\\/][^\s«»\"“”,;]*|[\w.\-]*\d{6,}[\w.\-]*\.(?:png|jpe?g|webp|"
+                      r"bmp|wav|mp3|pdf|docx?|xlsx?|xlsm|csv|pptx?|dxf|txt|json|zip)\b", " ",
+                      masked)  # fmt: skip
+        scan = re.sub(r"\b(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-_T]\d{4,6}\b",
+                      " ", scan)  # fmt: skip
+        for m in re.finditer(r"\d[\d\s\-]{7,}\d", scan):
             if re.fullmatch(r"\d{1,3}(?:[\s.,]\d{3})+", m.group().strip()):
                 continue  # an amount like 15 000 000 (so‘m), not a document number
             if len(re.sub(r"\D", "", m.group())) >= 8:

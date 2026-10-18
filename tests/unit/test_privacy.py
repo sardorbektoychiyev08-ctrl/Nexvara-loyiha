@@ -260,3 +260,17 @@ def test_facts_history_context_and_plan_args_are_protected(tmp_path, monkeypatch
     assert out.get("confirm") and "Aliyev Vali" in out["reply"] and "765-43-21" in out["reply"]
     assert "⟦" not in out["reply"] and out["privacy_masked"] >= 4
     assert re.search(r"yashirildi|AI’ga yuborilmadi", out["reply"])
+
+
+def test_nexvara_file_names_with_timestamps_do_not_block():
+    """Live check 2026-10-19: «rasm-20261019-025804.png» in the history blocked every request."""
+    from nexvara.ai.privacy import Guard, PrivacyBlocked
+
+    ok = (
+        "Tayyor. Fayl: C:/Users/toych/AppData/Local/Temp/data/AI rasmlar/rasm-20261019-025804.png "
+        "keyin kamera-20261019-031500.jpg va javob-20261019-031501.wav"
+    )
+    Guard().mask(ok)  # no PrivacyBlocked
+    Guard().mask("Hisobot 20261019-025804 vaqtida tuzildi")
+    with pytest.raises(PrivacyBlocked):  # a real long number still blocks
+        Guard().mask("Mening hisob raqamim 2020 8000 1234 5678 9")
