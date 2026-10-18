@@ -285,3 +285,14 @@ body.cad-mode .content { padding: 16px 20px; overflow: hidden; }
   .cad-btn { padding: 3px 6px; }
   .cad-log { height: 40px; }
 }
+
+/* «Ixcham»: the drawing gets the whole page */
+body.cad-compact .cad-head, body.cad-compact .cad-side, body.cad-compact .cad-group::before { display: none; }
+body.cad-compact .cad-main { grid-template-columns: minmax(0, 1fr); }
+body.cad-compact .cad-btn .ui-icon { margin-right: 0; }
+body.cad-compact .cad-btn { font-size: 0; padding: 5px; }
+body.cad-compact .cad-btn .ui-icon { width: 18px; height: 18px; }
+body.cad-compact .cad-btn[data-cad=compact], body.cad-compact .cad-btn[data-cad=zoomin],
+body.cad-compact .cad-btn[data-cad=zoomout], body.cad-compact .ai-btn { font-size: 12px; }
+body.cad-compact .cad-log { height: 32px; }
+.ai-btn { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff !important; border-radius: 8px; }

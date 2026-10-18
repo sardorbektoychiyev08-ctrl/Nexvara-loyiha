@@ -1201,6 +1201,18 @@ async function cadAction(action) {
   if (action === "undo") { cadRestore(cadState.undo, cadState.redo); return; }
   if (action === "redo") { cadRestore(cadState.redo, cadState.undo); return; }
   if (action === "extents") { cadExtents(); return; }
+  if (action === "zoomin" || action === "zoomout") {
+    const f = action === "zoomin" ? 1.25 : 0.8, cx = (cadWrap.clientWidth || 800) / 2, cy = (cadWrap.clientHeight || 500) / 2;
+    const before = cadModel(P(cx, cy));
+    cadState.scale = Math.max(0.0005, Math.min(2000, cadState.scale * f));
+    cadState.ox = cx - before.x * cadState.scale; cadState.oy = cy + before.y * cadState.scale;
+    cadRender(); return;
+  }
+  if (action === "compact") {
+    const on = document.body.classList.toggle("cad-compact");
+    try { localStorage.setItem("nexvara-cad-compact", on ? "1" : ""); } catch (_) { /* storage off */ }
+    requestAnimationFrame(cadRender); return;
+  }
   if (action === "erase") {
     if (!cadState.selected.size) { cadLog("O‘chirish uchun obyekt tanlang."); return; }
     cadSnapshot(); const n = cadState.selected.size;
@@ -1230,6 +1242,23 @@ async function cadAction(action) {
       else if (!r.cancelled) cadLog(r.error || "Saqlab bo‘lmadi.");
       return;
     }
+    if (action === "ai") {
+      if (!cadState.doc.entities.length) { cadLog("Avval biror narsa chizing — AI uni to‘g‘irlab beradi."); return; }
+      const note = window.prompt("Nimani chizmoqchi edingiz? (masalan: 100x60 plastina, markazida 20 mm teshik). Bo‘sh qoldirsangiz ham bo‘ladi.", "");
+      if (note === null) return;
+      cadLog("AI chizmani tuzatmoqda…");
+      let r = await api().cad_ai_fix(cadState.doc, note, false);
+      if (r.confirm) {
+        if (!window.confirm(`${r.confirm}. Davom etaymi?`)) { cadLog("Bekor qilindi, pul sarflanmadi."); return; }
+        r = await api().cad_ai_fix(cadState.doc, note, true);
+      }
+      if (!r.ok) { cadLog(r.error || "Tuzatib bo‘lmadi."); return; }
+      cadSnapshot();
+      cadState.doc.entities = r.drawing.entities;
+      cadState.selected.clear(); cadExtents(); cadRenderProps();
+      cadLog(`${r.reply} Yoqmasa — «Orqaga» (Ctrl+Z).`);
+      return;
+    }
     if (action === "pdf" || action === "png") {
       const r = await api().cad_export(cadState.doc, action);
       cadLog(r.ok ? `Tayyor: ${r.path}` : (r.error || "Eksport bajarilmadi."));
@@ -1249,6 +1278,7 @@ function addCadOpen(path) {
   row.appendChild(button); document.getElementById("chat-log").appendChild(row);
 }
 function renderCad() {
+  try { if (localStorage.getItem("nexvara-cad-compact")) document.body.classList.add("cad-compact"); } catch (_) { /* storage off */ }
   if (!cadState.ready) {
     cadState.ready = true;
     cadState.ox = (cadWrap.clientWidth || 800) / 2; cadState.oy = (cadWrap.clientHeight || 500) / 2;
@@ -1388,6 +1418,8 @@ document.addEventListener("keydown", (event) => {
   if (inCmd) return; // the command line handles its own Enter
   if (event.key === "Delete") { event.preventDefault(); cadAction("erase"); }
   else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); cadFinish(); }
+  else if (event.key === "+" || event.key === "=") { event.preventDefault(); cadAction("zoomin"); }
+  else if (event.key === "-") { event.preventDefault(); cadAction("zoomout"); }
   else if (event.key.length === 1 && !event.ctrlKey && !event.altKey) { const cmd = document.getElementById("cad-cmd"); cmd.focus(); }
 });
 window.addEventListener("resize", () => { if (cadState.ready) cadRender(); });

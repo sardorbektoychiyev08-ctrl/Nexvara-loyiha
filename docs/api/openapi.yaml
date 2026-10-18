@@ -491,6 +491,17 @@ paths:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "400": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/v1/cad/ai:
+    post:
+      summary: "«AI bilan tuzatish» {drawing (editor JSON), note (what the user meant), approved}: a clean drawing back {drawing, by: ai|offline, reply}; {confirm: text} when the AI request costs more than the user's limit (send again with approved=true); without AI the PC tidies the sketch itself"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {drawing: {}, note: {}, approved: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
   /api/v1/cad/open:
     post:
       summary: "Open a drawing from the Chizmalar folder {path} in the PC's own editor"

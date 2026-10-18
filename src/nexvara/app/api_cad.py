@@ -378,6 +378,50 @@ class CadApi:
             opener(str(out))
         return {"ok": True, "path": str(out), "name": out.name}
 
+    def cad_ai_fix(self, drawing: dict[str, Any], note: str = "",
+                   approved: bool = False) -> dict[str, Any]:  # fmt: skip
+        """«AI bilan tuzatish»: the clean drawing the user meant. Without AI: an exact tidy-up."""
+        from nexvara import cad_ai
+        from nexvara.core.task import UserError
+
+        if not isinstance(drawing, dict) or not drawing.get("entities"):
+            return {"ok": False, "error": "Chizma bo‘sh — avval biror narsa chizing"}
+        if not self._ai_ready():
+            fixed, n = cad_ai.beautify(drawing)
+            return {"ok": True, "drawing": fixed, "by": "offline", "fixes": n,
+                    "reply": f"AI ulanmagan, shuning uchun o‘zim tekisladim: {n} ta tuzatish "
+                    "(burchaklar, uchlar, o‘lchamlar). AI’ni ulasangiz (Sozlamalar → AI), "
+                    "chizmangizni to‘liq qayta chizib beradi."}  # fmt: skip
+        from nexvara.ai.router import NeedsConfirmation
+
+        system, msgs = cad_ai.ai_messages(drawing, note)
+        try:
+            reply = self._router().complete("drawing", system, msgs, max_tokens=8000,
+                                            expected_out=3000, approved=approved)  # fmt: skip
+        except NeedsConfirmation as e:
+            return {"ok": False, "confirm": e.estimate.describe()}
+        except UserError as e:  # no money left, free limit reached, blocked privacy check...
+            fixed, n = cad_ai.beautify(drawing)
+            return {
+                "ok": True,
+                "drawing": fixed,
+                "by": "offline",
+                "fixes": n,
+                "reply": f"AI ishlamadi ({e}). O‘zim tekisladim: {n} ta tuzatish.",
+            }
+        try:
+            fixed = cad_ai.parse_reply(reply.text, drawing.get("layers"))
+        except ValueError as e:
+            return {"ok": False, "error": f"AI javobi chizma emas edi ({e}). Qayta urinib ko‘ring."}
+        price = "bepul" if not reply.cost else f"≈${reply.cost:.3f}"
+        return {
+            "ok": True,
+            "drawing": fixed,
+            "by": "ai",
+            "cost": reply.cost,
+            "reply": f"AI chizmani qayta chizdi: {len(fixed['entities'])} ta obyekt ({price}).",
+        }
+
     def _cad_dialog(self, save: bool) -> str:
         import webview
 

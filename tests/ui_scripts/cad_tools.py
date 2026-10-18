@@ -139,6 +139,14 @@ def run():
         js("document.querySelector('[data-cad=undo]').click()")
         js("document.querySelector('[data-cad=redo]').click()")
         res["count"] = len(doc())
+        # 11) «AI bilan tuzatish» without a key: NEXVARA tidies the sketch itself; zoom; compact
+        js("window.prompt = () => ''; window.confirm = () => true;")
+        js("document.querySelector('[data-cad=ai]').click()")
+        res["ai_fix"] = until(
+            "document.getElementById('cad-log').textContent.includes('tekisladim')"
+        )
+        for b in ("zoomin", "zoomout", "compact", "compact"):
+            js(f"document.querySelector('[data-cad={b}]').click()")
         js("document.querySelector('[data-cad=save]').click()")
         res["saved"] = until("document.getElementById('cad-log').textContent.includes('Saqlandi:')")
         res["errors"] = json.loads(js("JSON.stringify(window.__errors)"))
@@ -169,6 +177,7 @@ checks = {
     "explode": res.get("explode") == 3,
     "saved": bool(res.get("saved")),
     "dxf": res.get("dxf_audit") == [] and "HATCH" in res.get("dxf_types", {}),
+    "ai_fix": bool(res.get("ai_fix")),
     "no_js_errors": not res.get("errors"),
 }
 print(json.dumps(checks, indent=1))

@@ -49,6 +49,11 @@ private enum class CadTool(val label: String) {
     Dim("O‘lcham"), Text("Matn"), Edit("O‘zgartirish"), Erase("O‘chirgich"),
 }
 
+/** How much of the screen the drawing takes (the user picks; «To‘liq» hides the header too). */
+private enum class CadArea(val label: String, val fraction: Float?) {
+    Small("kichik", 0.45f), Medium("o‘rta", 0.65f), Large("katta", null), Full("to‘liq", null),
+}
+
 private fun fmt(v: Double) = (Math.round(v * 10) / 10.0).toString().removeSuffix(".0").replace('.', ',')
 
 @Composable
@@ -65,6 +70,14 @@ fun CadScreen(m: AppModel) {
     var editIdx by remember { mutableStateOf<Int?>(null) }
     var saveDialog by remember { mutableStateOf(false) }
     var listDialog by remember { mutableStateOf(false) }
+    var aiDialog by remember { mutableStateOf(false) }
+    var area by remember { mutableStateOf(CadArea.Large) }
+    fun zoom(f: Float) {
+        val c = Offset(size.width / 2, size.height / 2)
+        val newScale = (scale * f).coerceIn(0.05f, 300f)
+        origin = Offset(c.x - (c.x - origin.x) * (newScale / scale), c.y - (c.y - origin.y) * (newScale / scale))
+        scale = newScale
+    }
     val ink = MaterialTheme.colorScheme.onSurface
     val accent = MaterialTheme.colorScheme.primary
     val grid = x.muted.copy(alpha = 0.18f)
@@ -123,17 +136,22 @@ fun CadScreen(m: AppModel) {
 
     LaunchedEffect(Unit) { m.cadList() }
     Column(Modifier.fillMaxSize()) {
-        ScreenHeader("Chizma", cad.name + if (cad.path != null) " · kompyuterda saqlangan" else "", onBack = { m.goBack() }) {
+        if (area != CadArea.Full) ScreenHeader("Chizma", cad.name + if (cad.path != null) " · kompyuterda saqlangan" else "", onBack = { m.goBack() }) {
+            IconButton(onClick = { aiDialog = true }) { Icon(Icons.Default.AutoFixHigh, "AI bilan tuzatish", tint = accent) }
             IconButton(onClick = { m.cadList(); listDialog = true }) { Icon(Icons.Default.FolderOpen, "Kompyuterdagi chizmalar") }
             IconButton(onClick = { saveDialog = true }) { Icon(Icons.Default.Save, "Saqlash") }
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Gutter),
             horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (area == CadArea.Full) AssistChip(onClick = { aiDialog = true }, label = { Text("AI") },
+                leadingIcon = { Icon(Icons.Default.AutoFixHigh, null) })
             CadTool.entries.forEach { t ->
                 FilterChip(selected = tool == t, onClick = { tool = t }, label = { Text(t.label) })
             }
         }
-        Box(Modifier.weight(1f).fillMaxWidth().padding(8.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))) {
+        val part = area.fraction
+        val boxMod = if (part == null) Modifier.weight(1f) else Modifier.fillMaxHeight(part)
+        Box(boxMod.fillMaxWidth().padding(8.dp).background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))) {
             Canvas(Modifier.fillMaxSize().pointerInput(tool, tidy, scale, origin) {
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -179,15 +197,42 @@ fun CadScreen(m: AppModel) {
                 else -> "Boshlanish nuqtasidan oxirigacha torting"
             }, style = MaterialTheme.typography.bodySmall, color = x.muted, modifier = Modifier.padding(8.dp))
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             IconButton(onClick = { cad.undo() }, enabled = cad.undo.isNotEmpty()) { Icon(Icons.AutoMirrored.Filled.Undo, "Orqaga") }
             IconButton(onClick = { cad.redo() }, enabled = cad.redo.isNotEmpty()) { Icon(Icons.AutoMirrored.Filled.Redo, "Qaytarish") }
+            IconButton(onClick = { zoom(1.25f) }) { Icon(Icons.Default.ZoomIn, "Kattalashtirish") }
+            IconButton(onClick = { zoom(0.8f) }) { Icon(Icons.Default.ZoomOut, "Kichiklashtirish") }
             IconButton(onClick = { fit() }) { Icon(Icons.Default.FitScreen, "Hammasini ko‘rsatish") }
+            AssistChip(onClick = { area = CadArea.entries[(area.ordinal + 1) % CadArea.entries.size] },
+                label = { Text("Maydon: ${area.label}") }, leadingIcon = { Icon(Icons.Default.AspectRatio, null) })
+            Spacer(Modifier.width(6.dp))
             FilterChip(selected = tidy, onClick = { tidy = !tidy }, label = { Text("Tekislash") })
             IconButton(onClick = { cad.clear() }) { Icon(Icons.Default.DeleteSweep, "Tozalash") }
-            Text("${cad.items.size} ta", style = MaterialTheme.typography.bodySmall, color = x.muted,
-                modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+            Text("${cad.items.size} ta", style = MaterialTheme.typography.bodySmall, color = x.muted)
         }
+    }
+
+    if (aiDialog) {
+        var note by remember { mutableStateOf("") }
+        AlertDialog(onDismissRequest = { aiDialog = false }, title = { Text("AI bilan tuzatish") },
+            icon = { Icon(Icons.Default.AutoFixHigh, null) },
+            text = { Column {
+                Text("Chizmangizni AI ko‘radi va siz chizmoqchi bo‘lgan toza chizmani chizib beradi: tekis chiziqlar, " +
+                    "to‘g‘ri burchaklar, yumaloq o‘lchamlar. AI ulanmagan bo‘lsa — kompyuter o‘zi tekislaydi.",
+                    style = MaterialTheme.typography.bodySmall, color = x.muted)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(note, { note = it }, label = { Text("Nimani chizmoqchi edingiz? (ixtiyoriy)") },
+                    placeholder = { Text("masalan: 100x60 plastina, markazida 20 mm teshik") }, minLines = 2)
+            } },
+            confirmButton = { TextButton(onClick = { m.cadAiFix(note); aiDialog = false }) { Text("Tuzatish") } },
+            dismissButton = { TextButton(onClick = { aiDialog = false }) { Text("Bekor") } })
+    }
+    cad.aiConfirm?.let { (cost, note) ->
+        AlertDialog(onDismissRequest = { cad.aiConfirm = null }, title = { Text("AI narxi") },
+            text = { Text("$cost. Davom etaymi?") },
+            confirmButton = { TextButton(onClick = { cad.aiConfirm = null; m.cadAiFix(note, approved = true) }) { Text("Ha") } },
+            dismissButton = { TextButton(onClick = { cad.aiConfirm = null }) { Text("Yo‘q") } })
     }
 
     textAt?.let { at ->

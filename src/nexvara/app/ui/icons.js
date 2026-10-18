@@ -56,6 +56,8 @@ const UI_ICON_PATHS = {
   explode: "<path d='M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M6 18l3-3'/>",
   zoomwin: "<circle cx='10' cy='10' r='6'/><path d='m15 15 6 6M7 10h6M10 7v6'/>",
   area: "<path d='M4 18 9 5l11 4-3 11z'/><path d='M8 14h7'/>",
+  ai: "<path d='m12 3 1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z'/><path d='M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z'/>",
+  compact: "<path d='M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5'/>",
 };
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".nav-item, #cad-toolbar .cad-btn").forEach((button) => {

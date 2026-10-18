@@ -19,6 +19,7 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("POST", "/api/v1/cad", True),
     ("GET", "/api/v1/cad/drawing", True),
     ("POST", "/api/v1/cad/open", True),
+    ("POST", "/api/v1/cad/ai", True),
 ]
 HANDLED = {p for _m, p, _a in ROUTES}
 PHONE_MAX_ENTITIES = 5000  # a phone screen does not need more; the PC keeps the full file
@@ -73,6 +74,13 @@ def route(
         cut = len(data["entities"]) > PHONE_MAX_ENTITIES
         data["entities"] = data["entities"][:PHONE_MAX_ENTITIES]
         return {"name": p.name, "path": str(p), "drawing": data, "truncated": cut}
+    if route == "/api/v1/cad/ai":  # «AI bilan tuzatish» for the phone sketch
+        b = body()
+        out = api.cad_ai_fix(b.get("drawing") or {}, str(b.get("note") or "")[:500],
+                             bool(b.get("approved")))  # fmt: skip
+        if not out.get("ok") and not out.get("confirm"):
+            raise ApiError("BAD_REQUEST", out.get("error") or "Tuzatib bo‘lmadi")
+        return out
     if route == "/api/v1/cad/open":
         p = _inside(api, str(body().get("path") or ""))
         api.ui_push({"kind": "cad_open", "path": str(p)})

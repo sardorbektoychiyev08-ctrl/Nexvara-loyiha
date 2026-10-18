@@ -198,6 +198,7 @@ class CadState {
     var path by mutableStateOf<String?>(null)
     var drawings by mutableStateOf<List<Pair<String, String>>>(emptyList())  // name, path on the PC
     var lastSaved by mutableStateOf<JSONObject?>(null)
+    var aiConfirm by mutableStateOf<Pair<String, String>?>(null)  // cost text, the user's note
     val undo = ArrayDeque<List<CadE>>()
     val redo = ArrayDeque<List<CadE>>()
 
@@ -208,6 +209,14 @@ class CadState {
     fun undo() { undo.removeLastOrNull()?.let { redo.addLast(items.toList()); items.clear(); items.addAll(it) } }
     fun redo() { redo.removeLastOrNull()?.let { undo.addLast(items.toList()); items.clear(); items.addAll(it) } }
     fun clear() { snapshot(); items.clear(); extra = emptyList(); path = null }
+
+    /** Replace the drawing (AI result) — undo brings the sketch back. */
+    fun replaceWith(drawing: JSONObject) {
+        val keepUndo = undo.toList()
+        val before = items.toList()
+        load(drawing)
+        undo.clear(); undo.addAll(keepUndo); undo.addLast(before); redo.clear()
+    }
 
     fun toJson(): JSONObject {
         val ents = JSONArray()
@@ -281,4 +290,16 @@ fun AppModel.cadSave(openOnPc: Boolean) {
 
 fun AppModel.cadOpenOnPc(path: String) = call(block = post("/api/v1/cad/open", JSONObject().put("path", path))) {
     notice = "Kompyuterdagi Chizmalar oynasida ochildi"
+}
+
+/** «AI bilan tuzatish»: the PC (AI, or its own tidy-up without AI) redraws the sketch. */
+fun AppModel.cadAiFix(note: String, approved: Boolean = false) {
+    if (cad.items.isEmpty()) { notice = "Avval biror narsa chizing"; return }
+    val body = JSONObject().put("drawing", cad.toJson()).put("note", note).put("approved", approved)
+    call(block = post("/api/v1/cad/ai", body)) {
+        val confirm = it.optString("confirm")
+        if (confirm.isNotBlank()) { cad.aiConfirm = confirm to note; return@call }
+        it.optJSONObject("drawing")?.let { d -> cad.replaceWith(d) }
+        notice = it.optString("reply").ifBlank { "Tuzatildi" } + " Yoqmasa — «Orqaga»."
+    }
 }

@@ -588,7 +588,7 @@ fun SectionsScreen(m: AppModel) {
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(items.indices.toList()) { i ->
                 val (s, ic, sub) = items[i]
-                Tile(ic, s.title, sub, tints[i]) { m.open(s) }
+                Tile(ic, s.title, sub, tints[i % tints.size]) { m.open(s) }  // never out of range
             }
         }
     }
