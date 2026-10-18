@@ -152,7 +152,8 @@ def test_phone_ai_chat_is_masked_and_counted_once(env):
     assert cap.seen, "the AI path was not used"
     for s in SECRETS:
         assert s not in sent, s
-    assert len(api._router().ledger.recent()) - before <= 1
+    # one ledger row per AI call (an unusable plan may be retried once on a stronger tier)
+    assert len(api._router().ledger.recent()) - before == len(cap.seen) <= 2
 
 
 def test_phone_chat_reaches_pc_window_and_history(env):
