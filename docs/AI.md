@@ -58,6 +58,19 @@ Outdated ids found in the check: `gemini-3.5-flash` (no longer listed), `deepsee
 Every request is masked locally first and restored locally after — see [PRIVACY.md](PRIVACY.md).
 Unreliable detection blocks the request. Applies to all providers and to a fallback provider.
 
+## Conversation memory and self-repair (2026-10-18)
+
+- **Memory**: chat, questions and the planner get the last `memory.recent_turns` (15) messages
+  from `app.db` (they survive restarts), older exchanges from the last `memory.chat_days` (30)
+  days that share words with the request (FTS5, at most 6), and one-line summaries of the
+  previous 7 days (built locally, no AI). All of it is the user's text: masked by
+  `ai/privacy.py` like the message. «… haqidagi gaplarni unut» / «buni unut» deletes chat
+  lines (facts and rules stay); the whole chat is cleared only from the Memory page.
+- **Self-repair** (`ai.self_repair`, on by default, only with AI ready): a command that fails
+  (tool error, or an Office task started from chat) goes back to the planner with the error
+  text; at most 2 tries per user message. A corrected plan that changes anything still waits
+  for «Ha»; a repair never asks to spend above the confirm limit by itself.
+
 ## Security
 
 Keys: Windows Credential Manager (`NEXVARA/ai/<provider>`) only. A key pasted into chat is
