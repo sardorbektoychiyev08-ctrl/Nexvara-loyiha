@@ -1,5 +1,28 @@
 # HANDOFF → Codex (Windows side)
 
+## ▶ CURRENT TASK 2 (2026-10-18, Claude) — continue from here if Claude stopped
+
+Owner asked: review Codex's work and fix gaps; Office "taught from official sources";
+CAD on Android with hand drawing; CAD "full functionality"; Uzbek always in Latin (no
+Cyrillic); then API keys; propose new features.
+
+- [x] CAD 2.0 (commit 1643b22): `app/ui/cad.js` rewritten (hatch, ellipse, polygon, linear/
+  aligned/radius/diameter dims, trim, extend, fillet, chamfer, scale, rect/polar array, explode,
+  grips, osnaps end/mid/center/quad/int/perp/near with markers, layer colour/weight/linetype/
+  lock/rename/delete, properties panel, area/distance, zoom window, Ctrl+C/V/A).
+  `api_cad.py`: new JSON kinds `ldim`, `rdim`, `hatch`, entity `color`, layer `locked`.
+  Real-window test `tests/ui_scripts/cad_tools.py` PASS.
+- [x] Latin only: `textnorm.cyr_to_latin / to_latin_if_uzbek`; router adds `LATIN_RULE` to every
+  system prompt and converts Cyrillic-Uzbek answers (not when the user asks for Russian);
+  Uzbek Cyrillic textbooks are converted at indexing (Russian ones stay skipped).
+  Tests `tests/unit/test_latin.py`.
+- [ ] Android «Chizma» screen with hand drawing (Compose canvas: finger strokes → straightened
+  into line/rect/circle/arc; pinch zoom; tools; send to PC as DXF via a new `/api/v1` route
+  that calls `CadApi.cad_save`; open the PC's last drawing on the phone).
+- [ ] Office guidance from official sources (Microsoft support, O‘zDSt/«Davlat tilida ish
+  yuritish») as `src/nexvara/knowledge/office_guide.py` used by AI prompts (`ai/features.py`).
+- [ ] Full test run (`test.ps1 -Office`), PROGRESS entry, then proposals to the owner.
+
 2026-10-18 Codex update: the textbook test-writing task is complete on
 `claude/android-v1`. The AI test prompt now carries the assessment rules and the
 requested grade/subject/topic; returned questions require an exact excerpt from
