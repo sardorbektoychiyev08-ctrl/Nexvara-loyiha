@@ -215,6 +215,11 @@ class Api(
             command = self._chat_command(text)
             if command is not None:
                 return command
+        from nexvara.knowledge.lessonplan import parse_lesson_request
+
+        lesson = parse_lesson_request(text)  # «… dars ishlanmasi»: plan + slides from the book
+        if lesson is not None:
+            return self._chat_lesson(lesson)
         req = parse_test_request(text)
         if req is not None:
             what = " ".join(
@@ -615,6 +620,30 @@ class Api(
         return self._context_file or ""
 
     # ----- lesson presentation from a textbook topic -----
+    def _chat_lesson(self, req: Any) -> dict[str, Any]:
+        from nexvara.knowledge.topicdoc import lookup
+
+        if not self.library_info()["books"]:
+            return {"reply": "Dars ishlanmasi uchun avval darsliklarni «Darsliklar» bo‘limida "
+                    "qo‘shing."}  # fmt: skip
+        try:
+            topic = lookup(req)
+        except (LookupError, ValueError) as e:
+            return {"reply": str(e)}
+        if "lesson" in self._overrides:
+            fn = self._overrides["lesson"]
+        else:
+            from nexvara.knowledge.lessonplan import run_lesson
+
+            def fn(task: Any) -> dict[str, Any]:
+                return run_lesson(task, req, self._output_dir, keep_open=self._keep_open())
+
+        snap = self._runner.start(f"Dars ishlanmasi: {topic.title}", fn).snapshot()
+        return {"reply": f"{topic.book.label()}, {topic.pages_label}: «{topic.title}» bo‘yicha "
+                "dars ishlanmasini (maqsadlar, 45 daqiqalik dars borishi, tushunchalar, "
+                "mustahkamlash savollari, uyga vazifa) Word’da va dars taqdimotini PowerPoint’da "
+                "tayyorlayapman.", "task": snap}  # fmt: skip
+
     def _chat_presentation(self, req: Any) -> dict[str, Any]:
         from nexvara.knowledge.topicdoc import lookup
 

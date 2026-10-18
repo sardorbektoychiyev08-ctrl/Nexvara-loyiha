@@ -10,7 +10,7 @@ Order and status (Claude ticks these as it goes):
   `POST /api/v1/cad/ai`, PC toolbar button, phone «AI» button (CadScreen.kt). Android 1.2.4.
 - [x] Drawing templates (`cad_templates.py`, PC select + phone dialog, `/api/v1/cad/templates`).
 - [x] Auto-fix documents («kamchiliklarni tuzat», action `fix` in *_exec.py), Office tests PASS.
-- [ ] Lesson plan from a textbook topic («dars ishlanmasi»): plan (Word) + questions + slides.
+- [x] Lesson plan («dars ishlanmasi», `knowledge/lessonplan.py`, `Api._chat_lesson`), Office test PASS.
 - [ ] Weekly report workflow template (every Friday: Excel → PDF → phone).
 - [ ] 3D view of a drawing (extrude closed shapes) in the PC editor.
 - [ ] Voice command on the PC (mic → WAV → Gemini transcription; needs the user's key + consent).

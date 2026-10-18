@@ -369,3 +369,34 @@ def test_powerpoint_fix(tmp_path):
         pres.Close()
         del tbl, pres
     assert size == 18
+
+
+# ---------------- «dars ishlanmasi» ----------------
+def test_lesson_plan_word_and_slides(tmp_path, monkeypatch):
+    from tests.textbook_fixture import write_pdf
+
+    monkeypatch.setenv("NEXVARA_DATA", str(tmp_path / "data"))
+    books = tmp_path / "data" / "Darsliklar" / "7-sinf"
+    books.mkdir(parents=True)
+    write_pdf(books / "Fizika.pdf")
+    from nexvara.core.task import TaskRunner
+    from nexvara.knowledge.lessonplan import parse_lesson_request, run_lesson
+    from nexvara.knowledge.service import index_library
+    from nexvara.skills.word.ops import WordSession
+
+    assert TaskRunner().start("index", index_library).wait(120)
+    req = parse_lesson_request("7-sinf fizika mexanik harakat dars ishlanmasi")
+    res = ok(run(run_lesson, req, tmp_path / "out"))
+    assert Path(res["path"]).is_file() and Path(res["pdf"]).is_file()
+    assert Path(res["slides"]).is_file() and res["questions"] >= 1
+    with WordSession(visible=False) as w:
+        doc = w.open_document(res["path"])
+        text = str(doc.Content.Text)
+        tables = int(doc.Tables.Count)
+        w.disown(doc)
+        doc.Close(0)
+        del doc
+    for part in ("DARS ISHLANMASI", "Darsning maqsadi", "Ta’limiy", "Darsning borishi",
+                 "Yangi mavzu bayoni", "Mustahkamlash savollari", "Uyga vazifa"):  # fmt: skip
+        assert part in text, part
+    assert tables == 2
