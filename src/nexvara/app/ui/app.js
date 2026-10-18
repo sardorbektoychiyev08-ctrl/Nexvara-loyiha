@@ -10,7 +10,7 @@ const STATUS_LABEL = {
   pending: i18n("status.pending"), running: i18n("status.running"), succeeded: i18n("status.succeeded"),
   failed: i18n("status.failed"), cancelled: i18n("status.cancelled"), paused: i18n("status.paused"),
 };
-const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows", "bi", "devices"]);
+const PAGES = new Set(["home", "chat", "office", "library", "history", "settings", "memory", "teach", "files", "workflows", "bi", "cad", "devices"]);
 
 let currentTaskId = null;
 let pollTimer = null;
@@ -28,6 +28,7 @@ function el(tag, cls, text) {
 
 // ---- navigation ----
 function show(page) {
+  document.body.classList.toggle("cad-mode", page === "cad");
   document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
   document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
   if (PAGES.has(page)) {
@@ -48,6 +49,7 @@ function show(page) {
   if (page === "workflows") renderWorkflows();
   if (page === "bi") renderBi();
   if (page === "devices") renderDevices();
+  if (page === "cad") renderCad();
 }
 
 $("#nav").addEventListener("click", (e) => {
@@ -88,6 +90,7 @@ function handleReply(r) {
   if (r.open_bi) biOpenSource(r.open_bi);
   if (r.theme) setTheme(r.theme, false);
   if (r.bi_ui) biFromChat(r.bi_ui);
+  if (r.dxf) addCadOpen(r.dxf);
 }
 
 // A paid AI request waits for the user's answer; nothing is sent before "Ha".
@@ -205,6 +208,7 @@ async function poll() {
     pollTimer = null;
     refreshCount();
     if (chatTasks.has(t.id)) { chatTasks.delete(t.id); addMsg(summary(t), false); }
+    if (t.status === "succeeded" && t.result && t.result.dxf) addCadOpen(t.result.dxf);
     if ($("#page-library").classList.contains("active")) renderLibrary();
   }
 }
@@ -800,7 +804,7 @@ async function renderAi(status) {
   $("#ai-free").checked = st.free_mode;
   const gem = st.providers.gemini;
   $("#ai-free-note").textContent = !gem.has_key
-    ? "Bepul rejim uchun Gemini kalitini kiriting (aistudio.google.com → «Get API key», bepul). " +
+    ? "Bepul rejim uchun Gemini kalitini kiriting (aistudio.google.com saytidan bepul kalit oling). " +
       "Kalit kiritilgach, hamma AI ishlari Gemini Flash orqali bepul bajariladi."
     : (st.free_active
       ? `Bepul rejim ishlayapti: bugun ${st.free_requests_today} ta bepul so‘rov. Google bepul darajada ` +

@@ -4,6 +4,31 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (25) — Codex — ichki CAD sahifasi, yagona belgi va Android 1.2.2
+
+**Tarmoq:** `claude/android-v1`, `.worktrees/android`. Claude’ning `f5093f5` WIP ishini foydalanuvchi topshirig‘i bilan shu tarmoqda davom ettirdim. `main` ga merge ham, push ham qilinmadi.
+
+**Chizmalar:** `cad.js` yozildi: DXFni ochish va ko‘rish (surish, kattalashtirish, to‘r), chiziq/polichiziq/to‘rtburchak/aylana/yoy/matn/o‘lcham, tanlash (oyna va kesishuv), qatlamlar, nuqtaga va to‘rga bog‘lanish, orto, ko‘chirish/nusxa/burish/ko‘zgu/parallel nusxa/masofa, orqaga va oldinga qaytarish, klaviatura hamda buyruq satri. DXF saqlash, PDF/PNG chiqarish ulandi. Suhbatda yaratilgan DXF natijasi uchun «Chizmalarda ochish» tugmasi qo‘shildi. CAD sahifasi uchun joylashuv va mavzu ranglari qo‘shildi.
+
+**Belgi va dizayn:** yon menyu uchun `brand.svg`, menyu va CAD asboblari uchun bir uslubdagi SVG piktogrammalar; Windows `.ico` generatorida shu NEXVARA belgisi; Android moslashuvchan belgisi. Telefon ilovasi `1.2.2` (`versionCode 6`) bo‘ldi. APK loyiha sinov kaliti bilan yig‘ildi va ulangan Xiaomi Android 16 telefoniga `adb install -r` orqali foydalanuvchi ma’lumotlarini saqlab o‘rnatildi; telefonda versiya `1.2.2` tekshirildi. APK SHA-256: `95ef83270828a7370cd2266d4c0bbad6171850a60624dafd677dd6d62438ce4e`.
+
+**Testlar:**
+
+| Sinov | Natija |
+|---|---|
+| `test_cad_api.py` — DXF→JSON→DXF, audit, noto‘g‘ri ma’lumot | PASS — 6/6 |
+| `cad_page.py` haqiqiy oyna — chizish, undo/redo, saqlash, ochish, PDF | PASS |
+| `test.ps1` — ruff, unit, oyna smoke | PASS — 405 passed, 62 Office skipped; smoke 13 sahifa, JS xatosiz |
+| `test.ps1 -Office` birinchi to‘liq yugurish | FAIL — 465 passed, 2 ta inglizcha UI matni tekshiruvi; ikkalasi tuzatildi |
+| Tuzatilgan 2 tekshiruv: `test_uzbek_ui.py` va `uzbek_ui.py` haqiqiy oyna | PASS — UI matn 100% o‘zbekcha; to‘liq Office to‘plami qayta yugurilmadi |
+| Android `assembleDebug` + `testDebugUnitTest` | PASS |
+| APK telefonga o‘rnatish va versiyani tekshirish | PASS |
+| DXFni AutoCAD dasturining o‘zida ochish | NOT TESTED — AutoCAD o‘rnatilmagan |
+
+**Keyingi qadam:** foydalanuvchi CADni o‘zi ishlatib ko‘radi; AutoCAD bor kompyuterda DXFni ochish va telefondagi qolgan qo‘l sinovlari. Windows installer yangi belgi bilan alohida build qilinmagan. Merge/push faqat foydalanuvchi topshirsa.
+
+---
+
 ## 2026-10-18 (24) — Claude Code — Chizma (AutoCAD DXF) va Office buyruqlari professional darajada; Android 1.2.1
 
 **Foydalanuvchi talabi:** hammasini qayta tekshirish, kamchiliklarni tuzatish; AutoCAD (chizma) mukammal va qulay ishlasin; Office dasturlarini «professional, xatosiz» darajaga yetkazish; o‘zi qatnashmasdan qilinadigan hamma ishni qilish. Telefon yangilash uchun ulangan.

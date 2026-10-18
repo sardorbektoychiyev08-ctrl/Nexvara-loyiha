@@ -1,6 +1,6 @@
 # HANDOFF → Codex (Windows side)
 
-## ▶ CURRENT TASK (2026-10-18) — continue from here if Claude stopped
+## ▶ CURRENT TASK (2026-10-18) — completed on `claude/android-v1` by Codex
 
 Branch: **`claude/android-v1`**, worktree `D:\Nexvara loyiha\.worktrees\android` (no `.venv`
 there: use `..\..\.venv\Scripts\python.exe`; for subprocess/smoke set
@@ -9,12 +9,19 @@ is done. The owner (Uzbek, non-programmer) asked for 4 things on 2026-10-18:
 
 | # | Task | Status | Where / how |
 |---|---|---|---|
-| A | **Built-in CAD ("AutoCAD inside NEXVARA")**: the user must not need AutoCAD. A «Chizma» page in the Windows app: open DXF, view (pan/zoom), draw line/polyline/rect/circle/arc/text/dimension, layers, snap/ortho, undo/redo, save DXF (R2010 via `cad.py`), export PDF/PNG; chat drawings open in it | see table below | `src/nexvara/cad.py` (DXF read/write, render), `drawing.py`/`drawing_offline.py` (spec), new `app/api_cad.py` + `app/ui/cad.js` |
-| B | **Gemini free tier first** so costs stay ~0: «Bepul rejim» — all purposes go to Gemini Flash/Flash-Lite (no Pro), cost recorded as 0, no paid fallback, clear message on 429 (free daily limit), privacy note (free tier data may be used by Google) | see table | `ai/router.py`, `ai/models.py`, `appdata.py` defaults, Settings UI (`index.html`, `app.js`) |
+| A | **Built-in CAD ("AutoCAD inside NEXVARA")**: the user must not need AutoCAD. A «Chizma» page in the Windows app: open DXF, view (pan/zoom), draw line/polyline/rect/circle/arc/text/dimension, layers, snap/ortho, undo/redo, save DXF (R2010 via `cad.py`), export PDF/PNG; chat drawings open in it | DONE: API and real window test PASS | `src/nexvara/cad.py` (DXF read/write, render), `drawing.py`/`drawing_offline.py` (spec), new `app/api_cad.py` + `app/ui/cad.js` |
+| B | **Gemini free tier first** so costs stay ~0: «Bepul rejim» — all purposes go to Gemini Flash/Flash-Lite (no Pro), cost recorded as 0, no paid fallback, clear message on 429 (free daily limit), privacy note (free tier data may be used by Google) | DONE by Claude | `ai/router.py`, `ai/models.py`, `appdata.py` defaults, Settings UI (`index.html`, `app.js`) |
 | C | Handoff (this section) kept up to date | ongoing | — |
-| D | **Professional design**: app icon (Windows .ico + Android adaptive launcher icon), consistent UI icons, polished look | see table | `src/nexvara/app/ui/`, `installer/`, `android/app/src/main/res/` |
+| D | **Professional design**: app icon (Windows .ico + Android adaptive launcher icon), consistent UI icons, polished look | DONE: APK 1.2.2 built and installed | `src/nexvara/app/ui/`, `installer/`, `android/app/src/main/res/` |
 
-Progress of A/B/D (Claude updates this after each step):
+Codex completion note (2026-10-18): `cad.js`, `test_cad_api.py`, `cad_page.py`, chat-to-CAD
+button, sidebar/CAD toolbar icons, shared brand SVG/Windows icon/Android adaptive icon done.
+`test.ps1` PASS (405 passed, 62 Office tests skipped); `test.ps1 -Office` first run
+465 passed, 2 Uzbek UI text failures; both fixed and separately rerun PASS (including
+real-window Uzbek UI at 100%). Android assembleDebug + unit PASS, version 1.2.2 (code 6)
+installed with `adb install -r`. See newest PROGRESS for details. No merge or push.
+
+Historical Claude plan below (its unchecked items were completed by Codex):
 - [x] B Gemini free mode — DONE (router `free_active()`, settings `ai.free_mode` default true, UI checkbox + note, chat «bepul rejimni yoq/o‘chir», tests in test_ai_router.py)
 - [ ] A CAD page — IN PROGRESS (Claude stopped here, limit). Done and committed as WIP:
   - `src/nexvara/app/api_cad.py` (CadApi, mixed into Api): `cad_open(path)` DXF→JSON

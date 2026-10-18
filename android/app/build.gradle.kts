@@ -20,8 +20,8 @@ android {
         applicationId = "uz.nexvara.mobile"
         minSdk = 29
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.2.1"
+        versionCode = 6
+        versionName = "1.2.2"
     }
     signingConfigs {
         if (releaseStore != null) create("nexvaraRelease") {

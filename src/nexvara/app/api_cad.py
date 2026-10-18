@@ -99,9 +99,18 @@ def doc_to_json(doc: Any) -> dict[str, Any]:
                     nx, ny = -(d2.y - d1.y) / length, (d2.x - d1.x) / length
                     off = (base.x - d2.x) * nx + (base.y - d2.y) * ny
                     label = e.dxf.get("text", "")
-                    out.append({"type": "dim", "layer": layer, "x1": d1.x, "y1": d1.y,
-                                "x2": d2.x, "y2": d2.y, "offset": off,
-                                "label": "" if label in ("", "<>") else _txt(label, 40)})  # fmt: skip
+                    out.append(
+                        {
+                            "type": "dim",
+                            "layer": layer,
+                            "x1": d1.x,
+                            "y1": d1.y,
+                            "x2": d2.x,
+                            "y2": d2.y,
+                            "offset": off,
+                            "label": "" if label in ("", "<>") else _txt(label, 40),
+                        }
+                    )
             elif t == "SPLINE":
                 pts = [[p.x, p.y, 0] for p in e.flattening(0.05)]
                 out.append({"type": "polyline", "layer": layer, "points": pts,
