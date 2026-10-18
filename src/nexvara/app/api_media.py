@@ -20,10 +20,12 @@ from typing import Any
 
 from nexvara import config
 
+# «rasm yarat: …», «maktab logotipini yasa», «create an image of …» — but not «rasmli taqdimot
+# yarat» or «rasm qo‘shib hujjat yarat» (those are Office work).
 _MAKE = re.compile(
-    r"\b(rasm\w*|surat\w*|tasvir\w*|illyustratsiya\w*|logotip\w*|picture|image)\b.*\b(yarat\w*|"
-    r"yasa\w*|tayyorla\w*|generatsiya\w*|chizdir\w*|create|generate|make)\b|"
-    r"\b(yarat\w*|yasa\w*|tayyorla\w*|generate|create)\b.*\b(rasm\w*|surat\w*|tasvir\w*|image)\b",
+    r"\b(rasm|surat|tasvir|logotip|illyustratsiya|plakat)(i|ni|ini|lar|larni)?\s*:?\s+(yarat|yasa|"
+    r"tayyorla|chizdir|generatsiya qil)\w*|\b(create|generate|make|draw)\s+(an?\s+)?(image|picture|"
+    r"logo|illustration)",
     re.IGNORECASE,
 )
 _EDIT = re.compile(

@@ -305,3 +305,51 @@ def test_google_link_only_for_pc_owner(env, tmp_path):
     assert ok == {"linked": True, "email": "ega@gmail.com", "name": ""}
     st = j(call(srv, "GET", "/api/v1/account", token=token))["data"]
     assert st["phone"]["linked_email"] == "ega@gmail.com" and st["phone"]["ready"] is True
+
+
+def test_phone_ai_directions_speech_and_pictures(env):
+    """🧠 settings are shared with the PC; 🔊 and ✨ results come back as downloadable files."""
+    from urllib.parse import quote
+
+    from test_ai_media import MediaFake
+
+    api, srv, token, _cap, _ = env
+    router = api._router()
+    router.settings.update({"ai": {"enabled": True}})
+    log: list = []
+    router.media_factory = lambda n, k: MediaFake(n, log)
+    st = j(call(srv, "GET", "/api/v1/ai/capabilities", token=token))["data"]
+    assert set(st["capabilities"]) == {"text", "vision", "image", "stt", "tts", "realtime"}
+    assert "sk-test" not in json.dumps(st)
+    bad = post(
+        srv,
+        "/api/v1/ai/capabilities",
+        {"cap": "image", "mode": "manual", "provider": "anthropic", "model": "x"},
+        token,
+    )
+    assert bad[0] == 400
+    ok = post(
+        srv,
+        "/api/v1/ai/capabilities",
+        {"cap": "tts", "mode": "manual", "provider": "openai", "model": "gpt-4o-mini-tts"},
+        token,
+    )
+    assert ok[0] == 200 and router.cap_settings()["tts"]["provider"] == "openai"  # the PC sees it
+    sp = j(post(srv, "/api/v1/ai/speak", {"text": "Salom, dars 9 da"}, token))["data"]
+    assert sp["path"].endswith(".wav") and sp["provider"] == "openai"
+    assert call(srv, "GET", f"/api/v1/files?path={quote(sp['path'])}", token=token)[0] == 200
+    api._ai_ready = lambda: True
+    r = j(post(srv, "/api/v1/chat", {"text": "rasm yarat: maktab logotipi"}, token))["data"]
+    assert (
+        r["confirm"]
+        and "gpt-image" in r["confirm"]["text"]
+        and not any(x[1] == "image" for x in log)
+    )
+    done = j(post(srv, "/api/v1/confirm", {"token": r["confirm"]["token"], "yes": True}, token))[
+        "data"
+    ]
+    assert done["image"]["name"].endswith(".png")
+    assert (
+        call(srv, "GET", f"/api/v1/files?path={quote(done['image']['path'])}", token=token)[0]
+        == 200
+    )

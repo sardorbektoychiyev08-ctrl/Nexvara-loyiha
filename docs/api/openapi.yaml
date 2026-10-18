@@ -186,6 +186,31 @@ paths:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "400": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/v1/ai/capabilities:
+    get:
+      summary: "🧠 Directions text, vision, image, stt, tts, realtime: mode auto|manual, chosen provider/model, what each provider offers (only models found in the account), the AUTO pick (free first, then cheapest), voices, speak_replies. Shared with the PC (one settings file); keys never included"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "401": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "Set one direction {cap, mode auto|manual, provider, model}; a model the provider/account cannot use for it is refused (400) — a MANUAL choice is never swapped later"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {cap: {}, mode: {}, provider: {}, model: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+  /api/v1/ai/speak:
+    post:
+      summary: "🔊 Text → speech on the TTS direction (Gemini free tier first in AUTO). {text} → {path (WAV, downloadable with GET /api/v1/files), provider, model, cost}. Personal data is replaced before sending; budget limits apply"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {text: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
   /api/v1/ai/{provider}/balance:
     post:
       summary: "Refresh the real balance where the provider has an official balance API (DeepSeek). No model is called (free). Others return {supported:false}"

@@ -25,6 +25,9 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("POST", "/api/v1/tasks/{id}/resume", True),
     ("GET", "/api/v1/ai", True),
     ("POST", "/api/v1/ai/{provider}/balance", True),
+    ("GET", "/api/v1/ai/capabilities", True),
+    ("POST", "/api/v1/ai/capabilities", True),
+    ("POST", "/api/v1/ai/speak", True),
     ("GET", "/api/v1/memory", True),
     ("POST", "/api/v1/memory", True),
     ("GET", "/api/v1/memory/search", True),
@@ -327,6 +330,37 @@ def route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list[
         if args["provider"] not in models.PROVIDERS:
             raise ApiError("NOT_FOUND", "Noma’lum provayder")
         return api.ai_balance(args["provider"])  # official balance API only; no model call
+    # ----- 🧠 directions (AUTO/MANUAL) and 🔊 speech, shared with the PC's settings -----
+    if route == "/api/v1/ai/capabilities" and h.command == "GET":
+        return api.ai_capabilities()
+    if route == "/api/v1/ai/capabilities":
+        b = body()
+        out = api.ai_set_capability(
+            str(b.get("cap", "")),
+            str(b.get("mode", "")),
+            str(b.get("provider", "")),
+            str(b.get("model", "")),
+        )
+        if not out.get("ok"):
+            raise ApiError("BAD_REQUEST", out.get("error") or "Saqlanmadi")
+        return out
+    if route == "/api/v1/ai/speak":
+        import base64
+        import time as _time
+
+        text = str(body().get("text", "")).strip()[:3000]
+        if not text:
+            raise ApiError("BAD_REQUEST", "Matn bo‘sh")
+        out = api.ai_speak(text)
+        if not out.get("ok"):
+            raise ApiError("BAD_REQUEST", out.get("error") or "Ovoz tayyorlanmadi")
+        folder = config.data_dir() / "Ovoz"
+        folder.mkdir(parents=True, exist_ok=True)
+        wav = folder / f"javob-{_time.strftime('%Y%m%d-%H%M%S')}.wav"
+        wav.write_bytes(base64.b64decode(out["audio"]))
+        _grant(srv, dev, str(wav), "shared", SHARED_TTL)
+        return {"path": str(wav), "provider": out["provider"], "model": out["model"],
+                "cost": out["cost"]}  # fmt: skip
     # ----- Memory -----
     if route == "/api/v1/memory" and h.command == "GET":
         return {"facts": api.memory_facts()}

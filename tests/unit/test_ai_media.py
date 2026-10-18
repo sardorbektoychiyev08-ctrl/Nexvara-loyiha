@@ -400,3 +400,22 @@ def test_without_ai_media_explains(tmp_path, monkeypatch):
 
     out = Api().chat("rasm yarat: olma")
     assert "AI kerak" in out["reply"]
+
+
+def test_picture_requests_are_not_confused_with_office_work():
+    from nexvara.app.api_media import _MAKE
+
+    for yes in (
+        "rasm yarat: olma",
+        "maktab logotipini yasa",
+        "AI bilan surat tayyorla",
+        "create an image of a school",
+    ):
+        assert _MAKE.search(yes), yes
+    for no in (
+        "rasmli taqdimot yarat",
+        "rasm qo‘shib hujjat yarat",
+        "7-sinf test yarat",
+        "Hisobot.xlsx dan diagramma yarat",
+    ):
+        assert not _MAKE.search(no), no
