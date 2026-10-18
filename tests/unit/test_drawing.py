@@ -11,7 +11,7 @@ from test_remote_v1 import call, j, pair
 
 from nexvara import drawing
 from nexvara.ai.keys import MemoryKeyStore
-from nexvara.ai.providers import AiError, ChatCompletionsProvider, Provider, Reply
+from nexvara.ai.providers import ChatCompletionsProvider, Provider, Reply
 from nexvara.core.task import UserError
 
 SPEC = {
@@ -96,7 +96,7 @@ def test_requests_are_recognised():
 
 
 # ---------------- providers: pictures ----------------
-def test_openai_format_sends_image_and_deepseek_refuses():
+def test_openai_and_deepseek_image_input_shape():
     wire = Wire(chat_answer("{}"))
     msgs = [{"role": "user", "content": "chiz", "images": [{"mime": "image/jpeg", "data": "QUJD"}]}]
     ChatCompletionsProvider("openai", "k", opener=wire).complete("m", "s", msgs, 100)
@@ -104,8 +104,8 @@ def test_openai_format_sends_image_and_deepseek_refuses():
     parts = body["messages"][1]["content"]
     assert parts[0] == {"type": "text", "text": "chiz"}
     assert parts[1]["image_url"]["url"] == "data:image/jpeg;base64,QUJD"
-    with pytest.raises(AiError, match="rasmni o‘qiy olmaydi"):
-        ChatCompletionsProvider("deepseek", "k", opener=wire).complete("m", "s", msgs, 100)
+    ChatCompletionsProvider("deepseek", "k", opener=wire).complete("deepseek-flash", "s", msgs, 100)
+    assert json.loads(wire.bodies[-1])["messages"][1]["content"][1] == parts[1]
 
 
 # ---------------- in chat ----------------
@@ -159,14 +159,14 @@ def test_text_drawing_without_picture_and_refusals(tmp_path, monkeypatch):
     assert out.get("confirm") and "Rasm" not in out["reply"]
     assert api.confirm_ai(out["confirm"], False)["reply"].startswith("Bekor")
     assert pro.calls == []
-    # DeepSeek alone cannot read a picture: the user is told, nothing is sent.
+    # DeepSeek Flash has vision, but this powerful drawing task needs a stronger tier.
     (tmp_path / "b").mkdir()
     api2, _pro2 = _api(tmp_path / "b", {"deepseek": "sk-deepseek-test-123456"})
     photo = tmp_path / "e.png"
     photo.write_bytes(b"\x89PNG fake")
     api2.set_context_file(str(photo))
     out = api2.chat("shu rasmdagi eskizni chizib ber")
-    assert "OpenAI, Gemini yoki Claude" in out["reply"] and not out.get("confirm")
+    assert "mos" in out["reply"] and not out.get("confirm") and not _pro2.calls
     # A school subject is a test request, not a drawing.
     assert drawing.is_drawing_request("7-sinf chizmachilik 20 ta test")
     assert "Chizmani AI tuzadi" not in api.chat("7-sinf chizmachilik 20 ta test")["reply"]

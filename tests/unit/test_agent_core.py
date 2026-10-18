@@ -50,6 +50,9 @@ def env(tmp_path, monkeypatch):
     fake = FakeProvider()
     router = AiRouter(Settings(tmp_path / "s.json"), MemoryKeyStore(), Ledger(tmp_path / "l.db"),
                       factory=lambda name, key: fake)  # fmt: skip
+    # These planner tests exercise tool flow after the owner approved AI spending.
+    budget = router.check_budget
+    router.check_budget = lambda est, approved: budget(est, True)
     mem = MemoryStore(tmp_path / "app.db")
     api = Api(TaskRunner(), overrides={"memory": mem, "command": office, "ai_router": router})
     api._context_file = str(work / "Hisobot.xlsx")

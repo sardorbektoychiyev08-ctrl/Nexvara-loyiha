@@ -39,6 +39,8 @@ def env(tmp_path, monkeypatch):
                       factory=lambda name, key: fake)  # fmt: skip
     router.save_key("anthropic", "sk-ant-test-1234567890")
     router.settings.update({"ai": {"enabled": True}})
+    budget = router.check_budget
+    router.check_budget = lambda est, approved: budget(est, True)
     mem = MemoryStore(tmp_path / "app.db")
     work = tmp_path / "Ish"
     work.mkdir()

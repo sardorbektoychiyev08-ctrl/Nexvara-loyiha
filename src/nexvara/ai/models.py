@@ -13,6 +13,8 @@ finds it in the account's own model list (see `pick_model`).
 
 from __future__ import annotations
 
+import re
+
 TIERS = ("cheap", "balanced", "powerful", "special")
 TIER_LABELS = {
     "cheap": "Tejamkor",
@@ -166,29 +168,39 @@ PRICES: dict[str, tuple[float, float]] = {
     "deepseek-v4-pro": (1.32, 3.96),
 }
 
-# Unknown model: assume the provider's most expensive listed price (never under-count).
-_FALLBACK = {
-    "anthropic": (10.00, 50.00),
-    "openai": (30.00, 180.00),
-    "gemini": (4.00, 18.00),
-    "deepseek": (1.32, 3.96),
+# These are checked snapshots of the standard API rate, not an inferred price from
+# GET /models. Providers do not expose a public per-model pricing API. A new model
+# remains unpriced until this table is checked against its official page.
+PRICE_SOURCES = {
+    "openai": "https://developers.openai.com/api/docs/pricing",
+    "anthropic": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "gemini": "https://ai.google.dev/gemini-api/docs/pricing",
+    "deepseek": "https://api-docs.deepseek.com/quick_start/pricing/",
 }
+PRICES_CHECKED_ON = "2026-10-18"
 
 
-def price(model: str, provider: str = "", overrides: dict | None = None) -> tuple[float, float]:
-    """Per-1M prices; the longest known prefix wins ("gemini-3.1-pro-preview-06" -> 3.1 pro)."""
+def price(
+    model: str, provider: str = "", overrides: dict | None = None
+) -> tuple[float, float] | None:
+    """Reviewed exact rate, also for a dated variant of that same model."""
     table = {**PRICES, **{k: tuple(v) for k, v in (overrides or {}).items()}}
     best = ""
     for name in table:
-        if model.startswith(name) and len(name) > len(best):
+        suffix = model.removeprefix(name + "-") if model.startswith(name + "-") else ""
+        dated = bool(re.fullmatch(r"\d{2,4}(?:-\d{2}){0,2}", suffix))
+        if (model == name or dated) and len(name) > len(best):
             best = name
     if best:
         return table[best]  # type: ignore[return-value]
-    return _FALLBACK.get(provider, (30.00, 180.00))
+    return None
 
 
 def cost(model: str, provider: str, input_tokens: int, output_tokens: int, overrides=None):
-    p_in, p_out = price(model, provider, overrides)
+    known = price(model, provider, overrides)
+    if known is None:
+        raise ValueError(f"«{model}» uchun tasdiqlangan narx yo‘q")
+    p_in, p_out = known
     return (input_tokens * p_in + output_tokens * p_out) / 1_000_000
 
 

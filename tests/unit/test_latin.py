@@ -58,14 +58,18 @@ def _router(tmp_path, answer):
 
 def test_ai_is_told_latin_and_a_cyrillic_answer_is_converted(tmp_path):
     r, pro = _router(tmp_path, "Нютон қонунлари: жисм тинч ҳолатда қолади.")
-    reply = r.complete("chat", "sys", [{"role": "user", "content": "Nyuton qonunlari nima?"}])
+    reply = r.complete(
+        "chat", "sys", [{"role": "user", "content": "Nyuton qonunlari nima?"}], approved=True
+    )
     assert reply.text == "Nyuton qonunlari: jism tinch holatda qoladi."
     assert LATIN_RULE.strip() in pro.systems[0]
 
 
 def test_an_explicit_russian_request_keeps_russian(tmp_path):
     r, pro = _router(tmp_path, "Законы Ньютона описывают движение тел.")
-    reply = r.complete("chat", "sys", [{"role": "user", "content": "Rus tiliga tarjima qil: ..."}])
+    reply = r.complete(
+        "chat", "sys", [{"role": "user", "content": "Rus tiliga tarjima qil: ..."}], approved=True
+    )
     assert reply.text == "Законы Ньютона описывают движение тел."
     assert "TIL QOIDASI" not in pro.systems[0]
 

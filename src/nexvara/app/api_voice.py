@@ -45,8 +45,14 @@ class VoiceApi:
         }
 
     def voice_command(
-        self, audio_b64: str, mime: str = "audio/wav", consent: bool = False
+        self,
+        audio_b64: str,
+        mime: str = "audio/wav",
+        consent: bool = False,
+        approved: bool = False,
+        live: bool = False,
     ) -> dict[str, Any]:
+        from nexvara.ai.router import NeedsConfirmation
         from nexvara.core.task import UserError
 
         st = self.voice_status()
@@ -70,7 +76,9 @@ class VoiceApi:
             return {"ok": False, "error": "Ovoz juda uzun (1 daqiqagacha gapiring)"}
         mime = mime if mime.startswith("audio/") else "audio/wav"
         try:
-            heard = self._transcribe(audio_b64, mime, TRANSCRIBE)
+            heard = self._transcribe(audio_b64, mime, TRANSCRIBE, approved=approved, live=live)
+        except NeedsConfirmation as e:
+            return {"ok": False, "needs_approval": True, "error": e.estimate.describe()}
         except UserError as e:
             return {"ok": False, "error": str(e)}
         text = " ".join(heard.split()).strip(' "«»')

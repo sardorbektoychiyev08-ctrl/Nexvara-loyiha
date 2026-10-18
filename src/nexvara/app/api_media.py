@@ -64,6 +64,42 @@ class MediaApi:
                 "connected": r.connected(),
                 "speak_replies": bool(r.config().get("speak_replies"))}  # fmt: skip
 
+    def ai_refresh_catalog(self) -> dict[str, Any]:
+        r = self._router()
+        return {"result": r.refresh_catalog(force=True), "catalog": r.catalog_status()}
+
+    def ai_preview(self, text: str = "", cap: str = "text") -> dict[str, Any]:
+        from nexvara.ai.router import TIER_FOR, AiUnavailable
+
+        r = self._router()
+        if cap not in ("text", "vision", "image", "stt", "tts", "realtime"):
+            return {"ok": False, "error": "Noma’lum yo‘nalish", "mode": "AUTO"}
+        if not r.config().get("enabled"):
+            return {"ok": False, "error": "AI o‘chirilgan", "mode": "AUTO"}
+        try:
+            if cap in ("text", "vision"):
+                purpose = "vision" if cap == "vision" else "chat"
+                est = r.text_candidates(
+                    TIER_FOR.get(purpose, "cheap"),
+                    "",
+                    [{"role": "user", "content": (text or "")[:2000]}],
+                    400,
+                    cap,
+                )[0]
+            else:
+                est = r.media_estimate(cap, 1)
+            return {
+                "ok": True,
+                "provider": est.provider,
+                "model": est.model,
+                "mode": "MANUAL" if r.manual(cap) else "AUTO",
+                "free": est.free,
+                "estimated_cost": est.cost,
+                "catalog": r.catalog_status()[est.provider],
+            }
+        except (AiUnavailable, ValueError) as e:
+            return {"ok": False, "error": str(e), "mode": "MANUAL" if r.manual(cap) else "AUTO"}
+
     def ai_set_capability(self, cap: str, mode: str, provider: str = "", model: str = ""):
         try:
             saved = self._router().set_capability(cap, mode, provider, model)
@@ -79,7 +115,7 @@ class MediaApi:
         return {"ok": True, "speak_replies": bool(on)}
 
     # ----- 🔊 speech -----
-    def ai_speak(self, text: str) -> dict[str, Any]:
+    def ai_speak(self, text: str, approved: bool = False, live: bool = False) -> dict[str, Any]:
         from nexvara.ai.capabilities import VOICES
         from nexvara.ai.privacy import Guard
         from nexvara.core.task import UserError
@@ -94,13 +130,22 @@ class MediaApi:
                     "AI’ga yuborilmadi."}  # fmt: skip
         router = self._router()
         want = str(router.config().get("voice") or "")
+        live_pick = router.manual("realtime") if live else None
+        provider_override = live_pick["provider"] if live_pick else None
 
         def call(client: Any, model: str) -> bytes:
             names = VOICES["openai" if "gpt" in model else "gemini"]
             return client.speak(model, spoken, want if want in names else names[0])
 
         try:
-            audio, est = router.media("tts", len(spoken) / 900, call, purpose="tts")
+            audio, est = router.media(
+                "tts",
+                len(spoken) / 900,
+                call,
+                approved=approved,
+                purpose="tts",
+                provider_override=provider_override,
+            )
         except Exception as e:  # noqa: BLE001 - shown to the user, never the key
             return self._media_error(e)
         return {"ok": True, "audio": base64.b64encode(audio).decode(), "mime": "audio/wav",
@@ -110,19 +155,28 @@ class MediaApi:
         from nexvara.ai.router import NeedsConfirmation
 
         if isinstance(e, NeedsConfirmation):
-            return {"ok": False, "error": f"Tasdiq kerak: {e.estimate.describe()}"}
+            return {
+                "ok": False,
+                "needs_approval": True,
+                "error": f"Tasdiq kerak: {e.estimate.describe()}",
+            }
         return {"ok": False, "error": str(e) or "AI xatosi"}
 
-    def _transcribe(self, audio_b64: str, mime: str, prompt: str) -> str:
+    def _transcribe(
+        self, audio_b64: str, mime: str, prompt: str, approved: bool = False, live: bool = False
+    ) -> str:
         """Speech → text on the STT direction: Gemini listens inside a normal (free Flash)
         request; OpenAI uses its transcription endpoint."""
         router = self._router()
-        p, row = router.candidates("stt")[0]
+        live_pick = router.manual("realtime") if live else None
+        provider_override = live_pick["provider"] if live_pick else None
+        p, row = router.candidates("stt", provider_override)[0]
         if p == "gemini":
             msg = {"role": "user", "content": "Ovozli buyruqni yozib ber.",
                    "audio": {"mime": mime, "data": audio_b64}}  # fmt: skip
             reply = router.complete("command", prompt, [msg], max_tokens=600, expected_out=80,
-                                    approved=True)  # fmt: skip
+                                    approved=approved, capability="stt",
+                                    provider_override=provider_override)  # fmt: skip
             return reply.text
         audio = base64.b64decode(audio_b64)
         seconds = max(1.0, len(audio) / 32000)
@@ -130,7 +184,14 @@ class MediaApi:
         def call(client: Any, model: str) -> str:
             return client.transcribe(model, audio, mime)
 
-        text, _est = router.media("stt", seconds / 60, call, approved=True, purpose="stt")
+        text, _est = router.media(
+            "stt",
+            seconds / 60,
+            call,
+            approved=approved,
+            purpose="stt",
+            provider_override=provider_override,
+        )
         return text
 
     # ----- 🖼️ 📷 photos -----
@@ -259,8 +320,8 @@ class MediaApi:
             prov = pinned["provider"] if pinned else self._vision_provider()
             if prov is None:
                 raise AiUnavailable("Rasmni ko‘radigan AI ulanmagan: OpenAI, Gemini yoki Claude.")
-            est = router.estimate("balanced", VISION_SYSTEM, msgs, 600, prov,
-                                  pinned["model"] if pinned else None)  # fmt: skip
+            est = router.text_candidates("balanced", VISION_SYSTEM, msgs, 600,
+                                         "vision")[0]  # fmt: skip
         except (AiUnavailable, NeedsConfirmation) as e:
             return {"reply": str(e)}
         token = uuid.uuid4().hex[:12]

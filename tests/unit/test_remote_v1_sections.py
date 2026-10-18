@@ -31,6 +31,8 @@ def env(tmp_path, monkeypatch):
     router = AiRouter(Settings(tmp_path / "s.json"),
                       MemoryKeyStore({"openai": "sk-test-openai-123456"}),
                       Ledger(tmp_path / "l.db"), factory=lambda n, k: cap)  # fmt: skip
+    budget = router.check_budget
+    router.check_budget = lambda est, approved: budget(est, True)
     api = Api(TaskRunner(), overrides={
         "device_store": DeviceStore(tmp_path / "app.db"), "remote_port": 0,
         "memory": MemoryStore(tmp_path / "mem.db"), "ai_router": router,

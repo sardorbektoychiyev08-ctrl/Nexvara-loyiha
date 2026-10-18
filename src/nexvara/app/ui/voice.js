@@ -80,7 +80,9 @@ async function voiceStop() {
   if (voice.live && !voice.heard) { liveListen(); return; } // nothing said: keep listening
   $("#chat-text").placeholder = "Ovoz matnga aylantirilmoqda…";
   const b64 = voiceWav(voiceDownsample(voice.chunks, rate, voice.rate), voice.rate);
-  const r = await api().voice_command(b64, "audio/wav", !!voice.consent);
+  let r = await api().voice_command(b64, "audio/wav", !!voice.consent, false, !!voice.live);
+  if (r.needs_approval && window.confirm(`${r.error}\nOvozni matnga aylantirish uchun pullik so‘rovni tasdiqlaysizmi?`))
+    r = await api().voice_command(b64, "audio/wav", !!voice.consent, true, !!voice.live);
   $("#chat-text").placeholder = "Masalan: 7-sinf fizika Nyuton qonunlari 20 ta test";
   if (!r.ok) { addMsg(r.error || r.needs_consent || "Ovoz tushunilmadi.", false); if (voice.live) liveListen(); return; }
   $("#chat-text").value = r.text;

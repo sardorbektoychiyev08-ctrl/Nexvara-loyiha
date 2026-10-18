@@ -91,6 +91,7 @@
         <button class="btn" id="chat-live" type="button" aria-pressed="false" title="🎧 Jonli ovozli suhbat: tinglaydi, javob beradi, yana tinglaydi">🎧 Jonli suhbat</button>
         <button class="btn" id="chat-models" type="button" title="🧠 AI modeli: har yo‘nalish uchun AUTO yoki qo‘lda">🧠 AUTO</button>
       </div>
+      <div class="muted small" id="chat-ai-meta" aria-live="polite">AI modeli: tanlanmagan</div>
       <form class="chat-input" id="chat-form">
         <button class="btn" id="chat-attach" type="button" title="Fayl tanlash">📎</button>
         <input id="chat-text" type="text" placeholder="Masalan: 7-sinf fizika Nyuton qonunlari 20 ta test" autocomplete="off">
@@ -316,6 +317,8 @@
             API krediti emas.</p>
         </details>
         <div id="ai-providers"></div>
+        <div class="row wrap"><button class="btn" id="ai-refresh-catalog" type="button">Hozir yangilash</button>
+          <span class="muted small" id="ai-catalog-status"></span></div>
         <h3 class="ai-caps-title">🧠 Yo‘nalishlar: AUTO yoki qo‘lda</h3>
         <p class="muted small">Matn, rasmni ko‘rish, rasm yaratish, ovoz → matn, matn → ovoz va jonli suhbat
           uchun alohida tanlang. AUTO — vazifaga qarab avval bepul, keyin eng arzon mos model; qo‘lda
@@ -327,6 +330,8 @@
             <label class="check-label"><input id="ai-enabled" type="checkbox"> AI yoqilgan</label>
             <label class="check-label wide-field"><input id="ai-free" type="checkbox">
               Bepul rejim: hamma ish Gemini’ning bepul darajasida (pul sarflanmaydi)</label>
+            <label class="check-label wide-field"><input id="ai-free-confirmed" type="checkbox">
+              AI Studio hisobimda ushbu kalit Free Tier ekanini tekshirdim</label>
             <div class="free-note wide-field" id="ai-free-note"></div>
             <label>Asosiy provayder <select id="ai-provider"></select></label>
             <label>Kunlik limit, $ <input id="ai-daily" type="number" min="0" step="0.1"></label>

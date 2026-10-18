@@ -15,7 +15,7 @@ import pytest
 from nexvara.ai.keys import MemoryKeyStore
 from nexvara.ai.privacy import Guard, PrivacyBlocked, public
 from nexvara.ai.providers import ChatCompletionsProvider, Provider, Reply
-from nexvara.ai.router import AiRouter, Ledger
+from nexvara.ai.router import AiRouter, Ledger, NeedsConfirmation
 from nexvara.appdata import Settings
 
 PERSON = (
@@ -165,9 +165,16 @@ def _no_secret_left(bodies):
 @pytest.mark.parametrize("provider", ["openai", "gemini"])
 def test_provider_receives_only_placeholders(wired, provider):
     r, wires = wired
-    r.settings.update({"ai": {"provider": provider}})
+    r.set_capability(
+        "text",
+        "manual",
+        provider,
+        "gpt-6-luna" if provider == "openai" else "gemini-3.5-flash-lite",
+    )
     wires[provider] = Wire(chat_answer("⟦ISM_1⟧ uchun ariza tayyor; tel ⟦TEL_1⟧."))
-    reply = r.complete("chat", "sys", [{"role": "user", "content": PERSON}], max_tokens=300)
+    reply = r.complete(
+        "chat", "sys", [{"role": "user", "content": PERSON}], max_tokens=300, approved=True
+    )
     blob = _no_secret_left(wires[provider].bodies)
     assert "⟦ISM_1⟧" in blob and "⟦JSHSHIR_1⟧" in blob
     assert reply.text == "Aliyev Vali Karimovich uchun ariza tayyor; tel +998 90 123-45-67."
@@ -179,10 +186,12 @@ def test_fallback_provider_also_gets_masked_text(wired):
     r.settings.update({"ai": {"fallback": True}})  # off by default; the user turned it on
     wires["openai"] = Wire(chat_answer("x"), status=503)
     wires["gemini"] = Wire(chat_answer("Javob: ⟦ISM_1⟧"))
-    reply = r.complete("chat", "sys", [{"role": "user", "content": PERSON}], max_tokens=300)
-    assert reply.provider == "gemini" and reply.text == "Javob: Aliyev Vali Karimovich"
-    _no_secret_left(wires["openai"].bodies + wires["gemini"].bodies)
-    assert wires["openai"].bodies and wires["gemini"].bodies
+    with pytest.raises(NeedsConfirmation):
+        r.complete(
+            "chat", "sys", [{"role": "user", "content": PERSON}], max_tokens=300, approved=True
+        )
+    _no_secret_left(wires["openai"].bodies)
+    assert wires["openai"].bodies and not wires["gemini"].bodies
 
 
 def test_fallback_is_off_by_default(wired):
@@ -190,7 +199,9 @@ def test_fallback_is_off_by_default(wired):
     wires["openai"] = Wire(chat_answer("x"), status=503)
     wires["gemini"] = Wire(chat_answer("y"))
     with pytest.raises(Exception, match="503"):
-        r.complete("chat", "sys", [{"role": "user", "content": "salom"}], max_tokens=300)
+        r.complete(
+            "chat", "sys", [{"role": "user", "content": "salom"}], max_tokens=300, approved=True
+        )
     assert wires["gemini"].bodies == []  # no paid fallback by itself
 
 
@@ -232,6 +243,8 @@ def test_facts_history_context_and_plan_args_are_protected(tmp_path, monkeypatch
     r = AiRouter(Settings(tmp_path / "s.json"), keys, Ledger(tmp_path / "l.db"),
                  factory=lambda n, k: cap)  # fmt: skip
     r.settings.update({"ai": {"enabled": True}})
+    budget = r.check_budget
+    r.check_budget = lambda est, approved: budget(est, True)
     mem = MemoryStore(tmp_path / "app.db")
     mem.add_fact("Nilufar telefoni +998 91 765-43-21")
     api = Api(overrides={"memory": mem, "ai_router": r})

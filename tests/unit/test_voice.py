@@ -29,7 +29,7 @@ def _router(tmp_path, keys, answer):
         Ledger(tmp_path / "l.db"),
         factory=factory,
     )
-    r.settings.update({"ai": {"enabled": True}})
+    r.settings.update({"ai": {"enabled": True, "free_tier_confirmed": "gemini" in keys}})
     return r, wires
 
 
@@ -64,7 +64,9 @@ def test_voice_with_only_openai_uses_its_transcription(tmp_path):
 
     ears = Net({"/audio/transcriptions": {"text": "Savdo.xlsx ni och"}})
     r.media_factory = lambda name, key: OpenAIMedia(key, opener=ears)
-    out = Api(overrides={"ai_router": r}).voice_command(AUDIO, consent=True)
+    app = Api(overrides={"ai_router": r})
+    assert app.voice_command(AUDIO, consent=True)["needs_approval"]
+    out = app.voice_command(AUDIO, consent=True, approved=True)
     assert out == {"ok": True, "text": "Savdo.xlsx ni och"} and not wires
     assert (
         ears.urls[0].endswith("/audio/transcriptions")

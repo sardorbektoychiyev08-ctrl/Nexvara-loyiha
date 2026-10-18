@@ -85,13 +85,13 @@ class DrawingApi:
 
         router = self._router()
         if image and self._vision_provider() is None:
-            return {"reply": "Rasmni o‘qiydigan AI ulanmagan: OpenAI, Gemini yoki Claude "
-                    "kalitini kiriting (DeepSeek rasmni o‘qimaydi)."}  # fmt: skip
+            return {"reply": "Rasmni o‘qiydigan AI ulanmagan: OpenAI, Gemini, Claude "
+                    "yoki DeepSeek Flash kalitini kiriting."}  # fmt: skip
         system, msgs = drawing.ai_messages(text, ("image/jpeg", "") if image else None,
                                            last if edit else None)  # fmt: skip
         try:
-            est = router.estimate(TIER_FOR["drawing"], system, msgs, 5000, self._vision_provider()
-                                  if image else None)  # fmt: skip
+            est = router.text_candidates(TIER_FOR["drawing"], system, msgs, 5000,
+                                         "vision" if image else "text")[0]  # fmt: skip
         except AiUnavailable as e:
             return {"reply": str(e)}
         import uuid
