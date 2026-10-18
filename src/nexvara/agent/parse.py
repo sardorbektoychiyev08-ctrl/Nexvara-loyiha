@@ -48,7 +48,10 @@ class Plan:
     unknown: list[str] = field(default_factory=list)
 
     def describe(self) -> list[str]:
-        return [DESCRIBE.get(a.kind, a.kind) + _args_text(a) for a in self.actions]
+        names = {**DESCRIBE, **({"format": "Hujjatni rasmiy formatlash"} if self.app == "word"
+                                else {"format": "Slaydlarni formatlash"} if self.app == "powerpoint"
+                                else {})}  # fmt: skip
+        return [names.get(a.kind, a.kind) + _args_text(a) for a in self.actions]
 
 
 DESCRIBE = {
@@ -484,6 +487,20 @@ def _classify_extra(clause: str, f: str, app: str | None) -> Action | None:
         return Action("count", {}, clause)
     if app == "word" and _has(f, "jadval") and _has(f, "formatla", "chiroyli", "bezat", "chegara"):
         return Action("tables", {}, clause)
+    # «rasmiy ariza ko‘rinishiga keltir» (live check 2026-10-19: only the PDF was made)
+    if (
+        app == "word"
+        and _has(f, "rasmiy")
+        and _has(f, "keltir", "korinish", "tayyorla", "moslashtir", "aylantir", "qilib ber")
+    ):
+        return Action("format", {}, clause)
+    # «mayda yozuvlarni kattalashtir»: the fix pass raises small text to the official minimum
+    if app in ("word", "powerpoint") and re.search(
+        r"\b(mayda|kichik|kichkina)\w*\s+(yozuv|matn|shrift|harf)\w*.*"
+        r"\b(kattalashtir|katta qil|oshir)",
+        f,
+    ):
+        return Action("fix", {}, clause)
     # "kamchiliklarni tuzat", "hujjatni tekshirib tuzat": fix what «tekshir» reports
     if app in ("excel", "word", "powerpoint") and _has(
         f, "tuzat", "to[‘’']?g[‘’']?irla", "togirla"

@@ -1243,6 +1243,13 @@ def sync_now(api, a):
 
 @tool("nexvara.command", "Buyruq", text=("string", True, "ilova tushunadigan o‘zbekcha buyruq"))
 def command(api, a):
+    from nexvara.agent.parse import find_file, parse_command
+
+    if find_file(a["text"]):  # a part the executors do not know is an error, not dropped
+        plan = parse_command(a["text"], api._context_file)
+        if plan is not None and plan.unknown:
+            raise ToolError("Ilova bu qismni tushunmadi: " + "; ".join(
+                f"«{u}»" for u in plan.unknown) + ". Office iboralaridan foydalaning.")  # fmt: skip
     out = api._chat_inner(a["text"], _use_ai=False)
     if out.get("unhandled"):
         raise ToolError(f"Buni bajara olmadim: «{a['text']}»")

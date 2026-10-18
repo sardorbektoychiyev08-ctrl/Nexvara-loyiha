@@ -232,6 +232,15 @@ class Api(
         # A named file means an Office command, whatever words its path contains
         # ("D:\Testlar\hisobot.xlsx" is not a request for a test).
         if find_file(text):
+            # Part of the request not understood offline («rasmiy ariza ko‘rinishiga keltir»,
+            # «mayda yozuvlarni kattalashtir» — live check 2026-10-19: only the PDF was made):
+            # with AI on, the whole request goes to the planner, which rewrites it into
+            # commands NEXVARA knows, instead of silently dropping that part.
+            from nexvara.agent.parse import parse_command
+
+            pre = parse_command(_BACKGROUND.sub("", text), self._context_file)
+            if pre is not None and pre.unknown and _use_ai and self._ai_ready():
+                return self._chat_ai(text)
             command = self._chat_command(text)
             if command is not None:
                 return command
