@@ -150,6 +150,11 @@ def run():
         res["template"] = (
             until(f"cad.doc.entities.length > {before_tpl}") and len(doc()) - before_tpl
         )
+        # 10c) 3D view: the rectangle + circle become a plate with a hole
+        js("window.prompt = () => '12'")
+        js("document.querySelector('[data-cad=view3d]').click()")
+        res["view3d"] = until("window.cad3dFaces > 6 && document.querySelector('.cad3d canvas')")
+        js("document.querySelector('.cad3d button').click()")
         # 11) «AI bilan tuzatish» without a key: NEXVARA tidies the sketch itself; zoom; compact
         js("window.prompt = () => ''; window.confirm = () => true;")
         js("document.querySelector('[data-cad=ai]').click()")
@@ -189,6 +194,7 @@ checks = {
     "saved": bool(res.get("saved")),
     "dxf": res.get("dxf_audit") == [] and "HATCH" in res.get("dxf_types", {}),
     "ai_fix": bool(res.get("ai_fix")),
+    "view3d": bool(res.get("view3d")),
     "template": (res.get("template") or 0) >= 10,
     "no_js_errors": not res.get("errors"),
 }

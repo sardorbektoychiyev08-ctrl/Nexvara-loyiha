@@ -1201,6 +1201,7 @@ async function cadAction(action) {
   if (action === "undo") { cadRestore(cadState.undo, cadState.redo); return; }
   if (action === "redo") { cadRestore(cadState.redo, cadState.undo); return; }
   if (action === "extents") { cadExtents(); return; }
+  if (action === "view3d") { cad3dOpen(); return; }
   if (action === "zoomin" || action === "zoomout") {
     const f = action === "zoomin" ? 1.25 : 0.8, cx = (cadWrap.clientWidth || 800) / 2, cy = (cadWrap.clientHeight || 500) / 2;
     const before = cadModel(P(cx, cy));

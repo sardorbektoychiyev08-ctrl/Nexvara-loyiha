@@ -12,7 +12,7 @@ Order and status (Claude ticks these as it goes):
 - [x] Auto-fix documents («kamchiliklarni tuzat», action `fix` in *_exec.py), Office tests PASS.
 - [x] Lesson plan («dars ishlanmasi», `knowledge/lessonplan.py`, `Api._chat_lesson`), Office test PASS.
 - [x] Weekly report (`weekly.py`, chat «… haftalik hisobot qil», workflow template Fri 17:00).
-- [ ] 3D view of a drawing (extrude closed shapes) in the PC editor.
+- [x] 3D view (`app/ui/cad3d.js`, button «3D»).
 - [ ] Voice command on the PC (mic → WAV → Gemini transcription; needs the user's key + consent).
 - [ ] Full tests, PROGRESS entry, build/install APK.
 
