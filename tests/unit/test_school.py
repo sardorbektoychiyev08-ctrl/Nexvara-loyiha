@@ -442,3 +442,19 @@ def test_route_photo_to_excel_and_word(env):
     outside.write_bytes(b"x")
     bad = post(srv, "/api/v1/ocr/convert", {"path": str(outside), "to": "excel"}, token)
     assert bad[0] == 400  # only photos the phone sent
+
+
+def test_route_morning_summary(env):
+    api, srv, token, _done, _tmp = env
+    from nexvara.core.task import UserError
+
+    def boom(task):
+        raise UserError("fayl topilmadi")
+
+    t = api._runner.start("Hisobot PDF", boom)
+    assert t.wait(5)
+    m = j(call(srv, "GET", "/api/v1/morning", token=token))["data"]
+    assert m["failed"] == 1 and any("Hisobot PDF" in x for x in m["lines"]), m
+    assert m["weekday"] in ("Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba",
+                            "Yakshanba")  # fmt: skip
+    assert call(srv, "GET", "/api/v1/morning")[0] == 401

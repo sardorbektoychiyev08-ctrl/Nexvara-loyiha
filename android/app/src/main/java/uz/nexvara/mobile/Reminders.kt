@@ -78,7 +78,7 @@ object Reminders {
 
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) { Reminders.schedule(ctx); return }
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) { Reminders.schedule(ctx); Morning.schedule(ctx); return }
         val s = Schedule(ctx)
         Reminders.nextLesson(s.lessons, s.remindMinutes, System.currentTimeMillis() - 5 * 60_000)?.let { (l, _) ->
             Reminders.notifyLesson(ctx, l, s.remindMinutes)

@@ -856,6 +856,8 @@ fun SettingsScreen(m: AppModel, act: PhoneActions) {
                     }
                     Switch(m.backgroundAlerts, { m.useBackgroundAlerts(it) })
                 }
+                HorizontalDivider(Modifier.padding(vertical = 10.dp), color = x.cardBorder)
+                MorningSettings()
             }
         }
         item { SectionTitle("Sinxronlash (NEXVARA-SYNC)") }
@@ -890,3 +892,29 @@ fun SettingsScreen(m: AppModel, act: PhoneActions) {
 }
 
 object BuildConfigInfo { var version = "" }
+
+
+/** «Ertalabki xulosa»: on/off, the time, and a button to see it now. */
+@Composable
+fun MorningSettings() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val x = LocalExtra.current
+    var on by remember { mutableStateOf(uz.nexvara.mobile.Morning.enabled(ctx)) }
+    var time by remember { mutableStateOf(uz.nexvara.mobile.Morning.time(ctx)) }
+    var error by remember { mutableStateOf<String?>(null) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text("Ertalabki xulosa", style = MaterialTheme.typography.bodyLarge)
+            Text("Har kuni: bugungi darslar va kompyuterda kutayotgan ishlar", style = MaterialTheme.typography.bodySmall, color = x.muted)
+        }
+        Switch(on, { on = it; runCatching { uz.nexvara.mobile.Morning.set(ctx, it, time) } })
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(time, { v ->
+            time = v.take(5)
+            error = runCatching { uz.nexvara.mobile.Morning.set(ctx, on, time) }.exceptionOrNull()?.message
+        }, label = { Text("Vaqt (HH:MM)") }, singleLine = true, isError = error != null, modifier = Modifier.weight(1f))
+        TextButton(onClick = { Thread { uz.nexvara.mobile.Morning.show(ctx) }.start() }) { Text("Hozir ko‘rsat") }
+    }
+    error?.let { Text(it, color = x.danger, style = MaterialTheme.typography.bodySmall) }
+}

@@ -32,6 +32,7 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("POST", "/api/v1/doctemplates/{id}", True),
     ("POST", "/api/v1/ocr", True),
     ("POST", "/api/v1/ocr/convert", True),
+    ("GET", "/api/v1/morning", True),
     ("GET", "/api/v1/files/preview", True),
     ("POST", "/api/v1/control", True),
     ("GET", "/api/v1/autostart", True),
@@ -224,6 +225,10 @@ def route(
         api.set_context_file(str(txt))
         _share(srv, dev, txt)
         return {"text": text, "path": str(txt), "chars": len(text)}
+    if route == "/api/v1/morning":
+        from nexvara import morning
+
+        return morning.summary(api)
     if route == "/api/v1/ocr/convert":
         return _ocr_convert(api, srv, dev, body())
     # ----- preview (PDF in the app) -----

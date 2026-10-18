@@ -59,6 +59,7 @@ class MainActivity : FragmentActivity() {
         handleShare(intent)
         handleOpen(intent)
         Reminders.schedule(this)
+        Morning.schedule(this)
         NexvaraWidget.refresh(this)
         setContent {
             var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
