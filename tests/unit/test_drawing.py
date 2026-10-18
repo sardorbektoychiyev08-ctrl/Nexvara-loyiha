@@ -222,3 +222,14 @@ def test_phone_cannot_upload_programs_and_token_guessing_is_throttled(server):
     codes = [call(srv, "GET", "/api/v1/session", token=f"guess-{i}")[0] for i in range(22)]
     assert codes[:20] == [401] * 20 and codes[-1] == 429
     assert call(srv, "GET", "/api/v1/session", token=token)[0] == 200  # the real phone still works
+
+
+def test_drawing_above_the_task_limit_uses_the_balanced_model(tmp_path, monkeypatch):
+    """Live check 2026-10-19: «Ha» was asked for $0.051, then the $0.05 task limit stopped it."""
+    api, pro = _api(tmp_path, {"anthropic": "sk-ant-test-1234567890"})
+    api._router().settings.update({"ai": {"task_limit_usd": 0.06}})
+    out = api.chat("AI bilan chizma chiz: L shaklidagi kronshteyn 100x60, qalinligi 10")
+    assert out.get("confirm") and "muvozanatli model" in out["reply"], out["reply"]
+    api._router().settings.update({"ai": {"task_limit_usd": 0.0001}})
+    out = api.chat("AI bilan chizma chiz: L shaklidagi kronshteyn 100x60, qalinligi 10")
+    assert not out.get("confirm") and "limit" in out["reply"].lower()
