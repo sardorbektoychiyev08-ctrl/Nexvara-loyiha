@@ -183,12 +183,13 @@ def route(
         return {"templates": catalog()}
     if route == "/api/v1/doctemplates/{id}":
         from nexvara import doctemplates
+        from nexvara.fileagent import free_name
 
         b = body()
         fields = b.get("fields") if isinstance(b.get("fields"), dict) else {}
         blocks = _user(lambda: doctemplates.render(args["id"], fields))
         name = doctemplates.TEMPLATES[args["id"]]["title"].split(" (")[0]
-        out = doctemplates.out_dir() / f"{name} {time.strftime('%Y%m%d-%H%M%S')}.docx"
+        out = free_name(doctemplates.out_dir() / f"{name} {time.strftime('%Y%m%d-%H%M%S')}.docx")
         fake = api._overrides.get("doctemplate") if hasattr(api, "_overrides") else None
 
         def fn(task: Any) -> dict[str, Any]:

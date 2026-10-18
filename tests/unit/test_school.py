@@ -124,7 +124,7 @@ def test_document_templates_render():
     t = next(x for x in cat if x["id"] == "ariza_tatil")
     fields = {f["key"]: f["example"] for f in t["fields"]}
     blocks = doctemplates.render("ariza_tatil", fields)
-    assert ("title", "ARIZA") in blocks and any("3 kunlik" in b for _k, b in blocks)
+    assert ("title", "ARIZA") in blocks and any("3 kalendar kun" in b for _k, b in blocks)
     with pytest.raises(UserError, match="To‘ldiring"):
         doctemplates.render("ariza_tatil", {**fields, "sabab": ""})
     items = doctemplates.render(

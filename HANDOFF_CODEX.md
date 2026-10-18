@@ -1,5 +1,10 @@
 # HANDOFF → Codex (Windows side)
 
+2026-10-18 Codex update: the later document-template task is complete on
+`claude/android-v1` (general/leave/job applications, formal Word layout, eight real Word
+DOCX/PDF tests). See PROGRESS entry (26) and `docs/HUJJAT_SHABLONLARI.md`. The CAD task
+below is historical. No merge or push.
+
 ## ▶ CURRENT TASK (2026-10-18) — completed on `claude/android-v1` by Codex
 
 Branch: **`claude/android-v1`**, worktree `D:\Nexvara loyiha\.worktrees\android` (no `.venv`

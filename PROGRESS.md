@@ -4,6 +4,29 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (26) — Codex — ariza va tayyor Word hujjatlaridagi xatolar tuzatildi
+
+**Tarmoq:** `claude/android-v1`, `.worktrees/android`; `main`ga merge va push qilinmadi. Foydalanuvchi hujjat ishlari, ayniqsa ariza yozilishidagi xatolarni tuzatishni va internetdagi ishonchli namunalarga tayangan holda mustaqil ishlashni so‘radi.
+
+**Manbalar:** Hukumat portalidagi [ishga qabul va ta’til arizalari](https://gov.uz/oz/vobkent/sections/view/117086), [Davlat tilida ish yuritish qo‘llanmasi](https://ebook.tsue.uz/public/ebooks/davlat-tilida-ish-yuritish/download/4d6a41774d413d). Xulosa va shablon tartibi [docs/HUJJAT_SHABLONLARI.md](docs/HUJJAT_SHABLONLARI.md) da.
+
+**Tuzatishlar:** umumiy ariza qo‘shildi (jami 8 shablon); ta’til arizasida ta’til turi va imzo yonidagi F.I.Sh. alohida kiritiladi; ishga qabul arizasida ham arizachi ismi ko‘rsatiladi. Sana `kun.oy.yil` shaklida va ta’til kunlari soni tekshiriladi. «20.10.2026 dan» kabi xato birikma o‘rniga «2026-yil 20-oktabrdan» yoziladi; lavozim so‘zi ikki marta takrorlanmaydi. Kiritilmagan maydon `None` bo‘lib chiqmaydi. Tushuntirish xatidagi asossiz avtomatik va’da olib tashlandi. Word’da A4, Times New Roman, 1,5 qator, to‘g‘ri chetlar va sana/imzo joylashuvi berildi; buyruq bandlari ketma-ket raqamlanadi. Telefon API’da bir xil nomli fayl ustiga yozilmasligi uchun bo‘sh nom tanlanadi.
+
+**Sinovlar:**
+
+| Sinov | Natija |
+|---|---|
+| Ariza matni/sana/bo‘sh maydon birlik testlari | PASS |
+| 8 shablon haqiqiy Word 2016’da DOCX va PDF | PASS — 8/8, har biri 1 sahifa |
+| Ta’til arizasi PDF sahifasini ko‘z bilan tekshirish | PASS — matn va imzo joylashuvi toza |
+| `test.ps1 -Office`: lint, barcha testlar, oyna smoke | PASS — pytest 489/489, smoke PASS; jurnalga yo‘naltirilgan tashqi PowerShell chaqiruvi ogohlantirishni xato kodi sifatida qaytardi, skriptning o‘zi `NATIJA: PASS` yozdi |
+| `test.ps1` oddiy chaqiruv | PASS — 419 passed, 70 Office skipped; smoke PASS, chiqish kodi 0 |
+| Foydalanuvchining o‘z real arizasi bilan solishtirish | NOT TESTED — namuna berilmagan |
+
+**Keyingi qadam:** foydalanuvchi real hujjatdagi muayyan xatoni ko‘rsatsa, shu holatni ham regressiya sinoviga qo‘shish. Maxfiy foydalanuvchi hujjatlari ochilmadi yoki o‘zgartirilmadi.
+
+---
+
 ## 2026-10-18 (25) — Codex — ichki CAD sahifasi, yagona belgi va Android 1.2.2
 
 **Tarmoq:** `claude/android-v1`, `.worktrees/android`. Claude’ning `f5093f5` WIP ishini foydalanuvchi topshirig‘i bilan shu tarmoqda davom ettirdim. `main` ga merge ham, push ham qilinmadi.
