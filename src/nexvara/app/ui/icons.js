@@ -40,6 +40,22 @@ const UI_ICON_PATHS = {
   redo: "<path d='m15 7 5 5-5 5m5-5H10a6 6 0 0 0-6 6'/>",
   extents: "<path d='M9 3H3v6m12-6h6v6M3 15v6h6m12-6v6h-6M8 12h8'/>",
   measure: "<path d='M3 17 17 3l4 4L7 21zM9 14l2 2M12 11l2 2M15 8l2 2'/>",
+  ellipse: "<ellipse cx='12' cy='12' rx='9' ry='5.5'/>",
+  polygon: "<path d='m12 3 8 5.5-3 9.5H7L4 8.5z'/>",
+  hatch: "<rect x='4' y='4' width='16' height='16'/><path d='M4 12 12 4M4 20 20 4M12 20l8-8'/>",
+  dimali: "<path d='m5 17 12-12M3 15l4 4M15 3l4 4'/><path d='m6 16 2-1-1 2zM16 6l-2 1 1-2z'/>",
+  dimrad: "<circle cx='12' cy='12' r='8'/><path d='M12 12l5.5-5.5M15 6h3v3'/>",
+  dimdia: "<circle cx='12' cy='12' r='8'/><path d='M6.5 17.5l11-11M15 6h3v3M9 18H6v-3'/>",
+  scale: "<rect x='3' y='11' width='10' height='10'/><path d='M13 11V3h8v8h-8M16 8l5-5M17 3h4v4'/>",
+  trim: "<circle cx='6' cy='6' r='3'/><circle cx='6' cy='18' r='3'/><path d='M8 8l12 12M8 16 20 4'/>",
+  extend: "<path d='M4 12h11M15 8l4 4-4 4M21 4v16'/>",
+  fillet: "<path d='M4 20V10a6 6 0 0 1 6-6h10'/>",
+  chamfer: "<path d='M4 20V9l5-5h11'/>",
+  array: "<rect x='3' y='3' width='6' height='6'/><rect x='15' y='3' width='6' height='6'/><rect x='3' y='15' width='6' height='6'/><rect x='15' y='15' width='6' height='6'/>",
+  parray: "<circle cx='12' cy='12' r='8' stroke-dasharray='2 3'/><circle cx='12' cy='4' r='2'/><circle cx='20' cy='12' r='2'/><circle cx='12' cy='20' r='2'/><circle cx='4' cy='12' r='2'/>",
+  explode: "<path d='M12 3v5M12 16v5M3 12h5M16 12h5M6 6l3 3M15 15l3 3M18 6l-3 3M6 18l3-3'/>",
+  zoomwin: "<circle cx='10' cy='10' r='6'/><path d='m15 15 6 6M7 10h6M10 7v6'/>",
+  area: "<path d='M4 18 9 5l11 4-3 11z'/><path d='M8 14h7'/>",
 };
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll(".nav-item, #cad-toolbar .cad-btn").forEach((button) => {

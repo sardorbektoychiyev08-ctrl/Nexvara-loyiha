@@ -35,6 +35,7 @@
 
 :root[data-theme="dark"] {
   --cad-bg: #0a1425;
+  --cad-ink: #e2e8f0;
   --cad-grid: #22314a;
   --bg: #0B1020;
   --surface: #121933;
@@ -45,6 +46,7 @@
 }
 :root[data-theme="light"] {
   --cad-bg: #edf4fc;
+  --cad-ink: #0f172a;
   --cad-grid: #d2dfed;
   --bg: #F5F7FB;
   --surface: #FFFFFF;
@@ -263,3 +265,23 @@ body.cad-mode .content { padding: 16px 20px; overflow: hidden; }
 .update-banner span { flex: 1 1 260px; }
 .ai-howto { margin: 6px 0 12px; }
 .ai-howto summary { cursor: pointer; font-weight: 600; }
+
+/* ---- Chizmalar: layers and properties ---- */
+.cad-main { grid-template-columns: minmax(0, 1fr) 230px; }
+.cad-swatch { width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--border); flex: none; margin: 0 4px; }
+.cad-layer-props { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 0 0 6px 26px; }
+.cad-layer-props select { min-width: 0; font-size: 11px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 2px; }
+.cad-layer-props .cad-mini { justify-self: start; color: var(--muted); }
+.cad-prop-title { color: var(--text); font-weight: 600; }
+.cad-field { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 6px; align-items: center; }
+.cad-field input[type=checkbox] { justify-self: start; }
+.cad-log { height: 64px; }
+.cad-group::before { white-space: nowrap; }
+/* small screens: the drawing area gets the room */
+@media (max-height: 1000px) {
+  .cad-head p { display: none; }
+  .cad-group::before { display: none; }
+  .cad-toolbar { padding: 4px; gap: 4px; }
+  .cad-btn { padding: 3px 6px; }
+  .cad-log { height: 40px; }
+}

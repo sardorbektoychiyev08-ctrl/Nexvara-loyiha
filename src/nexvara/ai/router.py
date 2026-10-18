@@ -14,6 +14,7 @@ Rules (spec: no surprise spending):
 from __future__ import annotations
 
 import datetime as dt
+import re
 import sqlite3
 import threading
 import time
@@ -51,6 +52,17 @@ PURPOSE_LABELS = {
 }
 WARN_AT = 0.8  # warn when 80% of a limit is spent
 FREE_PROVIDER = "gemini"  # the only provider with an official free API tier
+# Every answer is Uzbek in the Latin alphabet unless the user asked for another language/script.
+LATIN_RULE = (
+    "\n\nTIL QOIDASI: javobni faqat o‘zbek tilida, lotin alifbosida yoz (o‘, g‘, sh, ch, ’). "
+    "Kirill harflarini ishlatma. Foydalanuvchi boshqa til yoki yozuvni aniq so‘ragan bo‘lsagina "
+    "o‘sha tilda yoz."
+)
+_OTHER_SCRIPT = re.compile(
+    r"\brus\w*\s+til\w*|\bruscha\b|\bkirill\w*|\bingliz\w*|\benglish\b|"
+    r"на\s+русском|по-русски|русск\w*",
+    re.IGNORECASE,
+)
 IMAGE_TOKENS = 1600  # a photo (<= 1600 px) counted for the estimate
 
 _SCHEMA = """
@@ -322,6 +334,10 @@ class AiRouter:
         self.last_masked = guard.count
         self.masked_total = getattr(self, "masked_total", 0) + guard.count
         tier = tier or TIER_FOR.get(purpose, "balanced")
+        last_user = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
+        latin = not _OTHER_SCRIPT.search(last_user or "")
+        if latin:
+            system += LATIN_RULE
         first = self.provider_name()
         if first is None:
             raise AiUnavailable("AI kaliti kiritilmagan (Sozlamalar → AI).")
@@ -371,6 +387,10 @@ class AiRouter:
                 continue
             reply.provider = provider
             reply.text = guard.restore(reply.text)  # real values back, on this PC only
+            if latin:  # a model that still slipped into Cyrillic Uzbek is corrected here
+                from nexvara.knowledge.textnorm import to_latin_if_uzbek
+
+                reply.text = to_latin_if_uzbek(reply.text)
             reply.masked = guard.count  # type: ignore[attr-defined]
             reply.cost = 0.0 if est.free else models.cost(
                 reply.model or est.model, provider, reply.input_tokens, reply.output_tokens,

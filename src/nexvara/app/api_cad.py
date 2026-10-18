@@ -16,7 +16,8 @@ from pathlib import Path
 from typing import Any
 
 MAX_ENTITIES = 60000
-KINDS = {"line", "polyline", "circle", "arc", "ellipse", "text", "dim"}
+KINDS = {"line", "polyline", "circle", "arc", "ellipse", "text", "dim", "ldim", "rdim", "hatch"}
+LINETYPES = {"Continuous", "NX_SHTRIX", "NX_OQ"}
 
 
 def _f(v: Any, lo: float = -1e7, hi: float = 1e7) -> float:
@@ -39,7 +40,8 @@ def doc_to_json(doc: Any) -> dict[str, Any]:
 
     layers = [{"name": ly.dxf.name, "color": abs(int(ly.dxf.color or 7)) or 7,
                "lineweight": int(ly.dxf.lineweight) if int(ly.dxf.lineweight) > 0 else 25,
-               "linetype": str(ly.dxf.linetype or "Continuous"), "visible": ly.is_on()}
+               "linetype": str(ly.dxf.linetype or "Continuous"), "visible": ly.is_on(),
+               "locked": ly.is_locked()}
               for ly in doc.layers]  # fmt: skip
     out: list[dict[str, Any]] = []
     skipped: Counter = Counter()
@@ -93,24 +95,19 @@ def doc_to_json(doc: Any) -> dict[str, Any]:
                 out.append({"type": "text", "layer": layer, "x": p.x, "y": p.y,
                             "text": _txt(text), "h": h or 2.5, "rot": rot})  # fmt: skip
             elif t == "DIMENSION":
-                d1, d2, base = e.dxf.defpoint2, e.dxf.defpoint3, e.dxf.defpoint
-                length = math.hypot(d2.x - d1.x, d2.y - d1.y)
-                if length:
-                    nx, ny = -(d2.y - d1.y) / length, (d2.x - d1.x) / length
-                    off = (base.x - d2.x) * nx + (base.y - d2.y) * ny
-                    label = e.dxf.get("text", "")
-                    out.append(
-                        {
-                            "type": "dim",
-                            "layer": layer,
-                            "x1": d1.x,
-                            "y1": d1.y,
-                            "x2": d2.x,
-                            "y2": d2.y,
-                            "offset": off,
-                            "label": "" if label in ("", "<>") else _txt(label, 40),
-                        }
-                    )
+                out.extend(_dimension(e, layer))
+            elif t == "HATCH":
+                from ezdxf import path as ezpath
+
+                rings = [[[v.x, v.y] for v in pth.flattening(0.05)]
+                         for pth in ezpath.from_hatch(e)]  # fmt: skip
+                rings = [r[:-1] if r[0] == r[-1] else r for r in rings]
+                rings = [r for r in rings if len(r) >= 3]
+                if rings:
+                    solid = bool(e.dxf.solid_fill)
+                    out.append({"type": "hatch", "layer": layer, "paths": rings,
+                                "pattern": "SOLID" if solid else "ANSI31",
+                                "scale": float(e.dxf.get("pattern_scale", 1) or 1)})  # fmt: skip
             elif t == "SPLINE":
                 pts = [[p.x, p.y, 0] for p in e.flattening(0.05)]
                 out.append({"type": "polyline", "layer": layer, "points": pts,
@@ -132,8 +129,49 @@ def doc_to_json(doc: Any) -> dict[str, Any]:
             skipped[t] += 1
 
     for e in doc.modelspace():
+        n = len(out)
         add(e)
+        color = int(e.dxf.get("color", 256)) if e.dxf.hasattr("color") else 256
+        if 1 <= color <= 255:  # an own colour instead of the layer's ("ByLayer" = 256)
+            for item in out[n:]:
+                item.setdefault("color", color)
     return {"units": "mm", "layers": layers, "entities": out, "skipped": dict(skipped)}
+
+
+def _dimension(e: Any, layer: str) -> list[dict[str, Any]]:
+    """AutoCAD dimensions -> the editor's dim (aligned), ldim (linear, rotated), rdim."""
+    kind = int(e.dxf.dimtype) & 0x0F
+    label = e.dxf.get("text", "")
+    label = "" if label in ("", "<>", " ") else _txt(label, 40)
+    base = e.dxf.defpoint
+    if kind in (0, 1):
+        d1, d2 = e.dxf.defpoint2, e.dxf.defpoint3
+        if math.hypot(d2.x - d1.x, d2.y - d1.y) == 0:
+            return []
+        along = math.atan2(d2.y - d1.y, d2.x - d1.x)
+        rot = math.radians(float(e.dxf.get("angle", 0)))
+        if kind == 0 and abs(math.sin(along - rot)) > 1e-6:  # linear along "angle" (0/90…)
+            return [{"type": "ldim", "layer": layer, "x1": d1.x, "y1": d1.y, "x2": d2.x,
+                     "y2": d2.y, "bx": base.x, "by": base.y,
+                     "rot": float(e.dxf.get("angle", 0)), "label": label}]  # fmt: skip
+        length = math.hypot(d2.x - d1.x, d2.y - d1.y)
+        nx, ny = -(d2.y - d1.y) / length, (d2.x - d1.x) / length
+        off = (base.x - d2.x) * nx + (base.y - d2.y) * ny
+        return [{"type": "dim", "layer": layer, "x1": d1.x, "y1": d1.y, "x2": d2.x,
+                 "y2": d2.y, "offset": off, "label": label}]  # fmt: skip
+    if kind in (3, 4):  # diameter: defpoint & defpoint4 on the circle; radius: centre & point
+        p4 = e.dxf.defpoint4
+        if kind == 3:
+            cx, cy = (base.x + p4.x) / 2, (base.y + p4.y) / 2
+        else:
+            cx, cy = base.x, base.y
+        r = math.hypot(p4.x - cx, p4.y - cy)
+        if r == 0:
+            return []
+        ang = math.degrees(math.atan2(p4.y - cy, p4.x - cx))
+        return [{"type": "rdim", "layer": layer, "cx": cx, "cy": cy, "r": r, "angle": ang,
+                 "diameter": kind == 3, "label": label}]  # fmt: skip
+    return []
 
 
 # ---------------- JSON -> DXF ----------------
@@ -162,6 +200,8 @@ def json_to_doc(data: dict[str, Any]) -> Any:
             layer = doc.layers.add(name, color=color, lineweight=lw, linetype=lt)
         if ly.get("visible") is False:
             layer.off()
+        if ly.get("locked"):
+            layer.lock()
     msp = doc.modelspace()
     for i, e in enumerate(ents, 1):
         if not isinstance(e, dict) or e.get("type") not in KINDS:
@@ -169,7 +209,11 @@ def json_to_doc(data: dict[str, Any]) -> Any:
         layer = _txt(e.get("layer"), 60) or "0"
         if layer not in doc.layers:
             doc.layers.add(layer)
-        a = {"layer": layer}
+        a: dict[str, Any] = {"layer": layer}
+        if e.get("color") not in (None, "", 256):
+            a["color"] = int(_f(e["color"], 1, 255))
+        if e.get("linetype") in LINETYPES:
+            a["linetype"] = e["linetype"]
         t = e["type"]
         try:
             if t == "line":
@@ -211,6 +255,39 @@ def json_to_doc(data: dict[str, Any]) -> Any:
                                           dimstyle=cad.DIM_STYLE, text=label or "<>",
                                           dxfattribs=a)  # fmt: skip
                 dim.render()
+            elif t == "ldim":
+                p1, p2 = (_f(e["x1"]), _f(e["y1"])), (_f(e["x2"]), _f(e["y2"]))
+                label = _txt(e.get("label"), 40)
+                dim = msp.add_linear_dim(base=(_f(e["bx"]), _f(e["by"])), p1=p1, p2=p2,
+                                         angle=_f(e.get("rot", 0), -1e4, 1e4),
+                                         dimstyle=cad.DIM_STYLE, text=label or "<>",
+                                         dxfattribs=a)  # fmt: skip
+                dim.render()
+            elif t == "rdim":
+                c, r = (_f(e["cx"]), _f(e["cy"])), _f(e["r"], 1e-6)
+                ang = _f(e.get("angle", 45), -1e4, 1e4)
+                label = _txt(e.get("label"), 40)
+                make = msp.add_diameter_dim if e.get("diameter") else msp.add_radius_dim
+                dim = make(center=c, radius=r, angle=ang, dimstyle=cad.DIM_STYLE,
+                           text=label or "<>", dxfattribs=a)  # fmt: skip
+                dim.render()
+            elif t == "hatch":
+                paths = e.get("paths") or []
+                if not isinstance(paths, list) or not 1 <= len(paths) <= 200:
+                    raise ValueError("shtrix chegarasi noto‘g‘ri")
+                hatch = msp.add_hatch(dxfattribs=a)
+                if (e.get("pattern") or "SOLID") == "SOLID":
+                    hatch.set_solid_fill(color=a.get("color", 256))
+                else:
+                    hatch.set_pattern_fill(
+                        "ANSI31", color=a.get("color", 256), scale=_f(e.get("scale", 1), 0.01, 1000)
+                    )
+                for ring in paths:
+                    if not isinstance(ring, list) or not 2 <= len(ring) <= 100000:
+                        raise ValueError("shtrix chegarasi noto‘g‘ri")
+                    hatch.paths.add_polyline_path(
+                        [(_f(q[0]), _f(q[1]), _f(q[2] if len(q) > 2 else 0, -1e3, 1e3))
+                         for q in ring], is_closed=True)  # fmt: skip
         except (KeyError, TypeError, IndexError) as err:
             raise ValueError(f"{i}-obyekt ({t}) maydoni yetishmaydi: {err}") from err
     return doc
