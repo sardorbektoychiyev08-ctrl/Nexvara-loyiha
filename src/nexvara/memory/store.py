@@ -274,8 +274,12 @@ class MemoryStore:
             return 0
         with self._lock, self._db() as db:
             try:
-                ids = [r[0] for r in db.execute(
-                    "SELECT rowid FROM chat_fts WHERE chat_fts MATCH ?", (q,)).fetchall()]  # fmt: skip
+                ids = [
+                    r[0]
+                    for r in db.execute(
+                        "SELECT rowid FROM chat_fts WHERE chat_fts MATCH ?", (q,)
+                    ).fetchall()
+                ]
             except sqlite3.OperationalError:
                 return 0
             for i in ids:

@@ -420,7 +420,12 @@ class Api(
                     return out
             if intent.kind == "question":
                 ans = features.answer_question(
-                    router, text, approved, intent.grade, intent.subject or None, facts=facts,
+                    router,
+                    text,
+                    approved,
+                    intent.grade,
+                    intent.subject or None,
+                    facts=facts,
                     recall=recall,
                 )
             else:

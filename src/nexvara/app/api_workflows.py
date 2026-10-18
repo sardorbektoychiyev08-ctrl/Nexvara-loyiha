@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
 from typing import Any
 
 
@@ -35,6 +37,54 @@ class WorkflowsApi:
         if eng is not None:
             eng.start_watching()
         self.start_remote_if_enabled()  # phone access, if the user turned it on
+        self._auto_backup().start()  # weekly copy of the small user data
+
+    def _auto_backup(self):
+        if getattr(self, "_backup", None) is None:
+            from nexvara.appdata import Settings
+            from nexvara.autobackup import AutoBackup
+
+            self._backup = AutoBackup(Settings())
+        return self._backup
+
+    def _chat_backup(self, f: str, text: str) -> dict[str, Any] | None:
+        """«zaxira qil», «zaxira qachon qilingan», «avtomatik zaxirani o'chir/yoq»."""
+        if not re.search(r"\bzaxira\w*", f):
+            return None
+        if self._history is None and "backup" not in self._overrides:
+            return {"reply": "Zaxira bu rejimda o‘chirilgan."}
+        bk = self._overrides.get("backup") or self._auto_backup()
+        auto = "avto" in f or "haftalik" in f
+        if auto and re.search(r"\b(ochir|toxtat|kerak emas)\w*", f):
+            bk.settings.update({"backup": {"auto": False}})
+            return {"reply": "Haftalik avtomatik zaxira o‘chirildi. Qayta yoqish: «avtomatik "
+                    "zaxirani yoq»."}  # fmt: skip
+        if auto and re.search(r"\b(yoq|yoqib qoy|yoqing)\b", f):
+            bk.settings.update({"backup": {"auto": True}})
+            return {"reply": "Haftalik avtomatik zaxira yoqildi."}
+        if re.search(r"\b(qachon|holat\w*|bormi|qayerda)\b", f):
+            from nexvara.autobackup import backups
+
+            s = bk.settings.load().get("backup") or {}
+            items = backups(Path(s["folder"]) if s.get("folder") else None)
+            on = "yoqilgan (har hafta)" if s.get("auto", True) else "o‘chirilgan"
+            if not items:
+                return {"reply": f"Avtomatik zaxira {on}. Hali zaxira qilinmagan. «Zaxira qil» "
+                        "deb yozsangiz, hozir qilaman."}  # fmt: skip
+            return {"reply": f"Avtomatik zaxira {on}. Oxirgisi: {items[0].name[5:]}, jami "
+                    f"{len(items)} ta.\nJoyi: {items[0].parent}"}  # fmt: skip
+        if re.search(r"\b(qil|ol|yarat|saqla)\w*", f):
+            res = bk.run_now()
+            if res["verify_errors"]:
+                bad = len(res["verify_errors"])
+                return {"reply": f"Zaxira qilindi, lekin {bad} ta fayl tekshiruvdan o‘tmadi. "
+                        "Qaytadan urinib ko‘ring.", "error": True}  # fmt: skip
+            mb = res["bytes"] / 1e6
+            return {"reply": f"✅ Zaxira tayyor: {res['files']} ta fayl ({mb:.1f} MB), har biri "
+                    f"tekshirildi.\nJoyi: {res['path']}\nDarsliklar kiritilmaydi (ular qayta "
+                    "yuklanadi), API kalitlari faylga yozilmaydi.",
+                    "files": [res["path"]]}  # fmt: skip
+        return None
 
     def _need_wf(self):
         eng = self._wf()

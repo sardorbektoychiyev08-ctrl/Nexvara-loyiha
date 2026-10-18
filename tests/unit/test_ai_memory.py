@@ -128,9 +128,15 @@ def test_forget_in_chat(env):
 def test_self_repair_replans_with_the_error(env):
     api, work = env, env.work
     (work / "Hisobot.xlsx").write_bytes(b"PK")
-    bad = {"kind": "tools", "calls": [{"tool": "files.search", "args": {"folder": str(work / "Yoq")}}]}
-    good = {"kind": "tools", "say": "papka nomini tuzatdim",
-            "calls": [{"tool": "files.search", "args": {"folder": str(work), "ext": "xlsx"}}]}  # fmt: skip
+    bad = {
+        "kind": "tools",
+        "calls": [{"tool": "files.search", "args": {"folder": str(work / "Yoq")}}],
+    }
+    good = {
+        "kind": "tools",
+        "say": "papka nomini tuzatdim",
+        "calls": [{"tool": "files.search", "args": {"folder": str(work), "ext": "xlsx"}}],
+    }
     api.fake.replies = [json.dumps(bad), json.dumps(good)]
     r = api.chat("ish papkamdagi excellarni ko‘rsat")
     assert r.get("repaired") == 1, r
@@ -141,7 +147,7 @@ def test_self_repair_replans_with_the_error(env):
 
 
 def test_self_repair_stops_after_two_tries_and_can_be_switched_off(env):
-    api, work = env, env.work
+    api = env
     bad = json.dumps({"kind": "tools", "calls": [{"tool": "os.format_disk"}]})
     api.fake.replies = [bad, bad, bad]
     r = api.chat("kompyuterimni tezlashtir")
@@ -172,9 +178,22 @@ def test_failed_office_task_is_repaired_in_the_background(env):
     api = Api(TaskRunner(), overrides={"memory": api.mem, "ai_router": api.router,
                                        "command": office})  # fmt: skip
     api.fake = env.fake
-    api.fake.replies = [json.dumps({"kind": "tools", "say": "Summa ustuni bo‘yicha", "calls": [
-        {"tool": "nexvara.command",
-         "args": {"text": f"{work / 'Savdo.xlsx'} ni och, Summa bo‘yicha saralab saqla"}}]})]  # fmt: skip
+    api.fake.replies = [
+        json.dumps(
+            {
+                "kind": "tools",
+                "say": "Summa ustuni bo‘yicha",
+                "calls": [
+                    {
+                        "tool": "nexvara.command",
+                        "args": {
+                            "text": f"{work / 'Savdo.xlsx'} ni och, Summa bo‘yicha saralab saqla"
+                        },
+                    }
+                ],
+            }
+        )
+    ]
     r = api.chat(f"{work / 'Savdo.xlsx'} ni och, Narx bo‘yicha saralab saqla")
     api._runner.get(r["task"]["id"]).wait(10)
     for _ in range(100):

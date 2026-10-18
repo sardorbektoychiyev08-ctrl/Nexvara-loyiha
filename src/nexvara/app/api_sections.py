@@ -25,7 +25,7 @@ class SectionsChatApi:
 
         f = fold(text).strip(" ?!.")
         for fn in (self._chat_memory_recall, self._chat_history,
-                   self._chat_devices, self._chat_theme):  # fmt: skip
+                   self._chat_devices, self._chat_theme, self._chat_backup):  # fmt: skip
             out = fn(f, text)
             if out is not None:
                 return out

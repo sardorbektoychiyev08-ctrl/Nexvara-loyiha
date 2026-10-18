@@ -273,7 +273,9 @@ class AgentApi:
         if turns and turns[-1]["role"] == "user" and turns[-1]["text"].strip() == text.strip():
             turns = turns[:-1]  # chat() logged the current message already
         turns = turns[-n:] if n else []
-        return Recall(turns, mem.recall(text, days, skip_last=n + 1), mem.day_summaries(min(days, 7)))
+        return Recall(
+            turns, mem.recall(text, days, skip_last=n + 1), mem.day_summaries(min(days, 7))
+        )
 
     def _chat_forget(self, text: str) -> dict[str, Any] | None:
         """«buni unut» (the last exchange), «Savdo hisoboti haqidagi gaplarni unut»."""
@@ -290,8 +292,11 @@ class AgentApi:
         if re.search(r"\b(hamma|barcha|butun)\w* (suhbat|gap|xabar)", f):
             return {"reply": "Butun suhbatni o‘chirish uchun «Xotira» bo‘limida «Suhbatni "
                     "tozalash» tugmasini bosing (qaytarib bo‘lmaydi)."}  # fmt: skip
-        m = re.fullmatch(r"(.+?)\s+(haqidagi|haqida|to.?g.?risidagi|bilan bog.?liq)?\s*"
-                         r"(gaplarni|gapni|suhbatni|xabarlarni|narsalarni)?\s*(ni )?unut\w*", f)  # fmt: skip
+        m = re.fullmatch(
+            r"(.+?)\s+(haqidagi|haqida|to.?g.?risidagi|bilan bog.?liq)?\s*"
+            r"(gaplarni|gapni|suhbatni|xabarlarni|narsalarni)?\s*(ni )?unut\w*",
+            f,
+        )
         what = (m.group(1) if m else "").strip()
         what = re.sub(r"\b(ni|ga|haqida)$", "", what).strip()
         if len(what) < 3:
