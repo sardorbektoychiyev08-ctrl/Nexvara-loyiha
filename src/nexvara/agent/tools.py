@@ -194,6 +194,11 @@ def resolve_folder(api: Any, value: str, create: bool = False) -> Path:
         p = base / v
     if p.is_dir():
         return p
+    # «D:\Ish papkasi», «…\Ish papkasidagi»: the AI (or the user) glued the Uzbek word to the
+    # path (live check 2026-10-19) — the folder is the part before it.
+    bare = re.sub(r"(?i)[\s\\/]+papka\w*\s*$", "", str(p)).rstrip()
+    if bare != str(p) and Path(bare).is_dir():
+        return Path(bare)
     if create and p.parent.is_dir():
         p.mkdir()
         return p
@@ -225,7 +230,26 @@ def _names(paths: list[str]) -> str:
 )
 def files_search(api, a):
     folder = str(resolve_folder(api, a["folder"])) if a.get("folder") else ""
-    r = api.files_search(a.get("query", ""), folder, a.get("ext", ""))
+    query, ext = str(a.get("query") or ""), str(a.get("ext") or "")
+    # «Excel fayllari xlsx» is a kind of file, not words in its name (live check 2026-10-19:
+    # the AI sent it as the query and nothing was found).
+    kinds = {"excel": "xlsx", "eksel": "xlsx", "word": "docx", "vord": "docx", "pdf": "pdf",
+             "powerpoint": "pptx", "taqdimot": "pptx", "rasm": "jpg"}  # fmt: skip
+    words = [w for w in re.split(r"[\s,;]+", query) if w]
+    keep = []
+    for w in words:
+        f = fold(w).strip(".*")
+        k = next((v for key, v in kinds.items() if f.startswith(key)), None)
+        if k and not ext:
+            ext = k
+        if (
+            k
+            or f in ("xlsx", "xls", "docx", "doc", "pptx", "pdf", "csv")
+            or re.match(r"^(fayl|hujjat|jadval|ro.?yxat|barcha|hamma)\w*$", f)
+        ):
+            continue
+        keep.append(w)
+    r = api.files_search(" ".join(keep), folder, ext)
     if not r.get("ok"):
         raise ToolError(r["error"])
     paths = [f["path"] for f in r["files"]][:30]

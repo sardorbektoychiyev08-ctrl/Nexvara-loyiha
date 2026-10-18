@@ -191,3 +191,22 @@ def test_planner_gets_rules_and_facts(env):
     api.chat("21-maktab uchun nima qila olasan")
     system = api.fake.calls[0]["system"]
     assert "markazga" in system and "21-maktab" in system
+
+
+def test_folder_with_glued_uzbek_word_is_found(env):
+    r"""Live check 2026-10-19: the AI planner sent «…\Ish papkasi» as the folder."""
+    from nexvara.agent.tools import resolve_folder
+
+    api, work = env, env.work
+    assert resolve_folder(api, f"{work} papkasi") == work
+    assert resolve_folder(api, f"{work} papkasidagi") == work
+
+
+def test_search_query_made_of_file_kind_words_lists_the_files(env):
+    """Live check 2026-10-19: the planner sent query «Excel fayllari xlsx» — nothing was found."""
+    from nexvara.agent import tools
+
+    api, work = env, env.work
+    args = {"folder": str(work), "query": "Excel fayllari xlsx"}
+    out = tools.run(api, tools.ToolCall("files.search", args))
+    assert len(out["files"]) == 3, out

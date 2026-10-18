@@ -208,3 +208,18 @@ def test_failed_office_task_is_repaired_in_the_background(env):
     assert "Narx" in reply["reply"] and "🔧" in reply["reply"]
     assert reply.get("confirm")  # the corrected command changes a file: «Ha» first
     assert "Oldingi urinish bajarilmadi" in api.fake.calls[-1]["messages"][0]["content"]
+
+
+def test_service_lines_are_not_recalled_and_keyword_value_must_be_on_its_line(env):
+    """Live check 2026-10-19: NEXVARA's own privacy warning came back from memory and blocked
+    every later request («…hisob raqami bo‘lishi mumkin» + a date on the next line)."""
+    from nexvara.ai.privacy import Guard
+
+    api, mem = env, env.mem
+    mem.log_chat("user", "Ha")
+    mem.log_chat("nexvara", "So‘rov yuborilmadi: matnda tanilmagan uzun raqam bor (hujjat, "
+                 "telefon yoki hisob raqami bo‘lishi mumkin).")  # fmt: skip
+    mem.log_chat("user", "Hisobot haqida gaplashaylik")
+    rec = api._recall("hisob raqami")
+    assert all("yuborilmadi" not in t["text"] and t["text"] != "Ha" for t in rec.turns)
+    Guard().mask("NEXVARA: telefon yoki hisob raqami bo‘lishi mumkin.\n[2026-10-19] Ha")

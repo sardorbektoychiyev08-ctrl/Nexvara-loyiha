@@ -272,5 +272,6 @@ def test_nexvara_file_names_with_timestamps_do_not_block():
     )
     Guard().mask(ok)  # no PrivacyBlocked
     Guard().mask("Hisobot 20261019-025804 vaqtida tuzildi")
+    Guard().mask("[2026-10-19] Foydalanuvchi: Ha [2026-10-19] NEXVARA: gpt-5.4-mini-2026-03-17")
     with pytest.raises(PrivacyBlocked):  # a real long number still blocks
         Guard().mask("Mening hisob raqamim 2020 8000 1234 5678 9")

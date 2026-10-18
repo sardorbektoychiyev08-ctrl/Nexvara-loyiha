@@ -64,7 +64,7 @@ FREE_PROVIDER = "gemini"  # the only provider with an official free API tier
 LATIN_RULE = (
     "\n\nTIL QOIDASI: javobni faqat o‘zbek tilida, lotin alifbosida yoz (o‘, g‘, sh, ch, ’). "
     "Kirill harflarini ishlatma. Foydalanuvchi boshqa til yoki yozuvni aniq so‘ragan bo‘lsagina "
-    "o‘sha tilda yoz."
+    "o‘sha tilda yoz. Foydalanuvchiga hurmat bilan «siz» deb murojaat qil («sen» emas)."
 )
 _OTHER_SCRIPT = re.compile(
     r"\brus\w*\s+til\w*|\bruscha\b|\bkirill\w*|\bingliz\w*|\benglish\b|"

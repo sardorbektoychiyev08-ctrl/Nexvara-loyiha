@@ -296,7 +296,9 @@ class Guard:
                 if window is None:
                     continue
                 has_value = any(f"⟦{k}_" in window for k in kinds)
-                after = original[m.end() : m.end() + _NEAR]
+                # the value stands on the same line as its keyword (live check 2026-10-19: a date
+                # on the next history line made «…hisob raqami bo‘lishi mumkin» look like a value)
+                after = original[m.end() : m.end() + _NEAR].split("\n", 1)[0]
                 looks_like_value = re.search(r"[:\-–]\s*\S|\d", after) or (
                     "ISM" in kinds and re.match(rf"\s+{_CAP}", after)
                 )
@@ -314,6 +316,9 @@ class Guard:
                       masked)  # fmt: skip
         scan = re.sub(r"\b(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-_T]\d{4,6}\b",
                       " ", scan)  # fmt: skip
+        # ISO dates («[2026-10-19]» in the recalled history, «gpt-5.4-mini-2026-03-17») are dates,
+        # not numbers; a birth date next to its keyword is still caught by the keyword check.
+        scan = re.sub(r"\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b", " ", scan)
         for m in re.finditer(r"\d[\d\s\-]{7,}\d", scan):
             if re.fullmatch(r"\d{1,3}(?:[\s.,]\d{3})+", m.group().strip()):
                 continue  # an amount like 15 000 000 (so‘m), not a document number
