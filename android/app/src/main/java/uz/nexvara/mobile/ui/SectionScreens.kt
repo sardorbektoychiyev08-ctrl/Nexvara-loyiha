@@ -917,4 +917,23 @@ fun MorningSettings() {
         TextButton(onClick = { Thread { uz.nexvara.mobile.Morning.show(ctx) }.start() }) { Text("Hozir ko‘rsat") }
     }
     error?.let { Text(it, color = x.danger, style = MaterialTheme.typography.bodySmall) }
+    // Without the notification permission Android drops every NEXVARA notification silently.
+    var allowed by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            allowed = androidx.core.app.NotificationManagerCompat.from(ctx).areNotificationsEnabled()
+            kotlinx.coroutines.delay(1500)
+        }
+    }
+    if (!allowed) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Bildirishnomalar o‘chiq: ertalabki xulosa va «Tayyor» xabarlari kelmaydi",
+                color = x.warning, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+            TextButton(onClick = {
+                ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }) { Text("Ruxsat berish") }
+        }
+    }
 }

@@ -150,6 +150,7 @@ fun CadScreen(m: AppModel) {
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = Gutter),
             horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            AssistChip(onClick = { colorDialog = true }, label = { Text("Rang") }, leadingIcon = { ColorDot(cad.color, ink) })
             if (area == CadArea.Full) AssistChip(onClick = { aiDialog = true }, label = { Text("AI") },
                 leadingIcon = { Icon(Icons.Default.AutoFixHigh, null) })
             CadTool.entries.forEach { t ->
@@ -218,7 +219,7 @@ fun CadScreen(m: AppModel) {
                 label = { Text("Maydon: ${area.label}") }, leadingIcon = { Icon(Icons.Default.AspectRatio, null) })
             Spacer(Modifier.width(6.dp))
             FilterChip(selected = tidy, onClick = { tidy = !tidy }, label = { Text("Tekislash") })
-            AssistChip(onClick = { colorDialog = true }, label = { Text(CadColors.name(cad.color)) },
+            AssistChip(onClick = { colorDialog = true }, label = { Text("Rang: " + CadColors.name(cad.color)) },
                 leadingIcon = { ColorDot(cad.color, ink) })
             IconButton(onClick = { cad.clear() }) { Icon(Icons.Default.DeleteSweep, "Tozalash") }
             Text("${cad.items.size} ta", style = MaterialTheme.typography.bodySmall, color = x.muted)
