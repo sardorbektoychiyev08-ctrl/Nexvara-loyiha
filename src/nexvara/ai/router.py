@@ -470,6 +470,10 @@ class AiRouter:
                 from nexvara.knowledge.textnorm import to_latin_if_uzbek
 
                 reply.text = to_latin_if_uzbek(reply.text)
+            if purpose in ("chat", "qa", "vision", "analysis", "special"):
+                # The chat shows plain text: «**qalin**» markdown would appear as stars.
+                reply.text = re.sub(r"\*\*(.+?)\*\*|__(.+?)__", lambda m: m.group(1) or m.group(2),
+                                    reply.text)  # fmt: skip
             reply.masked = guard.count  # type: ignore[attr-defined]
             try:
                 reply.cost = 0.0 if est.free else models.cost(

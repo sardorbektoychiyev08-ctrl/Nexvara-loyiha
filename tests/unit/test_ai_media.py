@@ -483,3 +483,33 @@ def test_model_without_free_tier_gets_a_clear_message():
             "gemini-3.1-flash-image", "x"
         )
     assert e.value.retryable and len(net.urls) == 1  # no pointless retries
+
+
+def test_chat_answers_have_no_markdown_stars(tmp_path):
+    """Live check 2026-10-19: a vision answer came as «**NEXVARA 2026**» — shown as stars."""
+    r = make(tmp_path, {"anthropic": KEYS["anthropic"]})
+
+    class Bold(TextFake):
+        def complete(self, model, system, messages, max_tokens, effort="medium"):
+            return Reply("Rasmda **NEXVARA 2026** va __qizil__ shakl bor.", model, 10, 10)
+
+    r.factory = lambda n, k: Bold(n)
+    out = r.complete("vision", "s", [{"role": "user", "content": "nima?"}], approved=True)
+    assert out.text == "Rasmda NEXVARA 2026 va qizil shakl bor."
+    plan = r.complete("plan", "s", [{"role": "user", "content": "x"}], approved=True)
+    assert "**" in plan.text  # JSON/plans are left untouched
+
+
+def test_openai_transcription_gets_the_uzbek_hint(tmp_path, monkeypatch):
+    """Live check 2026-10-19: without a hint OpenAI wrote Uzbek speech in Kyrgyz-like Cyrillic."""
+    api, r = _api(tmp_path, monkeypatch, {"openai": KEYS["openai"]})
+    seen = {}
+
+    class Ear(MediaFake):
+        def transcribe(self, model, audio, mime="audio/wav", prompt=""):
+            seen["prompt"] = prompt
+            return "Бугун соат тўққизда дарс бор"
+
+    r.media_factory = lambda n, k: Ear(n, [])
+    text = api._transcribe(base64.b64encode(WAV * 100).decode(), "audio/wav", "x", approved=True)
+    assert "lotin" in seen["prompt"] and text.startswith("Bugun soat to")
