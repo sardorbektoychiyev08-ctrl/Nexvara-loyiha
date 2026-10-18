@@ -307,3 +307,17 @@ body.cad-compact .cad-log { height: 32px; }
 .cad3d canvas { flex: 1; width: 100%; min-height: 0; cursor: grab; touch-action: none; }
 
 #chat-mic.recording { background: var(--err); border-color: var(--err); color: #fff; animation: pulse 1s infinite; }
+
+/* CAD colour palette (AutoCAD colour index) */
+.cad-swatch.bylayer { background: linear-gradient(135deg, transparent 45%, var(--muted) 45% 55%, transparent 55%) !important; }
+.cad-color-btn { display: inline-flex; align-items: center; gap: 2px; background: var(--surface-2); color: inherit; border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; font: inherit; font-size: 12px; cursor: pointer; }
+.cad-color-tool { display: inline-flex; align-items: center; }
+.cad-palette { position: fixed; z-index: 60; background: var(--surface); color: var(--text, inherit); border: 1px solid var(--border); border-radius: 10px; padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.35); width: max-content; max-width: calc(100vw - 16px); }
+.cad-pal-title { font-weight: 600; margin-bottom: 6px; }
+.cad-pal-row { display: flex; flex-wrap: wrap; gap: 3px; margin: 4px 0; }
+.cad-pal-grid { display: grid; grid-template-columns: repeat(24, 14px); gap: 2px; margin: 6px 0; }
+.cad-pal-sw { width: 14px; height: 14px; padding: 0; border: 1px solid rgba(128,128,128,.45); border-radius: 3px; cursor: pointer; }
+.cad-pal-sw.big { width: 22px; height: 22px; }
+.cad-pal-sw.bylayer { width: 22px; height: 22px; background: linear-gradient(135deg, transparent 45%, var(--muted) 45% 55%, transparent 55%) !important; }
+.cad-pal-sw.on, .cad-pal-sw:hover { outline: 2px solid var(--accent, #6366f1); outline-offset: 1px; }
+.cad-pal-info { color: var(--muted); }

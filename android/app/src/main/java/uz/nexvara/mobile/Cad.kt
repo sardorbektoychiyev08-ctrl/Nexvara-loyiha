@@ -2,6 +2,7 @@ package uz.nexvara.mobile
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import org.json.JSONArray
@@ -190,9 +191,39 @@ object Recognizer {
     }
 }
 
+/** AutoCAD colour index (ACI), the same palette as the PC editor: 1..9 basic, 10..249, greys. */
+object CadColors {
+    const val BY_LAYER = 256
+    val named = listOf(BY_LAYER to "Qatlam bo‘yicha", 1 to "Qizil", 2 to "Sariq", 3 to "Yashil", 4 to "Havorang",
+        5 to "Ko‘k", 6 to "Pushti", 7 to "Oq/qora", 8 to "Kulrang", 9 to "Och kulrang", 30 to "To‘q sariq",
+        34 to "Jigarrang", 82 to "Och yashil", 150 to "To‘q ko‘k", 200 to "Binafsha", 250 to "To‘q kulrang")
+    private val basic = mapOf(1 to 0xFFEF4444, 2 to 0xFFFACC15, 3 to 0xFF22C55E, 4 to 0xFF22D3EE, 5 to 0xFF3B82F6,
+        6 to 0xFFD946EF, 8 to 0xFF8B95A8, 9 to 0xFFC0C8D4)
+
+    fun name(aci: Int) = named.firstOrNull { it.first == aci }?.second ?: "Rang $aci"
+
+    /** ARGB of an index; null for 7 (white on dark, black on paper → the theme's ink) and «by layer». */
+    fun argb(aci: Int): Long? {
+        basic[aci]?.let { return it }
+        if (aci in 10..249) {
+            val h = (((aci / 10) - 1) * 15) % 360.0
+            val s = if (aci % 2 == 1) 0.5 else 1.0
+            val v = doubleArrayOf(1.0, 1.0, 0.8, 0.8, 0.6, 0.6, 0.5, 0.5, 0.3, 0.3)[aci % 10]
+            fun f(n: Int): Long { val k = (n + h / 60) % 6; return Math.round((v - v * s * maxOf(0.0, minOf(k, 4 - k, 1.0))) * 255) }
+            return 0xFF000000 or (f(5) shl 16) or (f(3) shl 8) or f(1)
+        }
+        if (aci in 250..255) { val g = intArrayOf(51, 91, 132, 173, 214, 255)[aci - 250].toLong(); return 0xFF000000 or (g shl 16) or (g shl 8) or g }
+        return null
+    }
+}
+
 /** The drawing being edited on the phone (+ entities the phone does not edit, kept as they are). */
 class CadState {
     val items = mutableStateListOf<CadE>()
+    /** Own colours of objects (ACI); objects without one follow the layer. */
+    val colorOf = mutableStateMapOf<CadE, Int>()
+    /** The colour new objects get (256 = by layer). */
+    var color by mutableStateOf(CadColors.BY_LAYER)
     var extra: List<JSONObject> = emptyList()
     var name by mutableStateOf("Telefon chizmasi")
     var path by mutableStateOf<String?>(null)
@@ -204,8 +235,9 @@ class CadState {
     val redo = ArrayDeque<List<CadE>>()
 
     fun snapshot() { undo.addLast(items.toList()); if (undo.size > 80) undo.removeFirst(); redo.clear() }
-    fun add(e: CadE) { snapshot(); items.add(e) }
-    fun replace(i: Int, e: CadE) { snapshot(); items[i] = e }
+    fun add(e: CadE) { snapshot(); items.add(e); if (color != CadColors.BY_LAYER) colorOf[e] = color }
+    fun replace(i: Int, e: CadE) { snapshot(); colorOf[items[i]]?.let { colorOf[e] = it }; items[i] = e }
+    fun setColor(e: CadE, aci: Int) { if (aci == CadColors.BY_LAYER) colorOf.remove(e) else colorOf[e] = aci }
     fun remove(i: Int) { snapshot(); items.removeAt(i) }
     fun undo() { undo.removeLastOrNull()?.let { redo.addLast(items.toList()); items.clear(); items.addAll(it) } }
     fun redo() { redo.removeLastOrNull()?.let { undo.addLast(items.toList()); items.clear(); items.addAll(it) } }
@@ -214,7 +246,7 @@ class CadState {
     /** Add a template (frame, bolt…) to the drawing; undo removes it again. */
     fun append(drawing: JSONObject) {
         val t = CadState(); t.load(drawing)
-        snapshot(); items.addAll(t.items); extra = extra + t.extra
+        snapshot(); items.addAll(t.items); colorOf.putAll(t.colorOf); extra = extra + t.extra
     }
 
     /** Replace the drawing (AI result) — undo brings the sketch back. */
@@ -229,6 +261,7 @@ class CadState {
         val ents = JSONArray()
         fun o(type: String) = JSONObject().put("type", type).put("layer", "0")
         items.forEach { e ->
+            val c = colorOf[e]
             ents.put(when (e) {
                 is CadE.Line -> o("line").put("x1", e.a.x).put("y1", e.a.y).put("x2", e.b.x).put("y2", e.b.y)
                 is CadE.Poly -> o("polyline").put("closed", e.closed)
@@ -238,7 +271,7 @@ class CadState {
                 is CadE.Text -> o("text").put("x", e.p.x).put("y", e.p.y).put("text", e.text).put("h", e.h).put("rot", 0)
                 is CadE.Dim -> o("ldim").put("x1", e.a.x).put("y1", e.a.y).put("x2", e.b.x).put("y2", e.b.y)
                     .put("bx", e.base.x).put("by", e.base.y).put("rot", e.rot).put("label", "")
-            })
+            }.also { if (c != null) it.put("color", c) })
         }
         extra.forEach { ents.put(it) }
         return JSONObject().put("units", "mm").put("entities", ents)
@@ -247,6 +280,7 @@ class CadState {
 
     fun load(drawing: JSONObject) {
         val got = mutableListOf<CadE>(); val keep = mutableListOf<JSONObject>()
+        val colors = mutableMapOf<CadE, Int>()
         val arr = drawing.optJSONArray("entities") ?: JSONArray()
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
@@ -266,8 +300,11 @@ class CadState {
                 "ldim" -> got += CadE.Dim(Pt(d("x1"), d("y1")), Pt(d("x2"), d("y2")), Pt(d("bx"), d("by")), d("rot"))
                 else -> keep += o
             }
+            val c = o.optInt("color", CadColors.BY_LAYER)
+            if (c in 1..255 && got.isNotEmpty() && keep.lastOrNull() !== o) colors[got.last()] = c
         }
         undo.clear(); redo.clear(); items.clear(); items.addAll(got); extra = keep
+        colorOf.clear(); colorOf.putAll(colors)
     }
 }
 

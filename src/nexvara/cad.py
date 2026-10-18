@@ -271,14 +271,15 @@ def summary(doc: Any) -> dict[str, Any]:
 
 
 def render(doc: Any, pdf: Path | None = None, png: Path | None = None,
-           dpi: int = 150) -> dict[str, str]:  # fmt: skip
-    """Model space -> PDF (vector) and PNG on white paper, black lines, real line weights."""
+           dpi: int = 150, colors: bool = True) -> dict[str, str]:  # fmt: skip
+    """Model space -> PDF (vector) and PNG on white paper, real line weights. Objects keep
+    their colours (white/«7» prints black, as AutoCAD plots); colors=False: all black."""
     from ezdxf.addons.drawing import Frontend, RenderContext, config, layout, pymupdf
 
     backend = pymupdf.PyMuPdfBackend()
     cfg = config.Configuration(
         background_policy=config.BackgroundPolicy.WHITE,
-        color_policy=config.ColorPolicy.BLACK,
+        color_policy=config.ColorPolicy.COLOR_SWAP_BW if colors else config.ColorPolicy.BLACK,
         lineweight_policy=config.LineweightPolicy.ABSOLUTE,
     )
     Frontend(RenderContext(doc), backend, config=cfg).draw_layout(doc.modelspace(), finalize=True)

@@ -12,7 +12,7 @@ const cadState = {
   doc: CAD_EMPTY(), path: "", layer: "0", tool: "select", points: [], selected: new Set(),
   undo: [], redo: [], scale: 3, ox: 0, oy: 0, cursor: null, raw: null, snapHit: null, drag: null,
   snap: true, grid: true, ortho: false, dirty: false, ready: false, ask: null, opts: {},
-  clipboard: null, lastTool: "line", hover: -1,
+  clipboard: null, lastTool: "line", hover: -1, color: 256,  // colour of new objects (256 = by layer)
 };
 const CAD_TOOLS = {
   select: "Tanlash", line: "Chiziq", polyline: "Polichiziq", rect: "To‘rtburchak", circle: "Aylana",
@@ -35,7 +35,21 @@ const CAD_ALIASES = {
 const CAD_ACTIONS = { E: "erase", U: "undo", REDO: "redo", Z: "extents", ZE: "extents", N: "new" };
 // AutoCAD colour index 1..9 (7 = white on dark, black on light paper)
 const CAD_ACI = { 1: "#ef4444", 2: "#facc15", 3: "#22c55e", 4: "#22d3ee", 5: "#3b82f6", 6: "#d946ef", 7: null, 8: "#8b95a8", 9: "#c0c8d4" };
-const CAD_ACI_NAMES = { 1: "Qizil", 2: "Sariq", 3: "Yashil", 4: "Havorang", 5: "Ko‘k", 6: "Pushti", 7: "Oq/qora", 8: "Kulrang", 9: "Och kulrang" };
+const CAD_ACI_NAMES = { 1: "Qizil", 2: "Sariq", 3: "Yashil", 4: "Havorang", 5: "Ko‘k", 6: "Pushti", 7: "Oq/qora", 8: "Kulrang", 9: "Och kulrang",
+  30: "To‘q sariq", 34: "Jigarrang", 82: "Och yashil", 150: "To‘q ko‘k", 200: "Binafsha", 250: "To‘q kulrang" };
+// The full AutoCAD colour index 10..249 (24 hues × 10 shades) and the greys 250..255, as in
+// AutoCAD's «Select Color» window: even = full colour, odd = pastel; darker down the column.
+(function cadFillAci() {
+  const hsv = (h, s, v) => {
+    const f = (n) => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+    return "#" + [f(5), f(3), f(1)].map((x) => Math.round(x * 255).toString(16).padStart(2, "0")).join("");
+  };
+  const bright = [1, 1, 0.8, 0.8, 0.6, 0.6, 0.5, 0.5, 0.3, 0.3];
+  for (let i = 10; i <= 249; i++) CAD_ACI[i] = hsv(((Math.floor(i / 10) - 1) * 15) % 360, i % 2 ? 0.5 : 1, bright[i % 10]);
+  [51, 91, 132, 173, 214, 255].forEach((g, k) => { CAD_ACI[250 + k] = "#" + g.toString(16).padStart(2, "0").repeat(3); });
+})();
+const cadColorName = (i) => (+i === 256 ? "Qatlam bo‘yicha" : CAD_ACI_NAMES[i] || `Rang ${i}`);
+const cadSwatchColor = (i) => (+i === 256 ? "transparent" : CAD_ACI[i] || cadInk());
 const CAD_LINETYPES = { Continuous: "Uzluksiz", NX_SHTRIX: "Shtrix", NX_OQ: "O‘q (shtrix-punktir)" };
 const CAD_LT_PATTERN = { NX_SHTRIX: [4, 2], NX_OQ: [12, 2, 0.5, 2] }; // mm, as in cad.py
 const CAD_WEIGHTS = [13, 18, 25, 35, 50, 70, 100];
@@ -615,7 +629,8 @@ function cadSnapshot() {
   cadState.redo.length = 0; cadState.dirty = true;
 }
 function cadAdd(entities, keepPoints = false) {
-  const list = entities.filter(Boolean).map((e) => Object.assign({ layer: cadState.layer }, e));
+  const own = cadState.color !== 256 ? { color: cadState.color } : {};
+  const list = entities.filter(Boolean).map((e) => Object.assign({ layer: cadState.layer }, own, e));
   if (!list.length) return;
   cadSnapshot(); cadState.doc.entities.push(...list);
   if (!keepPoints) cadState.points = [];
@@ -1070,6 +1085,13 @@ function cadExec(value) {
   if (t === "chamfer" && /^D\s*\d/.test(cmd)) { cadState.chamferD = cadState.opts.dist = cadNumber(cmd.slice(1)) || 0; cadLog(`Faska: ${fmt(cadState.opts.dist)} mm`); return true; }
   if (t === "hatch" && /^(SOLID|ANSI31)$/.test(cmd)) { cadState.hatchPattern = cmd; cadLog(`Shtrix turi: ${cmd === "SOLID" ? "to‘liq bo‘yoq" : "qiya chiziqlar"}`); return true; }
   if (t === "text" && /^H\s*\d/.test(cmd)) { cadState.textH = cadNumber(cmd.slice(1)) || 3.5; cadLog(`Matn balandligi: ${fmt(cadState.textH)} mm`); return true; }
+  const col = cmd.match(/^(COLOR|COL|RANG)\s*(\d{1,3}|BYLAYER|QATLAM)?$/);
+  if (col) {
+    if (!col[2]) { cadColorPicker(document.getElementById("cad-color") || document.getElementById("cad-cmd"), cadState.color, true, cadSetColor); return true; }
+    const i = /^\d/.test(col[2]) ? +col[2] : 256;
+    if (i < 1 || i > 256) { cadLog("Rang raqami 1–255 (256 — qatlam bo‘yicha)."); return true; }
+    cadSetColor(i); return true;
+  }
   if (CAD_ALIASES[cmd]) { cadSetTool(CAD_ALIASES[cmd]); return true; }
   if (CAD_ACTIONS[cmd]) { cadAction(CAD_ACTIONS[cmd]); return true; }
   const pt = cadParsePoint(input);
@@ -1098,6 +1120,62 @@ function cadSelect(options, value, onChange, label) {
   Object.entries(options).forEach(([v, t]) => { const o = cadEl("option", "", t); o.value = v; s.appendChild(o); });
   s.value = String(value); s.addEventListener("change", () => onChange(s.value)); return s;
 }
+// «Rang tanlash» window: by layer, the 9 basic colours, the full 10..249 palette, greys.
+function cadColorPicker(anchor, current, byLayer, onPick) {
+  document.querySelectorAll(".cad-palette").forEach((n) => n.remove());
+  const pop = cadEl("div", "cad-palette"); pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Rang tanlash");
+  const info = cadEl("div", "cad-pal-info small", `Tanlangan: ${cadColorName(current)}`);
+  const sw = (i, cls = "") => {
+    const b = cadEl("button", `cad-pal-sw${cls}${+i === +current ? " on" : ""}`); b.type = "button";
+    b.style.background = cadSwatchColor(i); b.title = `${cadColorName(i)} (${i})`; b.dataset.aci = i;
+    b.addEventListener("mouseenter", () => { info.textContent = `${cadColorName(i)} · ${i}`; });
+    b.addEventListener("click", (ev) => { ev.stopPropagation(); pop.remove(); onPick(+i); });
+    return b;
+  };
+  const basic = cadEl("div", "cad-pal-row");
+  if (byLayer) basic.appendChild(sw(256, " bylayer"));
+  for (let i = 1; i <= 9; i++) basic.appendChild(sw(i, " big"));
+  const grid = cadEl("div", "cad-pal-grid");
+  for (let k = 0; k < 10; k++) for (let h = 1; h <= 24; h++) grid.appendChild(sw(h * 10 + k));
+  const greys = cadEl("div", "cad-pal-row");
+  for (let i = 250; i <= 255; i++) greys.appendChild(sw(i));
+  pop.append(cadEl("div", "cad-pal-title", "Rang tanlash"), basic, grid, greys, info);
+  document.body.appendChild(pop);
+  const r = anchor.getBoundingClientRect();
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
+  pop.style.top = `${r.bottom + h + 8 < innerHeight ? r.bottom + 4 : Math.max(8, r.top - h - 4)}px`;
+  const close = (ev) => { if (!pop.contains(ev.target)) { pop.remove(); document.removeEventListener("mousedown", close, true); } };
+  setTimeout(() => document.addEventListener("mousedown", close, true), 0);
+  const esc = (ev) => { if (ev.key === "Escape") { pop.remove(); document.removeEventListener("keydown", esc, true); } };
+  document.addEventListener("keydown", esc, true);
+  return pop;
+}
+function cadColorButton(current, byLayer, onPick, label = "Rang") {
+  const b = cadEl("button", "cad-color-btn"); b.type = "button"; b.setAttribute("aria-label", label);
+  const s = cadEl("span", "cad-swatch"); s.style.background = cadSwatchColor(current);
+  if (+current === 256) s.classList.add("bylayer");
+  b.append(s, cadEl("span", "", cadColorName(current)));
+  b.addEventListener("click", () => cadColorPicker(b, current, byLayer, onPick));
+  return b;
+}
+// The toolbar colour: new objects get it; with objects selected it recolours them too.
+function cadSetColor(i) {
+  cadState.color = i;
+  if (cadState.selected.size) {
+    cadSnapshot();
+    cadState.selected.forEach((k) => { const e = cadState.doc.entities[k]; if (i === 256) delete e.color; else e.color = i; });
+    cadRenderProps();
+  }
+  cadShowColor(); cadRender();
+  cadLog(`Rang: ${cadColorName(i)}${cadState.selected.size ? ` — ${cadState.selected.size} ta obyekt bo‘yaldi` : " (yangi obyektlar)"}`);
+}
+function cadShowColor() {
+  const b = document.getElementById("cad-color"); if (!b) return;
+  const s = b.querySelector(".cad-swatch"); s.style.background = cadSwatchColor(cadState.color);
+  s.classList.toggle("bylayer", cadState.color === 256);
+  b.querySelector(".cad-color-name").textContent = cadColorName(cadState.color);
+}
 function cadRenderLayers() {
   const root = document.getElementById("cad-layers"); root.replaceChildren();
   cadState.doc.layers.forEach((ly) => {
@@ -1106,14 +1184,14 @@ function cadRenderLayers() {
     eye.addEventListener("click", () => { cadSnapshot(); ly.visible = ly.visible === false; cadRenderLayers(); cadRender(); });
     const lock = cadEl("button", "cad-mini", ly.locked ? "🔒" : "🔓"); lock.title = "Qulflash (tahrirlab bo‘lmaydi)";
     lock.addEventListener("click", () => { cadSnapshot(); ly.locked = !ly.locked; cadRenderLayers(); });
-    const sw = cadEl("span", "cad-swatch"); sw.style.background = CAD_ACI[ly.color] || cadInk();
+    const sw = cadEl("span", "cad-swatch"); sw.style.background = cadSwatchColor(ly.color || 7);
     const name = cadEl("button", "cad-layer-name", ly.name); name.title = "Joriy qatlam (ikki marta bosing — nomini o‘zgartirish)";
     name.addEventListener("click", () => { cadState.layer = ly.name; cadRenderLayers(); cadRender(); });
     name.addEventListener("dblclick", () => cadRenameLayer(ly));
     row.append(eye, lock, sw, name);
     const det = cadEl("div", "cad-layer-props");
     det.append(
-      cadSelect(Object.fromEntries(Object.entries(CAD_ACI_NAMES)), ly.color || 7, (v) => { cadSnapshot(); ly.color = +v; cadRenderLayers(); cadRender(); }, "Rang"),
+      cadColorButton(ly.color || 7, false, (v) => { cadSnapshot(); ly.color = v; cadRenderLayers(); cadRender(); }, "Qatlam rangi"),
       cadSelect(Object.fromEntries(CAD_WEIGHTS.map((w) => [w, `${fmt(w / 100)} mm`])), CAD_WEIGHTS.includes(ly.lineweight) ? ly.lineweight : 25, (v) => { cadSnapshot(); ly.lineweight = +v; cadRender(); }, "Qalinlik"),
       cadSelect(CAD_LINETYPES, ly.linetype in CAD_LINETYPES ? ly.linetype : "Continuous", (v) => { cadSnapshot(); ly.linetype = v; cadRender(); }, "Chiziq turi"),
     );
@@ -1157,7 +1235,7 @@ function cadRenderProps() {
   const apply = (fn) => { cadSnapshot(); ents.forEach(fn); cadRender(); cadRenderProps(); };
   const field = (label, node) => { const l = cadEl("label", "cad-field"); l.append(cadEl("span", "", label), node); root.appendChild(l); };
   field("Qatlam", cadSelect(Object.fromEntries(cadState.doc.layers.map((l) => [l.name, l.name])), ents[0].layer || "0", (v) => apply((e) => { e.layer = v; }), "Qatlam"));
-  field("Rang", cadSelect({ 256: "Qatlam bo‘yicha", ...CAD_ACI_NAMES }, ents[0].color || 256, (v) => apply((e) => { if (+v === 256) delete e.color; else e.color = +v; }), "Rang"));
+  field("Rang", cadColorButton(ents[0].color || 256, true, (v) => apply((e) => { if (v === 256) delete e.color; else e.color = v; }), "Obyekt rangi"));
   if (ids.length !== 1) return;
   const e = ents[0];
   (CAD_FIELDS[e.type] || []).forEach(([k, label]) => {
@@ -1198,6 +1276,7 @@ function cadLoad(result) {
   cadLog(`${result.name || "Chizma"} ochildi.`); return true;
 }
 async function cadAction(action) {
+  if (action === "color") { cadColorPicker(document.getElementById("cad-color"), cadState.color, true, cadSetColor); return; }
   if (action === "undo") { cadRestore(cadState.undo, cadState.redo); return; }
   if (action === "redo") { cadRestore(cadState.redo, cadState.undo); return; }
   if (action === "extents") { cadExtents(); return; }

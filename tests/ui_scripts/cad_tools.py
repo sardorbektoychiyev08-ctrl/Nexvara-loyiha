@@ -163,6 +163,17 @@ def run():
         )
         for b in ("zoomin", "zoomout", "compact", "compact"):
             js(f"document.querySelector('[data-cad={b}]').click()")
+        # 12) colours: «COLOR 1» for new objects, the palette recolours the selection
+        ex("COLOR 1", "L", "0,-80", "60,-80", "")
+        last = len(doc()) - 1
+        res["color_new"] = doc()[last].get("color")
+        js(f"cad.select([{last}])")
+        js("document.getElementById('cad-color').click()")
+        res["palette"] = js("document.querySelectorAll('.cad-palette .cad-pal-sw').length")
+        js("document.querySelector('.cad-palette [data-aci=\"30\"]').click()")
+        res["color_pick"] = doc()[last].get("color")
+        js("cad.select([])")
+        ex("COLOR BYLAYER")  # with nothing selected: only the colour of new objects
         js("document.querySelector('[data-cad=save]').click()")
         res["saved"] = until("document.getElementById('cad-log').textContent.includes('Saqlandi:')")
         res["errors"] = json.loads(js("JSON.stringify(window.__errors)"))
@@ -177,6 +188,7 @@ if target.exists():
     d = cad.read(target)
     res["dxf_audit"] = cad.audit(d)
     res["dxf_types"] = cad.summary(d)["types"]
+    res["dxf_colors"] = sorted({e.dxf.color for e in d.modelspace() if e.dxf.hasattr("color")})
 else:
     res["dxf_audit"] = ["file missing"]
 print(json.dumps(res, ensure_ascii=False, indent=1))
@@ -196,6 +208,10 @@ checks = {
     "ai_fix": bool(res.get("ai_fix")),
     "view3d": bool(res.get("view3d")),
     "template": (res.get("template") or 0) >= 10,
+    "colors": res.get("color_new") == 1
+    and res.get("color_pick") == 30
+    and (res.get("palette") or 0) >= 255
+    and 30 in res.get("dxf_colors", []),
     "no_js_errors": not res.get("errors"),
 }
 print(json.dumps(checks, indent=1))

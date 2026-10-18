@@ -3,6 +3,10 @@ package uz.nexvara.mobile.ui
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
@@ -72,6 +76,7 @@ fun CadScreen(m: AppModel) {
     var listDialog by remember { mutableStateOf(false) }
     var aiDialog by remember { mutableStateOf(false) }
     var tplDialog by remember { mutableStateOf(false) }
+    var colorDialog by remember { mutableStateOf(false) }
     var area by remember { mutableStateOf(CadArea.Large) }
     fun zoom(f: Float) {
         val c = Offset(size.width / 2, size.height / 2)
@@ -178,7 +183,10 @@ fun CadScreen(m: AppModel) {
             }) {
                 if (size != this.size) { val first = size == Size.Zero; size = this.size; if (first) fit() }
                 drawGrid(scale, origin, grid)
-                cad.items.forEachIndexed { i, e -> drawEntity(e, ::toScreen, scale, if (i == editIdx) accent else ink) }
+                cad.items.forEachIndexed { i, e ->
+                    val own = cad.colorOf[e]?.let { CadColors.argb(it) }?.let { Color(it) }
+                    drawEntity(e, ::toScreen, scale, if (i == editIdx) accent else own ?: ink)
+                }
                 if (stroke.size > 1) {
                     for (k in 1 until stroke.size) drawLine(accent, stroke[k - 1], stroke[k], 3f, StrokeCap.Round)
                     val a = toModel(stroke.first()); val b = toModel(stroke.last())
@@ -210,6 +218,8 @@ fun CadScreen(m: AppModel) {
                 label = { Text("Maydon: ${area.label}") }, leadingIcon = { Icon(Icons.Default.AspectRatio, null) })
             Spacer(Modifier.width(6.dp))
             FilterChip(selected = tidy, onClick = { tidy = !tidy }, label = { Text("Tekislash") })
+            AssistChip(onClick = { colorDialog = true }, label = { Text(CadColors.name(cad.color)) },
+                leadingIcon = { ColorDot(cad.color, ink) })
             IconButton(onClick = { cad.clear() }) { Icon(Icons.Default.DeleteSweep, "Tozalash") }
             Text("${cad.items.size} ta", style = MaterialTheme.typography.bodySmall, color = x.muted)
         }
@@ -270,6 +280,11 @@ fun CadScreen(m: AppModel) {
             dismissButton = { TextButton(onClick = { textAt = null }) { Text("Bekor") } })
     }
 
+    if (colorDialog) ColorDialog(cad.color, ink, onPick = { aci ->
+        cad.color = aci
+        editIdx?.let { i -> if (i in cad.items.indices) { cad.snapshot(); cad.setColor(cad.items[i], aci) } }
+        colorDialog = false
+    }, onDismiss = { colorDialog = false })
     editIdx?.let { i -> if (i in cad.items.indices) EditDialog(cad.items[i], onDone = { e -> if (e != null) cad.replace(i, e); editIdx = null },
         onDelete = { cad.remove(i); editIdx = null }) else editIdx = null }
 
@@ -394,4 +409,47 @@ private fun DrawScope.drawEntity(e: CadE, s: (Pt) -> Offset, scale: Float, color
             drawLabel(fmt(CadGeom.dimValue(e)), mid + Offset(-20f, -10f), color, 34f)
         }
     }
+}
+
+
+@Composable
+private fun ColorDot(aci: Int, ink: Color, size: Int = 16) {
+    val c = CadColors.argb(aci)?.let { Color(it) } ?: if (aci == CadColors.BY_LAYER) Color.Transparent else ink
+    Box(Modifier.size(size.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(4.dp)).background(c)
+        .border(1.dp, MaterialTheme.colorScheme.outline, androidx.compose.foundation.shape.RoundedCornerShape(4.dp)))
+}
+
+/** «Rang tanlash»: by layer, the named colours and the full AutoCAD palette (10..255). */
+@Composable
+private fun ColorDialog(current: Int, ink: Color, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(onDismissRequest = onDismiss, confirmButton = { TextButton(onClick = onDismiss) { Text("Yopish") } },
+        title = { Text("Rang tanlash") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                CadColors.named.chunked(2).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { (aci, name) ->
+                            Row(Modifier.weight(1f).clickable { onPick(aci) }.padding(vertical = 6.dp),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                                ColorDot(aci, ink, 22); Spacer(Modifier.width(8.dp))
+                                Text(name + if (aci == current) " ✓" else "", style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+                Text("Barcha ranglar", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                for (k in 0 until 10) Row {
+                    for (h in 1..24) {
+                        val aci = h * 10 + k
+                        Box(Modifier.weight(1f).aspectRatio(1f).padding(0.5.dp).background(Color(CadColors.argb(aci)!!))
+                            .clickable { onPick(aci) })
+                    }
+                }
+                Row(Modifier.padding(top = 4.dp)) {
+                    for (aci in 250..255) Box(Modifier.weight(1f).height(18.dp).padding(0.5.dp)
+                        .background(Color(CadColors.argb(aci)!!)).clickable { onPick(aci) })
+                }
+            }
+        })
 }
