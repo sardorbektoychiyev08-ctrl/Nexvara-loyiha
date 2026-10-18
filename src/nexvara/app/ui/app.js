@@ -91,6 +91,7 @@ function handleReply(r) {
   if (r.theme) setTheme(r.theme, false);
   if (r.bi_ui) biFromChat(r.bi_ui);
   if (r.dxf) addCadOpen(r.dxf);
+  if (window.mediaOnReply) window.mediaOnReply(r);  // 🖼️ a made picture, 🔊 speaking
 }
 
 // A paid AI request waits for the user's answer; nothing is sent before "Ha".

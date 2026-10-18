@@ -108,7 +108,14 @@ class Settings:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
             tmp.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
-            tmp.replace(self.path)
+            for attempt in range(20):  # Windows: a reader may hold the file open for a moment
+                try:
+                    tmp.replace(self.path)
+                    break
+                except PermissionError:
+                    if attempt == 19:
+                        raise
+                    time.sleep(0.05)
             return merged
 
 

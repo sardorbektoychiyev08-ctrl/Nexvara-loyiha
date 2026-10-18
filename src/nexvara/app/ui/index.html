@@ -82,10 +82,18 @@
         natija «_NEXVARA» nusxasiga saqlanadi.</p>
       <div class="chat-log" id="chat-log"></div>
       <div class="chat-context" id="chat-context" hidden>📄 <span id="chat-file"></span></div>
+      <div class="chat-tools" role="toolbar" aria-label="Rasm, ovoz va AI modeli">
+        <button class="btn" id="chat-mic" type="button" title="🎤 Ovoz bilan topshiriq: bosing, gapiring, yana bosing (o‘zbek, rus, ingliz)">🎤 Gapirish</button>
+        <button class="btn" id="chat-speak" type="button" aria-pressed="false" title="🔊 Javoblarni ovozda eshitish (yoqish/o‘chirish)">🔊 Ovozli javob</button>
+        <button class="btn" id="chat-image" type="button" title="🖼️ Kompyuterdan rasm yuklash — keyin savol bering">🖼️ Rasm</button>
+        <button class="btn" id="chat-camera" type="button" title="📷 Kamera bilan suratga olish">📷 Kamera</button>
+        <button class="btn" id="chat-gen" type="button" title="✨ AI bilan rasm yaratish yoki ochiq rasmni tahrirlash (narxi oldin aytiladi)">✨ Rasm yaratish</button>
+        <button class="btn" id="chat-live" type="button" aria-pressed="false" title="🎧 Jonli ovozli suhbat: tinglaydi, javob beradi, yana tinglaydi">🎧 Jonli suhbat</button>
+        <button class="btn" id="chat-models" type="button" title="🧠 AI modeli: har yo‘nalish uchun AUTO yoki qo‘lda">🧠 AUTO</button>
+      </div>
       <form class="chat-input" id="chat-form">
         <button class="btn" id="chat-attach" type="button" title="Fayl tanlash">📎</button>
         <input id="chat-text" type="text" placeholder="Masalan: 7-sinf fizika Nyuton qonunlari 20 ta test" autocomplete="off">
-        <button class="btn" id="chat-mic" type="button" title="Ovoz bilan buyruq: bosing, gapiring, yana bosing (Gemini)">🎤</button>
         <button class="btn primary" type="submit">Yuborish</button>
       </form>
     </section>
@@ -308,6 +316,12 @@
             API krediti emas.</p>
         </details>
         <div id="ai-providers"></div>
+        <h3 class="ai-caps-title">🧠 Yo‘nalishlar: AUTO yoki qo‘lda</h3>
+        <p class="muted small">Matn, rasmni ko‘rish, rasm yaratish, ovoz → matn, matn → ovoz va jonli suhbat
+          uchun alohida tanlang. AUTO — vazifaga qarab avval bepul, keyin eng arzon mos model; qo‘lda
+          tanlangan model o‘zboshimchalik bilan almashtirilmaydi. Pullik rasm yaratish har doim
+          narxi aytilib, «Ha» dan keyin bajariladi.</p>
+        <div id="ai-caps-settings" class="caps-list"></div>
         <form id="ai-form">
           <div class="form-grid">
             <label class="check-label"><input id="ai-enabled" type="checkbox"> AI yoqilgan</label>
@@ -769,6 +783,7 @@
   <script src="cad.js"></script>
   <script src="cad3d.js"></script>
   <script src="voice.js"></script>
+  <script src="media.js"></script>
   <script src="icons.js"></script>
 </body>
 </html>
