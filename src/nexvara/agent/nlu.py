@@ -517,6 +517,10 @@ def _settings(text: str, f: str) -> list[ToolCall] | None:
     m = re.search(r"(\d+(?:[.,]\d+)?)\s*(\$|dollar\w*)\s*(dan\s+)?qimmat", f)
     if m:
         return set_("ai.confirm_over_usd", _num(m.group(1)))
+    if _has(f, r"\bbepul\s+rejim\w*\s+(ni\s+)?(yoq|yoqib\s+qoy)\b"):
+        return set_("ai.free_mode", "true")
+    if _has(f, r"\bbepul\s+rejim\w*\s+(ni\s+)?(ochir|ochirib\s+qoy)\w*"):
+        return set_("ai.free_mode", "false")
     if _has(f, r"^(ai|suniy intellekt)\w*\s+(ni\s+)?(yoq|yoqib\s+qoy)\b"):
         return set_("ai.enabled", "true")
     if _has(f, r"^(ai|suniy intellekt)\w*\s+(ni\s+)?(ochir|ochirib\s+qoy)\w*"):

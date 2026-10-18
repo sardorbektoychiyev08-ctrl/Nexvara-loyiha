@@ -797,6 +797,18 @@ async function renderAi(status) {
   $("#ai-confirm").value = st.confirm_over_usd;
   $("#ai-task").value = st.task_limit_usd ?? "";
   $("#ai-fallback").checked = st.fallback;
+  $("#ai-free").checked = st.free_mode;
+  const gem = st.providers.gemini;
+  $("#ai-free-note").textContent = !gem.has_key
+    ? "Bepul rejim uchun Gemini kalitini kiriting (aistudio.google.com → «Get API key», bepul). " +
+      "Kalit kiritilgach, hamma AI ishlari Gemini Flash orqali bepul bajariladi."
+    : (st.free_active
+      ? `Bepul rejim ishlayapti: bugun ${st.free_requests_today} ta bepul so‘rov. Google bepul darajada ` +
+        "kunlik so‘rovlar sonini cheklaydi — tugasa, keyinroq qayta urinasiz (pullik provayderga o‘tilmaydi). " +
+        "Eslatma: bepul darajada Google so‘rovlarni o‘z xizmatlarini yaxshilash uchun ishlatishi mumkin; " +
+        "NEXVARA ism, telefon, pasport kabi shaxsiy ma’lumotlarni yuborishdan oldin yashiradi. " +
+        "AI Studio’da to‘lov (Billing) yoqilmagan bo‘lsin — aks holda Google haq oladi."
+      : "Bepul rejim o‘chiq: so‘rovlar tanlangan provayderga ketadi va pul sarflanadi.");
   $("#ai-send-text").checked = st.send_textbook_text;
   $("#ai-spent").textContent =
     `${i18n("ai.estimated")}: bugun ${money(st.spent_today)} / ${money(st.daily_budget_usd)}, shu oy ${money(st.spent_month)} / ${money(st.monthly_budget_usd)}. Narxlar taxminiy — provayder hisobidagi summa asosiy.` +
@@ -824,7 +836,7 @@ $("#ai-form").addEventListener("submit", async (e) => {
     daily_budget_usd: Number($("#ai-daily").value), monthly_budget_usd: Number($("#ai-monthly").value),
     confirm_over_usd: Number($("#ai-confirm").value), send_textbook_text: $("#ai-send-text").checked,
     task_limit_usd: $("#ai-task").value === "" ? null : Number($("#ai-task").value),
-    fallback: $("#ai-fallback").checked,
+    fallback: $("#ai-fallback").checked, free_mode: $("#ai-free").checked,
   } });
   $("#ai-error").hidden = r.ok; $("#ai-error").textContent = r.ok ? "" : r.error;
   $("#ai-saved").textContent = r.ok ? "Saqlandi ✓" : "";

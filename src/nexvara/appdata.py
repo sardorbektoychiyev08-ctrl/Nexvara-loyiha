@@ -40,6 +40,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "task_limit_usd": 0.50,  # a single request estimated above this is refused
         "limits": {},  # provider -> {"daily_usd": x, "monthly_usd": y} (optional, own caps)
         "fallback": False,  # busy/down provider -> another one; off: no paid call by itself
+        # With a Gemini key: everything goes to Gemini's free tier (Flash/Flash-Lite) at $0.
+        "free_mode": True,
         "send_textbook_text": True,
         "models": {},  # provider -> tier -> model id (filled when a key is checked)
         "checked": {},  # provider -> {"at": time, "models": n} of the last key check

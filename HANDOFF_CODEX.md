@@ -15,7 +15,7 @@ is done. The owner (Uzbek, non-programmer) asked for 4 things on 2026-10-18:
 | D | **Professional design**: app icon (Windows .ico + Android adaptive launcher icon), consistent UI icons, polished look | see table | `src/nexvara/app/ui/`, `installer/`, `android/app/src/main/res/` |
 
 Progress of A/B/D (Claude updates this after each step):
-- [ ] B Gemini free mode
+- [x] B Gemini free mode — DONE (router `free_active()`, settings `ai.free_mode` default true, UI checkbox + note, chat «bepul rejimni yoq/o‘chir», tests in test_ai_router.py)
 - [ ] A CAD page
 - [ ] D icons/design
 

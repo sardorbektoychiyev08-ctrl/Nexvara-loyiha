@@ -85,7 +85,7 @@ def test_missing_models_are_not_shown_as_working(make):
     r = make()
     r.fakes["gemini"].models_list = ["gemini-3.6-flash"]  # an account without most models
     info = r.save_key("gemini", "AIza-test-key-123456")
-    r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
+    r.settings.update({"ai": {"enabled": True, "free_mode": False}})  # switched on by the user
     assert info["models"]["balanced"] == "gemini-3.6-flash"  # alternative from the account
     assert info["models"]["cheap"] == "gemini-3.6-flash"
     assert "Kuchli" in info["missing"] and "Maxsus" in info["missing"]
@@ -302,3 +302,60 @@ def test_openai_own_daily_and_task_limits(make):
         r.complete("plan", "s", msg, max_tokens=400)
     own = r.status()["providers"]["openai"]["own_limits"]
     assert own == {"daily_usd": 0.25, "monthly_usd": None, "task_usd": 0.05}
+
+
+# ---------------- Gemini free mode ----------------
+def _keys(r, *names):
+    for n in names:
+        r.keys.save(n, {"openai": "sk-test-openai-123456", "gemini": "AIza-test-gemini-1234567",
+                        "anthropic": "sk-ant-test-1234567890"}[n])  # fmt: skip
+    r.settings.update({"ai": {"enabled": True, "provider": names[0]}})
+
+
+def test_free_mode_sends_everything_to_gemini_flash_at_zero_cost(make):
+    r = make()
+    _keys(r, "openai", "gemini")  # a paid key is chosen, but Gemini's free tier wins
+    assert r.free_active() and r.provider_name() == "gemini"
+    for purpose in ("chat", "plan", "analysis", "drawing"):
+        reply = r.complete(purpose, "s", [{"role": "user", "content": "salom"}], max_tokens=300)
+        assert reply.provider == "gemini" and reply.cost == 0.0
+        assert "pro" not in reply.model  # Pro has no free tier
+    assert r.fakes["openai"].calls == []
+    est = r.estimate("powerful", "s", [{"role": "user", "content": "x"}], 100)
+    assert est.free and est.cost == 0 and "bepul" in est.describe()
+    st = r.status()
+    assert st["free_active"] and st["free_requests_today"] == 4 and st["spent_today"] == 0
+    # "special" is still the user's explicit, confirmed choice (a paid model).
+    with pytest.raises(NeedsConfirmation):
+        r.complete("special", "s", [{"role": "user", "content": "x"}], max_tokens=300)
+
+
+def test_free_limit_reached_never_switches_to_a_paid_provider(make):
+    r = make()
+    _keys(r, "gemini", "openai")
+    r.settings.update({"ai": {"fallback": True}})
+    r.fakes["gemini"].fail = AiError("Gemini: so‘rovlar chegarasi yoki kvota tugagan.", True)
+    with pytest.raises(AiUnavailable, match="bepul limiti"):
+        r.complete("chat", "s", [{"role": "user", "content": "salom"}], max_tokens=300)
+    assert r.fakes["openai"].calls == []
+
+
+def test_free_mode_off_or_without_gemini_uses_the_chosen_provider(make):
+    r = make()
+    _keys(r, "openai")
+    assert not r.free_active() and r.provider_name() == "openai"
+    _keys(r, "openai", "gemini")
+    r.settings.update({"ai": {"free_mode": False}})
+    reply = r.complete("chat", "s", [{"role": "user", "content": "salom"}], max_tokens=300)
+    assert reply.provider == "openai" and reply.cost > 0
+
+
+def test_free_mode_from_chat(tmp_path, monkeypatch):
+    monkeypatch.setenv("NEXVARA_DATA", str(tmp_path / "data"))
+    from nexvara.app.api import Api
+
+    api = Api()
+    assert "Bepul rejim" in api.chat("bepul rejimni o‘chir")["reply"]
+    assert Settings().load()["ai"]["free_mode"] is False
+    api.chat("bepul rejimni yoq")
+    assert Settings().load()["ai"]["free_mode"] is True

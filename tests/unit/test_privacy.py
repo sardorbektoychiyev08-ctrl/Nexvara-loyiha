@@ -143,7 +143,8 @@ def wired(tmp_path):
         Ledger(tmp_path / "l.db"),
         factory=factory,
     )
-    r.settings.update({"ai": {"enabled": True, "provider": "openai"}})
+    # Paid routing is tested here; Gemini's free mode (on by default) has its own tests.
+    r.settings.update({"ai": {"enabled": True, "provider": "openai", "free_mode": False}})
     return r, wires
 
 

@@ -1119,6 +1119,7 @@ SETTINGS: dict[str, tuple[str, str, Any]] = {
     "ai.monthly_budget_usd": ("Oylik AI limiti, $", "float", (0, 10000)),
     "ai.confirm_over_usd": ("Shundan qimmat so‘rovda so‘rash, $", "float", (0, 100)),
     "ai.send_textbook_text": ("Darslik parchalarini AI’ga yuborish", "bool", None),
+    "ai.free_mode": ("Bepul rejim (Gemini bepul darajasi)", "bool", None),
     "remote.port": ("Telefon ulanish porti", "int", (1024, 65535)),
     "update.channel": ("Yangilanish kanali", "str", None),
     "update.auto_check": ("Yangilanishni o‘zi tekshirsin", "bool", None),
