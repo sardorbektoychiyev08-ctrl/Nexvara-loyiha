@@ -206,7 +206,7 @@ def build(spec: dict[str, Any], frame: bool = True) -> Any:
         info = f"Masshtab {s['scale']} · {time.strftime('%d.%m.%Y')} · NEXVARA"
         text(bx + 3, by_bot + 3, info, 3.0)
         for i, n in enumerate(s["notes"][:2]):
-            text(x0 + MARGIN / 2 + 2, by_top - 4 - 4 * (i + 1), n, 2.8)
+            text(x0 + MARGIN / 2 + 2, by_top - 6 - 5 * i, n, 2.8)
     doc.set_modelspace_vport(height=max(s["height"], s["width"] * 0.6) + 40,
                              center=(s["width"] / 2, s["height"] / 2 - TITLE_H / 2))  # fmt: skip
     doc.header["$EXTMIN"] = (-MARGIN, -(MARGIN + TITLE_H), 0)

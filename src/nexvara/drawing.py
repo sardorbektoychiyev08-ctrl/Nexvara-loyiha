@@ -297,8 +297,8 @@ def render_svg(spec: dict[str, Any]) -> str:
     body = "\n".join(_shape_svg(c) for c in s["shapes"])
     date = time.strftime("%d.%m.%Y")
     notes = "".join(
-        f'<text x="{_f(MARGIN + 2)}" y="{_f(H - TITLE_H + 4 + 4 * (i + 1))}" font-size="2.8" '
-        f'font-family="Arial, sans-serif" fill="#374151">{escape(n)}</text>'
+        f'<text x="{_f(MARGIN + 2)}" y="{_f(H - TITLE_H - MARGIN / 2 + 6 + 5 * i)}" '
+        f'font-size="2.8" font-family="Arial, sans-serif" fill="#374151">{escape(n)}</text>'
         for i, n in enumerate(s["notes"][:2])
     )
     tx = W - MARGIN - 90

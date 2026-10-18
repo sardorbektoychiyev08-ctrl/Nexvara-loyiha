@@ -4,6 +4,44 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (24) — Claude Code — Chizma (AutoCAD DXF) va Office buyruqlari professional darajada; Android 1.2.1
+
+**Foydalanuvchi talabi:** hammasini qayta tekshirish, kamchiliklarni tuzatish; AutoCAD (chizma) mukammal va qulay ishlasin; Office dasturlarini «professional, xatosiz» darajaga yetkazish; o‘zi qatnashmasdan qilinadigan hamma ishni qilish. Telefon yangilash uchun ulangan.
+
+**Chizma / AutoCAD** (`cad.py` yangi, `drawing_offline.py` yangi, `app/api_drawing.py`):
+- DXF endi `ezdxf` bilan: AutoCAD 2010 (R2010, Unicode), mm ($INSUNITS=4), qatlamlar (KONTUR, INGICHKA, YASHIRIN, SHTRIX, OQ_CHIZIQ, OLCHAM, MATN, RAMKA) rang/qalinlik/chiziq turi bilan, LWPOLYLINE (yumaloq burchak — bulge), ELLIPSE, haqiqiy DIMENSION (o‘lcham yozuvi doim o‘qiladigan tomonda), ramka va shtamp. Avval R12: faqat chiziqlar, «?» harflar, shtrix yo‘q edi.
+- Har chizmadan keyin DXF qayta o‘qilib AutoCAD auditidan o‘tkaziladi (xato bo‘lsa vazifa FAIL).
+- AI’siz aniq chizish (bepul, tasdiqsiz): plastina/kvadrat (markaziy teshik, burchakda 4 teshik, R burchak), doira, flanes (bolt teshiklari aylana bo‘ylab), halqa/shayba, uchburchak (3 tomon / asos+balandlik), ko‘pburchak/gayka (kalit o‘lchami), ellips; katta detal masshtabda, o‘lcham yozuvi haqiqiy qiymatda; «oxirgi chizmani o‘zgartir: teshik 10 mm» faqat aytilganini o‘zgartiradi. Tushunilmagan detal → AI (kalit bo‘lsa).
+- «Chizma.dxf ni PDF qil» / «shu DXF faylni ko‘rsat»: istalgan DXF → PDF + PNG (ezdxf + PyMuPDF). DWG — yopiq format, «DXF qilib saqlang» deyiladi.
+- Tuzatildi: izohlar shtamp ramkasidan tashqariga chiqardi.
+- Yangi bog‘liqliklar: `ezdxf`, `pillow` (pyproject, installer spec). Asosiy `.venv` ga o‘rnatildi.
+
+**Office buyruqlari** (`agent/parse.py`, `excel_exec.py`, `word_exec.py`, `ppt_exec.py`; har biri qayta ochib tekshiriladi):
+- Excel: shartli formatlash (shart, eng katta/kichik N, rang shkalasi, ma’lumot chiziqlari — `DisplayFormat` bilan haqiqatan tekshiriladi), pul/foiz/dollar/kasr/butun/sana formati (15 kabi foiz qiymatlar 1500% bo‘lib ketmaydi), formula ustun (`Foyda = Daromad - Xarajat`, «ko‘paytir/minus» so‘zlari; natija Python’da qayta hisoblanadi), o‘rtacha/maksimum/minimum/soni/mediana qatorlari (JAMI bilan birga, saralashda jadval ostida qoladi), ustunni o‘chirish, varaq nomi, kenglikni moslashtirish, chop etish (albom, bir sahifa eniga, sarlavha har sahifada), shrift, almashtirish. Ustun harf bilan ham («C ustunni pul formatiga»). «sartirovka» ham tushuniladi.
+- Word: tekislash (matn/sarlavhalar), yuqori/pastki kolontitul (sahifa raqami saqlanadi), albom/kitob, chetlar (har tomon alohida), ortiqcha bo‘sh joy va bo‘sh qatorlarni tozalash, birinchi qatorni sarlavha, jadvallarni formatlash, statistika; xatboshi endi qayta tekshiriladi.
+- PowerPoint (mavjud fayl): almashtirish (guruh va jadval ichida ham, formatlash saqlanadi), shrift nomi, o‘tish effekti, slayd raqamlari (har qanday maketda), sifat tekshiruvi (sig‘magan matn, ustma-ust), PDF; natija `_NEXVARA.pptx`.
+- AI yo‘naltiruvchi (`ai/features.py`) yangi buyruq namunalarini biladi.
+
+**Android 1.2.1:** tayyor buyruqlarga AI’siz chizma va yangi Office namunalari (+ rus tarjimasi). Loyihaning sinov kaliti (`ANDROID_USER_HOME=.tools/android-home`) bilan yig‘ildi — boshqa kalit bilan telefon o‘rnatishni rad etadi. Telefondagi 1.2.0 ustiga ma’lumot o‘chmasdan o‘rnatildi. APK `D:/NEXVARA/android/NEXVARA-Android-1.2.1-debug.apk` (SHA-256 `1eb9933c779898cada3f72643dc66b089d2173380b320bc43a1f7c0029dcc60f`).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| Unit + haqiqiy Office (`NEXVARA_RUN_OFFICE=1`, to‘liq) | 453/454; `test_word_command` tekshiruvlar soni 7→8 (xatboshi endi tekshiriladi) — test yangilandi, qayta PASS |
+| Yangi: `tests/unit/test_cad.py`, parse testlari, `tests/office/test_commands_pro.py` (Excel 15 bosqichli zanjir, Word 13, PowerPoint 6 — haqiqiy Office) | PASS |
+| Smoke (shu tarmoq kodi bilan, `PYTHONPATH=src`) + 10 ta oyna UI testi | PASS |
+| Android `assembleDebug` + `testDebugUnitTest` | PASS |
+| Telefonga o‘rnatish (Android 16), ilova ochiladi, crash yo‘q | PASS |
+| DXF’ni AutoCAD dasturining o‘zida ochish | NOT TESTED — kompyuterda AutoCAD yo‘q (ezdxf auditi va qayta o‘qish PASS) |
+| Telefon ↔ kompyuter ulanishi bilan chizma/Office | NOT TESTED — sinov paytida kompyuterdagi NEXVARA telefonga ulanmagan edi |
+
+**Eslatma:** `.worktrees/android` da `.venv` yo‘q; `../../.venv` ishlatiladi. U yerdagi `nexvara` paketi asosiy papkaga o‘rnatilgan — subprocess/smoke uchun `PYTHONPATH=<worktree>/src` qo‘ying, aks holda `main` kodi sinaladi.
+
+**Keyingi qadam (foydalanuvchi bilan):** DXF’ni AutoCAD’da ochib ko‘rish (AutoCAD bor kompyuterda); telefon ulanganda chizma va Office buyruqlarini telefondan sinash; oldingi yozuvdagi qo‘l sinovlari (kamera bilan varaq, ovoz, barmoq izi, vidjet); keyin `claude/android-v1` → `main` merge.
+
+---
+
 ## 2026-10-18 (23) — Claude Code — Android 1.2.0: o‘qituvchi va ofis uchun 14 ta yangi imkoniyat, aqlli OCR va ovoz, telefonda E2E
 
 **Foydalanuvchi talabi:** taklif qilingan barcha qulayliklar: javob varaqalari, jurnal, rasmdan matn, dars jadvali, hujjat shablonlari, skaner, majlis yozuvi, ilovada ko‘rish, kompyuterni yoqish, vidjet, haftalik jadval, sevimlilar, kompyuterni boshqarish, rus tili; «hammasi aqlli ishlasin, ayniqsa rasmni o‘qish va ovozni matnga aylantirish».

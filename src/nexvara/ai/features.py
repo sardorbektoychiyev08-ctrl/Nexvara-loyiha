@@ -29,9 +29,21 @@ Namuna: "8-sinf tarix Amir Temur mavzusida taqdimot tayyorla"
 - "command": mavjud Office faylida ish. Ilova shu so‘zlarni tushunadi:
   Excel: "Hisobot.xlsx ni och, B ustun bo‘yicha kamayish tartibida saralab, filtr qo‘y, \
 dublikatlarni o‘chir, bo‘sh joylarni tozala, C ustunni pul formatiga o‘tkaz, jami qo‘sh, \
-diagramma qo‘sh, PDF qilib saqla"
-  Word: "Xat.docx ni och, «eski» so‘zini «yangi» ga almashtir, sarlavha qo‘sh, PDF qilib saqla"
-  PowerPoint: "Taqdimot.pptx ni PDF qilib saqla"
+diagramma qo‘sh, PDF qilib saqla"; yana: "Summa 1000000 dan katta kataklarni qizil bilan \
+belgila", "eng katta 3 ta Summani yashil bilan belgila", "Summa ustuniga rang shkalasi qo‘sh", \
+"Soni ustuniga ma’lumot chiziqlari qo‘sh", "Ulush ustunini foiz formatida qil", \
+"Foyda = Daromad - Xarajat ustunini qo‘sh", "o‘rtacha qatorini qo‘sh", "eng katta va eng kichik \
+qiymat qatorlarini qo‘sh", "Izoh ustunini o‘chir", "varaq nomini «Hisobot» qil", \
+"ustunlar kengligini moslashtir", "albom qilib bir sahifaga sig‘dir", "shriftni Arial 12 qil"
+  Word: "Xat.docx ni och, «eski» so‘zini «yangi» ga almashtir, sarlavha qo‘sh, PDF qilib saqla"; \
+yana: "hujjatni rasmiy formatla", "matnni kenglik bo‘yicha tekisla", "sarlavhalarni markazga \
+tekisla", "yuqori kolontitulga «5-maktab» yoz", "sahifani albom qil", "chap chetini 3 sm qil", \
+"ortiqcha bo‘sh joylarni tozala", "so‘zlarni sana", "birinchi qatorni sarlavha qil", \
+"jadvallarni formatla", "sahifa raqamlarini qo‘y", "mundarija qo‘sh", "shriftni Times New Roman 14 \
+qil", "qator oralig‘ini 1,5 qil"
+  PowerPoint: "Taqdimot.pptx ni PDF qilib saqla"; yana: "«2025» ni «2026» ga almashtir", \
+"barcha slaydlarga o‘tish effekti qo‘sh", "slayd raqamlarini qo‘sh", "slaydlarni tekshir", \
+"shriftni Arial qil"
   Fayl nomini foydalanuvchi aytganicha saqla. Fayl aytilmagan bo‘lsa "shu fayl" deb yoz.
 - "question": bilim savoli (darslik mavzusi, fan, ta’rif, sana va h.k.).
 - "chat": salomlashish, ilova haqida savol yoki boshqa suhbat.

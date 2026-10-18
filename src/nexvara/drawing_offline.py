@@ -23,7 +23,7 @@ SHAPES = [
     ("polygon", r"(?:olti|besh|sakkiz|uch|tort|\d+)\s*burchakli|oltiburchak|gayka|kopburchak"),
     ("triangle", r"uchburchak"),
     ("ellipse", r"ellips|oval"),
-    ("circle", r"doira|aylana|disk|gardish"),
+    ("circle", r"flanes|flanets|gardish|doira|aylana|disk"),
     ("rect", r"tortburchak|plastina|plita|list|kvadrat|panel|taxta|lavha|detal"),
 ]
 _N_SIDES = {"uch": 3, "tort": 4, "besh": 5, "olti": 6, "sakkiz": 8}
@@ -88,7 +88,16 @@ def parse(text: str, base: dict[str, Any] | None = None) -> dict[str, Any] | Non
         if corner is not None:
             p["corner_r"] = corner
         if hole is not None:
-            p.update(hole)
+            many = hole.get("holes")
+            if many and many["n"] == 4 and "burchak" in f:
+                p["corner_holes"] = many["d"]
+            elif many:
+                raise ValueError(
+                    "Plastinada bir nechta teshikni faqat 4 ta burchakka joylayman "
+                    "(«burchaklarida 4 ta 10 mm teshik»)"
+                )
+            if hole.get("center_hole"):
+                p["center_hole"] = hole["center_hole"]
         if not (p.get("w") and p.get("h")):
             return None
     elif shape == "circle":
@@ -98,6 +107,20 @@ def parse(text: str, base: dict[str, Any] | None = None) -> dict[str, Any] | Non
         p["d"] = d
         if hole is not None and hole.get("center_hole"):
             p["center_hole"] = hole["center_hole"]
+        if hole is not None and hole.get("holes"):
+            p["bolt_n"], p["bolt_d"] = hole["holes"]["n"], hole["holes"]["d"]
+            if not 2 <= p["bolt_n"] <= 36:
+                raise ValueError("Teshiklar soni 2 dan 36 gacha bo‘lsin")
+        pcd = _find(
+            f, "markaziy aylana", "bolt aylana", "teshiklar aylanasi", "oraliq diametr", "pcd"
+        )
+        if pcd:
+            p["pcd"] = pcd
+        if p.get("bolt_n"):
+            inner = p.get("center_hole", 0)
+            p.setdefault("pcd", round((p["d"] + inner) / 2, 1))
+            if p["pcd"] + p["bolt_d"] > p["d"] or p["pcd"] - p["bolt_d"] < inner:
+                raise ValueError("Teshiklar sig‘maydi: diametrlarni tekshiring")
     elif shape == "ring":
         outer = _find(f, "tashqi diametr", "tashqi") or (a if a and b else None) or dia
         inner = _find(f, "ichki diametr", "ichki", "teshik") or (b if a and b else None)
@@ -160,14 +183,17 @@ def _hole(f: str) -> dict[str, Any] | None:
     """Holes: "markazida 20 mm teshik", "burchaklarida 4 ta 8 mm teshik", "teshik Ø10"."""
     if "teshik" not in f:
         return None
-    m = re.search(rf"{_NUM}{_UNIT}\s*(?:li|lik)?\s*(?:diametrli\s+)?teshik", f)
+    out: dict[str, Any] = {}
+    hole = r"\s*(?:li|lik)?\s*(?:diametrli\s+)?(?:boltli\s+|bolt uchun\s+|vint uchun\s+)?teshik"
+    many = re.search(rf"\b(\d+)\s*ta\s*{_NUM}{_UNIT}{hole}", f)
+    if many:
+        out["holes"] = {"n": int(many.group(1)), "d": _mm(many.group(2), many.group(3))}
+        f = f[: many.start()] + " " + f[many.end() :]
+    m = re.search(rf"{_NUM}{_UNIT}{hole}", f)
     m = m or re.search(rf"teshik\w*\s*(?:diametri\s*)?(?:Ø|d|r)?\s*=?\s*{_NUM}{_UNIT}", f)
-    if not m:
-        return None
-    size = _mm(m.group(1), m.group(2))
-    if re.search(r"burchak\w*", f) and re.search(r"\b4\s*ta|tort\w* (?:ta )?teshik", f):
-        return {"corner_holes": size}
-    return {"center_hole": size}
+    if m:
+        out["center_hole"] = _mm(m.group(1), m.group(2))
+    return out or None
 
 
 def _title(text: str, shape: str) -> str:
@@ -180,6 +206,8 @@ def _title(text: str, shape: str) -> str:
         words = {"6": "olti", "5": "besh", "8": "sakkiz", "3": "uch", "4": "to‘rt", "tort": "to‘rt"}
         if m:
             return f"{words.get(m.group(1), m.group(1)).capitalize()} burchakli detal"
+    if shape == "circle" and re.search(r"flanes|flanets|gardish", fold(text)):
+        return "Flanes"
     if shape == "rect" and "kvadrat" in fold(text):
         return "Kvadrat"
     return names[shape]
@@ -255,6 +283,18 @@ def build_spec(p: dict[str, Any]) -> dict[str, Any]:
             shapes.append({"type": "circle", "cx": cx, "cy": cy, "r": p["center_hole"] / 2 / k,
                            "w": 0.7})  # fmt: skip
             notes.append(f"Markaziy teshik Ø{_num(p['center_hole'])}")
+        if p.get("bolt_n"):
+            pr = p["pcd"] / 2 / k
+            shapes.append({"type": "circle", "cx": cx, "cy": cy, "r": pr, "style": "center",
+                           "w": 0.25})  # fmt: skip
+            for i in range(p["bolt_n"]):
+                ang = -math.pi / 2 + 2 * math.pi * i / p["bolt_n"]
+                hx, hy = cx + pr * math.cos(ang), cy + pr * math.sin(ang)
+                shapes.append({"type": "circle", "cx": hx, "cy": hy, "r": p["bolt_d"] / 2 / k,
+                               "w": 0.7})  # fmt: skip
+            dim(cx - pr, cy - r, cx + pr, cy - r, p["pcd"], -8, "Ø")
+            notes.insert(0, f"{p['bolt_n']} ta teshik Ø{_num(p['bolt_d'])}, "
+                            f"Ø{_num(p['pcd'])} aylana bo‘ylab teng")  # fmt: skip
     elif t == "ring":
         r, ri = p["d"] / 2 / k, p["d_in"] / 2 / k
         shapes += [{"type": "circle", "cx": cx, "cy": cy, "r": r, "w": 0.7},

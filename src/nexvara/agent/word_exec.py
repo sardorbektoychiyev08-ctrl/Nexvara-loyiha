@@ -136,6 +136,8 @@ def _execute(task, w, plan, source, out, overwrite, visible, pause, keep_open) -
             elif k == "pdf":
                 pdf_path = True
                 s.detail = "saqlashda yaratiladi"
+            elif k in _EXTRA:
+                s.detail = _EXTRA[k](doc, a, ops, expect)
             else:
                 raise CommandError(f"Word uchun bu buyruq hali qo‘llanmaydi: «{a.text}»")
             report.append(f"{title}: {s.detail}")
@@ -182,6 +184,8 @@ def _execute(task, w, plan, source, out, overwrite, visible, pause, keep_open) -
                 checks.append({"name": "Sahifa raqamlari", "ok": n >= 1})
             elif kind == "toc":
                 checks.append({"name": "Mundarija", "ok": doc2.TablesOfContents.Count >= 1})
+            else:
+                checks.append(_verify(doc2, kind, arg, ops))
         if pdf_path:
             ok = Path(pdf_path).is_file() and Path(pdf_path).read_bytes()[:5] == b"%PDF-"
             checks.append({"name": "PDF", "ok": ok, "detail": Path(pdf_path).name})
@@ -226,3 +230,172 @@ def _first_body(doc: Any) -> Any:
         ):
             return p
     return doc.Paragraphs(1)
+
+
+# ---------------- professional commands ----------------
+def _headings(doc: Any) -> list[Any]:
+    return [doc.Paragraphs(i) for i in range(1, doc.Paragraphs.Count + 1)
+            if 1 <= int(doc.Paragraphs(i).OutlineLevel) <= 9]  # fmt: skip
+
+
+def _wd_align(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    how = a.args.get("how", "justify")
+    value = ops.ALIGN[how]
+    if a.args.get("target") == "headings":
+        heads = _headings(doc)
+        if not heads:
+            raise CommandError("Hujjatda sarlavha uslubidagi qator yo‘q")
+        for p in heads:
+            p.Alignment = value
+        expect.append(("align_headings", value))
+        return f"{len(heads)} ta sarlavha: {_ALIGN_UZ[how]}"
+    _set_body(doc, Alignment=value)
+    expect.append(("align", value))
+    return f"asosiy matn: {_ALIGN_UZ[how]}"
+
+
+_ALIGN_UZ = {"left": "chapga", "center": "markazga", "right": "o‘ngga",
+             "justify": "kenglik bo‘yicha (ikki tomonga)"}  # fmt: skip
+
+
+def _wd_header(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    text, where = a.args["text"], a.args.get("where", "header")
+    for i in range(1, doc.Sections.Count + 1):
+        sec = doc.Sections(i)
+        hf = sec.Footers(1) if where == "footer" else sec.Headers(1)
+        rng = hf.Range
+        if where == "footer" and hf.PageNumbers.Count and str(rng.Text).strip():
+            rng.InsertBefore(text + "\t")  # keep the page number that is already there
+        else:
+            rng.Text = text
+            rng.ParagraphFormat.Alignment = ops.ALIGN["center" if where == "footer" else "right"]
+            rng.Font.Size = 10
+        del rng, hf, sec
+    expect.append((where, text))
+    return f"{'pastki' if where == 'footer' else 'yuqori'} kolontitul: «{text}»"
+
+
+def _wd_orientation(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    value = ops.ORIENTATION["landscape" if a.args.get("landscape") else "portrait"]
+    for i in range(1, doc.Sections.Count + 1):
+        doc.Sections(i).PageSetup.Orientation = value
+    expect.append(("orientation", value))
+    return "albom (yotiq)" if value == 1 else "kitob (tik)"
+
+
+def _wd_margins(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    names = {"top": "TopMargin", "right": "RightMargin", "bottom": "BottomMargin",
+             "left": "LeftMargin"}  # fmt: skip
+    uz = {"top": "yuqori", "right": "o‘ng", "bottom": "past", "left": "chap"}
+    for i in range(1, doc.Sections.Count + 1):
+        ps = doc.Sections(i).PageSetup
+        for side, cm in a.args.items():
+            setattr(ps, names[side], ops.cm_to_pt(cm))
+        del ps
+    expect.append(("margins", dict(a.args)))
+    return ", ".join(f"{uz[s]} {str(v).replace('.', ',').removesuffix(',0')} sm"
+                     for s, v in a.args.items())  # fmt: skip
+
+
+def _wd_clean(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    """Double spaces, spaces before punctuation, empty paragraphs (outside tables)."""
+    fixed = 0
+    for find, repl in (("  ", " "), (" ,", ","), (" .", "."), (" ;", ";"), (" :", ":"),
+                       (" !", "!"), (" ?", "?")):  # fmt: skip
+        for _ in range(30):  # "    " needs several passes
+            n = str(doc.Content.Text).count(find)
+            if not n:
+                break
+            # One pass turns "    " into "  "; find_replace would call that a failure.
+            ops._find_execute(doc.Content, find, True, repl, ops.WD_REPLACE_ALL)
+            fixed += n
+    empty = 0
+    for i in range(doc.Paragraphs.Count, 1, -1):
+        p = doc.Paragraphs(i)
+        rng = p.Range
+        if (str(rng.Text).strip() == "" and not rng.Information(12)
+                and rng.InlineShapes.Count == 0 and rng.ShapeRange.Count == 0):  # fmt: skip
+            prev = str(doc.Paragraphs(i - 1).Range.Text).strip()
+            if prev == "" or i == doc.Paragraphs.Count:
+                rng.Delete()
+                empty += 1
+        del rng, p
+    expect.append(("clean", None))
+    return f"{fixed} ta ortiqcha bo‘sh joy, {empty} ta bo‘sh qator olib tashlandi"
+
+
+def _wd_count(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    words, chars, pages = (int(doc.ComputeStatistics(k)) for k in (0, 3, 2))
+    paras = int(doc.ComputeStatistics(4))
+    return f"{words} so‘z, {chars} belgi, {paras} xatboshi, {pages} sahifa"
+
+
+def _wd_title(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    for i in range(1, doc.Paragraphs.Count + 1):
+        p = doc.Paragraphs(i)
+        text = str(p.Range.Text).strip()
+        if text and not p.Range.Information(12):
+            p.Style = ops.STYLE_HEADING[1]
+            p.Alignment = ops.ALIGN["center"]
+            expect.append(("title", text))
+            return f"«{text[:60]}» — 1-darajali sarlavha (mundarijaga kiradi)"
+    raise CommandError("Hujjatda matn yo‘q")
+
+
+def _wd_tables(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    from nexvara.skills.excel.table import excel_color
+
+    n = doc.Tables.Count
+    if not n:
+        raise CommandError("Hujjatda jadval yo‘q")
+    for i in range(1, n + 1):
+        t = doc.Tables(i)
+        t.Borders.Enable = True
+        head = t.Rows(1)
+        head.Range.Font.Bold = True
+        head.HeadingFormat = -1  # repeat the header row on every page
+        head.Shading.BackgroundPatternColor = excel_color("#E0E7FF")
+        t.AutoFitBehavior(ops.WD_AUTOFIT_WINDOW)
+        del head, t
+    expect.append(("tables", n))
+    return f"{n} ta jadval: chegaralar, qalin sarlavha, sarlavha har sahifada"
+
+
+_EXTRA = {
+    "align": _wd_align, "header": _wd_header, "orientation": _wd_orientation,
+    "margins": _wd_margins, "clean": _wd_clean, "count": _wd_count, "title": _wd_title,
+    "tables": _wd_tables,
+}  # fmt: skip
+
+
+def _verify(doc: Any, kind: str, arg: Any, ops: Any) -> dict[str, Any]:
+    """Re-read one property of the saved document."""
+    if kind == "align":
+        return {"name": "Tekislash", "ok": int(_first_body(doc).Alignment) == arg}
+    if kind == "align_headings":
+        return {"name": "Sarlavhalar", "ok": all(int(p.Alignment) == arg for p in _headings(doc))}
+    if kind in ("header", "footer"):
+        sec = doc.Sections(1)
+        hf = sec.Footers(1) if kind == "footer" else sec.Headers(1)
+        return {"name": "Kolontitul", "ok": arg in str(hf.Range.Text)}
+    if kind == "orientation":
+        return {"name": "Sahifa yo‘nalishi", "ok": int(doc.PageSetup.Orientation) == arg}
+    if kind == "margins":
+        names = {"top": "TopMargin", "right": "RightMargin", "bottom": "BottomMargin",
+                 "left": "LeftMargin"}  # fmt: skip
+        ps = doc.PageSetup
+        ok = all(abs(getattr(ps, names[s]) - ops.cm_to_pt(v)) < 0.6 for s, v in arg.items())
+        return {"name": "Chetlar", "ok": ok}
+    if kind == "indent":
+        got = float(_first_body(doc).FirstLineIndent)
+        return {"name": "Xatboshi", "ok": abs(got - ops.cm_to_pt(arg)) < 0.6, "detail": f"{got}"}
+    if kind == "clean":
+        text = str(doc.Content.Text)
+        return {"name": "Ortiqcha bo‘sh joy yo‘q", "ok": "  " not in text}
+    if kind == "title":
+        heads = [str(p.Range.Text).strip() for p in _headings(doc)]
+        return {"name": "Sarlavha", "ok": arg in heads}
+    if kind == "tables":
+        ok = all(bool(doc.Tables(i).Borders.Enable) for i in range(1, doc.Tables.Count + 1))
+        return {"name": "Jadvallar", "ok": ok and doc.Tables.Count == arg}
+    return {"name": kind, "ok": True}

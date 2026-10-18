@@ -76,6 +76,24 @@ DESCRIBE = {
     "toc": "Mundarija",
     "spelling": "Imloni tekshirish",
     "presentation": "Mavzu bo‘yicha taqdimot",
+    "highlight": "Shartli formatlash (rang bilan belgilash)",
+    "numfmt": "Raqam formati",
+    "autofit": "Ustun kengligini moslashtirish",
+    "stats": "Statistika qatorlari",
+    "formula": "Hisoblangan ustun (formula)",
+    "rename_sheet": "Varaq nomini o‘zgartirish",
+    "delete_column": "Ustunni o‘chirish",
+    "print_setup": "Chop etishga tayyorlash",
+    "align": "Matnni tekislash",
+    "header": "Kolontitul",
+    "orientation": "Sahifa yo‘nalishi",
+    "margins": "Sahifa chetlari",
+    "count": "Hujjat statistikasi",
+    "title": "Sarlavha uslubi",
+    "tables": "Jadvallarni formatlash",
+    "transition": "Slayd o‘tish effekti",
+    "slide_numbers": "Slayd raqamlari",
+    "check": "Sifatni tekshirish",
 }
 
 
@@ -99,7 +117,15 @@ _LEADING_CONNECTOR = re.compile(
 )
 
 
+_STAT_PAIR = re.compile(
+    r"\b(eng (?:katta|kichik)|o[‘’']?rtacha|maksimum|minimum|soni)\s+va\s+"
+    r"(?=eng |o[‘’']?rtacha|maksimum|minimum|soni)",
+    re.IGNORECASE,
+)
+
+
 def split_clauses(text: str) -> list[str]:
+    text = _STAT_PAIR.sub(r"\1 & ", text)  # "eng katta va eng kichik" is one request
     out = []
     for c in _SPLIT.split(text):
         c = (c or "").strip()
@@ -151,7 +177,7 @@ def _sort(clause: str, f: str) -> Action:
     desc = _has(f, "kamay", "teskari", "kattadan", "yuqoridan", "z dan a", "desc")
     words = _strip_words(
         f,
-        r"sarala|saralash|tartibla|tartiblash|kamay|o[‘’']?sish|o[‘’']?suvchi|teskari|kattadan|kichikdan|"
+        r"sarala|saralash|tartibla|tartiblash|sartirovka|sortirovka|sortla|kamay|o[‘’']?sish|o[‘’']?suvchi|teskari|kattadan|kichikdan|"
         r"yuqoridan|pastdan|alifbo|asc|desc",
         _COMMON,
     )
@@ -167,19 +193,23 @@ _CMP = [
 ]
 
 
-def _filter(clause: str, f: str) -> Action:
-    if _has(f, "olib tashla", "bekor", "tozala", "ochir", "o‘chir", "o'chir", "olib"):
-        return Action("clear_filter", {}, clause)
-    criteria = None
+def _criteria(f: str) -> tuple[str | None, str]:
+    """(">500000", text without it) for "500000 dan katta" / "> 500000"; (None, f) if absent."""
     for pat, op in _CMP:
         m = re.search(pat, f)
         if m:
             if op is None:
-                criteria = f"{m.group(1)}{m.group(2).replace(',', '.')}"
+                crit = f"{m.group(1)}{m.group(2).replace(',', '.')}"
             else:
-                criteria = f"{op}{m.group(1).replace(',', '.')}"
-            f = f[: m.start()] + " " + f[m.end() :]
-            break
+                crit = f"{op}{m.group(1).replace(',', '.')}"
+            return crit, f[: m.start()] + " " + f[m.end() :]
+    return None, f
+
+
+def _filter(clause: str, f: str) -> Action:
+    if _has(f, "olib tashla", "bekor", "tozala", "ochir", "o‘chir", "o'chir", "olib"):
+        return Action("clear_filter", {}, clause)
+    criteria, f = _criteria(f)
     quoted = _QUOTED.search(clause)
     words = _strip_words(
         f,
@@ -257,6 +287,201 @@ def _indent(clause: str, f: str) -> Action:
     return Action("indent", {"cm": float(m.group(1).replace(",", ".")) if m else 1.25}, clause)
 
 
+_COLORS = {
+    "qizil": "#FCA5A5", "sariq": "#FDE68A", "yashil": "#86EFAC", "kok": "#93C5FD",
+    "havorang": "#BAE6FD", "pushti": "#F9A8D4", "toq sariq": "#FDBA74", "binafsha": "#C4B5FD",
+}  # fmt: skip
+
+
+def _highlight(clause: str, f: str) -> Action:
+    if _has(f, "rang shkala", "shkala", "issiqlik xarita"):
+        mode, n = "scale", None
+    elif _has(f, "malumot chiziq", "data bar", "chiziqcha", "katak ichida gistogramma"):
+        mode, n = "bars", None
+    else:
+        top = re.search(r"eng (katta|yuqori|kichik|past)\w*\s*(\d+)\s*ta", f) or re.search(
+            r"(\d+)\s*ta\s*eng (katta|yuqori|kichik|past)", f
+        )  # fmt: skip
+        if top:
+            word, num = (top.group(1), top.group(2)) if top.group(1).isalpha() else (
+                top.group(2), top.group(1))  # fmt: skip
+            mode, n = ("top" if word in ("katta", "yuqori") else "bottom"), int(num)
+            f = f[: top.start()] + " " + f[top.end() :]
+        else:
+            mode, n = "cells", None
+    criteria, f = _criteria(f)
+    color = next((c for name, c in _COLORS.items() if name in f), None)
+    words = _strip_words(
+        f,
+        r"belgila|boya|rangla|ajrat|korsat|rang|shkala|issiqlik|xarita|malumot|chiziq|data|bar|"
+        r"katak|qiymat|kattalar|kichiklar|" + "|".join(_COLORS),
+        _COMMON,
+    )
+    return Action("highlight", {"mode": mode, "criteria": criteria, "top": n, "color": color,
+                                "words": words, "column": _column_ref(clause)}, clause)  # fmt: skip
+
+
+def _numfmt(clause: str, f: str) -> Action:
+    if _has(f, "foiz", "protsent"):
+        kind = "percent"
+    elif _has(f, "sana"):
+        kind = "date"
+    elif _has(f, "pul", "som", "valyuta", "sum\\b"):
+        kind = "money"
+    elif _has(f, "dollar", "usd"):
+        kind = "usd"
+    elif _has(f, "butun"):
+        kind = "integer"
+    else:
+        kind = "decimal"
+    dec = re.search(r"(\d)\s*(?:ta\s*)?(?:xona|raqam)", f)
+    words = _strip_words(
+        f,
+        r"format|formatiga|formatida|qil|otkaz|aylantir|korinish|pul|som|sum\b|valyuta|foiz|"
+        r"protsent|sana|kasr|butun|son|xona|raqam|verguldan|keyin|dollar|usd|\d",
+        _COMMON,
+    )
+    return Action("numfmt", {"kind": kind, "decimals": int(dec.group(1)) if dec else None,
+                             "words": words, "column": _column_ref(clause)}, clause)  # fmt: skip
+
+
+_STAT_WORDS = [
+    (("ortacha", "average"), "average"),
+    (("eng katta", "maksimum", "maksimal", "max"), "max"),
+    (("eng kichik", "minimum", "minimal", "min"), "min"),
+    (("soni", "nechta", "count"), "count"),
+    (("mediana",), "median"),
+]
+
+
+def _stats(clause: str, f: str) -> Action:
+    funcs = [fn for keys, fn in _STAT_WORDS if any(re.search(rf"\b{k}\b", f) for k in keys)]
+    return Action("stats", {"funcs": funcs or ["average"]}, clause)
+
+
+_OPS_WORDS = [
+    (r"\bminus\b|\bayir\w*", "-"), (r"\bplyus\b|\bqo[‘’']?shuv\b", "+"),
+    (r"\bko[‘’']?paytir\w*|\bmarta\b", "*"), (r"\bbo[‘’']?lin\w*|\bbo[‘’']?lib\b", "/"),
+]  # fmt: skip
+
+
+def _formula(clause: str, f: str) -> Action | None:
+    """ "Foyda = Daromad - Xarajat", "Foyda ustunini qo‘sh: Daromad minus Xarajat"."""
+    text = re.sub(r"[«»\"“”]", "", clause)
+    m = re.search(r"^(.*?)=(.+)$", text)
+    if m:
+        name, expr = m.group(1), m.group(2)
+    else:
+        m = re.search(r"^(.*?)\bustun\w*\s+(?:qo[‘’']?sh|qosh|yarat|hisobla)\w*\s*:(.+)$", text,
+                      re.IGNORECASE)  # fmt: skip
+        if not m:
+            return None
+        name, expr = m.group(1), m.group(2)
+    name = re.sub(r"(?i)\b(?:yangi|ustun\w*|qo[‘’']?sh\w*|qosh\w*|hisobla\w*|yarat\w*)\b", " ",
+                  name)  # fmt: skip
+    name = re.sub(r"\s+", " ", name).strip(" :,-")
+    expr = re.sub(r"(?i)\b(?:ustun\w*|bo[‘’']?lsin|bolsin|qo[‘’']?sh\w*|qosh\w*|hisobla\w*)\b",
+                  " ", expr)  # fmt: skip
+    for pat, op in _OPS_WORDS:
+        expr = re.sub(pat, f" {op} ", expr, flags=re.IGNORECASE)
+    expr = re.sub(r"\s+", " ", expr).strip(" .,")
+    if not name or not expr or not re.search(r"[-+*/]", expr):
+        return None
+    return Action("formula", {"name": name, "expr": expr}, clause)
+
+
+def _margins(clause: str, f: str) -> Action | None:
+    sides = {"top": r"yuqori|tepa", "right": r"ong", "bottom": r"past|quyi", "left": r"chap"}
+    out: dict[str, float] = {}
+    for side, pat in sides.items():
+        m = re.search(rf"\b(?:{pat})\w*\s*(?:chet\w*\s*)?(\d+(?:[.,]\d+)?)", f)
+        if m:
+            out[side] = float(m.group(1).replace(",", "."))
+    if not out:
+        m = re.search(r"chet\w*\s*(?:hammasi\s*)?(\d+(?:[.,]\d+)?)\s*(?:sm|cm)", f)
+        if not m:
+            return None
+        v = float(m.group(1).replace(",", "."))
+        out = {"top": v, "right": v, "bottom": v, "left": v}
+    if any(not 0 <= v <= 10 for v in out.values()):
+        return None
+    return Action("margins", out, clause)
+
+
+def _align(clause: str, f: str) -> Action:
+    if _has(f, "kenglik", "ikki tomon", "eniga", "shirina"):
+        how = "justify"
+    elif _has(f, "markaz", "orta"):
+        how = "center"
+    elif _has(f, "ong"):
+        how = "right"
+    else:
+        how = "left"
+    target = "headings" if _has(f, "sarlavha") else "body"
+    return Action("align", {"how": how, "target": target}, clause)
+
+
+def _classify_extra(clause: str, f: str, app: str | None) -> Action | None:
+    """Commands added for professional use (highlighting, number formats, layout...)."""
+    quoted = _QUOTED.search(clause)
+    if app == "powerpoint" or _has(f, "slayd"):
+        if _has(f, "otish effekt", "animats", "otish", "perexod"):
+            return Action("transition", {}, clause)
+        if _has(f, "slayd raqam", "raqamla"):
+            return Action("slide_numbers", {}, clause)
+        if _has(f, "tekshir"):
+            return Action("check", {}, clause)
+    if _has(f, "belgila", "boya", "rangla", "ajratib korsat", "rang shkala", "shkala",
+            "data bar", "malumot chiziq"):  # fmt: skip
+        return _highlight(clause, f)
+    if _has(f, "ortacha", "maksimum", "minimum", "mediana") or re.search(
+        r"\beng (katta|kichik)\b.*\b(qator|qiymat|hisobla|qosh)", f
+    ):  # fmt: skip
+        return _stats(clause, f)
+    if "=" in clause or re.search(r"\bustun\w*\s+(qosh|yarat|hisobla)\w*\s*:", f):
+        a = _formula(clause, f)
+        if a is not None:
+            return a
+    if re.search(r"\b(pul|som|foiz|protsent|valyuta|sana|kasr|butun son|dollar)\w*\b", f) and (
+        _has(f, "format", "korinish", "otkaz", "aylantir", "qil", "xona")
+    ):
+        return _numfmt(clause, f)
+    if _has(f, "ustun") and _has(f, "ochir", "olib tashla") and not _has(f, "takror", "dublikat"):
+        words = _strip_words(f, r"ochir|olib|tashla", _COMMON)
+        return Action("delete_column", {"words": words, "column": _column_ref(clause)}, clause)
+    if _has(f, "varaq", "list") and _has(f, "nom") and quoted:
+        return Action("rename_sheet", {"name": quoted.group(1).strip()}, clause)
+    if _has(f, "kenglig", "moslashtir", "avtomatik kenglik", "avtopodbor"):
+        return Action("autofit", {}, clause)
+    if _has(f, "kolontitul", "header", "footer"):
+        if not quoted:
+            return None
+        where = "footer" if _has(f, "past", "quyi", "footer") else "header"
+        return Action("header", {"where": where, "text": quoted.group(1)}, clause)
+    if _has(f, "albom", "landshaft", "gorizontal sahifa", "portret", "kitob shakl"):
+        landscape = not _has(f, "portret", "kitob")
+        if app == "excel" or _has(f, "bir sahifa", "chop"):
+            return Action("print_setup", {"landscape": landscape, "fit": True}, clause)
+        return Action("orientation", {"landscape": landscape}, clause)
+    if _has(f, "bir sahifaga", "chop etish", "chopga", "pechat"):
+        return Action("print_setup", {"landscape": None, "fit": True}, clause)
+    if _has(f, "chet", "hoshiya", "maydon") and re.search(r"\d", f):
+        a = _margins(clause, f)
+        if a is not None:
+            return a
+    if _has(f, "tekisla", "vyravn"):
+        return _align(clause, f)
+    if re.search(r"\bsarlavha (qil|uslub)", f) or _has(f, "birinchi qatorni sarlavha"):
+        return Action("title", {}, clause)
+    if re.search(r"\b(soz|sahifa|belgi|harf)\w*\b.*\b(sana|nechta|hisobla)", f) or _has(
+        f, "statistika"
+    ):
+        return Action("count", {}, clause)
+    if app == "word" and _has(f, "jadval") and _has(f, "formatla", "chiroyli", "bezat", "chegara"):
+        return Action("tables", {}, clause)
+    return None
+
+
 def _classify(clause: str, app: str | None) -> Action | None:
     f = fold(clause)
     if (_has(f, "och", "yukla") and find_file(clause)) or re.fullmatch(
@@ -270,12 +495,15 @@ def _classify(clause: str, app: str | None) -> Action | None:
         return Action("dedupe", {"words": words}, clause)
     if _has(f, "filtr"):
         return _filter(clause, f)
-    if _has(f, "sarala", "tartibla", "saralash"):
+    if _has(f, "sarala", "tartibla", "saralash", "sartirovka", "sortirovka", "sortla"):
         return _sort(clause, f)
     if _has(f, "pivot", "svodn", "yigma jadval", "yig‘ma jadval", "yig'ma jadval"):
         return _pivot(clause, f)
     if _has(f, "diagramma", "grafik", "chizma"):
         return _chart(clause, f)
+    extra = _classify_extra(clause, f, app)
+    if extra is not None:
+        return extra
     if _has(f, "jami", "yigindi", "yig‘indi", "itog"):
         return Action("total", {}, clause)
     if _has(f, "pdf"):
@@ -324,12 +552,16 @@ def parse_command(text: str, context_file: str | None = None) -> Plan | None:
     else:
         app = None
 
+    # Clauses are read for the app of the file in hand ("jadvallarni formatla" in Word).
+    cls_app = app or (_app_for(context_file) if file is None and context_file else None)
     actions: list[Action] = []
     unknown: list[str] = []
     for clause in split_clauses(text):
-        a = _classify(clause, app)
+        a = _classify(clause, cls_app)
         if a is None:
             unknown.append(clause)
+        elif actions and a.kind == actions[-1].kind == "margins":
+            actions[-1].args.update(a.args)  # "chap chetini 3 sm, o‘ng chetini 1,5 sm"
         elif not (actions and a.kind == actions[-1].kind == "open"):
             actions.append(a)
     if not any(a.kind != "open" for a in actions) and file is None:

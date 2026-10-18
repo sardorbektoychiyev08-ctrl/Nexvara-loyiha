@@ -155,6 +155,11 @@ private val RU: Map<String, String> = mapOf(
     "Buyruq loyihasi" to "Проект приказа", "Tarjima" to "Перевод", "Qisqartirish" to "Сокращение", "Detal chizmasi" to "Чертёж детали",
     "Sxema" to "Схема", "Oxirgi chizmani tuzatish" to "Исправить последний чертёж", "Nimalarni bilasan" to "Что ты знаешь",
     "Teach qoidasi" to "Правило обучения", "Sinxronlash" to "Синхронизация",
+    "Excel: hisob-kitob" to "Excel: расчёты", "Excel: rang bilan belgilash" to "Excel: выделение цветом",
+    "Excel: chop etishga tayyorlash" to "Excel: подготовка к печати", "Word: rasmiy hujjat" to "Word: официальный документ",
+    "Word: kolontitul" to "Word: колонтитул", "PowerPoint: tayyorlash" to "PowerPoint: подготовка",
+    "Flanes (AI’siz, bepul)" to "Фланец (без AI, бесплатно)", "Plastina (AI’siz)" to "Пластина (без AI)",
+    "Shayba (AI’siz)" to "Шайба (без AI)", "Gayka (AI’siz)" to "Гайка (без AI)", "AutoCAD faylini ko‘rish" to "Просмотр файла AutoCAD",
     // teacher tools
     "Yangi varaqa" to "Новый бланк", "Nomi (masalan: 7-B fizika, 1-chorak)" to "Название (например: 7-Б физика, 1-я четверть)",
     "Savollar" to "Вопросы", "Nusxa soni" to "Кол-во копий", "To‘g‘ri javoblar (ixtiyoriy): ABCDA…" to "Правильные ответы (необязательно): ABCDA…",

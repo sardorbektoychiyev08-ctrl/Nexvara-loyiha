@@ -101,6 +101,8 @@ def test_any_dxf_becomes_pdf_and_png(tmp_path):
         ("teng tomonli uchburchak tomoni 60 chiz", {"shape": "triangle", "sides": [60, 60, 60]}),
         ("olti burchakli detal kalit o‘lchami 24 chiz", {"shape": "polygon", "n": 6}),
         ("ellips 80x40 chiz", {"shape": "ellipse", "rx": 40, "ry": 20}),
+        ("Diametri 80 mm flanes, markazda 30 mm teshik, 4 ta 8 mm boltli teshik chiz",
+         {"shape": "circle", "d": 80, "center_hole": 30, "bolt_n": 4, "bolt_d": 8, "pcd": 55}),
     ],
 )  # fmt: skip
 def test_simple_parts_are_understood(text, want):

@@ -17,6 +17,12 @@ from nexvara.core.task import Task, UserError
 from nexvara.knowledge.textnorm import fold
 
 _FOOTER_WORDS = {"jami", "jami:", "итого", "itogo", "total", "всего", "hammasi"}
+# Summary rows NEXVARA adds under the table ("o‘rtacha qatorini qo‘sh"): also footers.
+STAT_LABELS = {"average": "O‘RTACHA", "max": "MAKSIMUM", "min": "MINIMUM", "count": "SONI",
+               "median": "MEDIANA"}  # fmt: skip
+STAT_FUNCS = {"average": "AVERAGE", "max": "MAX", "min": "MIN", "count": "COUNT",
+              "median": "MEDIAN"}  # fmt: skip
+_FOOTER_WORDS |= {fold(v).lower() for v in STAT_LABELS.values()}
 
 
 class CommandError(UserError):
@@ -58,11 +64,21 @@ class Table:
         rows = vals[1:]
         # A trailing "JAMI" row is a footer, not data: sorting, filters, charts and pivots
         # must not treat it as one more record.
-        self.has_footer = bool(rows) and any(
-            isinstance(v, str) and fold(v).strip() in _FOOTER_WORDS for v in rows[-1]
-        )
-        if self.has_footer:
+        self.footers: list[str] = []  # labels of the footer rows, top to bottom
+        while rows:
+            label = next(
+                (
+                    fold(v).strip()
+                    for v in rows[-1]
+                    if isinstance(v, str) and fold(v).strip() in _FOOTER_WORDS
+                ),
+                None,
+            )
+            if label is None:
+                break
+            self.footers.insert(0, label)
             rows = rows[:-1]
+        self.has_footer = bool(self.footers)
         self.rows = rows
         last = self.top + len(rows)
         self.range = self.ws.Range(
@@ -352,6 +368,10 @@ def _do(a, xl, ws, t, ops, format_table, freeze_header, TableSpec, col_letter, c
         if not nums:
             raise CommandError("Jadvalda raqamli ustun yo‘q")
         r = t.top + t.n_rows + 1
+        if "jami" in t.footers:
+            r += t.footers.index("jami")
+        elif t.footers:  # summary rows already there: JAMI goes right under the data
+            ws.Rows(r).Insert()
         first, last = t.top + 1, t.top + t.n_rows
         if 1 not in nums:
             ws.Cells(r, t.left).Value = "JAMI"
@@ -417,7 +437,403 @@ def _do(a, xl, ws, t, ops, format_table, freeze_header, TableSpec, col_letter, c
     if k in ("pdf", "csv"):
         return "saqlashda yaratiladi"
 
+    if k in _EXTRA:
+        return _EXTRA[k](a, xl, ws, t, ops, col_letter, check, nums, texts)
+
     raise CommandError(f"Excel uchun bu buyruq hali qo‘llanmaydi: «{a.text}»")
+
+
+# ---------------- professional commands ----------------
+def _abs_col(t: Table, c: int) -> int:
+    return t.left + c - 1
+
+
+def _body(ws: Any, t: Table, c: int, footers: bool = False) -> Any:
+    """Data cells of table column c (1-based), optionally with the footer rows."""
+    last = t.top + t.n_rows + (len(t.footers) if footers else 0)
+    return ws.Range(ws.Cells(t.top + 1, _abs_col(t, c)), ws.Cells(last, _abs_col(t, c)))
+
+
+def _number_column(t: Table, words: str | None, nums: list[int], what: str,
+                   letter: str | None = None) -> int:  # fmt: skip
+    col = t.find_column(words, letter) if (words or letter) else None
+    if col in nums:
+        return col
+    if col is None and len(nums) == 1:
+        return nums[0]
+    names = ", ".join(t.headers[c - 1] for c in nums) or "yo‘q"
+    if col is not None:
+        raise CommandError(f"«{t.headers[col - 1]}» raqamli ustun emas. {what} uchun raqamli "
+                           f"ustunni yozing: {names}")  # fmt: skip
+    raise CommandError(f"{what}: qaysi ustun? Raqamli ustunlar: {names}")
+
+
+def _strict_column(t: Table, words: str | None, letter: str | None = None) -> int | None:
+    """A column the user really named (for deleting): its header shares the first word's stem."""
+    if letter:
+        return t.find_column(None, letter)
+    col = t.find_column(words) if words else None
+    if col is None:
+        return None
+    first = fold(re.findall(r"\w+", words or "")[0])
+    head = re.findall(r"\w+", fold(t.headers[col - 1]))
+    return col if any(h.startswith(_stem(first)) or first.startswith(h) for h in head) else None
+
+
+def _ex_highlight(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    from nexvara.skills.excel.table import excel_color
+
+    col = _number_column(t, a.args.get("words"), nums, "Belgilash", a.args.get("column"))
+    body = _body(ws, t, col)
+    name = t.headers[col - 1]
+    mode = a.args.get("mode") or "cells"
+    color = a.args.get("color") or "#FDE68A"
+    before = int(body.FormatConditions.Count)
+    vals = t.column(col)
+    if mode == "scale":
+        ops.color_scale(body)
+        check("Rang shkalasi", body.FormatConditions.Count == before + 1)
+        return f"«{name}»: rang shkalasi (kichik — qizil, katta — yashil)"
+    if mode == "bars":
+        ops.data_bars(body)
+        check("Ma’lumot chiziqlari", body.FormatConditions.Count == before + 1)
+        return f"«{name}»: katak ichida chiziqlar"
+    if mode in ("top", "bottom"):
+        n = max(1, min(int(a.args.get("top") or 3), t.n_rows))
+        fc = body.FormatConditions.AddTop10()
+        fc.TopBottom = 1 if mode == "top" else 0  # xlTop10Top / xlTop10Bottom
+        fc.Rank = n
+        fc.Percent = False
+        fc.Interior.Color = excel_color(color)
+        del fc
+        numbers = sorted((v for v in vals if _is_num(v)), reverse=mode == "top")
+        edge = numbers[n - 1] if len(numbers) >= n else None
+        want = [_is_num(v) and edge is not None and (v >= edge if mode == "top" else v <= edge)
+                for v in vals]  # fmt: skip
+    else:
+        crit = a.args.get("criteria")
+        if not crit:
+            raise CommandError("Qaysi qiymatlarni belgilash kerak? Masalan: «Summa 1000000 dan "
+                               "katta kataklarni qizil bilan belgila»")  # fmt: skip
+        m = re.match(r"(>=|<=|>|<|=)?(.+)", crit)
+        op, num = m.group(1) or "=", float(m.group(2))
+        dec = ops.separators(xl.app)[0]
+        value = str(int(num)) if num.is_integer() else repr(num).replace(".", dec)
+        fc = body.FormatConditions.Add(1, ops.OPERATORS[op], f"={value}")  # xlCellValue
+        fc.Interior.Color = excel_color(color)
+        del fc
+        want = [_is_num(v) and _cmp(v, crit) for v in vals]
+    target = excel_color(color)
+    got = [int(body.Cells(i, 1).DisplayFormat.Interior.Color) == target
+           for i in range(1, min(len(vals), 300) + 1)]  # fmt: skip
+    check("Belgilangan kataklar", got == want[: len(got)], f"{sum(got)} ta")
+    return f"«{name}»: {sum(want)} ta katak belgilandi"
+
+
+def _ex_numfmt(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    kind = a.args.get("kind") or "decimal"
+    dec = a.args.get("decimals")
+    words = a.args.get("words")
+    if kind == "date":
+        col = t.find_column(words, a.args.get("column")) if words or a.args.get("column") else None
+        if col is None:
+            raise CommandError("Sana formati: qaysi ustun? Ustunlar: " + ", ".join(t.headers))
+        import datetime as _dt
+
+        vals = [v for v in t.column(col) if v not in (None, "")]
+        if not vals or not all(isinstance(v, _dt.datetime) or _is_num(v) for v in vals):
+            raise CommandError(f"«{t.headers[col - 1]}» ustunida sanalar matn sifatida yozilgan "
+                               "— Excel ularni sana deb bilmaydi")  # fmt: skip
+        code = "dd.mm.yyyy"
+    else:
+        col = _number_column(t, words, nums, "Raqam formati", a.args.get("column"))
+        frac = "." + "0" * dec if dec else ""
+        values = [v for v in t.column(col) if _is_num(v)]
+        if kind == "money":
+            code = f'#,##0{frac}" so‘m"'
+        elif kind == "usd":
+            code = f'"$"#,##0{frac or ".00"}'
+        elif kind == "percent":
+            pfrac = "." + "0" * (1 if dec is None else dec) if dec != 0 else ""
+            # 0,15 is 15 %; but a column of 15, 40 already holds percents: show "15,0%" as is.
+            already = values and max(abs(v) for v in values) > 1.5
+            code = f'0{pfrac}"%"' if already else f"0{pfrac}%"
+        elif kind == "integer":
+            code = "#,##0"
+        else:
+            code = f"#,##0.{'0' * (2 if dec is None else max(dec, 1))}"
+    rng = _body(ws, t, col, footers=True)
+    ops.set_number_format(rng, code)
+    ws.Columns(_abs_col(t, col)).AutoFit()
+    shown = str(rng.Cells(1, 1).Text)
+    marks = {"money": "so‘m", "usd": "$", "percent": "%"}
+    ok = "#" not in shown and (kind not in marks or marks[kind] in shown)
+    check("Raqam formati", ok, shown)
+    return f"«{t.headers[col - 1]}»: masalan {shown}"
+
+
+def _ex_autofit(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    last = t.top + t.n_rows + len(t.footers)
+    full = ws.Range(ws.Cells(t.top, t.left), ws.Cells(last, t.left + len(t.headers) - 1))
+    full.Columns.AutoFit()
+    hidden = [t.headers[c - 1] for c in nums
+              if any(str(_body(ws, t, c).Cells(i, 1).Text).startswith("#")
+                     for i in range(1, min(t.n_rows, 200) + 1))]  # fmt: skip
+    check("Raqamlar to‘liq ko‘rinadi", not hidden, ", ".join(hidden))
+    return f"{len(t.headers)} ta ustun kengligi matnga moslandi"
+
+
+def _ex_stats(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    import statistics
+
+    if not nums:
+        raise CommandError("Jadvalda raqamli ustun yo‘q")
+    if 1 in nums:
+        raise CommandError("Statistika qatori nomini yozish uchun birinchi ustun matnli bo‘lishi "
+                           "kerak (masalan «Hudud»)")  # fmt: skip
+    first, last = t.top + 1, t.top + t.n_rows
+    footers = list(t.footers)
+    done = []
+    for fn in a.args.get("funcs") or ["average"]:
+        label = STAT_LABELS[fn]
+        key = fold(label).lower()
+        r = (t.top + t.n_rows + 1 + footers.index(key)) if key in footers else (
+            t.top + t.n_rows + 1 + len(footers))  # fmt: skip
+        if key not in footers:
+            footers.append(key)
+        ws.Cells(r, t.left).Value = label
+        for c in nums:
+            letter = col_letter(_abs_col(t, c))
+            cell = ws.Cells(r, _abs_col(t, c))
+            cell.Formula = f"={STAT_FUNCS[fn]}({letter}{first}:{letter}{last})"
+            if fn in ("average", "median"):
+                ops.set_number_format(cell, "decimal")
+            vals = [v for v in t.column(c) if _is_num(v)]
+            want = {"average": statistics.fmean, "max": max, "min": min, "count": len,
+                    "median": statistics.median}[fn](vals) if vals else 0  # fmt: skip
+            got = cell.Value
+            check(f"{label}: {t.headers[c - 1]}", _is_num(got) and abs(got - want) < 1e-6,
+                  str(got))  # fmt: skip
+        ws.Rows(r).Font.Italic = True
+        ws.Cells(r, t.left).Font.Bold = True
+        done.append(label.capitalize())
+    return ", ".join(done) + " qatorlari: " + ", ".join(t.headers[c - 1] for c in nums)
+
+
+_TOKEN = re.compile(r"\s*([-+*/()])\s*")
+
+
+def _ex_formula(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    import ast
+
+    name = str(a.args["name"]).strip()
+    parts = [p.strip() for p in _TOKEN.split(a.args["expr"]) if p and p.strip()]
+    first = t.top + 1
+    excel, cols = [], []
+    for p in parts:
+        if p in "+-*/()":
+            excel.append(p)
+            cols.append(p)
+            continue
+        num = re.fullmatch(r"(\d+(?:[.,]\d+)?)\s*(%)?", p)
+        if num:
+            v = float(num.group(1).replace(",", ".")) / (100 if num.group(2) else 1)
+            excel.append(repr(v) if not v.is_integer() else str(int(v)))
+            cols.append(excel[-1])
+            continue
+        c = t.find_column(p)
+        if c is None or c not in nums:
+            raise CommandError(
+                f"Formulada «{p}» ustuni topilmadi yoki raqamli emas. Raqamli "
+                "ustunlar: " + ", ".join(t.headers[i - 1] for i in nums)
+            )
+        excel.append(f"{col_letter(_abs_col(t, c))}{first}")
+        cols.append(c)
+    try:
+        ast.parse("".join(str(x) if not isinstance(x, int) else "1" for x in cols), mode="eval")
+    except SyntaxError as e:
+        raise CommandError(f"Formulani tushunmadim: «{a.args['expr']}»") from e
+    existing = next((i for i, h in enumerate(t.headers, 1) if fold(h) == fold(name)), None)
+    if existing is not None and existing in nums and existing not in cols:
+        c_new = existing  # "Foyda" again: recalculate the same column
+    elif existing is not None:
+        raise CommandError(f"«{name}» ustuni allaqachon bor")
+    else:
+        c_new = len(t.headers) + 1
+        ws.Cells(t.top, _abs_col(t, c_new)).Value = name
+        prev, head = ws.Cells(t.top, _abs_col(t, c_new) - 1), ws.Cells(t.top, _abs_col(t, c_new))
+        head.Font.Bold = prev.Font.Bold
+        if int(prev.Interior.ColorIndex) != -4142:  # xlColorIndexNone
+            head.Interior.Color = prev.Interior.Color
+            head.Font.Color = prev.Font.Color
+        head.HorizontalAlignment = prev.HorizontalAlignment
+    body = ws.Range(ws.Cells(first, _abs_col(t, c_new)),
+                    ws.Cells(t.top + t.n_rows, _abs_col(t, c_new)))  # fmt: skip
+    body.Formula = "=" + "".join(excel)  # relative references follow each row
+    # Footer rows (JAMI, O‘RTACHA ...) get the same summary for the new column.
+    for i, key in enumerate(t.footers):
+        fn = (
+            "SUM"
+            if key == "jami"
+            else next(
+                (STAT_FUNCS[f] for f, lab in STAT_LABELS.items() if fold(lab).lower() == key), None
+            )
+        )
+        if fn:
+            letter = col_letter(_abs_col(t, c_new))
+            ws.Cells(
+                t.top + t.n_rows + 1 + i, _abs_col(t, c_new)
+            ).Formula = f"={fn}({letter}{first}:{letter}{t.top + t.n_rows})"
+    got = [r[0] for r in ops.read_range(body)]
+    want: list[float | None] = []
+    for row in t.rows:
+        expr = []
+        for x in cols:
+            if isinstance(x, int):
+                v = row[x - 1]
+                expr.append(repr(float(v)) if _is_num(v) else "None")
+            else:
+                expr.append(str(x))
+        try:
+            want.append(_safe_eval("".join(expr)))
+        except (ZeroDivisionError, TypeError, ValueError):
+            want.append(None)
+    bad = sum(
+        1
+        for g, w in zip(got, want, strict=False)
+        if w is not None and not (_is_num(g) and abs(g - w) < 1e-6 * max(1, abs(w)))
+    )
+    check("Formula natijalari", bad == 0, f"{bad} ta qator mos emas")
+    integer = all(float(w).is_integer() for w in want if w is not None)
+    ops.set_number_format(_body(ws, t, c_new, footers=True), "integer" if integer else "decimal")
+    if int(ws.Cells(first, _abs_col(t, c_new) - 1).Borders(9).LineStyle) != -4142:
+        full = ws.Range(
+            ws.Cells(t.top, _abs_col(t, c_new)),
+            ws.Cells(t.top + t.n_rows + len(t.footers), _abs_col(t, c_new)),
+        )
+        full.Borders.LineStyle = 1
+    ws.Columns(_abs_col(t, c_new)).AutoFit()
+    return f"«{name}» = {a.args['expr']} ({t.n_rows} qator, Excel formulasi bilan)"
+
+
+def _safe_eval(expr: str) -> float | None:
+    """Arithmetic only (numbers, + - * /, brackets); None when a cell was not a number."""
+    import ast
+    import operator
+
+    if "None" in expr:
+        return None
+    ops_ = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
+            ast.Div: operator.truediv, ast.USub: operator.neg, ast.UAdd: operator.pos}  # fmt: skip
+
+    def ev(n: ast.AST) -> float:
+        if isinstance(n, ast.Expression):
+            return ev(n.body)
+        if isinstance(n, ast.Constant) and isinstance(n.value, int | float):
+            return float(n.value)
+        if isinstance(n, ast.BinOp) and type(n.op) in ops_:
+            return ops_[type(n.op)](ev(n.left), ev(n.right))
+        if isinstance(n, ast.UnaryOp) and type(n.op) in ops_:
+            return ops_[type(n.op)](ev(n.operand))
+        raise ValueError("faqat arifmetika")
+
+    return ev(ast.parse(expr, mode="eval"))
+
+
+def _ex_rename_sheet(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    name = re.sub(r"[\[\]:*?/\\]", "-", str(a.args.get("name") or "")).strip(" '")[:31]
+    if not name:
+        raise CommandError("Varaq uchun yangi nomni «qo‘shtirnoq» ichida yozing")
+    wb = ws.Parent
+    taken = {str(wb.Worksheets(i).Name) for i in range(1, wb.Worksheets.Count + 1)} - {ws.Name}
+    if name in taken:
+        raise CommandError(f"«{name}» nomli varaq allaqachon bor")
+    old = str(ws.Name)
+    ws.Name = name
+    check("Varaq nomi", str(ws.Name) == name, name)
+    return f"«{old}» → «{name}»"
+
+
+def _ex_delete_column(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    col = _strict_column(t, a.args.get("words"), a.args.get("column"))
+    if col is None:
+        raise CommandError(f"O‘chirish uchun ustun topilmadi: «{a.args.get('words')}». Ustunlar: "
+                           + ", ".join(t.headers))  # fmt: skip
+    if len(t.headers) < 2:
+        raise CommandError("Jadvaldagi yagona ustunni o‘chirib bo‘lmaydi")
+    name = t.headers[col - 1]
+    last = t.top + t.n_rows + len(t.footers)
+    ws.Range(ws.Cells(t.top, _abs_col(t, col)), ws.Cells(last, _abs_col(t, col))).Delete(-4159)
+    t.refresh()
+    check("Ustun o‘chirildi", name not in t.headers, name)
+    return f"«{name}» ustuni o‘chirildi (asl fayl o‘zgarmaydi)"
+
+
+def _ex_print_setup(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    try:
+        ps = ws.PageSetup
+        if a.args.get("landscape") is not None:
+            ps.Orientation = 2 if a.args["landscape"] else 1  # xlLandscape / xlPortrait
+        ps.Zoom = False
+        ps.FitToPagesWide = 1
+        ps.FitToPagesTall = False
+        ps.PrintTitleRows = f"${t.top}:${t.top}"
+        ps.CenterHorizontally = True
+        orient = int(ps.Orientation)
+        wide = int(ps.FitToPagesWide)
+        del ps
+    except Exception as e:  # PageSetup needs a printer driver (even "Microsoft Print to PDF")
+        raise CommandError(
+            "Chop etish sozlamalarini o‘zgartirib bo‘lmadi: Windows’da printer "
+            "(masalan «Microsoft Print to PDF») o‘rnatilganini tekshiring"
+        ) from e
+    check("Bir sahifa eniga", wide == 1)
+    if a.args.get("landscape") is not None:
+        check("Sahifa yo‘nalishi", orient == (2 if a.args["landscape"] else 1))
+    what = "albom, " if orient == 2 else ""
+    return f"{what}eni bir sahifaga sig‘adi, sarlavha har sahifada takrorlanadi"
+
+
+def _ex_font(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    if not a.args.get("name") and not a.args.get("size"):
+        raise CommandError("Qaysi shrift yoki o‘lcham kerakligini yozing (masalan «Arial 12»)")
+    last = t.top + t.n_rows + len(t.footers)
+    rng = ws.Range(ws.Cells(t.top, t.left), ws.Cells(last, t.left + len(t.headers) - 1))
+    if a.args.get("name"):
+        rng.Font.Name = a.args["name"]
+    if a.args.get("size"):
+        rng.Font.Size = a.args["size"]
+    rng.Columns.AutoFit()
+    f = ws.Cells(t.top + 1, t.left).Font
+    ok = (not a.args.get("name") or f.Name == a.args["name"]) and (
+        not a.args.get("size") or abs(f.Size - a.args["size"]) < 0.01)  # fmt: skip
+    check("Shrift", ok, f"{f.Name} {f.Size}")
+    return " ".join(str(x) for x in (a.args.get("name"), a.args.get("size")) if x)
+
+
+def _ex_replace(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    find, repl = str(a.args["find"]), str(a.args["replace"])
+    used = ws.UsedRange
+
+    def count() -> int:
+        return sum(str(v).count(find) for row in ops.read_range(used) for v in row
+                   if isinstance(v, str))  # fmt: skip
+
+    before = count()
+    if before == 0:
+        raise CommandError(f"Jadvalda «{find}» matni topilmadi")
+    used.Replace(find, repl, 2, 1, True)  # What, Replacement, xlPart, xlByRows, MatchCase
+    left = count() if find not in repl else 0
+    check("Almashtirildi", left == 0, f"{before} ta")
+    return f"«{find}» → «{repl}»: {before} ta"
+
+
+_EXTRA = {
+    "highlight": _ex_highlight, "numfmt": _ex_numfmt, "autofit": _ex_autofit,
+    "stats": _ex_stats, "formula": _ex_formula, "rename_sheet": _ex_rename_sheet,
+    "delete_column": _ex_delete_column, "print_setup": _ex_print_setup, "font": _ex_font,
+    "replace": _ex_replace,
+}  # fmt: skip
 
 
 def _letter(text: str | None) -> str | None:

@@ -148,3 +148,65 @@ def test_words_inside_file_paths_do_not_change_intent(tmp_path):
     reply = api.chat(text)
     assert reply["task"]["title"] == "Buyruq: Savdo.xlsx"
     assert runner.get(reply["task"]["id"]).wait(5)
+
+
+X, W, P = "D:/x/savdo.xlsx", "D:/x/xat.docx", "D:/x/dars.pptx"
+
+
+@pytest.mark.parametrize(
+    ("ctx", "text", "kind", "args"),
+    [
+        (X, "Summa 1000000 dan katta kataklarni qizil rang bilan belgila", "highlight",
+         {"mode": "cells", "criteria": ">1000000", "color": "#FCA5A5", "words": "summa"}),
+        (X, "Summa ustuniga rang shkalasi qo‘sh", "highlight", {"mode": "scale"}),
+        (X, "Soni ustuniga ma’lumot chiziqlari qo‘sh", "highlight", {"mode": "bars"}),
+        (X, "eng katta 3 ta Summani yashil bilan belgila", "highlight",
+         {"mode": "top", "top": 3, "color": "#86EFAC"}),
+        (X, "C ustunni pul formatiga o‘tkaz", "numfmt", {"kind": "money", "column": "C"}),
+        (X, "Ulush ustunini foiz formatida qil", "numfmt", {"kind": "percent", "words": "ulush"}),
+        (X, "Summa ustunini 2 xonali kasr qil", "numfmt", {"kind": "decimal", "decimals": 2}),
+        (X, "o‘rtacha qatorini qo‘sh", "stats", {"funcs": ["average"]}),
+        (X, "eng katta va eng kichik qiymat qatorlarini qo‘sh", "stats", {"funcs": ["max", "min"]}),
+        (X, "Foyda = Summa - Soni * 1000 ustunini qo‘sh", "formula",
+         {"name": "Foyda", "expr": "Summa - Soni * 1000"}),
+        (X, "QQS ustunini qo‘sh: Summa ko‘paytir 0,12", "formula",
+         {"name": "QQS", "expr": "Summa * 0,12"}),
+        (X, "Mahsulot ustunini o‘chir", "delete_column", {"words": "mahsulot"}),
+        (X, "varaq nomini «Hisobot 2026» qil", "rename_sheet", {"name": "Hisobot 2026"}),
+        (X, "ustunlar kengligini moslashtir", "autofit", {}),
+        (X, "albom qilib bir sahifaga sig‘dir", "print_setup", {"landscape": True, "fit": True}),
+        (X, "shriftni Arial 12 qil", "font", {"name": "Arial", "size": 12.0}),
+        (X, "summa bo‘yicha kamayish tartibida sartirovka qil", "sort",
+         {"column": "summa", "descending": True}),
+        (W, "matnni kenglik bo‘yicha tekisla", "align", {"how": "justify", "target": "body"}),
+        (W, "sarlavhalarni markazga tekisla", "align", {"how": "center", "target": "headings"}),
+        (W, "yuqori kolontitulga «5-maktab» yoz", "header", {"text": "5-maktab"}),
+        (W, "pastki kolontitulga «Toshkent» yoz", "header", {"where": "footer"}),
+        (W, "sahifani albom qil", "orientation", {"landscape": True}),
+        (W, "chap chetini 3 sm, o‘ng chetini 1,5 sm qil", "margins", {"left": 3.0, "right": 1.5}),
+        (W, "chetlarini 2 sm qil", "margins", {"top": 2.0, "left": 2.0}),
+        (W, "ortiqcha bo‘sh joylarni tozala", "clean", {}),
+        (W, "so‘zlarni sana", "count", {}),
+        (W, "birinchi qatorni sarlavha qil", "title", {}),
+        (W, "jadvallarni formatla", "tables", {}),
+        (W, "hujjatni rasmiy formatla", "format", {}),
+        (P, "barcha slaydlarga o‘tish effekti qo‘sh", "transition", {}),
+        (P, "slayd raqamlarini qo‘sh", "slide_numbers", {}),
+        (P, "slaydlarni tekshir", "check", {}),
+    ],
+)  # fmt: skip
+def test_professional_commands(ctx, text, kind, args):
+    plan = parse_command(text, context_file=ctx)
+    assert plan is not None and kinds(plan) == [kind] and plan.unknown == [], plan
+    for k, v in args.items():
+        assert plan.actions[0].args[k] == v, (k, plan.actions[0].args)
+
+
+def test_professional_commands_chain_in_one_message():
+    plan = parse_command(
+        "Savdo.xlsx ni och, Foyda = Summa - Soni ustunini qo‘sh, Summa ustunini pul formatiga "
+        "o‘tkaz, Summa 1000000 dan katta kataklarni qizil bilan belgila, o‘rtacha qatorini qo‘sh, "
+        "ustunlar kengligini moslashtir va saqla"
+    )
+    assert kinds(plan) == ["open", "formula", "numfmt", "highlight", "stats", "autofit", "save"]
+    assert plan.unknown == []
