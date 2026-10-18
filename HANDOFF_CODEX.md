@@ -1,5 +1,29 @@
 # HANDOFF → Codex (Windows side)
 
+## ▶ CURRENT TASK (2026-10-18) — continue from here if Claude stopped
+
+Branch: **`claude/android-v1`**, worktree `D:\Nexvara loyiha\.worktrees\android` (no `.venv`
+there: use `..\..\.venv\Scripts\python.exe`; for subprocess/smoke set
+`PYTHONPATH=<worktree>\src`, otherwise the `main` copy is tested). Newest PROGRESS entry = what
+is done. The owner (Uzbek, non-programmer) asked for 4 things on 2026-10-18:
+
+| # | Task | Status | Where / how |
+|---|---|---|---|
+| A | **Built-in CAD ("AutoCAD inside NEXVARA")**: the user must not need AutoCAD. A «Chizma» page in the Windows app: open DXF, view (pan/zoom), draw line/polyline/rect/circle/arc/text/dimension, layers, snap/ortho, undo/redo, save DXF (R2010 via `cad.py`), export PDF/PNG; chat drawings open in it | see table below | `src/nexvara/cad.py` (DXF read/write, render), `drawing.py`/`drawing_offline.py` (spec), new `app/api_cad.py` + `app/ui/cad.js` |
+| B | **Gemini free tier first** so costs stay ~0: «Bepul rejim» — all purposes go to Gemini Flash/Flash-Lite (no Pro), cost recorded as 0, no paid fallback, clear message on 429 (free daily limit), privacy note (free tier data may be used by Google) | see table | `ai/router.py`, `ai/models.py`, `appdata.py` defaults, Settings UI (`index.html`, `app.js`) |
+| C | Handoff (this section) kept up to date | ongoing | — |
+| D | **Professional design**: app icon (Windows .ico + Android adaptive launcher icon), consistent UI icons, polished look | see table | `src/nexvara/app/ui/`, `installer/`, `android/app/src/main/res/` |
+
+Progress of A/B/D (Claude updates this after each step):
+- [ ] B Gemini free mode
+- [ ] A CAD page
+- [ ] D icons/design
+
+Rules for this task: tests stay green (`.\scripts\test.ps1`, Office with `-Office`); Uzbek UI
+text only (i18n test); phone APK must be built with `ANDROID_USER_HOME=.tools\android-home`
+(the project debug key — another key makes the phone refuse the update); install with
+`adb install -r` (keeps the user's data). Do not push or merge to `main` without the owner.
+
 Written by Claude Code on 2026-10-17 so that Codex can continue the **Windows** work if
 Claude's limit runs out. Android has its own document: [docs/ANDROID_HANDOFF.md](docs/ANDROID_HANDOFF.md)
 (Codex already works there on `codex/android-mobile` in `.worktrees/android` — Claude never
