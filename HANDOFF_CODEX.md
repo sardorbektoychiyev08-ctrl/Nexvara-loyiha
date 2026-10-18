@@ -16,7 +16,7 @@ Cyrillic); then API keys; propose new features.
   system prompt and converts Cyrillic-Uzbek answers (not when the user asks for Russian);
   Uzbek Cyrillic textbooks are converted at indexing (Russian ones stay skipped).
   Tests `tests/unit/test_latin.py`.
-- [ ] Android «Chizma» screen with hand drawing (Compose canvas: finger strokes → straightened
+- [x] (commit 66812ac, APK 1.2.3 built — NOT installed: phone was disconnected) Android «Chizma» screen with hand drawing (Compose canvas: finger strokes → straightened
   into line/rect/circle/arc; pinch zoom; tools; send to PC as DXF via a new `/api/v1` route
   that calls `CadApi.cad_save`; open the PC's last drawing on the phone).
 - [ ] Office guidance from official sources (Microsoft support, O‘zDSt/«Davlat tilida ish
