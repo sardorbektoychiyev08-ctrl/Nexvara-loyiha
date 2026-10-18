@@ -16,8 +16,38 @@ is done. The owner (Uzbek, non-programmer) asked for 4 things on 2026-10-18:
 
 Progress of A/B/D (Claude updates this after each step):
 - [x] B Gemini free mode — DONE (router `free_active()`, settings `ai.free_mode` default true, UI checkbox + note, chat «bepul rejimni yoq/o‘chir», tests in test_ai_router.py)
-- [ ] A CAD page
-- [ ] D icons/design
+- [ ] A CAD page — IN PROGRESS (Claude stopped here, limit). Done and committed as WIP:
+  - `src/nexvara/app/api_cad.py` (CadApi, mixed into Api): `cad_open(path)` DXF→JSON
+    (`doc_to_json`, explodes blocks, splines→polylines), `cad_save(drawing, path)` JSON→DXF
+    (`json_to_doc`, validated, audited, old file backed up), `cad_export(drawing, "pdf"|"png")`,
+    `cad_last_drawing()`, `_cad_dialog` (override key `cad_dialog` for tests). JSON format in
+    the module docstring (y up, mm, arc angles CCW degrees, dim offset = left of p1→p2).
+  - `index.html`: nav item `data-page="cad"` («Chizmalar», i18n `nav.cad`), section
+    `#page-cad` (toolbar `data-cad=` actions / `data-tool=` tools, `#cad-canvas`, layers
+    `#cad-layers`, props `#cad-props`, command line `#cad-cmd`, status toggles
+    `data-toggle=snap|grid|ortho`), `<script src="cad.js">`. Tests updated to 13 nav items.
+  - NOT DONE (next steps, in order):
+    1. Write `src/nexvara/app/ui/cad.js` (file does not exist yet!) — canvas editor: pan
+       (middle drag), wheel zoom at cursor, grid, layers panel, select (click, window L→R /
+       crossing R→L), tools line/polyline/rect/circle/arc(center,start,end)/text/dim/move/copy/
+       rotate/mirror/offset/measure, erase, undo/redo (JSON snapshots), osnap (end, mid,
+       center, quadrant) + grid snap + ortho, AutoCAD-like command line (L, PL, REC, C, A, T,
+       DIM, M, CO, RO, MI, O, E, U, Z; input `x,y`, `@dx,dy`, `@len<ang`, plain number =
+       distance), keys F3/F7/F8, Esc, Enter/space, Delete, Ctrl+Z/Y/S. Calls `api().cad_open`,
+       `cad_save`, `cad_export`, `cad_last_drawing`. Expose `window.cad = {exec, doc, load}` for
+       UI tests. Register: add "cad" to `PAGES` in app.js and `if (page === "cad") renderCad();`;
+       add `body.cad-mode` (hide right panel) CSS + `.cad-*` styles in app.css.
+    2. Unit test `tests/unit/test_cad_api.py`: cad.build(spec) → save DXF → `cad_open` →
+       entities by type; `cad_save` round trip (audit clean, counts equal); bad JSON rejected.
+    3. UI script `tests/ui_scripts/cad_page.py` (pattern: files_page.py): open page, run
+       `cad.exec("L"); cad.exec("0,0"); cad.exec("@100,0")…`, save via override, check DXF.
+    4. Chat: after «… chizib ber» offer «Chizmalar’da ochish» (api_drawing result has `dxf`).
+    5. Smoke + `.\scripts	est.ps1 -Office`, PROGRESS entry, ROADMAP.
+- [ ] D icons/design — NOT STARTED: Windows app icon (.ico for installer/shortcut, sidebar
+  logo SVG instead of letter «N»), Android adaptive launcher icon
+  (`android/app/src/main/res/mipmap-*`, `drawable/ic_launcher_foreground.xml`), SVG icons on
+  nav items and CAD toolbar; keep dark/light themes. Then rebuild APK (1.2.2, versionCode 6)
+  with `ANDROID_USER_HOME=.toolsndroid-home` and `adb install -r`.
 
 Rules for this task: tests stay green (`.\scripts\test.ps1`, Office with `-Office`); Uzbek UI
 text only (i18n test); phone APK must be built with `ANDROID_USER_HOME=.tools\android-home`

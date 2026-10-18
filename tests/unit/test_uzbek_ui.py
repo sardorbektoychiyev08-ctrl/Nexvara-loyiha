@@ -51,13 +51,14 @@ def test_menu_uses_the_agreed_names_from_the_dictionary():
     assert names == {
         "nav.home": "Bosh sahifa", "nav.chat": "AI suhbat", "nav.office": "Office yordamchisi",
         "nav.library": "Darsliklar va testlar", "nav.files": "Fayllar", "nav.bi": "NEXVARA BI",
+        "nav.cad": "Chizmalar",
         "nav.workflows": "Ish jarayonlari", "nav.teach": "NEXVARA’ga o‘rgatish",
         "nav.memory": "Xotira", "nav.history": "Vazifalar va tarix", "nav.devices": "Qurilmalar",
         "nav.settings": "Sozlamalar",
     }  # fmt: skip
     html = (UI / "index.html").read_text(encoding="utf-8")
     assert (
-        len(re.findall(r'class="nav-item[^"]*" data-page="\w+"[^>]*data-i18n="nav\.', html)) == 12
+        len(re.findall(r'class="nav-item[^"]*" data-page="\w+"[^>]*data-i18n="nav\.', html)) == 13
     )
     for value in re.findall(r'"[\w.]+": "([^"]+)"', src):
         assert english_words(value) == [], value

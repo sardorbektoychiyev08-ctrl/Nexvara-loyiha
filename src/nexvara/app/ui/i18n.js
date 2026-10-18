@@ -14,6 +14,7 @@ const I18N = {
     "nav.library": "Darsliklar va testlar",
     "nav.files": "Fayllar",
     "nav.bi": "NEXVARA BI",
+    "nav.cad": "Chizmalar",
     "nav.workflows": "Ish jarayonlari",
     "nav.teach": "NEXVARA’ga o‘rgatish",
     "nav.memory": "Xotira",

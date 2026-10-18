@@ -17,6 +17,7 @@ from nexvara import __version__, config
 from nexvara.app.api_account import AccountApi
 from nexvara.app.api_agent import AgentApi, looks_like_secret
 from nexvara.app.api_bi import BiApi
+from nexvara.app.api_cad import CadApi
 from nexvara.app.api_devices import DevicesApi
 from nexvara.app.api_drawing import DrawingApi
 from nexvara.app.api_files import FilesApi
@@ -69,6 +70,7 @@ class Api(
     SectionsChatApi,
     SyncApi,
     DrawingApi,
+    CadApi,
     ReadingApi,
 ):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
