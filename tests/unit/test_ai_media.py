@@ -169,7 +169,7 @@ def test_auto_image_asks_first_then_runs_and_records(tmp_path):
 
 
 def test_auto_falls_back_when_provider_is_busy_not_when_key_is_wrong(tmp_path):
-    r = make(tmp_path, KEYS)
+    r = make(tmp_path, KEYS, fallback=True)
     r.fails["openai"] = AiError("band", retryable=True)
     out, est = r.media("image", 1, lambda c, m: c.generate_image(m, "x"), approved=True)
     assert est.provider == "gemini" and [x[0] for x in r.log] == ["openai", "gemini"]
@@ -419,3 +419,16 @@ def test_picture_requests_are_not_confused_with_office_work():
         "Hisobot.xlsx dan diagramma yarat",
     ):
         assert not _MAKE.search(no), no
+
+
+def test_fallback_off_or_free_mode_never_moves_to_another_paid_provider(tmp_path):
+    r = make(tmp_path, KEYS)  # fallback off (default)
+    r.fails["openai"] = AiError("band", retryable=True)
+    with pytest.raises(AiError, match="band"):
+        r.media("image", 1, lambda c, m: c.generate_image(m, "x"), approved=True)
+    assert {x[0] for x in r.log} == {"openai"}
+    r = make(tmp_path / "b", KEYS, fallback=True)  # free Gemini TTS busy, free mode on
+    r.fails["gemini"] = AiError("chegara", retryable=True)
+    with pytest.raises(AiError):
+        r.media("tts", 0.2, lambda c, m: c.speak(m, "salom"))
+    assert [x[0] for x in r.log] == ["gemini", "gemini"]  # both free Gemini voices, no OpenAI

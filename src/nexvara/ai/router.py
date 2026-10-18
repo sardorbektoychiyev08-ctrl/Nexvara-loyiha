@@ -592,6 +592,13 @@ class AiRouter:
                 if confirm_always and not approved and not est.free:
                     raise NeedsConfirmation(est)
             else:
+                # Same rules as text: free mode never moves to a paid model by itself, and
+                # another provider is tried only with «boshqa provayderga o‘tish» switched on.
+                first_free = bool(cands[0][1].get("free"))
+                if (first_free and self.free_active() and not est.free) or (
+                    p != cands[0][0] and not cfg.get("fallback", False)
+                ):
+                    continue
                 try:
                     self.check_budget(est, approved=True)
                 except BudgetExceeded:
