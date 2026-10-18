@@ -897,8 +897,71 @@ def _ex_check(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
     return f"{len(problems)} ta tavsiya: " + "; ".join(problems)
 
 
+def _ex_fix(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    """Fix what «tekshir» finds: blank rows that split the table, merged cells in the table,
+    numbers stored as text, default sheet names, empty extra sheets; then fit the columns."""
+    done: list[str] = []
+    wb = ws.Parent
+    # 1) a blank row that cuts the table in two (Excel only sees the top part)
+    for _ in range(20):
+        last = t.top + t.n_rows + len(t.footers)
+        nxt = ws.Range(ws.Cells(last + 2, t.left), ws.Cells(last + 2, t.left + len(t.headers) - 1))
+        if not any(v not in (None, "") for v in ops.read_range(nxt)[0]):
+            break
+        ws.Rows(last + 1).Delete()
+        done.append(f"{last + 1}-qatordagi bo‘sh qator o‘chirildi")
+        t.refresh()
+    # 2) merged cells inside the table: unmerge (the value stays in the first cell)
+    last = t.top + t.n_rows + len(t.footers)
+    full = ws.Range(ws.Cells(t.top, t.left), ws.Cells(last, t.left + len(t.headers) - 1))
+    if full.MergeCells is not False:
+        full.UnMerge()
+        done.append("birlashtirilgan kataklar ajratildi")
+        t.refresh()
+    # 3) numbers written as text become numbers
+    converted = 0
+    for c in range(1, len(t.headers) + 1):
+        vals = [v for v in t.column(c) if v not in (None, "")]
+        as_text = [v for v in vals if isinstance(v, str) and _NUMBER_TEXT.match(v)]
+        if not vals or len(as_text) < max(1, len(vals) // 2):
+            continue
+        for i, v in enumerate(t.column(c)):
+            if isinstance(v, str) and _NUMBER_TEXT.match(v):
+                num = float(v.replace(" ", "").replace(",", "."))
+                cell = ws.Cells(t.top + 1 + i, t.left + c - 1)
+                cell.NumberFormat = "General"
+                cell.Value = int(num) if num.is_integer() else num
+                converted += 1
+    if converted:
+        done.append(f"{converted} ta matn-raqam songa aylantirildi")
+        t.refresh()
+    # 4) sheets: a clear name instead of Sheet1, empty extra sheets removed
+    for i in range(wb.Worksheets.Count, 0, -1):
+        sh = wb.Worksheets(i)
+        used = sh.UsedRange
+        empty = used.Count == 1 and used.Value in (None, "")
+        if empty and wb.Worksheets.Count > 1 and sh.Name != ws.Name:
+            xl.app.DisplayAlerts = False
+            name = str(sh.Name)
+            sh.Delete()
+            done.append(f"bo‘sh «{name}» varag‘i o‘chirildi")
+        del used, sh
+    if _DEFAULT_SHEET.match(str(ws.Name)):
+        base = re.sub(r"[\[\]:*?/\\]", "", Path(str(wb.Name)).stem).strip()[:31] or "Jadval"
+        names = {str(wb.Worksheets(i).Name) for i in range(1, wb.Worksheets.Count + 1)}
+        if base not in names:
+            old = str(ws.Name)
+            ws.Name = base
+            done.append(f"«{old}» varag‘i «{base}» deb nomlandi")
+    last = t.top + t.n_rows + len(t.footers)
+    ws.Range(ws.Cells(t.top, t.left), ws.Cells(last, t.left + len(t.headers) - 1)).Columns.AutoFit()
+    check("Tuzatish", True)
+    return "; ".join(done) if done else "Tuzatiladigan kamchilik topilmadi"
+
+
 _EXTRA = {
     "check": _ex_check,
+    "fix": _ex_fix,
     "highlight": _ex_highlight, "numfmt": _ex_numfmt, "autofit": _ex_autofit,
     "stats": _ex_stats, "formula": _ex_formula, "rename_sheet": _ex_rename_sheet,
     "delete_column": _ex_delete_column, "print_setup": _ex_print_setup, "font": _ex_font,

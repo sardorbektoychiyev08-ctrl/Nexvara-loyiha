@@ -19,6 +19,14 @@ Qoidalar kodda: [src/nexvara/knowledge/office_guide.py](../src/nexvara/knowledge
      sarlavhali slaydlar, 18 pt dan kichik matn (jadval ichida ham), 6 tadan ortiq band, izohsiz
      rasmlar, sig‘magan matn, ustma-ust obyektlar.
 
+3. **«Kamchiliklarni tuzat»** (natija `_NEXVARA` nusxada, asl fayl o‘zgarmaydi):
+   - Excel: jadvalni bo‘lgan bo‘sh qatorlar o‘chiriladi, birlashtirilgan kataklar ajratiladi,
+     matn-raqamlar songa aylanadi, «Sheet1» fayl nomi bilan nomlanadi, bo‘sh varaqlar o‘chadi.
+   - Word: ortiqcha bo‘sh joy va qatorlar, qalin «sarlavhalar» → Sarlavha uslubi, mayda yoki
+     aralash matn → Times New Roman 14, sahifa raqamlari, sana → «2026-yil 18-oktabr».
+   - PowerPoint: 18 pt dan kichik matn 18 pt bo‘ladi; sarlavhasiz slayd kabi narsalar ro‘yxatda
+     qoladi (ularni foydalanuvchi o‘zi hal qiladi).
+
 ## Manbalar (2026-10-18 da tekshirilgan)
 
 | Manba | Nima olindi |

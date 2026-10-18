@@ -288,3 +288,84 @@ def test_powerpoint_check_reports_small_text(tmp_path):
     res = ok(run(run_ppt_plan, parse_command("dars.pptx ni och va slaydlarni tekshir"), src))
     text = " ".join(res["report"])
     assert "kamida 18 pt" in text, text  # the table on slide 3 uses 14 pt
+
+
+# ---------------- «kamchiliklarni tuzat» ----------------
+def test_excel_fix(tmp_path):
+    from nexvara.agent.excel_exec import run_excel_plan
+    from nexvara.agent.parse import parse_command
+    from nexvara.skills.excel import ops
+    from nexvara.skills.excel.bridge import ExcelSession
+
+    src = tmp_path / "Savdo hisobi.xlsx"
+    with ExcelSession(visible=False) as xl:
+        wb = xl.new_workbook()
+        ws = wb.Worksheets(1)
+        rows = [["Hudud", "Summa"], ["Toshkent", "'1200"], ["Buxoro", "'800"], ["", ""],
+                ["Samarqand", "'500"]]  # fmt: skip
+        ops.write_rows(ws, rows)
+        wb.Worksheets.Add()  # an empty extra sheet
+        ws.Activate()
+        xl.save_as(wb, src)
+        wb.Close(SaveChanges=False)
+        del ws, wb
+    before = digest(src)
+    res = ok(
+        run(run_excel_plan, parse_command("«Savdo hisobi.xlsx» dagi kamchiliklarni tuzat"), src)
+    )
+    assert digest(src) == before
+    with ExcelSession(visible=False) as xl:
+        wb = xl.open_workbook(tmp_path / "Savdo hisobi_NEXVARA.xlsx")
+        ws = wb.ActiveSheet
+        name, sheets = str(ws.Name), int(wb.Worksheets.Count)
+        values = ops.read_range(ws.UsedRange)
+        del ws, wb
+    assert name == "Savdo hisobi" and sheets == 1, (name, sheets, res["report"])
+    assert values == [["Hudud", "Summa"], ["Toshkent", 1200], ["Buxoro", 800], ["Samarqand", 500]]
+
+
+def test_word_fix(tmp_path):
+    from nexvara.agent.parse import parse_command
+    from nexvara.agent.word_exec import run_word_plan
+    from nexvara.skills.word import ops
+    from nexvara.skills.word.ops import WordSession
+
+    src = tmp_path / "xat.docx"
+    with WordSession(visible=False) as w:
+        doc = w.new_document()
+        ops.add_paragraph(doc, "Kirish", bold=True)
+        ops.add_paragraph(doc, "Majlis  2026-10-18 kuni  bo‘ldi.")
+        w.save_as(doc, src)
+        w.disown(doc)
+        doc.Close(0)
+        del doc
+    res = ok(run(run_word_plan, parse_command("xat.docx ni tekshirib tuzat"), src))
+    with WordSession(visible=False) as w:
+        doc = w.open_document(tmp_path / "xat_NEXVARA.docx")
+        text = str(doc.Content.Text)
+        level = int(doc.Paragraphs(1).OutlineLevel)
+        size = float(doc.Paragraphs(2).Range.Font.Size)
+        w.disown(doc)
+        doc.Close(0)
+        del doc
+    assert "2026-yil 18-oktabr" in text and "  " not in text, (text, res["report"])
+    assert level == 1 and size == 14
+
+
+def test_powerpoint_fix(tmp_path):
+    from nexvara.agent.parse import parse_command
+    from nexvara.agent.ppt_exec import run_ppt_plan
+    from nexvara.skills.powerpoint.ops import PowerPointSession
+
+    src = make_deck(tmp_path / "dars.pptx")
+    res = ok(run(run_ppt_plan, parse_command("dars.pptx dagi kamchiliklarni tuzat"), src))
+    assert "18 pt ga kattalashtirildi" in " ".join(res["report"])
+    with PowerPointSession(visible=True) as pp:
+        pres = pp.open_presentation(tmp_path / "dars_NEXVARA.pptx")
+        tbl = next(pres.Slides(3).Shapes(j) for j in range(1, pres.Slides(3).Shapes.Count + 1)
+                   if pres.Slides(3).Shapes(j).HasTable).Table  # fmt: skip
+        size = float(tbl.Cell(2, 1).Shape.TextFrame.TextRange.Font.Size)
+        pp.disown(pres)
+        pres.Close()
+        del tbl, pres
+    assert size == 18

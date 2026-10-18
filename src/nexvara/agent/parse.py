@@ -94,6 +94,7 @@ DESCRIBE = {
     "transition": "Slayd o‘tish effekti",
     "slide_numbers": "Slayd raqamlari",
     "check": "Sifatni tekshirish",
+    "fix": "Kamchiliklarni tuzatish",
 }
 
 
@@ -479,6 +480,12 @@ def _classify_extra(clause: str, f: str, app: str | None) -> Action | None:
         return Action("count", {}, clause)
     if app == "word" and _has(f, "jadval") and _has(f, "formatla", "chiroyli", "bezat", "chegara"):
         return Action("tables", {}, clause)
+    # "kamchiliklarni tuzat", "hujjatni tekshirib tuzat": fix what «tekshir» reports
+    if app in ("excel", "word", "powerpoint") and _has(
+        f, "tuzat", "to[‘’']?g[‘’']?irla", "togirla"
+    ):
+        if _has(f, "kamchilik", "xato", "hujjat", "jadval", "fayl", "tekshir", "slayd", "taqdimot"):
+            return Action("fix", {}, clause)
     # "hujjatni tekshir", "jadvalni tekshir": official rules (knowledge/office_guide.py)
     if (
         app in ("excel", "word")

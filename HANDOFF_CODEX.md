@@ -9,7 +9,7 @@ Order and status (Claude ticks these as it goes):
   `api_cad.json_to_doc`; offline `beautify()` when no AI), `CadApi.cad_ai_fix`, phone route
   `POST /api/v1/cad/ai`, PC toolbar button, phone «AI» button (CadScreen.kt). Android 1.2.4.
 - [x] Drawing templates (`cad_templates.py`, PC select + phone dialog, `/api/v1/cad/templates`).
-- [ ] Auto-fix documents («kamchiliklarni tuzat») for Excel/Word/PowerPoint.
+- [x] Auto-fix documents («kamchiliklarni tuzat», action `fix` in *_exec.py), Office tests PASS.
 - [ ] Lesson plan from a textbook topic («dars ishlanmasi»): plan (Word) + questions + slides.
 - [ ] Weekly report workflow template (every Friday: Excel → PDF → phone).
 - [ ] 3D view of a drawing (extrude closed shapes) in the PC editor.

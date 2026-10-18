@@ -245,7 +245,7 @@ def run_ppt_plan(
     from nexvara.skills.powerpoint.ops import PowerPointSession
 
     kinds = [a for a in plan.actions if a.kind not in ("open", "save")]
-    allowed = {"pdf", "replace", "font", "transition", "slide_numbers", "check"}
+    allowed = {"pdf", "replace", "font", "transition", "slide_numbers", "check", "fix"}
     bad = [a for a in kinds if a.kind not in allowed]
     if bad:
         raise CommandError(
@@ -457,8 +457,40 @@ def _pp_check(pres: Any, a: Any, ops: Any) -> tuple[str, bool]:
     return f"{len(problems)} ta kamchilik: " + "; ".join(problems[:8]) + more, True  # a report
 
 
+def _pp_fix(pres: Any, a: Any, ops: Any) -> tuple[str, bool]:
+    """Text below 18 pt becomes 18 pt (Microsoft); what cannot be decided for the user (a
+    missing title, an overflow) is reported by the check that follows."""
+    fixed = 0
+    for i in range(1, pres.Slides.Count + 1):
+        shapes = pres.Slides(i).Shapes
+        for j in range(1, shapes.Count + 1):
+            sh = shapes(j)
+            if str(sh.Name) == NUM_NAME:
+                continue
+            ranges = []
+            if sh.HasTable:
+                tbl = sh.Table
+                ranges = [
+                    tbl.Cell(r, c).Shape.TextFrame.TextRange
+                    for r in range(1, tbl.Rows.Count + 1)
+                    for c in range(1, tbl.Columns.Count + 1)
+                ]
+            elif sh.HasTextFrame and sh.TextFrame.HasText:
+                ranges = [sh.TextFrame.TextRange]
+            for tr in ranges:
+                for k in range(1, tr.Runs().Count + 1):
+                    run = tr.Runs(k)
+                    if 0 < float(run.Font.Size) < 18 and str(run.Text).strip():
+                        run.Font.Size = 18
+                        fixed += 1
+            del sh
+    report, _ok = _pp_check(pres, a, ops)
+    return f"{fixed} ta matn bo‘lagi 18 pt ga kattalashtirildi. Qolgani: {report}", True
+
+
 _PPT = {
     "replace": _pp_replace,
+    "fix": _pp_fix,
     "font": _pp_font,
     "transition": _pp_transition,
     "slide_numbers": _pp_slide_numbers,

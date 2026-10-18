@@ -436,8 +436,77 @@ def _wd_check(doc: Any, a: Any, ops: Any, expect: list) -> str:
     return f"{len(problems)} ta tavsiya: " + "; ".join(problems)
 
 
+_UZ_MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr",
+              "oktabr", "noyabr", "dekabr"]  # fmt: skip
+
+
+def _uz_date(raw: str) -> str | None:
+    """2026-10-18 or 18/10/2026 -> «2026-yil 18-oktabr» (VM 140-son qarori, 16-band)."""
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", raw) or None
+    if m:
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    else:
+        m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{2,4})", raw)
+        if not m:
+            return None
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        y += 2000 if y < 100 else 0
+    if not (1 <= mo <= 12 and 1 <= d <= 31):
+        return None
+    return f"{y}-yil {d}-{_UZ_MONTHS[mo - 1]}"
+
+
+def _wd_fix(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    """Fix what «tekshir» finds: spaces and empty lines, bold lines without a heading style,
+    small or mixed body text, page numbers, non-standard dates."""
+    done: list[str] = []
+    cleaned = _wd_clean(doc, a, ops, [])
+    if not cleaned.startswith("0 ta ortiqcha bo‘sh joy, 0"):
+        done.append(cleaned)
+    heads = 0
+    for i in range(1, min(doc.Paragraphs.Count, 1500) + 1):
+        p = doc.Paragraphs(i)
+        rng = p.Range
+        text = str(rng.Text).strip()
+        if (text and int(p.OutlineLevel) == 10 and not rng.Information(12) and len(text) < 80
+                and rng.Font.Bold == -1 and not text.endswith((".", ":", ","))):  # fmt: skip
+            p.Style = ops.STYLE_HEADING[1 if heads == 0 else 2]
+            heads += 1
+        del rng, p
+    if heads:
+        done.append(f"{heads} ta qator sarlavha uslubiga o‘tkazildi (mundarijaga kiradi)")
+    sizes, fonts = set(), set()
+    for i in range(1, min(doc.Paragraphs.Count, 1500) + 1):
+        p = doc.Paragraphs(i)
+        if int(p.OutlineLevel) == 10 and not p.Range.Information(12) and str(p.Range.Text).strip():
+            if p.Range.Font.Size and float(p.Range.Font.Size) < 900:
+                sizes.add(float(p.Range.Font.Size))
+            fonts.add(str(p.Range.Font.Name))
+        del p
+    if (sizes and min(sizes) < 12) or len(fonts) > 2:
+        for i in range(1, min(doc.Paragraphs.Count, 1500) + 1):
+            p = doc.Paragraphs(i)
+            if int(p.OutlineLevel) == 10 and not p.Range.Information(12):
+                p.Range.Font.Name, p.Range.Font.Size = "Times New Roman", 14
+            del p
+        done.append("asosiy matn: Times New Roman 14")
+        expect.append(("font", {"name": "Times New Roman", "size": 14}))
+    if int(doc.ComputeStatistics(2)) >= 2 and doc.Sections(1).Footers(1).PageNumbers.Count == 0:
+        doc.Sections(1).Footers(1).PageNumbers.Add(ops.WD_PAGE_NUMBER_CENTER, True)
+        done.append("sahifa raqamlari qo‘yildi")
+        expect.append(("page_numbers", None))
+    for raw in sorted(set(_ODD_DATE.findall(str(doc.Content.Text)))):
+        new = _uz_date(raw)
+        if new:
+            ops.find_replace(doc, raw, new)
+            done.append(f"sana «{raw}» → «{new}»")
+    expect.append(("clean", None))
+    return "; ".join(done) if done else "Tuzatiladigan kamchilik topilmadi"
+
+
 _EXTRA = {
     "check": _wd_check,
+    "fix": _wd_fix,
     "align": _wd_align, "header": _wd_header, "orientation": _wd_orientation,
     "margins": _wd_margins, "clean": _wd_clean, "count": _wd_count, "title": _wd_title,
     "tables": _wd_tables,

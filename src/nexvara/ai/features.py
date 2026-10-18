@@ -35,7 +35,7 @@ belgila", "eng katta 3 ta Summani yashil bilan belgila", "Summa ustuniga rang sh
 "Foyda = Daromad - Xarajat ustunini qo‘sh", "o‘rtacha qatorini qo‘sh", "eng katta va eng kichik \
 qiymat qatorlarini qo‘sh", "Izoh ustunini o‘chir", "varaq nomini «Hisobot» qil", \
 "ustunlar kengligini moslashtir", "albom qilib bir sahifaga sig‘dir", "shriftni Arial 12 qil", \
-"jadvalni tekshir", \n"jadvalni tekshir"
+"jadvalni tekshir", "kamchiliklarni tuzat", \n"jadvalni tekshir"
   Word: "Xat.docx ni och, «eski» so‘zini «yangi» ga almashtir, sarlavha qo‘sh, PDF qilib saqla"; \
 yana: "hujjatni rasmiy formatla", "matnni kenglik bo‘yicha tekisla", "sarlavhalarni markazga \
 tekisla", "yuqori kolontitulga «5-maktab» yoz", "sahifani albom qil", "chap chetini 3 sm qil", \
