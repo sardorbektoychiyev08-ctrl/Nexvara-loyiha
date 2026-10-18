@@ -92,3 +92,42 @@ def ocr_pdf(
         return out
 
     return asyncio.run(run())
+
+
+def ocr_image(path: Path, language: str = "") -> str:
+    """Text of a photo (a textbook page, a document) with the Windows OCR engine.
+
+    `language`: "uz"/"en" read Latin text (Uzbek Latin is read well by the English engine),
+    "ru" Cyrillic; empty = Latin first, Cyrillic if that finds almost nothing."""
+    import pymupdf
+    from winrt.windows.globalization import Language
+    from winrt.windows.media.ocr import OcrEngine
+
+    langs = available()
+    if not langs:
+        raise RuntimeError("Windows OCR mavjud emas")
+    pix = pymupdf.Pixmap(Path(path).read_bytes())
+    if pix.alpha:
+        pix = pymupdf.Pixmap(pix, 0)
+    while max(pix.width, pix.height) > 4000:
+        pix.shrink(1)
+    png = pix.tobytes("png")
+
+    def run(tag: str) -> str:
+        engine = OcrEngine.try_create_from_language(Language(tag))
+        if engine is None:
+            return ""
+        return asyncio.run(_ocr_png(png, engine))
+
+    want = ["ru"] if language == "ru" else ["en"] if language in ("uz", "en") else ["en", "ru"]
+    best = ""
+    for w in want:
+        tag = next((x for x in langs if x.lower().startswith(w)), None)
+        if tag is None:
+            continue
+        text = run(tag)
+        if len(text.strip()) > len(best.strip()):
+            best = text
+        if language or len(best.strip()) > 40:
+            break
+    return best

@@ -80,6 +80,8 @@ def run_make_test(
         "variants": len(quizzes),
         "note": notes[0] if notes else "",
         "pictures": pictures,
+        # Answer keys per variant ("ABDC…"), so answer sheets can be checked by photo.
+        "answers": ["".join(x.answer for x in q.questions) for q in quizzes],
     }
 
 

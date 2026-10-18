@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
-from nexvara import __version__, config, remote_v1_sections
+from nexvara import __version__, config, remote_v1_school, remote_v1_sections
 from nexvara.protocol import MIN_CLIENT_PROTOCOL, PROTOCOL, ApiError, ok, task_dto
 
 # (method, path pattern, needs a device token)
@@ -37,6 +37,7 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("GET", "/api/v1/sync", True),
     ("POST", "/api/v1/sync", True),
     *remote_v1_sections.ROUTES,  # Home, AI spend, Memory, Teach, Workflows, BI, textbooks...
+    *remote_v1_school.ROUTES,  # answer sheets, journal, documents, OCR, preview, control
 ]
 log = logging.getLogger(__name__)
 WATCH_MAX = 25.0  # seconds a long-poll may hang
@@ -141,6 +142,23 @@ def _addresses() -> list[dict[str, str]]:
         return []
 
 
+_WAKE: dict[str, Any] = {"at": 0.0, "info": None}
+
+
+def _wake() -> dict[str, str] | None:
+    """Cached for 10 minutes: `ipconfig /all` is not run on every phone refresh."""
+    from nexvara.pcpower import wake_info
+    from nexvara.remote import lan_ip
+
+    if time.time() - _WAKE["at"] > 600:
+        try:
+            _WAKE["info"] = wake_info(lan_ip())
+        except Exception:
+            _WAKE["info"] = None
+        _WAKE["at"] = time.time()
+    return _WAKE["info"]
+
+
 def _session(srv: Any, dev: dict[str, Any]) -> dict[str, Any]:
     from nexvara.remote import TOKEN_MAX_DAYS, TOKEN_ROTATE_DAYS, server_id
 
@@ -154,6 +172,7 @@ def _session(srv: Any, dev: dict[str, Any]) -> dict[str, Any]:
         "rotate_recommended": age > TOKEN_ROTATE_DAYS * 86400,
         "port": srv.port,
         "addresses": _addresses(),  # the phone keeps them to reconnect from another network
+        "wake": _wake(),  # MAC + broadcast: the phone can wake this PC (Wake-on-LAN)
     }
 
 
@@ -162,6 +181,9 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
     from nexvara.remote import MAX_UPLOAD, TOKEN_MAX_DAYS, server_id
 
     api = srv.api
+    if route in remote_v1_school.HANDLED:
+        assert dev is not None
+        return remote_v1_school.route(h, srv, route, args, q, dev, lambda: _json_body(h))
     if route in remote_v1_sections.HANDLED:
         assert dev is not None
         return remote_v1_sections.route(h, srv, route, args, q, dev, lambda: _json_body(h))

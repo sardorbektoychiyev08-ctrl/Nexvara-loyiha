@@ -235,15 +235,16 @@ $("#task-pause").addEventListener("click", async () => {
 });
 
 // The phone is looking at this screen: say so (it is turned off in settings.json if unwanted).
-function showPhoneBadge() {
+function showPhoneBadge(text) {
   let b = document.getElementById("phone-badge");
   if (!b) {
-    b = el("div", "phone-badge", i18n("phone.screen"));
+    b = el("div", "phone-badge", "");
     b.id = "phone-badge";
     b.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:50;padding:8px 14px;border-radius:12px;" +
       "background:#6366F1;color:#fff;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25)";
     document.body.appendChild(b);
   }
+  b.textContent = text || i18n("phone.screen");
   b.hidden = false;
   clearTimeout(showPhoneBadge.t);
   showPhoneBadge.t = setTimeout(() => { b.hidden = true; }, 35000);
@@ -265,6 +266,8 @@ async function phoneEvents() {
       track(ev.task, false);
     } else if (ev.kind === "phone_screen") {
       showPhoneBadge();
+    } else if (ev.kind === "phone_control") {
+      showPhoneBadge(i18n("phone.control"));
     } else if (ev.kind === "bi_open" && ev.file) {
       biFromChat({ open: ev.file, state: ev.state && Object.keys(ev.state).length ? ev.state : null });
     }
@@ -1362,6 +1365,7 @@ $("#wf-form").addEventListener("submit", async (e) => {
 // ---- devices ----
 let devTimer = null;
 async function renderDevices() {
+  renderDeviceOptions();
   if (!api()) return;
   drawDevices(await api().devices_status());
   clearInterval(devTimer);
@@ -1406,6 +1410,27 @@ function drawDevices(st) {
     });
     row.appendChild(rm);
     box.appendChild(row);
+  });
+}
+
+// What a paired phone may do: see the screen, control mouse/keyboard, NEXVARA at sign-in.
+async function renderDeviceOptions() {
+  if (!api() || !api().devices_options) return;
+  const o = await api().devices_options();
+  for (const k of ["screen_view", "control", "autostart"]) {
+    const box = $("#opt-" + k);
+    if (box) box.checked = !!o[k];
+  }
+}
+for (const k of ["screen_view", "control", "autostart"]) {
+  const box = document.getElementById("opt-" + k);
+  if (box) box.addEventListener("change", async () => {
+    if (k === "control" && box.checked && !confirm("Telefon bu kompyuterning sichqonchasi va klaviaturasini boshqara oladi. Yoqilsinmi?")) {
+      box.checked = false;
+      return;
+    }
+    await api().devices_set_option(k, box.checked);
+    renderDeviceOptions();
   });
 }
 

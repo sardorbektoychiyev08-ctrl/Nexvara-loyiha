@@ -22,7 +22,8 @@ from typing import Any
 from nexvara import config
 
 STEP_KINDS = ("command", "approve", "wait")
-TRIGGERS = ("manual", "folder", "daily")
+TRIGGERS = ("manual", "folder", "daily", "weekly")
+WEEKDAYS = ("Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya")  # Monday = 0, as time.localtime()
 TICK_SECONDS = 15
 STABLE_SECONDS = 5  # a new file must be unchanged this long (still being copied otherwise)
 
@@ -135,7 +136,11 @@ class Workflow:
                 raise ValueError(
                     "Papka kuzatilsa, buyruqda {fayl} bo‘lishi kerak (yangi fayl o‘rni)"
                 )
-        if t == "daily":
+        if t == "weekly":
+            days = self.trigger.get("days")
+            if not isinstance(days, list) or not days or not all(d in range(7) for d in days):
+                raise ValueError("Hafta kunlarini tanlang")
+        if t in ("daily", "weekly"):
             hhmm = str(self.trigger.get("time") or "")
             try:
                 h, m = (int(x) for x in hhmm.split(":"))
@@ -515,11 +520,14 @@ class WorkflowEngine:
                     self.store.mark(wf.id, key)  # before running: never twice
                     started.append(self.start(wf, str(p), f"yangi fayl: {p.name}"))
                     break  # one file per tick; the rest follow on the next ticks
-            elif t == "daily":
+            elif t in ("daily", "weekly"):
                 lt = time.localtime(now)
                 today = time.strftime("%Y-%m-%d", lt)
                 h, m = (int(x) for x in str(wf.trigger.get("time")).split(":"))
+                if t == "weekly" and lt.tm_wday not in (wf.trigger.get("days") or []):
+                    continue
                 if wf.last_daily != today and (lt.tm_hour, lt.tm_min) >= (h, m):
                     self.store.set_last_daily(wf, today)
-                    started.append(self.start(wf, "", f"har kuni {h:02d}:{m:02d}"))
+                    when = "har kuni" if t == "daily" else WEEKDAYS[lt.tm_wday]
+                    started.append(self.start(wf, "", f"{when} {h:02d}:{m:02d}"))
         return started

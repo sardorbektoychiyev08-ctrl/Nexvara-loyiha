@@ -32,6 +32,7 @@ const I18N = {
     "phone.prefix": "📱 Telefondan: ",
     "phone.file": "📱 Telefondan fayl keldi: ",
     "phone.screen": "📱 Telefon ekranni ko‘rmoqda",
+    "phone.control": "📱 Telefon kompyuterni boshqarmoqda",
     // umumiy tugmalar va so‘zlar
     "btn.save": "Saqlash",
     "btn.cancel": "Bekor qilish",
