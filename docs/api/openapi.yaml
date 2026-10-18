@@ -641,6 +641,17 @@ paths:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "400": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/v1/ocr/convert:
+    post:
+      summary: "A photo's text → Excel table (sync: {path, rows, cols}, shared to the phone) or Word document (a task) {path (uploaded photo or its .txt), to excel|word, text (optional, the edited OCR text), lang, background}"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {path: {}, to: {}, text: {}, lang: {}, background: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
   /api/v1/files/preview:
     get:
       summary: "A file to view in the app: PDF as is, Office files converted to PDF in a temp folder, pictures and text as is (query path=; task results or shared files only)"

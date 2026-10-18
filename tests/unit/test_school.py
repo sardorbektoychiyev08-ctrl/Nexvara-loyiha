@@ -413,3 +413,32 @@ def test_mostly_white_high_resolution_photo(tmp_path):
     out = tmp_path / "telefon.jpg"
     page.get_pixmap(matrix=fitz.Matrix(2.2, 2.2).prerotate(6)).save(str(out))
     assert omr.read_sheet(out, 10, 1)["answers"] == ans
+
+
+def test_route_photo_to_excel_and_word(env):
+    api, srv, token, _done, tmp = env
+    import openpyxl
+
+    api._overrides["photo_word"] = lambda text, photo: {"path": str(photo.with_suffix(".docx"))}
+    img = tmp / "jadval.jpg"
+    img.write_bytes(b"\xff\xd8 table")
+    up = _upload(srv, token, img)
+    text = "Ism | Sinf | Ball\nAli | 7-A | 85\nVali | 7-B | 92"
+    r = j(post(srv, "/api/v1/ocr/convert", {"path": up, "to": "excel", "text": text}, token))
+    res = r["data"]
+    assert res["rows"] == 2 and res["cols"] == 3 and res["path"].endswith("_NEXVARA.xlsx")
+    ws = openpyxl.load_workbook(res["path"]).active
+    assert ws["A1"].value == "Ism" and ws["C3"].value == 92
+    from urllib.parse import quote
+
+    assert call(srv, "GET", f"/api/v1/files?path={quote(res['path'])}", token=token)[0] == 200
+    plain = post(srv, "/api/v1/ocr/convert", {"path": up, "to": "excel", "text": "oddiy matn"},
+                 token)  # fmt: skip
+    assert plain[0] == 400 and "jadval topilmadi" in j(plain)["error"]["message"]
+    w = j(post(srv, "/api/v1/ocr/convert", {"path": up, "to": "word"}, token))["data"]  # OCR
+    assert api._runner.get(w["task"]["id"]).wait(5)
+    assert post(srv, "/api/v1/ocr/convert", {"path": up, "to": "pdf"}, token)[0] == 400
+    outside = tmp / "boshqa.jpg"
+    outside.write_bytes(b"x")
+    bad = post(srv, "/api/v1/ocr/convert", {"path": str(outside), "to": "excel"}, token)
+    assert bad[0] == 400  # only photos the phone sent

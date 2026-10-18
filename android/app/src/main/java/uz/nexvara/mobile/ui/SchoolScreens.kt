@@ -438,6 +438,10 @@ fun OcrPanel(m: AppModel, act: PhoneActions) {
             SelectionContainer { Text(text.take(3000), style = MaterialTheme.typography.bodyMedium) }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 TextButton(onClick = { act.copyText(text) }) { Text("Nusxa") }
+                TextButton(onClick = { m.ocrConvert("excel") }, enabled = m.tools.ocrRaw.isNotBlank()) { Text("Excel") }
+                TextButton(onClick = { m.ocrConvert("word") }, enabled = m.tools.ocrRaw.isNotBlank()) { Text("Word") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 TextButton(onClick = { m.compose("AI bilan shu matndan 10 ta test tuz: ${text.take(3000)}") }) { Text("Test (AI)") }
                 TextButton(onClick = { m.compose("AI bilan shu matnni qisqa konspekt qil: ${text.take(3000)}") }) { Text("Konspekt (AI)") }
             }

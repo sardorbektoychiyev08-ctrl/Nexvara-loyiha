@@ -31,6 +31,7 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("GET", "/api/v1/doctemplates", True),
     ("POST", "/api/v1/doctemplates/{id}", True),
     ("POST", "/api/v1/ocr", True),
+    ("POST", "/api/v1/ocr/convert", True),
     ("GET", "/api/v1/files/preview", True),
     ("POST", "/api/v1/control", True),
     ("GET", "/api/v1/autostart", True),
@@ -223,6 +224,8 @@ def route(
         api.set_context_file(str(txt))
         _share(srv, dev, txt)
         return {"text": text, "path": str(txt), "chars": len(text)}
+    if route == "/api/v1/ocr/convert":
+        return _ocr_convert(api, srv, dev, body())
     # ----- preview (PDF in the app) -----
     if route == "/api/v1/files/preview":
         from nexvara.remote_v1 import _allowed_files
@@ -291,6 +294,52 @@ def route(
         getter = api._overrides.get("autostart_get") if hasattr(api, "_overrides") else None
         return {"on": (getter or pcpower.autostart_enabled)()}
     raise ApiError("NOT_FOUND")
+
+
+def _ocr_convert(api: Any, srv: Any, dev: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    """The photo's text (as the phone shows/edited it) → Excel table or Word document."""
+    from nexvara import photodoc
+
+    to = str(b.get("to") or "")
+    if to not in ("excel", "word"):
+        raise ApiError("BAD_REQUEST", "to: excel yoki word")
+    photo = Path(sec._phone_file(str(b.get("path", ""))))
+    text = str(b.get("text") or "")
+    if not text.strip():
+        txt = photo.with_suffix(".txt")
+        if photo.suffix.lower() == ".txt":
+            text = photo.read_text(encoding="utf-8", errors="replace")
+        elif txt.is_file():
+            text = txt.read_text(encoding="utf-8", errors="replace")
+        else:
+            ocr = api._overrides.get("ocr") if hasattr(api, "_overrides") else None
+            if ocr is None:
+                from nexvara.knowledge.ocr import ocr_image as ocr
+            text = ocr(photo, str(b.get("lang") or ""))
+    if len(text) > 200_000:
+        raise ApiError("BAD_REQUEST", "Matn juda uzun")
+    if to == "excel":
+        res = _user(lambda: photodoc.convert(text, photo, "excel"))
+        _share(srv, dev, res["path"])
+        api.set_context_file(res["path"])
+        return res
+    fake = api._overrides.get("photo_word") if hasattr(api, "_overrides") else None
+
+    def fn(task: Any) -> dict[str, Any]:
+        with task.step("Word hujjat") as s:
+            res = (
+                fake(text, photo)
+                if fake
+                else photodoc.convert(
+                    text, photo, "word", visible=not b.get("background"), keep_open=api._keep_open()
+                )
+            )
+            s.detail = Path(res["path"]).name
+        return res
+
+    snap = api._runner.start("Rasm → Word", fn).snapshot()
+    api.ui_push({"kind": "task", "task": snap})
+    return {"task": task_dto(snap)}
 
 
 def _office_pdf(api: Any, p: Path) -> bytes:

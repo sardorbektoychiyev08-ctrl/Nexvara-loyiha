@@ -22,6 +22,8 @@ class Tools {
     var jSubject by mutableStateOf("")
     var templates by mutableStateOf<List<DocTemplate>>(emptyList())
     var ocrText by mutableStateOf<String?>(null)
+    var ocrPath by mutableStateOf<String?>(null)  // the uploaded photo the text came from
+    var ocrRaw by mutableStateOf("")
     var preview by mutableStateOf<Preview?>(null)
     var autostart by mutableStateOf<Boolean?>(null)
     var controlOn by mutableStateOf(false)
@@ -113,7 +115,24 @@ fun AppModel.makeDocument(t: DocTemplate, fields: Map<String, String>, backgroun
 
 // ---------------- photo → text ----------------
 fun AppModel.ocr(path: String, lang: String = "") = call(block = post("/api/v1/ocr", JSONObject().put("path", path).put("lang", lang))) {
+    tools.ocrPath = path
+    tools.ocrRaw = it.optString("text")
     tools.ocrText = it.optString("text").ifBlank { "(matn topilmadi — suratni yaqinroq va yorug‘roq oling)" }
+}
+
+/** The photo's text → an Excel table (opened here as a preview) or a Word document (a PC task). */
+fun AppModel.ocrConvert(to: String) {
+    val path = tools.ocrPath ?: return
+    val body = JSONObject().put("path", path).put("to", to).put("text", tools.ocrRaw)
+    call(block = post("/api/v1/ocr/convert", body)) {
+        if (to == "excel") {
+            notice = "Excel jadval tayyor: ${it.optInt("rows")} qator, ${it.optInt("cols")} ustun"
+            previewFile(it.optString("path"))
+        } else {
+            notice = "Word hujjat kompyuterda yozilmoqda"
+            refreshTasks(); open(Screen.Tasks)
+        }
+    }
 }
 
 // ---------------- preview inside the app ----------------
