@@ -422,6 +422,20 @@ class CadApi:
             "reply": f"AI chizmani qayta chizdi: {len(fixed['entities'])} ta obyekt ({price}).",
         }
 
+    def cad_templates(self) -> list[dict[str, str]]:
+        from nexvara import cad_templates
+
+        return cad_templates.CATALOG
+
+    def cad_template(self, name: str, size: str = "") -> dict[str, Any]:
+        """A ready sheet (A4/A3 frame + title block) or a standard part, as editor JSON."""
+        from nexvara import cad_templates
+
+        try:
+            return {"ok": True, "drawing": cad_templates.make(str(name), str(size or ""))}
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+
     def _cad_dialog(self, save: bool) -> str:
         import webview
 

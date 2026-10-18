@@ -133,3 +133,35 @@ def test_phone_route(tmp_path, monkeypatch):
         assert call(srv, "POST", "/api/v1/cad/ai", {"drawing": {}}, token)[0] == 400
     finally:
         api.devices_stop()
+
+
+def test_templates_are_clean_autocad_drawings(tmp_path, monkeypatch):
+    import pytest
+
+    from nexvara import cad_templates
+    from nexvara.app.api import Api
+
+    monkeypatch.setenv("NEXVARA_DATA", str(tmp_path / "data"))
+    api = Api(output_dir=tmp_path)
+    assert {t["id"] for t in api.cad_templates()} == {
+        "A4",
+        "A3",
+        "bolt",
+        "nut",
+        "washer",
+        "bearing",
+    }
+    for name, size in (("A4", ""), ("A3", ""), ("bolt", "M10x50"), ("nut", "M12"),
+                       ("washer", "m8"), ("bearing", "6204")):  # fmt: skip
+        out = api.cad_template(name, size)
+        assert out["ok"], (name, out)
+        assert cad.audit(json_to_doc(out["drawing"])) == []
+    frame = cad_templates.make("A4")["entities"]
+    assert frame[0]["points"][2][:2] == [210, 297]  # the A4 sheet itself
+    bolt = cad_templates.make("bolt", "M10x50")["entities"]
+    assert any(e.get("label") == "M10" for e in bolt)
+    assert any("16" == str(int(cad_templates.METRIC[10][0])) for _ in [0])  # s = 16 for M10
+    assert not api.cad_template("bolt", "M7")["ok"]
+    assert "6200" in api.cad_template("bearing", "9999")["error"]
+    with pytest.raises(ValueError):
+        cad_templates.make("nimadir")

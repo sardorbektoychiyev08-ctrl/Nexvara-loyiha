@@ -1283,10 +1283,34 @@ function renderCad() {
     cadState.ready = true;
     cadState.ox = (cadWrap.clientWidth || 800) / 2; cadState.oy = (cadWrap.clientHeight || 500) / 2;
     cadRenderLayers(); cadSetTool("select"); cadRenderProps();
+    cadLoadTemplates();
     cadLog("Maslahat: buyruqni yozing (L — chiziq, C — aylana, TR — kesish, F — yumaloqlash), sichqoncha g‘ildiragi — yaqinlashtirish, o‘ng tugma bilan sudrash — surish.");
   }
   requestAnimationFrame(cadRender);
 }
+
+// ---------------- templates (frame, bolt, nut, washer, bearing) ----------------
+let cadTemplateList = [];
+async function cadLoadTemplates() {
+  if (cadTemplateList.length || !api() || !api().cad_templates) return;
+  cadTemplateList = await api().cad_templates();
+  const sel = document.getElementById("cad-template");
+  cadTemplateList.forEach((t) => { const o = document.createElement("option"); o.value = t.id; o.textContent = t.title; sel.appendChild(o); });
+}
+async function cadInsertTemplate(id) {
+  const t = cadTemplateList.find((x) => x.id === id); if (!t) return;
+  let size = "";
+  if (t.ask) { size = window.prompt(`${t.title}: ${t.ask}`, t.ask.split("masalan ")[1] || ""); if (size === null) return; }
+  const r = await api().cad_template(id, size);
+  if (!r.ok) { cadLog(r.error || "Shablon qo‘shilmadi."); return; }
+  cadSnapshot();
+  (r.drawing.layers || []).forEach((l) => { if (!cadLayer(l.name)) cadState.doc.layers.push(l); });
+  cadState.doc.entities.push(...r.drawing.entities);
+  cadRenderLayers(); cadExtents(); cadLog(`Qo‘shildi: ${t.title}${size ? ` (${size})` : ""}. Kerakli joyga «Ko‘chirish» (M) bilan suring.`);
+}
+document.getElementById("cad-template").addEventListener("change", (e) => {
+  const v = e.target.value; e.target.value = ""; if (v) cadInsertTemplate(v);
+});
 
 // ---------------- grips (drag a selected object's point) ----------------
 function cadGripAt(s) {

@@ -502,6 +502,23 @@ paths:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "400": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/v1/cad/templates:
+    get:
+      summary: "Drawing templates: A4/A3 sheet with frame and title block, bolt, nut, washer, bearing {templates: [{id, title, ask}]}"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "One template {name, size (e.g. M10x50, 6204)} as editor JSON {drawing}"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {name: {}, size: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
   /api/v1/cad/open:
     post:
       summary: "Open a drawing from the Chizmalar folder {path} in the PC's own editor"

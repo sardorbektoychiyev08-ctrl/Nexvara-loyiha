@@ -199,6 +199,7 @@ class CadState {
     var drawings by mutableStateOf<List<Pair<String, String>>>(emptyList())  // name, path on the PC
     var lastSaved by mutableStateOf<JSONObject?>(null)
     var aiConfirm by mutableStateOf<Pair<String, String>?>(null)  // cost text, the user's note
+    var templates by mutableStateOf<List<Triple<String, String, String>>>(emptyList())  // id, title, ask
     val undo = ArrayDeque<List<CadE>>()
     val redo = ArrayDeque<List<CadE>>()
 
@@ -209,6 +210,12 @@ class CadState {
     fun undo() { undo.removeLastOrNull()?.let { redo.addLast(items.toList()); items.clear(); items.addAll(it) } }
     fun redo() { redo.removeLastOrNull()?.let { undo.addLast(items.toList()); items.clear(); items.addAll(it) } }
     fun clear() { snapshot(); items.clear(); extra = emptyList(); path = null }
+
+    /** Add a template (frame, bolt…) to the drawing; undo removes it again. */
+    fun append(drawing: JSONObject) {
+        val t = CadState(); t.load(drawing)
+        snapshot(); items.addAll(t.items); extra = extra + t.extra
+    }
 
     /** Replace the drawing (AI result) — undo brings the sketch back. */
     fun replaceWith(drawing: JSONObject) {
@@ -303,3 +310,15 @@ fun AppModel.cadAiFix(note: String, approved: Boolean = false) {
         notice = it.optString("reply").ifBlank { "Tuzatildi" } + " Yoqmasa — «Orqaga»."
     }
 }
+
+fun AppModel.cadTemplates() = call(quiet = true, block = get("/api/v1/cad/templates")) {
+    val arr = it.optJSONArray("templates") ?: JSONArray()
+    cad.templates = (0 until arr.length()).mapNotNull { k -> arr.optJSONObject(k)?.let { o ->
+        Triple(o.optString("id"), o.optString("title"), o.optString("ask")) } }
+}
+
+fun AppModel.cadInsertTemplate(id: String, size: String) =
+    call(block = post("/api/v1/cad/templates", JSONObject().put("name", id).put("size", size))) {
+        it.optJSONObject("drawing")?.let { d -> cad.append(d) }
+        notice = "Shablon qo‘shildi — «Hammasi» tugmasi bilan ko‘ring"
+    }

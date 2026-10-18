@@ -139,6 +139,17 @@ def run():
         js("document.querySelector('[data-cad=undo]').click()")
         js("document.querySelector('[data-cad=redo]').click()")
         res["count"] = len(doc())
+        # 10b) a template: an M10x50 bolt from the list
+        until("document.querySelectorAll('#cad-template option').length > 3")
+        before_tpl = len(doc())
+        js("window.prompt = () => 'M10x50'")
+        js(
+            "const s = document.getElementById('cad-template'); s.value = 'bolt'; "
+            "s.dispatchEvent(new Event('change'))"
+        )
+        res["template"] = (
+            until(f"cad.doc.entities.length > {before_tpl}") and len(doc()) - before_tpl
+        )
         # 11) «AI bilan tuzatish» without a key: NEXVARA tidies the sketch itself; zoom; compact
         js("window.prompt = () => ''; window.confirm = () => true;")
         js("document.querySelector('[data-cad=ai]').click()")
@@ -178,6 +189,7 @@ checks = {
     "saved": bool(res.get("saved")),
     "dxf": res.get("dxf_audit") == [] and "HATCH" in res.get("dxf_types", {}),
     "ai_fix": bool(res.get("ai_fix")),
+    "template": (res.get("template") or 0) >= 10,
     "no_js_errors": not res.get("errors"),
 }
 print(json.dumps(checks, indent=1))

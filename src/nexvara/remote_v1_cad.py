@@ -20,6 +20,8 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("GET", "/api/v1/cad/drawing", True),
     ("POST", "/api/v1/cad/open", True),
     ("POST", "/api/v1/cad/ai", True),
+    ("GET", "/api/v1/cad/templates", True),
+    ("POST", "/api/v1/cad/templates", True),
 ]
 HANDLED = {p for _m, p, _a in ROUTES}
 PHONE_MAX_ENTITIES = 5000  # a phone screen does not need more; the PC keeps the full file
@@ -80,6 +82,14 @@ def route(
                              bool(b.get("approved")))  # fmt: skip
         if not out.get("ok") and not out.get("confirm"):
             raise ApiError("BAD_REQUEST", out.get("error") or "Tuzatib bo‘lmadi")
+        return out
+    if route == "/api/v1/cad/templates" and h.command == "GET":
+        return {"templates": api.cad_templates()}
+    if route == "/api/v1/cad/templates":
+        b = body()
+        out = api.cad_template(str(b.get("name") or ""), str(b.get("size") or ""))
+        if not out.get("ok"):
+            raise ApiError("BAD_REQUEST", out.get("error") or "Shablon topilmadi")
         return out
     if route == "/api/v1/cad/open":
         p = _inside(api, str(body().get("path") or ""))

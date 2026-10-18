@@ -71,6 +71,7 @@ fun CadScreen(m: AppModel) {
     var saveDialog by remember { mutableStateOf(false) }
     var listDialog by remember { mutableStateOf(false) }
     var aiDialog by remember { mutableStateOf(false) }
+    var tplDialog by remember { mutableStateOf(false) }
     var area by remember { mutableStateOf(CadArea.Large) }
     fun zoom(f: Float) {
         val c = Offset(size.width / 2, size.height / 2)
@@ -138,6 +139,7 @@ fun CadScreen(m: AppModel) {
     Column(Modifier.fillMaxSize()) {
         if (area != CadArea.Full) ScreenHeader("Chizma", cad.name + if (cad.path != null) " · kompyuterda saqlangan" else "", onBack = { m.goBack() }) {
             IconButton(onClick = { aiDialog = true }) { Icon(Icons.Default.AutoFixHigh, "AI bilan tuzatish", tint = accent) }
+            IconButton(onClick = { m.cadTemplates(); tplDialog = true }) { Icon(Icons.Default.Dashboard, "Shablonlar") }
             IconButton(onClick = { m.cadList(); listDialog = true }) { Icon(Icons.Default.FolderOpen, "Kompyuterdagi chizmalar") }
             IconButton(onClick = { saveDialog = true }) { Icon(Icons.Default.Save, "Saqlash") }
         }
@@ -213,6 +215,24 @@ fun CadScreen(m: AppModel) {
         }
     }
 
+    if (tplDialog) {
+        var pick by remember { mutableStateOf<Triple<String, String, String>?>(null) }
+        var size by remember { mutableStateOf("") }
+        AlertDialog(onDismissRequest = { tplDialog = false }, title = { Text("Shablonlar") },
+            text = { Column {
+                if (cad.templates.isEmpty()) Text("Kompyuter bilan aloqa kerak", color = x.muted)
+                cad.templates.forEach { t ->
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        RadioButton(pick?.first == t.first, { pick = t; size = t.third.substringAfter("masalan ", "") })
+                        Text(t.second)
+                    }
+                }
+                pick?.let { t -> if (t.third.isNotBlank()) OutlinedTextField(size, { size = it }, label = { Text(t.third) }) }
+            } },
+            confirmButton = { TextButton(enabled = pick != null, onClick = {
+                pick?.let { m.cadInsertTemplate(it.first, size) }; tplDialog = false; fit() }) { Text("Qo‘shish") } },
+            dismissButton = { TextButton(onClick = { tplDialog = false }) { Text("Bekor") } })
+    }
     if (aiDialog) {
         var note by remember { mutableStateOf("") }
         AlertDialog(onDismissRequest = { aiDialog = false }, title = { Text("AI bilan tuzatish") },
