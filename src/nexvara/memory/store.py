@@ -198,6 +198,100 @@ class MemoryStore:
             ).fetchall()
         return [{"id": r[0], "ts": r[1], "role": r[2], "text": r[3]} for r in reversed(rows)]
 
+    def recent_turns(self, limit: int = 15, days: int = 30) -> list[dict[str, str]]:
+        """The last messages of the conversation (they survive an app restart)."""
+        since = time.time() - days * 86400
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT role, text FROM chat_log WHERE ts >= ? ORDER BY id DESC LIMIT ?",
+                (since, limit),
+            ).fetchall()
+        return [{"role": r[0], "text": r[1][:1500]} for r in reversed(rows)]
+
+    def recall(
+        self, text: str, days: int = 30, limit: int = 6, skip_last: int = 15
+    ) -> list[dict[str, Any]]:
+        """Older chat lines (within `days`) that share words with the request, each with the
+        answer that followed it. The newest `skip_last` lines are left out: they are sent
+        as the recent conversation anyway."""
+        q = _match_query(text, " OR ")
+        if not q:
+            return []
+        since = time.time() - days * 86400
+        with self._db() as db:
+            newest = db.execute(
+                "SELECT id FROM chat_log ORDER BY id DESC LIMIT 1 OFFSET ?", (skip_last - 1,)
+            ).fetchone()
+            cutoff = newest[0] if newest else 0
+            try:
+                rows = db.execute(
+                    "SELECT c.id, c.ts, c.role, c.text FROM chat_fts f JOIN chat_log c "
+                    "ON c.id = f.rowid WHERE chat_fts MATCH ? AND c.ts >= ? AND c.id < ? "
+                    "ORDER BY bm25(chat_fts) LIMIT ?",
+                    (q, since, cutoff, limit),
+                ).fetchall()
+            except sqlite3.OperationalError:
+                return []
+            out = []
+            for rid, ts, role, body in rows:
+                pair = db.execute(
+                    "SELECT role, text FROM chat_log WHERE id = ?",
+                    (rid + 1 if role == "user" else rid - 1,),
+                ).fetchone()
+                q_text, a_text = (body, pair[1] if pair else "") if role == "user" else (
+                    pair[1] if pair else "", body)  # fmt: skip
+                out.append({"ts": ts, "user": q_text[:400], "nexvara": a_text[:600]})
+        return sorted(out, key=lambda x: x["ts"])
+
+    def day_summaries(self, days: int = 7, per_day: int = 4) -> list[str]:
+        """A short local summary of each earlier day: what the user asked (no AI involved)."""
+        today = time.strftime("%Y-%m-%d")
+        since = time.time() - days * 86400
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT ts, text FROM chat_log WHERE role = 'user' AND ts >= ? ORDER BY id",
+                (since,),
+            ).fetchall()
+        by_day: dict[str, list[str]] = {}
+        for ts, body in rows:
+            day = time.strftime("%Y-%m-%d", time.localtime(ts))
+            short = " ".join(body.split())[:90]
+            if day == today or len(short) < 6 or fold(short) in ("ha", "yoq"):
+                continue
+            items = by_day.setdefault(day, [])
+            if short not in items:
+                items.append(short)
+        return [
+            f"{d}: " + "; ".join(v[-per_day:]) + (f" (+{len(v) - per_day} ta)" if len(v) > per_day
+                                                  else "")
+            for d, v in sorted(by_day.items())
+        ]  # fmt: skip
+
+    def forget_chat(self, text: str) -> int:
+        """«… ni unut»: delete chat lines that contain all the given words."""
+        q = _match_query(text, " AND ")
+        if not q:
+            return 0
+        with self._lock, self._db() as db:
+            try:
+                ids = [r[0] for r in db.execute(
+                    "SELECT rowid FROM chat_fts WHERE chat_fts MATCH ?", (q,)).fetchall()]  # fmt: skip
+            except sqlite3.OperationalError:
+                return 0
+            for i in ids:
+                db.execute("DELETE FROM chat_log WHERE id = ?", (i,))
+                db.execute("DELETE FROM chat_fts WHERE rowid = ?", (i,))
+        return len(ids)
+
+    def forget_last(self, n: int) -> int:
+        with self._lock, self._db() as db:
+            ids = [r[0] for r in db.execute(
+                "SELECT id FROM chat_log ORDER BY id DESC LIMIT ?", (n,)).fetchall()]  # fmt: skip
+            for i in ids:
+                db.execute("DELETE FROM chat_log WHERE id = ?", (i,))
+                db.execute("DELETE FROM chat_fts WHERE rowid = ?", (i,))
+        return len(ids)
+
     def clear_chat(self) -> None:
         with self._lock, self._db() as db:
             db.execute("DELETE FROM chat_log")

@@ -112,6 +112,7 @@ class Api(
             elif prev_hook is not None:
                 prev_hook(t)
             self._ctx.task_done(snap)  # its output becomes "uni" / "natija"
+            self._repair_task(snap)  # a failed chat command: the AI may fix and retry
 
         self._runner.on_finish = on_finish
         if excel_demo:
@@ -177,7 +178,13 @@ class Api(
         if mem is not None:
             mem.log_chat("user", text)
         self._ctx.add_turn("user", text)
-        out = self._chat_inner(self._expand_aliases(text))
+        self._repair_origin = [text, 0]  # a new message: its failures may be repaired again
+        forget = self._chat_forget(text)
+        out = forget if forget is not None else self._chat_inner(self._expand_aliases(text))
+        if out.get("error") and not out.get("confirm") and self._self_repair_on():
+            fixed = self._repair(text, out.get("reply", ""))
+            if fixed is not None:
+                out = fixed
         if mem is not None:
             mem.log_chat("nexvara", out.get("reply", ""))
         self._ctx.add_turn("nexvara", out.get("reply", ""))
@@ -395,8 +402,9 @@ class Api(
         try:
             facts = mem.relevant_facts(text) if mem is not None else []
             rules = [f"{r.label()}: {r.text}" for r in mem.rules(enabled_only=True)] if mem else []
+            recall = self._recall(text)
             p = features.plan(router, text, agent_tools.catalog(), self._ctx.snapshot(),
-                              list(self._ctx.turns)[:-1], facts, rules, approved)  # fmt: skip
+                              recall.turns, facts, rules, approved, recall.older)  # fmt: skip
             if p.kind == "tools":
                 calls = [agent_tools.ToolCall(str(c["tool"]), dict(c.get("args") or {}))
                          for c in p.calls]  # fmt: skip
@@ -412,10 +420,11 @@ class Api(
                     return out
             if intent.kind == "question":
                 ans = features.answer_question(
-                    router, text, approved, intent.grade, intent.subject or None, facts=facts
+                    router, text, approved, intent.grade, intent.subject or None, facts=facts,
+                    recall=recall,
                 )
             else:
-                ans = features.chat_reply(router, text, approved, facts=facts)
+                ans = features.chat_reply(router, text, approved, facts=facts, recall=recall)
         except NeedsConfirmation as e:
             ask = self._ask("chat", text, e.estimate)
             return {"reply": ask["text"], "confirm": ask["token"]}
@@ -585,6 +594,7 @@ class Api(
         self._context_file = str(source)
         self._ctx.command = text
         snap = self.run_command_plan(plan, str(source), background=bool(bg))
+        self._chat_task = snap.get("id", "")
         steps = "\n".join(f"• {d}" for d in plan.describe())
         reply = f"Fayl: {source}\nBajaraman:\n{steps}"
         if taught:

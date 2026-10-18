@@ -263,6 +263,8 @@ async function phoneEvents() {
     if (ev.kind === "phone_chat") {
       addMsg(i18n("phone.prefix") + ev.text, true);
       handleReply(ev.reply || {});
+    } else if (ev.kind === "nexvara_reply" && ev.reply) {
+      handleReply(ev.reply);  // e.g. the AI fixed a failed command and tried again
     } else if (ev.kind === "phone_file") {
       addMsg(i18n("phone.file") + ev.name, false);
       showContext(ev.path);
