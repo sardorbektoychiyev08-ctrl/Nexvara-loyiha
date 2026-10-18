@@ -174,6 +174,11 @@ function renderTask(t) {
     const b = el("button", "btn", "Faylni ko'rsatish");
     b.addEventListener("click", () => api().reveal_file(t.result.path));
     row.appendChild(b);
+    if (t.result.sheet) {
+      const sh = el("button", "btn", "Javob varaqasi (PDF)");
+      sh.addEventListener("click", () => api().reveal_file(t.result.sheet));
+      row.appendChild(sh);
+    }
     if (t.result.excerpt) {
       const ex = el("button", "btn", "Asl sahifalar (PDF)");
       ex.addEventListener("click", () => api().reveal_file(t.result.excerpt));

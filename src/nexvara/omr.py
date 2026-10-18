@@ -85,7 +85,7 @@ def make_sheet_pdf(path: Path, title: str, n: int, variants: int = 1, copies: in
         page.insert_text((70, 162), "Variant:", fontsize=11, fontname="helv")
         for k, (x, y) in enumerate(lay["variant"]):
             page.draw_circle((x, y), R, color=(0, 0, 0), width=0.8)
-            page.insert_text((x - 3, y - R - 3), str(k + 1), fontsize=8, fontname="helv")
+            page.insert_text((x - 3, y - R - 3), LETTERS[k], fontsize=8, fontname="helv")
         cols = (n - 1) // ROWS + 1
         for c in range(cols):
             for k, ch in enumerate(LETTERS):

@@ -40,6 +40,9 @@ private fun Screen(m: AppModel, title: String, subtitle: String? = null, actions
 
 private fun markColor(mark: Int, x: Extra) = when (mark) { 5 -> x.success; 4 -> Color(0xFF0EA5E9); 3 -> x.warning; else -> x.danger }
 
+/** 1 -> "A": the same letters as on the printed answer sheet and in the Word test. */
+fun variantLetter(v: Int): String = if (v in 1..6) "ABCDEF"[v - 1].toString() else v.toString()
+
 // ---------------- answer sheets ----------------
 @Composable
 fun AnswerSheetsScreen(m: AppModel, act: PhoneActions) {
@@ -64,7 +67,7 @@ fun AnswerSheetsScreen(m: AppModel, act: PhoneActions) {
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
                             Text(r.student, style = MaterialTheme.typography.titleMedium)
-                            Text("${r.right} / ${r.total} to‘g‘ri · ${r.percent}% · ${r.variant}-variant", style = MaterialTheme.typography.bodyMedium)
+                            Text("${r.right} / ${r.total} to‘g‘ri · ${r.percent}% · ${variantLetter(r.variant)} variant", style = MaterialTheme.typography.bodyMedium)
                             if (r.wrong.isNotEmpty()) Text("Xato: ${r.wrong.joinToString(", ")}", style = MaterialTheme.typography.bodySmall, color = x.muted)
                         }
                     }
@@ -142,7 +145,7 @@ fun AnswerSheetsScreen(m: AppModel, act: PhoneActions) {
         AlertDialog(onDismissRequest = { keyFor = null }, title = { Text("To‘g‘ri javoblar") },
             text = {
                 Column {
-                    if (s.variants > 1) ChipRow((1..s.variants).map { it.toString() to "$it-variant" }, v.toString()) {
+                    if (s.variants > 1) ChipRow((1..s.variants).map { it.toString() to "${variantLetter(it)} variant" }, v.toString()) {
                         v = it.toInt(); k = s.keys[it].orEmpty()
                     }
                     OutlinedTextField(k, { k = it.uppercase().filter { c -> c in "ABCD" } }, label = { Text("ABCD… (${s.questions} ta)") },

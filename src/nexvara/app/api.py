@@ -263,7 +263,9 @@ class Api(
             return {
                 "reply": (
                     f"Tushundim: {what or 'darslik'}{topic}, {req.count} ta savol, "
-                    f"{req.variants} ta variant. {by}Word'da tuzyapman — jarayon o‘ng panelda."
+                    f"{req.variants} ta variant. {by}Word'da tuzyapman — jarayon o‘ng panelda. "
+                    "Variantlar A, B, C… harflari bilan; javob varaqasi (PDF) ham tayyorlanadi, "
+                    "to‘ldirilganini telefonda suratga olib tekshirasiz."
                 ),
                 "task": snap,
             }
@@ -994,7 +996,8 @@ class Api(
 
                     book, _pages, topic = topic_material(req)
                     out = self._output_dir / default_test_path(book, topic).name
-                return run_make_test(task, req, out, keep_open=self._keep_open(), make=make)
+                res = run_make_test(task, req, out, keep_open=self._keep_open(), make=make)
+                return _with_answer_sheet(task, res)
 
         what = " ".join(
             x for x in (f"{req.grade}-sinf" if req.grade else "", req.subject or "") if x
@@ -1118,6 +1121,25 @@ class Api(
         if os.name == "nt":
             subprocess.Popen(["explorer", "/select,", str(p)])
         return True
+
+
+def _with_answer_sheet(task: Any, res: dict[str, Any]) -> dict[str, Any]:
+    """Every A/B/C/D test gets a printable answer sheet with its keys: the filled sheets are
+    then checked by a phone photo («Javob varaqalari»)."""
+    from nexvara import omr
+
+    answers = res.get("answers") or []
+    n = len(answers[0]) if answers else 0
+    if not res.get("sheet_ready") or not 1 <= n <= omr.MAX_Q or not 1 <= len(answers) <= 4:
+        return res
+    with task.step("Javob varaqasi (chop etish uchun)") as s:
+        title = f"{res.get('book', 'Test')}: {res.get('topic', '')}".strip(": ")
+        keys = {str(i + 1): k for i, k in enumerate(answers)}
+        sheet = omr.create_set(title, n, len(answers), keys)
+        res["sheet"] = sheet["pdf"]
+        res["sheet_id"] = sheet["id"]
+        s.detail = f"{n} savol, {len(answers)} variant; kalitlar saqlandi"
+    return res
 
 
 def _clipboard(clear: bool = False) -> str:
