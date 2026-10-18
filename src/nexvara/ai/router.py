@@ -818,6 +818,9 @@ class AiRouter:
             else:
                 if self.manual(cap) or provider_override or not self.config().get("fallback"):
                     break
+                # Free mode never moves from a free model to a paid one by itself.
+                if cands[0][1].get("free") and self.free_active() and not est.free:
+                    continue
                 try:
                     self.check_budget(est, approved=True)
                 except (BudgetExceeded, AiUnavailable):
