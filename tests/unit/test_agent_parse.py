@@ -240,3 +240,16 @@ def test_professional_commands_chain_in_one_message():
     )
     assert kinds(plan) == ["open", "formula", "numfmt", "highlight", "stats", "autofit", "save"]
     assert plan.unknown == []
+
+
+def test_new_excel_table_without_count_and_with_ustunlari():
+    plan = parse_command("Excel o‘quvchilar jadvali tuz, ustunlari: Ism, Sinf, Baho")
+    assert kinds(plan) == ["create_table"], plan
+    assert plan.actions[0].args["count"] == 3
+    assert plan.actions[0].args["headers"] == ["Ism", "Sinf", "Baho"]
+    assert plan.actions[0].args["title"] == "o‘quvchilar"
+    plan = parse_command("Excel’da sinf jadvali tuz: Ism, Baho")
+    assert plan.actions[0].args == {"count": 2, "headers": ["Ism", "Baho"], "title": "sinf"}
+    assert kinds(parse_command("Excel’da 2 ustunli narxlar jadvali yarat — Mahsulot, Narx")) == [
+        "create_table"
+    ]

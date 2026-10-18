@@ -51,6 +51,13 @@ class WorkflowsApi:
         """«zaxira qil», «zaxira qachon qilingan», «avtomatik zaxirani o'chir/yoq»."""
         if not re.search(r"\bzaxira\w*", f):
             return None
+        from nexvara.agent.parse import find_file
+
+        # «Hisobot.xlsx ning zaxira nusxasini ol», versions, restore: the File agent's job
+        if find_file(text) or re.search(r"\b(nusxa\w*|versiya\w*|tikla\w*|papka\w*)", f):
+            return None
+        if self._ctx.file and re.search(r"\b(shu|bu|ushbu)\b", f):
+            return None
         if self._history is None and "backup" not in self._overrides:
             return {"reply": "Zaxira bu rejimda o‘chirilgan."}
         bk = self._overrides.get("backup") or self._auto_backup()

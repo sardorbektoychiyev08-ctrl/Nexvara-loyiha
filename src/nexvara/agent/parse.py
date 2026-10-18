@@ -595,20 +595,22 @@ def _new_excel_table(text: str) -> Plan | None:
     """A named blank workbook requested in chat, with its actual column headings."""
     if not re.search(r"\b(?:excel|eksel)\w*", fold(text)) or find_file(text):
         return None
+    # «5 ustunli o‘quvchilar jadvali tuz: A, B, …», also without the count and with
+    # «…, ustunlari: A, B» / «… jadval yarat — A, B».
     m = re.search(
-        r"\b(?P<count>\d{1,2})\s*ustunli\s+(?P<title>.+?)\s+jadval\w*\s+"
-        r"(?:tuz|yarat)\w*\s*:\s*(?P<headers>.+)$",
+        r"(?:\b(?:excel|eksel)[’'‘ʼ`]?\w*\s+)?(?:\b(?P<count>\d{1,2})\s*ustunli\s+)?"
+        r"(?P<title>\S.*?)\s+"
+        r"jadval\w*\s+(?:tuz|yarat|ochib ber|qil)\w*[\s,]*(?:ustunlari\s*)?[:\-–—]\s*"
+        r"(?P<headers>.+)$",
         text,
         re.IGNORECASE | re.DOTALL,
     )
     if not m:
         return None
-    headers = [h.strip() for h in re.split(r"[,;]", m.group("headers"))]
-    action = Action(
-        "create_table",
-        {"count": int(m.group("count")), "headers": headers, "title": m.group("title").strip()},
-        text,
-    )
+    headers = [h.strip() for h in re.split(r"[,;]", m.group("headers")) if h.strip()]
+    count = int(m.group("count")) if m.group("count") else len(headers)
+    title = re.sub(r"^(?:da|ga|de)\s+", "", m.group("title").strip(), flags=re.IGNORECASE)
+    action = Action("create_table", {"count": count, "headers": headers, "title": title}, text)
     return Plan("excel", None, [action])
 
 

@@ -489,7 +489,19 @@ def _do(a, xl, ws, t, ops, format_table, freeze_header, TableSpec, col_letter, c
         return f"«{t.headers[col - 1]}» = {criteria}: {shown} ta qator ko‘rinadi"
 
     if k == "format":
-        return "sarlavha, ramka va ustun kengligi barcha amallar tugagach qo‘llanadi"
+        # Borders/header/width come in the finishing pass; number formats only here, and
+        # only on columns still in "General" (money, dates, percents stay as they are).
+        done = 0
+        for c in nums:
+            body = ops.column_range(t.range, c)
+            first = ws.Cells(t.top + 1, t.left + c - 1)
+            if str(first.NumberFormat) not in ("General", "Общий", "Umumiy", "@"):
+                continue
+            integer = all(float(v).is_integer() for v in t.column(c) if _is_num(v))
+            ops.set_number_format(body, "integer" if integer else "decimal")
+            done += 1
+        return (f"{done} ta raqamli ustunga raqam formati; sarlavha, ramka va kenglik "
+                "barcha amallar tugagach qo‘llanadi")  # fmt: skip
 
     if k == "total":
         if not nums:
