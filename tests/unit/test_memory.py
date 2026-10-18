@@ -167,3 +167,13 @@ def test_api_teach_page(mem):
     assert api.teach_delete(rid) == []
     plain = Api()  # tests without a memory never touch the user's data
     assert plain.memory_facts() == [] and plain.teach_rules() == []
+
+
+def test_refusing_to_be_remembered_is_not_a_teach_request():
+    from nexvara.memory.teach import parse_teach
+
+    for no in ("Mening ismim Sardor. Buni eslab qol degan emasman, shunchaki gaplashyapmiz.",
+               "Buni eslab qolish shart emas", "eslab qolma, bu sinov"):  # fmt: skip
+        assert parse_teach(no) is None, no
+    assert parse_teach("Eslab qol: maktabim 12-maktab").kind == "fact"
+    assert parse_teach("Unutma, majlis juma kuni").kind == "fact"

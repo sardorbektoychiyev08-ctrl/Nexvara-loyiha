@@ -132,3 +132,16 @@ def test_gemini_native_models_api_is_paginated_and_keeps_key_out_of_url():
     assert len(requests) == 2 and "pageToken=next" in requests[1].full_url
     assert all("private-test-key" not in req.full_url for req in requests)
     assert all(req.get_header("X-goog-api-key") == "private-test-key" for req in requests)
+
+
+def test_media_models_are_never_chat_models():
+    from nexvara.ai.catalog import tier_of
+
+    for p, m in (("gemini", "gemini-3.1-flash-lite-image"), ("gemini", "gemini-3.8-flash-tts"),
+                 ("gemini", "gemini-3.8-flash-lite-tts"), ("gemini", "gemini-3.8-live"),
+                 ("openai", "gpt-image-1-mini"), ("openai", "gpt-4o-mini-transcribe"),
+                 ("openai", "gpt-realtime-mini")):  # fmt: skip
+        assert tier_of(p, m) is None, m
+    assert tier_of("gemini", "gemini-3.5-flash-lite") == "cheap"  # listens and chats
+    assert tier_of("gemini", "gemini-3.8-flash") == "balanced"
+    assert tier_of("openai", "gpt-6-luna") == "cheap"

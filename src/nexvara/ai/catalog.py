@@ -23,7 +23,19 @@ PROVIDERS_API = {
 QUALITY = {"cheap": 1, "balanced": 2, "powerful": 3, "special": 4}
 
 
+_MEDIA_ONLY = ("-image", "-tts", "-transcribe", "-realtime", "-audio", "-live", "-embedding",
+               "image-", "tts-", "whisper", "dall-e", "-search", "-moderation")  # fmt: skip
+
+
 def tier_of(provider: str, model: str) -> str | None:
+    # «gemini-3.1-flash-lite-image» starts like a chat model but only makes pictures;
+    # TTS, transcription, realtime and embedding ids never answer a chat either.
+    if any(caps.find(provider, c, model) for c in ("image", "stt", "tts")) and not any(
+        model == r["model"] for r in caps.MEDIA.get(provider, {}).get("stt", [])
+    ):
+        return None
+    if any(tag in model for tag in _MEDIA_ONLY):
+        return None
     if provider == "deepseek" and model == "deepseek-flash":
         return "balanced"  # the same reviewed model is listed for cheap and balanced
     info = models.PROVIDERS[provider]
