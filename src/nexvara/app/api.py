@@ -197,6 +197,9 @@ class Api(
         drawn = self._chat_drawing(text)  # "... chizib ber", a photo of a hand-drawn sketch
         if drawn is not None:
             return drawn
+        weekly = self._chat_weekly(text)  # "Hisobotlar papkasidan haftalik hisobot qil"
+        if weekly is not None:
+            return weekly
         text = self._bind_refs(text)  # "uni PDF qil" -> the file the last step produced
         agent = self._chat_agent(text, _use_ai)  # several tasks; Files/BI/Workflows/Settings
         if agent is not None:
@@ -620,6 +623,43 @@ class Api(
         return self._context_file or ""
 
     # ----- lesson presentation from a textbook topic -----
+    def _chat_weekly(self, text: str) -> dict[str, Any] | None:
+        """A PDF summary of the week's Excel files in a folder (see nexvara/weekly.py)."""
+        import re
+
+        from nexvara import config
+        from nexvara.agent.nlu import locations
+        from nexvara.knowledge.textnorm import fold
+
+        f = fold(text)
+        if not re.search(r"\bhaftalik\s+hisobot\w*|\bhafta\w*\s+(?:uchun\s+)?hisobot\w*", f):
+            return None
+        folder = next((Path(p) for p in locations(text) if Path(p).is_dir()), None)
+        if folder is None:
+            m = re.search(r"([\w‘’'-]+)\s+papka", text, re.IGNORECASE)
+            name = m.group(1) if m else "Hisobotlar"
+            home = Path.home()
+            for root in (config.data_dir(), home / "Documents", home / "Desktop", Path("D:/")):
+                if (root / name).is_dir():
+                    folder = root / name
+                    break
+        if folder is None:
+            folder = config.data_dir() / "Hisobotlar"
+            folder.mkdir(parents=True, exist_ok=True)
+        out_dir = self._output_dir or (config.data_dir() / "Hisobotlar" / "Haftalik")
+        from nexvara import weekly
+
+        def fn(task: Any) -> dict[str, Any]:
+            with task.step(f"Excel fayllarni o‘qish: {folder}") as s:
+                res = weekly.build(folder, out_dir)
+                s.detail = f"{res['files']} ta fayl"
+            return res
+
+        snap = self._runner.start(f"Haftalik hisobot: {folder.name}", fn).snapshot()
+        return {"reply": f"«{folder}» papkasidagi shu hafta o‘zgargan Excel fayllardan PDF hisobot "
+                "tayyorlayapman (Excel ochilmaydi). Har juma avtomatik bo‘lishi uchun: Ish "
+                "jarayonlari → shablon «Haftalik hisobot».", "task": snap}  # fmt: skip
+
     def _chat_lesson(self, req: Any) -> dict[str, Any]:
         from nexvara.knowledge.topicdoc import lookup
 

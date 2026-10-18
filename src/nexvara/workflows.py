@@ -42,6 +42,12 @@ TEMPLATES: list[dict[str, Any]] = [
         "trigger": {"type": "folder", "folder": "", "ext": ".docx"},
     },
     {
+        "name": "Haftalik hisobot (har juma 17:00)",
+        "steps": [{"kind": "command",
+                   "text": "Hisobotlar papkasidagi Excel fayllardan haftalik hisobot qil"}],
+        "trigger": {"type": "weekly", "days": [4], "time": "17:00"},
+    },
+    {
         "name": "Haftalik test (tasdiq bilan)",
         "steps": [
             {"kind": "approve", "text": "Test tuzishni boshlaymi?"},

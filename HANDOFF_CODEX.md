@@ -11,7 +11,7 @@ Order and status (Claude ticks these as it goes):
 - [x] Drawing templates (`cad_templates.py`, PC select + phone dialog, `/api/v1/cad/templates`).
 - [x] Auto-fix documents («kamchiliklarni tuzat», action `fix` in *_exec.py), Office tests PASS.
 - [x] Lesson plan («dars ishlanmasi», `knowledge/lessonplan.py`, `Api._chat_lesson`), Office test PASS.
-- [ ] Weekly report workflow template (every Friday: Excel → PDF → phone).
+- [x] Weekly report (`weekly.py`, chat «… haftalik hisobot qil», workflow template Fri 17:00).
 - [ ] 3D view of a drawing (extrude closed shapes) in the PC editor.
 - [ ] Voice command on the PC (mic → WAV → Gemini transcription; needs the user's key + consent).
 - [ ] Full tests, PROGRESS entry, build/install APK.
