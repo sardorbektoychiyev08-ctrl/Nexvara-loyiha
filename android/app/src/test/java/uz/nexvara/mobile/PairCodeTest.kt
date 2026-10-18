@@ -44,3 +44,12 @@ class PairCodeTest {
         }
     }
 }
+
+class DiscoveryTest {
+    @org.junit.Test fun scansOnlyPrivateNetworksWithoutOwnAddress() {
+        val c = WindowsApi.candidates(listOf("172.30.96.93" to 24, "11.71.160.37" to 30, "127.0.0.1" to 8, "10.23.234.125" to 16))
+        org.junit.Assert.assertEquals(253, c.size)  // only 172.30.96.x: public, loopback and /16 skipped
+        org.junit.Assert.assertTrue("172.30.96.202" in c && "172.30.96.93" !in c)
+        org.junit.Assert.assertTrue(WindowsApi.isPrivate("192.168.1.5") && !WindowsApi.isPrivate("8.8.8.8"))
+    }
+}

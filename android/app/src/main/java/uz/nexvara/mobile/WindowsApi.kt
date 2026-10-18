@@ -63,7 +63,29 @@ class WindowsApi(private val pair: PairCode, private val token: String? = null, 
     private fun open(path: String, method: String, requestId: String?, setup: (HttpsURLConnection) -> Unit = {}): HttpsURLConnection {
         require(path.startsWith("/api/v1/"))
         var last: Exception? = null
+        val tried = mutableSetOf<String>()
         for (base in bases) {
+            tried += base
+            try { return attempt(base, path, method, requestId, setup) }
+            catch (e: javax.net.ssl.SSLException) { throw e }  // a wrong certificate never means "try the next address"
+            catch (e: java.io.IOException) { last = e }
+        }
+        // None of the known addresses answered: the PC may be on another network now (e.g. on
+        // this phone's hotspot or USB tethering). Look for it on the phone's own local networks;
+        // the pinned certificate still decides whether it is our PC.
+        val port = runCatching { URL(pair.baseUrl).port }.getOrDefault(-1)
+        if (port in 1..65535 && discoveryAllowed(pair.serverId)) {
+            for (base in discover(port).filter { it !in tried }) {
+                // another machine with the same port open fails the pin and is simply skipped
+                try { return attempt(base, path, method, requestId, setup) } catch (_: java.io.IOException) { }
+            }
+        }
+        throw last ?: java.io.IOException("Kompyuter manzili yo‘q")
+    }
+
+    private fun attempt(base: String, path: String, method: String, requestId: String?,
+                        setup: (HttpsURLConnection) -> Unit): HttpsURLConnection {
+        run {
             val c = URL(base + path).openConnection() as HttpsURLConnection
             try {
                 c.sslSocketFactory = sslFactory
@@ -80,13 +102,10 @@ class WindowsApi(private val pair: PairCode, private val token: String? = null, 
                 c.connect()
                 lastGood[pair.serverId] = base
                 return c
-            } catch (e: javax.net.ssl.SSLException) {
-                c.disconnect(); throw e  // a wrong certificate never means "try the next address"
             } catch (e: java.io.IOException) {
-                c.disconnect(); last = e
+                c.disconnect(); throw e
             }
         }
-        throw last ?: java.io.IOException("Kompyuter manzili yo‘q")
     }
 
     private fun envelope(c: HttpsURLConnection): JSONObject {
@@ -179,6 +198,48 @@ class WindowsApi(private val pair: PairCode, private val token: String? = null, 
 
     companion object {
         private val lastGood = java.util.concurrent.ConcurrentHashMap<String, String>()
+        private val lastScan = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+        private fun discoveryAllowed(serverId: String): Boolean {
+            val now = System.currentTimeMillis()
+            val prev = lastScan[serverId] ?: 0L
+            if (now - prev < 60_000) return false  // at most once a minute
+            lastScan[serverId] = now
+            return true
+        }
+
+        /** Private /24 networks this phone is on, without its own address (pure, unit-tested). */
+        fun candidates(own: List<Pair<String, Int>>): List<String> = own
+            .filter { (ip, prefix) -> prefix in 20..30 && isPrivate(ip) }
+            .flatMap { (ip, _) -> val net = ip.substringBeforeLast('.'); (1..254).map { "$net.$it" }.filter { it != ip } }
+            .distinct().take(1024)
+
+        fun isPrivate(ip: String): Boolean {
+            val p = ip.split('.').mapNotNull { it.toIntOrNull() }
+            if (p.size != 4) return false
+            return p[0] == 10 || (p[0] == 172 && p[1] in 16..31) || (p[0] == 192 && p[1] == 168)
+        }
+
+        /** "https://ip:port" of every machine on the phone's local networks with [port] open. */
+        fun discover(port: Int): List<String> {
+            val own = runCatching {
+                java.net.NetworkInterface.getNetworkInterfaces().toList().filter { it.isUp && !it.isLoopback }
+                    .flatMap { it.interfaceAddresses }
+                    .mapNotNull { ia -> (ia.address as? java.net.Inet4Address)?.let { it.hostAddress.orEmpty() to ia.networkPrefixLength.toInt() } }
+            }.getOrDefault(emptyList())
+            val ips = candidates(own)
+            if (ips.isEmpty()) return emptyList()
+            val pool = java.util.concurrent.Executors.newFixedThreadPool(48)
+            try {
+                val jobs = ips.map { ip ->
+                    pool.submit<String?> {
+                        try { java.net.Socket().use { it.connect(java.net.InetSocketAddress(ip, port), 400) }; ip } catch (_: Exception) { null }
+                    }
+                }
+                return jobs.mapNotNull { runCatching { it.get(6, java.util.concurrent.TimeUnit.SECONDS) }.getOrNull() }
+                    .map { "https://$it:$port" }
+            } finally { pool.shutdownNow() }
+        }
 
         /** "https://ip:port" for every address the PC reported (LAN first, then Tailscale). */
         fun hostsFrom(data: JSONObject?): List<String> {
