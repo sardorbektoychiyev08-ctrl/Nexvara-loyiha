@@ -152,20 +152,24 @@ def _gray(path: Path, long_side: int) -> Gray:
 
 
 def _threshold(img: Gray) -> int:
+    """Ink vs paper (Otsu): works for a mostly white sheet and for a grey, dim photo alike."""
     hist = [0] * 256
-    step = max(1, len(img.data) // 200_000)
+    step = max(1, len(img.data) // 300_000)
     for v in img.data[::step]:
         hist[v] += 1
     total = sum(hist)
-    acc, p5, med = 0, None, None
-    for v, c in enumerate(hist):
-        acc += c
-        if p5 is None and acc >= total * 0.03:
-            p5 = v
-        if med is None and acc >= total * 0.5:
-            med = v
-            break
-    return int(((p5 or 0) + (med or 255)) / 2)
+    sum_all = sum(i * c for i, c in enumerate(hist))
+    best, t, w0, sum0 = -1.0, 128, 0, 0
+    for v in range(256):
+        w0 += hist[v]
+        if w0 == 0 or w0 == total:
+            continue
+        sum0 += v * hist[v]
+        m0, m1 = sum0 / w0, (sum_all - sum0) / (total - w0)
+        between = w0 * (total - w0) * (m0 - m1) ** 2
+        if between > best:
+            best, t = between, v
+    return max(40, min(t, 200))
 
 
 def _blobs(img: Gray, t: int) -> list[dict[str, float]]:

@@ -119,7 +119,7 @@ fun AnswerSheetsScreen(m: AppModel, act: PhoneActions) {
                     TextButton(onClick = { val who = student; m.onUploaded = { p -> m.gradeSheet(s, p, who) }; act.pickImage() },
                         enabled = s.keys.isNotEmpty()) { Text("Galereyadan") }
                     TextButton(onClick = { m.previewFile(s.pdf) }) { Text("Varaqani ko‘rish") }
-                    TextButton(onClick = { act.saveResult(s.pdf) }) { Text("Telefonga") }
+                    IconButton(onClick = { act.saveResult(s.pdf) }) { Icon(Icons.Default.Download, "Telefonga yuklab olish") }
                 }
                 s.results.take(5).forEach { r ->
                     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {

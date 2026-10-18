@@ -218,6 +218,18 @@ opened on the PC (`POST /files/open`, programs/scripts refused) or shared to the
 (`POST /files/share` → `GET /files?path=` for 30 minutes) for 10 minutes. Keys, databases,
 `*.pem/*.jks/*.kdbx…` and NEXVARA's own `remote/`, `telegram/`, `release/` are never listed.
 
+## 13. Teacher and office tools
+
+| Area | Routes |
+|---|---|
+| Answer sheets | `GET/POST /omr`, `POST /omr/{id}/keys`, `POST /omr/{id}/grade` (`path` of an uploaded photo). Sheet = PDF with 4 corner squares; reading = homography + Otsu threshold (`src/nexvara/omr.py`); results → Excel |
+| Class journal | `GET/POST /journal`, `GET /journal/{id}?subject=`, `POST /journal/{id}/students|delete|export`, `POST /journal/grade`, `POST /journal/grade/{id}/delete` |
+| Documents | `GET /doctemplates`, `POST /doctemplates/{id}` (`fields`, `background`) → Word on the PC, DOCX + PDF |
+| Photo → text | `POST /ocr` (`path`, `lang`): Windows OCR offline, enhanced photo, best of Latin/Cyrillic; in chat «AI bilan … o‘qi» reads handwriting after consent |
+| Preview | `GET /files/preview?path=`: PDF / picture / text as is, Office → PDF in a temp folder |
+| Control | `POST /control` (off unless `remote.control`; PC shows «📱 Telefon boshqarmoqda») |
+| Autostart | `GET/POST /autostart`; `session.wake` = `{mac, broadcast}` for Wake-on-LAN |
+
 ## 9. Testing without the real PC data
 
 ```

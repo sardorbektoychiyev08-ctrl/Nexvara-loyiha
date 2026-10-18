@@ -24,7 +24,33 @@ object Lang {
     var ru by mutableStateOf(false)
 }
 
-fun tr(s: String): String = if (!Lang.ru) s else RU[s] ?: s
+fun tr(s: String): String {
+    if (!Lang.ru) return s
+    RU[s]?.let { return it }
+    for ((rx, out) in PATTERNS) {
+        val m = rx.matchEntire(s) ?: continue
+        return out(m.groupValues)
+    }
+    return s
+}
+
+/** Sentences with numbers in them. */
+private val PATTERNS: List<Pair<Regex, (List<String>) -> String>> = listOf(
+    Regex("qoldi (.+)") to { g -> "осталось ${g[1]}" },
+    Regex("(\\d+) ta panel") to { g -> "панелей: ${g[1]}" },
+    Regex("(\\d+) ta jarayon") to { g -> "процессов: ${g[1]}" },
+    Regex("(\\d+) ta qoida") to { g -> "правил: ${g[1]}" },
+    Regex("(\\d+) ta eslatma") to { g -> "заметок: ${g[1]}" },
+    Regex("(\\d+) ta o‘quvchi") to { g -> "учеников: ${g[1]}" },
+    Regex("(\\d+) ta maydon") to { g -> "полей: ${g[1]}" },
+    Regex("(\\d+) ta") to { g -> g[1] },
+    Regex("Oylik limit (.+) · AI yoqilgan") to { g -> "Месячный лимит ${g[1]} · AI включён" },
+    Regex("Oylik limit (.+) · AI o‘chiq") to { g -> "Месячный лимит ${g[1]} · AI выключен" },
+    Regex("Bugun: (.+)") to { g -> "Сегодня: ${g[1]}" },
+    Regex("Oxirgi: (.+) · shifrlangan") to { g -> "Последняя: ${g[1]} · зашифровано" },
+    Regex("(\\d+) savol · (\\d+) variant · (\\d+) ta tekshirildi(.*)") to { g -> "${g[1]} вопр. · ${g[2]} вар. · проверено: ${g[3]}${g[4].replace(" · kalit yo‘q", " · нет ключа")}" },
+    Regex("(\\d+)-sinf") to { g -> "${g[1]} класс" },
+)
 
 @Composable
 fun Text(
@@ -145,4 +171,16 @@ private val RU: Map<String, String> = mapOf(
     "Yozishni boshlash" to "Начать запись", "To‘xtatish" to "Остановить", "Hali hech narsa yozilmadi" to "Пока ничего не записано",
     "Kompyuterga yozish" to "Ввод на компьютер", "Kompyuter ekrani yuklanmoqda…" to "Загружается экран компьютера…",
     "NEXVARA’ga buyruq…" to "Команда для NEXVARA…", "Yopish" to "Закрыть",
+    "Qoidalar" to "Правила", "Panellar" to "Панели", "Sinxron sozlanmagan" to "Синхронизация не настроена",
+    "Kompyuterda Sozlamalar → Sinxronlash" to "На ПК: Настройки → Синхронизация", "ulangan" to "подключён",
+    "kalit yo‘q" to "нет ключа", "Kalit kiritilmagan" to "Ключ не введён", "baho yo‘q" to "оценок нет",
+    "Kompyuter bilan aloqa yo‘q — ulangach sarf va limitlar shu yerda ko‘rinadi" to "Нет связи с ПК — расходы и лимиты появятся после подключения",
+    "Tinglayapman…" to "Слушаю…", "Gapirilganini matnga aylantiradi" to "Превращает речь в текст", "Boshqarish rejimi" to "Режим управления",
+    "Faqat ko‘rish" to "Только просмотр", "To‘xtatilgan" to "Остановлено", "Buyruqlar kompyuterda bajariladi" to "Команды выполняются на ПК",
+    "Ovozli suhbat yoqilgan" to "Голосовой чат включён", "Suhbatga" to "В чат", "Sevimlilarga" to "В избранное",
+    "Kompyuterni boshqarish" to "Управление компьютером", "Darsdan oldin eslatma keladi (internetsiz)" to "Напоминание перед уроком (без интернета)",
+    "To‘ldiring — Word kompyuterda yozadi (DOCX + PDF)" to "Заполните — Word напишет на ПК (DOCX + PDF)",
+    "Telefondan baho qo‘ying — Excel jurnal kompyuterda" to "Ставьте оценки с телефона — журнал Excel на ПК",
+    "Chop eting → o‘quvchilar bo‘yaydi → suratga oling → baho tayyor" to "Печать → ученики закрашивают → фото → оценка готова",
+    "Galereyadan" to "Из галереи",
 )

@@ -789,7 +789,7 @@ fun SettingsScreen(m: AppModel, act: PhoneActions) {
                 Spacer(Modifier.height(10.dp))
                 Text("Til", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(8.dp))
-                ChipRow(listOf("uz" to "O‘zbekcha", "ru" to "Русский"), if (m.russian) "ru" else "uz") { m.useRussian(it == "ru") }
+                ChipRow(listOf("uz" to "O‘zbek tili", "ru" to "Русский язык"), if (m.russian) "ru" else "uz") { m.useRussian(it == "ru") }
             }
         }
         item { SectionTitle("Xavfsizlik va ovoz") }

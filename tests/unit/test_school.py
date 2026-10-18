@@ -393,3 +393,23 @@ def test_read_photo_in_chat_offline_and_with_ai(tmp_path, monkeypatch):
     done = api2.confirm_ai(ask["confirm"], True)
     assert "12-mashq" in done["reply"] and "GPSLatitude" not in pro.calls[0][0]["images"][0]["data"]
     assert r.ledger.recent()[0]["purpose"] == "Rasmdan matn"
+
+
+def test_mostly_white_high_resolution_photo(tmp_path):
+    """Regression: a big, almost all-white JPEG (a real phone photo of a short test) once
+    gave threshold 255 and read every row as «several marks»."""
+    import fitz
+
+    from nexvara import omr
+
+    pdf = omr.make_sheet_pdf(tmp_path / "s.pdf", "Qisqa", 10, 1)
+    doc = fitz.open(str(pdf))
+    page = doc[0]
+    lay = omr.layout(10, 1)
+    ans = "ABCDABCDCC"
+    for i, ch in enumerate(ans):
+        x, y = lay["q"][i]["ABCD".index(ch)]
+        page.draw_circle((x, y), omr.R * 0.75, color=(0.1, 0.1, 0.35), fill=(0.1, 0.1, 0.35))
+    out = tmp_path / "telefon.jpg"
+    page.get_pixmap(matrix=fitz.Matrix(2.2, 2.2).prerotate(6)).save(str(out))
+    assert omr.read_sheet(out, 10, 1)["answers"] == ans

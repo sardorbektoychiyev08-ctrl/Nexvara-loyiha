@@ -61,7 +61,9 @@ fun AppModel.setOmrKey(set: OmrSet, variant: Int, key: String) =
 
 fun AppModel.gradeSheet(set: OmrSet, photoPath: String, student: String) =
     call(block = post("/api/v1/omr/${set.id}/grade", JSONObject().put("path", photoPath).put("student", student))) {
-        tools.omrLast = SchoolParse.omrResult(it)
+        val r = SchoolParse.omrResult(it)
+        tools.omrLast = r
+        notice = "${r.student}: baho ${r.mark} — ${r.right}/${r.total} to‘g‘ri (${r.percent}%)"
         loadOmr()
     }
 

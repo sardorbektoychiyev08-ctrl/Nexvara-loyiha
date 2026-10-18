@@ -4,6 +4,41 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-18 (23) — Claude Code — Android 1.2.0: o‘qituvchi va ofis uchun 14 ta yangi imkoniyat, aqlli OCR va ovoz, telefonda E2E
+
+**Foydalanuvchi talabi:** taklif qilingan barcha qulayliklar: javob varaqalari, jurnal, rasmdan matn, dars jadvali, hujjat shablonlari, skaner, majlis yozuvi, ilovada ko‘rish, kompyuterni yoqish, vidjet, haftalik jadval, sevimlilar, kompyuterni boshqarish, rus tili; «hammasi aqlli ishlasin, ayniqsa rasmni o‘qish va ovozni matnga aylantirish».
+
+**Windows (yangi modullar):** `omr.py` (javob varaqasi PDF; rasmda 4 burchak → gomografiya → doirachalar; Otsu chegara; Excel natijalar), `journal.py` (app.db, Excel jurnal), `doctemplates.py` (7 shablon, Word jonli, DOCX+PDF), `knowledge/ocr.ocr_image` (tiniqlashtirish, lotin/kirill eng yaxshisi, `tidy`), `app/api_reading.py` (suhbatda «rasmdagi matnni o‘qi»: oflayn yoki «AI bilan» — qo‘lyozma, ruxsat bilan), `control.py` (sichqoncha/klaviatura; sukut bo‘yicha o‘chiq, PC’da yoqiladi), `pcpower.py` (Windows bilan ishga tushish, Wake-on-LAN ma’lumoti), haftalik workflow, testlar javob kaliti natijada, `remote_v1_school.py` (+19 marshrut), Qurilmalar sahifasida «Telefonga ruxsatlar».
+
+**Android 1.2.0:** Javob varaqalari, Sinf jurnali, Hujjat shablonlari, Dars jadvali + eslatma (AlarmManager, qayta yuklashdan keyin ham), Majlis yozuvi (uzluksiz SpeechRecognizer, til tanlash, Android 13+ tinish belgilari, AI tahrir/bayonnoma), Rasmdan matn (+ «Qo‘lyozma: AI bilan»), ML Kit skaner → PDF, ilovada PDF/Word/rasm/matn ko‘rish, kompyuterni boshqarish (barmoq izi bilan), Wake-on-LAN, bosh ekran vidjeti, sevimli/oxirgi buyruqlar, haftalik jadval, rus tili (`ui/I18n.kt`; buyruq namunalari ataylab o‘zbekcha).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff, Windows unit | PASS — 342 passed, 56 skipped |
+| Windows oyna smoke + 9 ta haqiqiy oyna UI skripti | PASS |
+| Javob varaqasi: −30°…+30° burilgan 60 savol/4 variant | PASS (61 holat) |
+| Haqiqiy Windows OCR: past kontrast lotin, kirill (avto tanlov) | PASS (rus OCR «қ/ҳ» ni «к/х» o‘qiydi — cheklov) |
+| Android build + 16 unit test | PASS — APK `D:\NEXVARA\android\NEXVARA-Android-1.2.0-debug.apk` |
+| Telefonda E2E (Android 16, haqiqiy Agent, vaqtinchalik ma’lumot, AI kalitsiz): jurnal (sinf, o‘quvchi, baho, Excel PC’da) | PASS 4/4 |
+| Hujjat shabloni → haqiqiy Word DOCX+PDF; Word hujjatini ilova ichida ko‘rish | PASS |
+| Javob varaqasi yaratish (PDF PC’da), ilovada PDF ko‘rish | PASS |
+| Galereyadagi to‘ldirilgan varaq rasmi → «baho 4 — 8/10» | PASS (avval FAIL: oq rasmda chegara 255 → Otsu bilan tuzatildi + regressiya testi) |
+| Galereyadagi sahifa rasmi → matn (internetsiz) | PASS |
+| Dars jadvali + Bosh sahifada «Bugungi darslar» | PASS |
+| Majlis yozuvi: mikrofon ruxsati, tinglash, jimlikda uzilmasligi | PASS; nutqning matnga aylanishi — NOT TESTED (tirik ovoz kerak) |
+| Rus tili ↔ o‘zbek tili | PASS (til tugmalari tarjima bo‘lib qolgani topildi → tuzatildi) |
+| ML Kit skaner ochilishi; Wake-on-LAN tugmasi va signal | PASS |
+| Kompyuterni boshqarish (telefon UI) | NOT TESTED — barmoq izi kerak (API testlari PASS) |
+| Vidjet, dars eslatmasi bildirishnomasi | NOT TESTED — qo‘l bilan |
+| AI bilan qo‘lyozma, bayonnoma, chizma | NOT TESTED — kalit yo‘q (soxta AI bilan PASS) |
+
+**Tozalash:** telefon `stay_on_while_plugged_in` = 0 ga qaytarildi, sinov rasmlari va sinov kompyuteri o‘chirildi, sinov Word hujjati yopildi. NEXVARA’ga mikrofon ruxsati berildi (telefon sozlamalaridan olib tashlash mumkin).
+
+**Keyingi qadam:** foydalanuvchi bilan: haqiqiy qog‘oz varaqni kamera bilan, ovoz, barmoq izi bilan boshqarish, vidjet; AI kaliti bilan qo‘lyozma va bayonnoma; keyin `main` ga merge.
+
+---
+
 ## 2026-10-17 (22) — Claude Code — Android 1.1.0: barcha qulayliklar, boshqa tarmoq, telefonda haqiqiy E2E
 
 **Foydalanuvchi talabi:** Android’da hamma ishni tugatish (o‘qituvchidan ofisgacha barcha imkoniyatlar, juda qulay), har xil Wi-Fi’da xavfsiz ishlash, taklif qilingan barcha qulayliklar; API kalitsiz Android va Windows’ni o‘zim sinash — telefon USB bilan ulab qo‘yildi, foydalanuvchi uxladi.
