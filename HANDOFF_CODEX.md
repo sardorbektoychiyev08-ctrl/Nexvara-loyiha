@@ -1,5 +1,41 @@
 # HANDOFF → Codex (Windows side)
 
+## ▶ CURRENT TASK 4 (2026-10-18, for Codex) — Excel quality, then Word and PowerPoint
+
+Owner (Uzbek, non-programmer): «Excel’da jadval tuzishda xatolar bor va ramka chiziqlari yo‘q —
+o‘zi ko‘rib, to‘liq tuzatsin; qolganlarini (Word, PowerPoint) ham tekshirib, xato bo‘lsa
+tuzatsin». Branch `claude/android-v1`, worktree `D:\Nexvara loyiha\.worktrees\android`
+(`.venv` there is a junction to `..\..\.venv`). Office tests: `NEXVARA_RUN_OFFICE=1` (the owner
+allows throwaway test files only).
+
+What Claude found (start here):
+1. Borders are drawn only by the `format` action (`skills/excel/bridge.py:format_table`,
+   `rng.Borders` on `Table.range`, which EXCLUDES footer rows). So:
+   - rows added later — JAMI (`total`), O‘RTACHA/MAKSIMUM… (`stats`) — have no borders;
+   - a formula column (`formula`) gets borders only if the cell left of it had one;
+   - any command without «formatla» (sort, filter, numfmt, highlight…) leaves a plain table.
+   Fix: every Excel command that writes or changes a table ends with a «finish the table» pass
+   (thin borders on the whole table incl. footers, bold header with fill, numbers right/centre,
+   AutoFit, freeze header) unless the user said not to; verify borders on reopen
+   (`Borders(xlEdgeBottom/xlInsideHorizontal).LineStyle` on header, a body cell, the footer).
+2. Check `BORDER_COLOR` is visible on paper (PDF export) — a very light colour looks like «no
+   lines». Use a mid grey/black for print.
+3. «Jadval tuzishda xatolar»: test real requests end to end in Excel and fix what fails, e.g.
+   «Savdo.xlsx ni och, jami qo‘sh, formatla», «formatla, jami qo‘sh» (both orders), headers in
+   row 2 or 3, merged title in row 1, empty columns, dates and money columns, 2 000+ rows,
+   Russian Office. There is no «create a new table from my words» command yet
+   (e.g. «Excel’da 5 ustunli o‘quvchilar jadvali tuz: F.I.Sh, sinf, …») — add it
+   (`agent/parse.py` + new executor step), real Excel test included.
+4. Then the same review for Word (`agent/word_exec.py`) and PowerPoint (`agent/ppt_exec.py`):
+   run every command in `tests/office/test_commands*.py` style on realistic files, open the
+   results, fix what looks wrong (tables without borders in Word too, layout overflow).
+5. Rules: originals never change (`_NEXVARA` copies); Uzbek Latin messages; `test.ps1 -Office`
+   PASS; PROGRESS entry; commit; no merge/push without the owner. Rebuild Windows installer
+   (`scripts\build.ps1`, then `python -m nexvara.updater publish dist\installer\NEXVARA-Setup-<v>.exe
+   <v> D:\NEXVARA\releases "<notes>"`, bump `__version__` to 1.1.1) and install silently
+   (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART`) after backing up `D:\NEXVARA\*.db`,
+   `settings.json`. Also run the installed `NEXVARA.exe --selftest-installed <temp dir>`.
+
 ## ▶ CURRENT TASK 3 (2026-10-18 noon, Claude) — continue from here if Claude stopped
 
 Owner: "do all six proposals; an AI button that redraws my rough sketch correctly; install the
