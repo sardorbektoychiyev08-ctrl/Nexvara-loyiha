@@ -21,6 +21,7 @@ from nexvara.app.api_cad import CadApi
 from nexvara.app.api_devices import DevicesApi
 from nexvara.app.api_drawing import DrawingApi
 from nexvara.app.api_files import FilesApi
+from nexvara.app.api_media import MediaApi
 from nexvara.app.api_memory import MemoryApi
 from nexvara.app.api_reading import ReadingApi
 from nexvara.app.api_sections import SectionsChatApi
@@ -73,6 +74,7 @@ class Api(
     DrawingApi,
     CadApi,
     VoiceApi,
+    MediaApi,
     ReadingApi,
 ):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
@@ -206,6 +208,9 @@ class Api(
         drawn = self._chat_drawing(text)  # "... chizib ber", a photo of a hand-drawn sketch
         if drawn is not None:
             return drawn
+        media = self._chat_media(text)  # ✨ «rasm yarat: …», a question about the open photo
+        if media is not None:
+            return media
         weekly = self._chat_weekly(text)  # "Hisobotlar papkasidan haftalik hisobot qil"
         if weekly is not None:
             return weekly
@@ -471,6 +476,10 @@ class Api(
             return self._run_drawing(payload)
         if kind == "read":
             return self._run_read(payload)
+        if kind == "image":
+            return self._run_image(payload)
+        if kind == "vision":
+            return self._run_vision(payload)
         snap = self.make_test({**payload, "approved": True})
         if "id" not in snap:
             return {"reply": snap.get("error") or "Test boshlanmadi"}

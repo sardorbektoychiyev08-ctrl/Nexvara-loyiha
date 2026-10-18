@@ -76,6 +76,13 @@ def _json_from(text: str) -> Any:
     raise AiError("AI javobini tushunib bo‘lmadi (JSON emas).")
 
 
+def _is_json_object(text: str) -> bool:
+    try:
+        return isinstance(_json_from(text), dict)
+    except AiError:
+        return False
+
+
 def classify(router: AiRouter, text: str, approved: bool = False) -> Intent:
     r = router.complete(
         "classify",
@@ -251,6 +258,7 @@ def plan(
         expected_out=500,
         approved=approved,
         effort="low" if purpose == "plan" else "medium",
+        accept=_is_json_object,  # an unusable plan → one retry on the next stronger tier
     )
     data = _json_from(r.text)
     if not isinstance(data, dict):

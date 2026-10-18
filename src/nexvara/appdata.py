@@ -49,6 +49,11 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "free_mode": True,
         "voice_consent": False,  # spoken commands go to Gemini only after the user agreed
         "self_repair": True,  # a failed command: the AI reads the error and tries again (2x)
+        # 🧠 per direction: {"mode": "auto"|"manual", "provider", "model"} (ai/capabilities.py)
+        "capabilities": {},
+        "catalog": {},  # provider -> direction -> model ids of the account (key check)
+        "speak_replies": False,  # 🔊 read every answer aloud
+        "voice": "",  # TTS voice ("" = the provider's default)
         "send_textbook_text": True,
         "models": {},  # provider -> tier -> model id (filled when a key is checked)
         "checked": {},  # provider -> {"at": time, "models": n} of the last key check
