@@ -589,6 +589,16 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     fun shareToPhone(f: PcFile, then: (String) -> Unit) = call(block = post("/api/v1/files/share", JSONObject().put("path", f.path))) {
         then(it.optString("path"))
     }
+    /** ZIP on the PC, next to the first file; [then] gets the archive when the phone may take it. */
+    fun zipOnPc(files: List<String>, then: (String) -> Unit) =
+        call(block = post("/api/v1/files/zip", JSONObject().put("paths", JSONArray(files)))) {
+            notice = "ZIP tayyor: «${it.optString("name")}», ${it.optInt("files")} ta fayl (kompyuterda, fayllar yonida)"
+            if (it.optBoolean("downloadable")) then(it.optString("path"))
+            else notice = "ZIP kompyuterda tayyor, lekin telefonga olish uchun juda katta"
+        }
+    fun unzipOnPc(f: PcFile) = call(block = post("/api/v1/files/unzip", JSONObject().put("path", f.path))) {
+        notice = "Arxivdan chiqarildi: «${it.optString("name")}» papkasi, ${it.optInt("files")} ta fayl"
+    }
 
     fun linkGoogle(idToken: String) = call(block = post("/api/v1/account/link", JSONObject().put("id_token", idToken))) {
         notice = "Google hisobi bog‘landi: ${it.optString("email")}"; refreshAll()

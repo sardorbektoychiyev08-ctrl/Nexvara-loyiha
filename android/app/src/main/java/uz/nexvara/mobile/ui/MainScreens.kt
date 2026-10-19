@@ -112,7 +112,7 @@ fun AppRoot(m: AppModel, act: PhoneActions) {
                 Screen.Dictation -> DictationScreen(m, act)
                 Screen.Preview -> PreviewScreen(m, act)
                 Screen.Templates -> TemplatesScreen(m)
-                Screen.Cad -> CadScreen(m)
+                Screen.Cad -> CadScreen(m, act)
                 Screen.Office -> OfficeScreen(m, act)
                 Screen.Library -> LibraryScreen(m)
                 Screen.Files -> FilesScreen(m, act)

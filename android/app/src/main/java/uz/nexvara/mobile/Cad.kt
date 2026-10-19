@@ -327,7 +327,7 @@ fun AppModel.cadSave(openOnPc: Boolean) {
     val body = JSONObject().put("name", cad.name).put("drawing", cad.toJson()).put("open_on_pc", openOnPc)
     call(block = post("/api/v1/cad", body)) {
         cad.lastSaved = it; cad.path = it.optString("dxf")
-        notice = "Saqlandi: AutoCAD DXF, PDF va rasm kompyuterda" + if (openOnPc) " — Chizmalar oynasida ochildi" else ""
+        notice = "Saqlandi: AutoCAD DXF, PDF, Word va rasm kompyuterda" + if (openOnPc) " — Chizmalar oynasida ochildi" else ""
         cadList()
     }
 }

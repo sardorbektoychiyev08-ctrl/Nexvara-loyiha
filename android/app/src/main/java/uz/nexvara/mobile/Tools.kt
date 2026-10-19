@@ -27,6 +27,8 @@ class Tools {
     var preview by mutableStateOf<Preview?>(null)
     var autostart by mutableStateOf<Boolean?>(null)
     var controlOn by mutableStateOf(false)
+    var touchpad by mutableStateOf(true)  // finger moves the cursor, like a laptop touchpad
+    var dragging by mutableStateOf(false)
     var dictating by mutableStateOf(false)
     var dictation by mutableStateOf("")
     var partial by mutableStateOf("")
@@ -156,8 +158,8 @@ fun AppModel.previewFile(path: String) {
 }
 
 // ---------------- the PC: control, autostart, wake ----------------
-fun AppModel.control(action: String, x: Float? = null, y: Float? = null, dy: Int = 0, text: String = "", key: String = "") {
-    val b = JSONObject().put("action", action).put("dy", dy).put("text", text).put("key", key)
+fun AppModel.control(action: String, x: Float? = null, y: Float? = null, dy: Int = 0, text: String = "", key: String = "", dx: Int = 0) {
+    val b = JSONObject().put("action", action).put("dy", dy).put("dx", dx).put("text", text).put("key", key)
     if (x != null && y != null) b.put("x", x.toDouble()).put("y", y.toDouble())
     call(quiet = true, block = post("/api/v1/control", b)) { }
 }

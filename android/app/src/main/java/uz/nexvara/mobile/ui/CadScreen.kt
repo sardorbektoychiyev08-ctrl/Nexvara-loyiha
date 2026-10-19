@@ -61,7 +61,7 @@ private enum class CadArea(val label: String, val fraction: Float?) {
 private fun fmt(v: Double) = (Math.round(v * 10) / 10.0).toString().removeSuffix(".0").replace('.', ',')
 
 @Composable
-fun CadScreen(m: AppModel) {
+fun CadScreen(m: AppModel, act: PhoneActions) {
     val cad = m.cad
     val x = LocalExtra.current
     var tool by remember { mutableStateOf(CadTool.Smart) }
@@ -298,10 +298,24 @@ fun CadScreen(m: AppModel) {
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                     Checkbox(openPc, { openPc = it }); Text("Kompyuterdagi Chizmalar oynasida ochish")
                 }
-                Text("AutoCAD DXF (mm), PDF va rasm bo‘lib saqlanadi.", style = MaterialTheme.typography.bodySmall, color = x.muted)
+                Text("AutoCAD DXF (mm), PDF, Word va rasm bo‘lib saqlanadi.", style = MaterialTheme.typography.bodySmall, color = x.muted)
             } },
             confirmButton = { TextButton(onClick = { cad.name = name.ifBlank { "Telefon chizmasi" }; m.cadSave(openPc); saveDialog = false }) { Text("Saqlash") } },
             dismissButton = { TextButton(onClick = { saveDialog = false }) { Text("Bekor") } })
+    }
+
+    cad.lastSaved?.let { saved ->
+        AlertDialog(onDismissRequest = { cad.lastSaved = null }, title = { Text("Kompyuterda saqlandi") },
+            text = { Column {
+                Text("Telefonga olish:", style = MaterialTheme.typography.bodySmall, color = x.muted)
+                listOf("pdf" to "PDF (chop etish uchun)", "docx" to "Word", "png" to "Rasm (PNG)", "dxf" to "AutoCAD DXF").forEach { (k, label) ->
+                    val path = saved.optString(k)
+                    if (path.isNotBlank()) TextButton(onClick = { act.saveResult(path) }) {
+                        Icon(Icons.Default.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(label)
+                    }
+                }
+            } },
+            confirmButton = { TextButton(onClick = { cad.lastSaved = null }) { Text("Yopish") } })
     }
 
     if (listDialog) {
