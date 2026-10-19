@@ -294,6 +294,74 @@ def render(doc: Any, pdf: Path | None = None, png: Path | None = None,
     return out
 
 
+_KIND_UZ = {"LINE": "Chiziq", "LWPOLYLINE": "Siniq chiziq", "POLYLINE": "Siniq chiziq",
+            "CIRCLE": "Aylana", "ARC": "Yoy", "ELLIPSE": "Ellips", "SPLINE": "Egri chiziq",
+            "TEXT": "Matn", "MTEXT": "Matn", "DIMENSION": "O‘lcham", "HATCH": "Shtrix",
+            "INSERT": "Blok", "POINT": "Nuqta", "SOLID": "To‘ldirilgan shakl"}  # fmt: skip
+
+
+def measurements(doc: Any) -> list[tuple[str, str]]:
+    """The drawing's numbers for a table under its picture: overall size, objects by kind,
+    hole diameters, the length of all lines, and the dimensions written on it."""
+    msp = doc.modelspace()
+    s = summary(doc)
+    u = f" {s['units']}" if s["units"] else ""
+    w, h = s["size"]
+    rows = [("Umumiy o‘lcham", f"{w:g} × {h:g}{u}"), ("Obyektlar", f"{s['entities']} ta")]
+    by_label: dict[str, int] = {}
+    for kind, n in s["types"].items():
+        label = _KIND_UZ.get(kind, kind.title())
+        by_label[label] = by_label.get(label, 0) + n
+    rows += [(f"  {label}", f"{n} ta") for label, n in by_label.items()]
+    diam = sorted({round(e.dxf.radius * 2, 2) for e in msp.query("CIRCLE")}, reverse=True)
+    if diam:
+        more = f" (+{len(diam) - 8})" if len(diam) > 8 else ""
+        rows.append(("Aylanalar diametri", ", ".join(f"Ø{d:g}" for d in diam[:8]) + more))
+    total = 0.0
+    for e in msp.query("LINE"):
+        total += e.dxf.start.distance(e.dxf.end)
+    for e in msp.query("LWPOLYLINE"):
+        pts = [(p[0], p[1]) for p in e.get_points("xy")]
+        if e.closed and len(pts) > 2:
+            pts.append(pts[0])
+        total += sum(((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5
+                     for a, b in zip(pts, pts[1:], strict=False))  # fmt: skip
+    if total:
+        rows.append(("Chiziqlar umumiy uzunligi", f"{total:.1f}{u}"))
+    dims = []
+    for e in msp.query("DIMENSION"):
+        try:
+            dims.append(round(float(e.get_measurement()), 2))
+        except (TypeError, ValueError, AttributeError):
+            continue
+    if dims:
+        more = f" (+{len(dims) - 12})" if len(dims) > 12 else ""
+        rows.append(("Chizmadagi o‘lchamlar", ", ".join(f"{d:g}" for d in dims[:12]) + more))
+    return rows
+
+
+def album_pdf(drawings: list[tuple[str, Any]], out: Path) -> Path:
+    """Several drawings in one PDF, one drawing per page (each page sized to its drawing)."""
+    import tempfile
+
+    import pymupdf
+
+    if not drawings:
+        raise ValueError("Chizma tanlanmagan")
+    book = pymupdf.open()
+    with tempfile.TemporaryDirectory() as tmp:
+        for i, (_title, doc) in enumerate(drawings):
+            page = Path(tmp) / f"{i}.pdf"
+            render(doc, page, None)
+            with pymupdf.open(page) as one:
+                book.insert_pdf(one)
+    for i, (title, _doc) in enumerate(drawings):
+        book.set_toc(book.get_toc() + [[1, title, i + 1]])
+    book.save(out)
+    book.close()
+    return out
+
+
 # ---------------- drawing -> Word (.docx) without opening Word ----------------
 _NS = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
@@ -303,9 +371,38 @@ _NS = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
 _REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
 
 
-def png_to_docx(png: Path, out: Path, title: str = "") -> Path:
+def _table_xml(rows: list[tuple[str, str]], width: int) -> str:
+    from xml.sax.saxutils import escape
+
+    b = '<w:{0} w:val="single" w:sz="4" w:space="0" w:color="808080"/>'
+    borders = "".join(b.format(k) for k in ("top", "left", "bottom", "right", "insideH",
+                                             "insideV"))  # fmt: skip
+    first, second = width * 2 // 5, width - width * 2 // 5
+
+    def cell(text: str, w: int, bold: bool = False) -> str:
+        rpr = (
+            '<w:rPr><w:b/><w:sz w:val="18"/></w:rPr>'
+            if bold
+            else '<w:rPr><w:sz w:val="18"/></w:rPr>'
+        )
+        return (f'<w:tc><w:tcPr><w:tcW w:w="{w}" w:type="dxa"/></w:tcPr><w:p><w:pPr>'
+                '<w:spacing w:before="0" w:after="0"/></w:pPr>'
+                f'<w:r>{rpr}<w:t xml:space="preserve">{escape(text)}</w:t></w:r>'
+                "</w:p></w:tc>")  # fmt: skip
+
+    body = "".join(f"<w:tr>{cell(a, first, not a.startswith(' '))}{cell(v, second)}</w:tr>"
+                   for a, v in rows)  # fmt: skip
+    return (f'<w:tbl><w:tblPr><w:tblW w:w="{width}" w:type="dxa"/><w:jc w:val="center"/>'
+            f"<w:tblBorders>{borders}</w:tblBorders></w:tblPr><w:tblGrid>"
+            f'<w:gridCol w:w="{first}"/><w:gridCol w:w="{second}"/></w:tblGrid>'
+            f"{body}</w:tbl>")  # fmt: skip
+
+
+def png_to_docx(png: Path, out: Path, title: str = "",
+                rows: list[tuple[str, str]] | None = None) -> Path:  # fmt: skip
     """A Word file with the drawing picture on one A4 page (landscape when the drawing is
-    wide), written as plain OOXML: no Word window, the same on any Office language."""
+    wide) and, when given, a table of its measurements below; written as plain OOXML: no Word
+    window, the same on any Office language."""
     import zipfile
     from xml.sax.saxutils import escape
 
@@ -318,7 +415,8 @@ def png_to_docx(png: Path, out: Path, title: str = "") -> Path:
     margin = 851  # 1.5 cm
     # The picture fills the free area and keeps its shape; 1 twip = 635 EMU.
     box_w = (page_w - 2 * margin) * 635
-    box_h = (page_h - 2 * margin - (900 if title else 300)) * 635
+    table_h = 260 * len(rows or []) + (200 if rows else 0)  # one table row ≈ 0.46 cm
+    box_h = max(page_h // 4, page_h - 2 * margin - (900 if title else 300) - table_h) * 635
     k = min(box_w / w_px, box_h / h_px)
     cx, cy = int(w_px * k), int(h_px * k)
     center = '<w:pPr><w:jc w:val="center"/></w:pPr>'
@@ -336,6 +434,7 @@ def png_to_docx(png: Path, out: Path, title: str = "") -> Path:
         f'<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm>'
         '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>'
         "</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"
+        f"{_table_xml(rows, (page_w - 2 * margin) * 3 // 5) if rows else ''}"
         f'<w:sectPr><w:pgSz w:w="{page_w}" w:h="{page_h}"{orient}/>'
         f'<w:pgMar w:top="{margin}" w:right="{margin}" w:bottom="{margin}" w:left="{margin}" '
         'w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>'

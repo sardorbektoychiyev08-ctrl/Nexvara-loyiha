@@ -20,7 +20,11 @@ from nexvara.app.api import Api
 from nexvara.app.main import UI_DIR
 
 target = tmp / "asboblar.dxf"
-api = Api(output_dir=tmp, overrides={"cad_dialog": lambda _save: str(target)})
+api = Api(
+    output_dir=tmp,
+    overrides={"cad_dialog": lambda _save: str(target),
+               "cad_album_dialog": lambda: [str(target), str(target)]},
+)  # fmt: skip
 win = webview.create_window(
     "NEXVARA Chizma asboblari", url=str(UI_DIR / "index.html"), js_api=api, width=1500, height=900
 )
@@ -177,6 +181,10 @@ def run():
         js("document.querySelector('[data-cad=save]').click()")
         res["saved"] = until("document.getElementById('cad-log').textContent.includes('Saqlandi:')")
         # 13) PDF and Word buttons: files next to the drawing (Word: the drawing on an A4 page)
+        js("document.querySelector('[data-cad=album]').click()")
+        res["album"] = until(
+            "document.getElementById('cad-log').textContent.includes('2 sahifa')", 40
+        )
         for kind, ext in (("pdf", ".pdf"), ("word", ".docx")):
             js(f"document.querySelector('[data-cad={kind}]').click()")
             res[f"export_{kind}"] = until(
@@ -221,6 +229,7 @@ checks = {
     and res.get("color_pick") == 30
     and (res.get("palette") or 0) >= 255
     and 30 in res.get("dxf_colors", []),
+    "album": bool(res.get("album")),
     "pdf_word": bool(res.get("export_pdf"))
     and bool(res.get("export_word"))
     and res.get("pdf_ok")

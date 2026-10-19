@@ -379,13 +379,45 @@ class CadApi:
             with tempfile.TemporaryDirectory() as tmp:
                 png = Path(tmp) / "chizma.png"
                 cad.render(doc, None, png, dpi=200)
-                cad.png_to_docx(png, out, out.stem.replace("_", " "))
+                cad.png_to_docx(png, out, out.stem.replace("_", " "), cad.measurements(doc))
         else:
             cad.render(doc, out if kind == "pdf" else None, out if kind == "png" else None)
         opener = self._overrides.get("open_file")
         if opener:
             opener(str(out))
         return {"ok": True, "path": str(out), "name": out.name}
+
+    def cad_album(self, paths: list[str] | None = None) -> dict[str, Any]:
+        """Several AutoCAD drawings (.dxf) in one PDF, a page each (asks for the files when
+        none are given), saved in Chizmalar."""
+        import time
+
+        from nexvara import cad, config
+
+        if not paths:
+            pick = self._overrides.get("cad_album_dialog")
+            if pick is None:
+                import webview
+
+                if not webview.windows:
+                    return {"ok": False, "error": "Oyna yo‘q"}
+                chosen = webview.windows[0].create_file_dialog(
+                    webview.OPEN_DIALOG, allow_multiple=True,
+                    file_types=("AutoCAD chizmalari (*.dxf)",))  # fmt: skip
+                paths = [str(c) for c in chosen or []]
+            else:
+                paths = pick()
+        if not paths:
+            return {"ok": False, "error": "Chizma tanlanmadi"}
+        try:
+            docs = [(Path(p).stem, cad.read(Path(p))) for p in paths]
+        except Exception as e:  # noqa: BLE001 - a broken file is a clear message
+            return {"ok": False, "error": str(e)}
+        folder = Path(getattr(self, "_output_dir", None) or (config.data_dir() / "Chizmalar"))
+        folder.mkdir(parents=True, exist_ok=True)
+        out = folder / f"Albom_{time.strftime('%Y%m%d-%H%M%S')}.pdf"
+        cad.album_pdf(docs, out)
+        return {"ok": True, "path": str(out), "name": out.name, "pages": len(docs)}
 
     def cad_ai_fix(self, drawing: dict[str, Any], note: str = "",
                    approved: bool = False) -> dict[str, Any]:  # fmt: skip
