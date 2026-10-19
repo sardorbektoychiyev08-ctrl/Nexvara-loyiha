@@ -604,6 +604,21 @@ class AppModel(app: Application) : AndroidViewModel(app) {
             if (it.optBoolean("downloadable")) then(it.optString("path"))
             else notice = "ZIP kompyuterda tayyor, lekin telefonga olish uchun juda katta"
         }
+    fun renameOnPc(f: PcFile, name: String) = call(block = post("/api/v1/files/rename",
+        JSONObject().put("path", f.path).put("name", name))) {
+        notice = "Yangi nomi: «${it.optString("name")}»"
+        pcFiles = pcFiles.map { p -> if (p.path == f.path) p.copy(path = it.optString("path"), name = it.optString("name")) else p }
+    }
+    fun pdfOnPc(paths: List<String>) = call(block = post("/api/v1/files/pdf", JSONObject().put("paths", JSONArray(paths)))) {
+        notice = "PDF qilinmoqda — tayyor bo‘lgach «Vazifalar»da telefonga olish mumkin"
+        refreshTasks()
+    }
+    fun moveOnPc(paths: List<String>, to: String, folder: String) = call(block = post("/api/v1/files/move",
+        JSONObject().put("paths", JSONArray(paths)).put("to", to).put("folder", folder))) {
+        val moved = it.optJSONArray("files")?.length() ?: 0
+        notice = "$moved ta fayl ko‘chirildi: ${it.optString("folder")}"
+        pcFiles = pcFiles.filter { p -> p.path !in paths }
+    }
     fun unzipOnPc(f: PcFile) = call(block = post("/api/v1/files/unzip", JSONObject().put("path", f.path))) {
         notice = "Arxivdan chiqarildi: «${it.optString("name")}» papkasi, ${it.optInt("files")} ta fayl"
     }
