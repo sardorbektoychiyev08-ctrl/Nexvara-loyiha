@@ -564,6 +564,7 @@ async function renderSync(status) {
   const st = status || await api().sync_status();
   if (document.activeElement !== $("#sync-folder")) $("#sync-folder").value = st.folder || "";
   $("#sync-drive").checked = !!st.google_drive;
+  $("#sync-chat").checked = !!st.chat;
   $("#sync-pass").placeholder = st.has_passphrase ? "saqlangan ✓ (almashtirish uchun yozing)" : "parol kiriting";
   const last = st.last ? new Date(st.last * 1000).toLocaleString() : "hali yo‘q";
   if (!$("#sync-msg").dataset.keep) $("#sync-msg").textContent = `Oxirgi sinxron: ${last}`;
@@ -578,7 +579,8 @@ $("#sync-form").addEventListener("submit", async (e) => {
     $("#sync-pass").value = "";
     if (!r.ok) { err.hidden = false; err.textContent = r.error; return; }
   }
-  const r = await api().save_settings({ sync: { folder: $("#sync-folder").value.trim(), google_drive: $("#sync-drive").checked } });
+  const r = await api().save_settings({ sync: { folder: $("#sync-folder").value.trim(), google_drive: $("#sync-drive").checked,
+                                           chat: $("#sync-chat").checked } });
   err.hidden = r.ok; err.textContent = r.ok ? "" : r.error;
   renderSync();
 });

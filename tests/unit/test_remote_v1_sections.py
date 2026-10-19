@@ -325,7 +325,7 @@ def test_phone_ai_directions_speech_and_pictures(env):
 
     router.check_budget = AiRouter.check_budget.__get__(router)
     st = j(call(srv, "GET", "/api/v1/ai/capabilities", token=token))["data"]
-    assert set(st["capabilities"]) == {"text", "vision", "image", "stt", "tts", "realtime"}
+    assert set(st["capabilities"]) == {"text", "vision", "image", "stt", "tts", "realtime", "web"}
     assert "sk-test" not in json.dumps(st)
     bad = post(
         srv,

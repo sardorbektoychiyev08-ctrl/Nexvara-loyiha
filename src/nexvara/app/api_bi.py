@@ -35,7 +35,8 @@ class BiApi:
         chosen = webview.windows[0].create_file_dialog(
             webview.OPEN_DIALOG,
             file_types=(
-                "Ma’lumot fayllari (*.xlsx;*.xlsm;*.csv;*.json;*.xml;*.txt;*.tsv)",
+                "Ma’lumot fayllari va bazalar (*.xlsx;*.xlsm;*.csv;*.json;*.xml;*.txt;*.tsv;"
+                "*.db;*.sqlite;*.sqlite3;*.accdb;*.mdb)",
                 "Barcha fayllar (*.*)",
             ),
         )

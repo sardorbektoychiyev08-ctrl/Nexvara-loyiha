@@ -68,8 +68,15 @@ def task_dto(t: dict[str, Any]) -> dict[str, Any]:
             {"name": s["name"], "status": s["status"], "detail": s.get("detail", "")}
             for s in t.get("steps") or []
         ],
-        "files": [
-            res[k] for k in ("path", "pdf", "dxf") if isinstance(res.get(k), str) and res.get(k)
-        ],
+        "files": list(
+            dict.fromkeys(
+                [
+                    res[k]
+                    for k in ("path", "pdf", "dxf")
+                    if isinstance(res.get(k), str) and res.get(k)
+                ]
+                + [f for f in res.get("files") or [] if isinstance(f, str) and f]
+            )
+        ),  # fmt: skip
         "report": res.get("report") or [],
     }

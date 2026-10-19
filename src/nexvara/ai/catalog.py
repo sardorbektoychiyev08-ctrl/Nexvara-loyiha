@@ -55,7 +55,7 @@ def tier_of(provider: str, model: str) -> str | None:
 def directions(provider: str, model: str, detail: dict[str, Any] | None = None) -> list[str]:
     """Only features backed by the API metadata or a reviewed provider mapping."""
     detail = detail or {}
-    offered = {c for c in ("image", "stt", "tts") if caps.find(provider, c, model)}
+    offered = {c for c in ("image", "stt", "tts", "web") if caps.find(provider, c, model)}
     if tier_of(provider, model) is not None:
         offered.add("text")
         modalities = detail.get("input_modalities")

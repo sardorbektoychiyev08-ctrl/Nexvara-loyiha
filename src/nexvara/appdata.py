@@ -27,7 +27,13 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "update": {"channel": "", "auto_check": True},
     # Settings, memory and Teach rules between devices (sync.py). The passphrase is in
     # Credential Manager (NEXVARA/sync/passphrase), never here.
-    "sync": {"enabled": False, "folder": "", "google_drive": False, "last": 0.0},
+    "sync": {
+        "enabled": False,
+        "folder": "",
+        "google_drive": False,
+        "last": 0.0,
+        "chat": False,
+    },  # chat: the last 30 days of chat also go to the other PCs
     # Google on the phone: the "Web application" OAuth client ID (public, not a secret) that
     # Android puts into the ID token's audience; the PC checks the phone's token against it.
     "google": {"android_web_client_id": ""},
@@ -94,9 +100,24 @@ class Settings:
         self._lock = threading.Lock()
 
     def load(self) -> dict[str, Any]:
+        """The stored settings over the defaults. While another thread replaces the file,
+        Windows refuses to open it for a moment: wait and read again — never fall back to the
+        defaults then, or the AI would look switched off and the next save would write the
+        defaults over the owner's settings."""
+        for attempt in range(40):
+            try:
+                text = self.path.read_text(encoding="utf-8")
+                break
+            except FileNotFoundError:
+                text = "{}"
+                break
+            except PermissionError:
+                if attempt == 39:
+                    raise
+                time.sleep(0.05)
         try:
-            saved = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            saved = json.loads(text)
+        except ValueError:
             saved = {}
         return _merge(DEFAULT_SETTINGS, saved if isinstance(saved, dict) else {})
 

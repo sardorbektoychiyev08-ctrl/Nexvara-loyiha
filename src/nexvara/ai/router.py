@@ -626,7 +626,7 @@ class AiRouter:
             if "vision" in saved
             else [m for m in out["text"] if "vision" in model_catalog.directions(provider, m)]
         )
-        for c in ("image", "stt", "tts"):
+        for c in ("image", "stt", "tts", "web"):
             out[c] = (
                 saved.get(c)
                 if saved.get(c) is not None

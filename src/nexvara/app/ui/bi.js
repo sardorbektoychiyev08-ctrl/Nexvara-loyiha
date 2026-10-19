@@ -183,6 +183,8 @@ async function biOpenSource(path) {
   sel.textContent = "";
   sel.hidden = sheets.length < 2;
   sheets.forEach((s) => { const o = el("option", "", s); o.value = s; sel.appendChild(o); });
+  $("#bi-sql").hidden = !/\.(db|sqlite3?|accdb|mdb)$/i.test(path || "");  // a database: tables or a SELECT
+  $("#bi-sql").value = "";
   await biLoad(await api().bi_auto(path, sheets.length > 1 ? sheets[0] : null));
   $("#bi-msg").textContent = bi.cfg ? `Manba: ${path}` : "";
 }
@@ -534,6 +536,13 @@ $("#bi-folder").addEventListener("click", async () => { const p = await api().fi
 $("#bi-sheet").addEventListener("change", async () => {
   const src = bi.cfg && bi.cfg.source;
   if (src) await biLoad(await api().bi_auto(src, $("#bi-sheet").value));
+});
+$("#bi-sql").addEventListener("keydown", async (e) => {
+  const src = bi.cfg && bi.cfg.source, q = e.target.value.trim();
+  if (e.key !== "Enter" || !src || !q) return;
+  $("#bi-msg").textContent = "Yuklanmoqda…";
+  await biLoad(await api().bi_auto(src, q));
+  $("#bi-msg").textContent = `Manba: ${src}`;
 });
 // The chat asked for a saved dashboard (optionally filtered, optionally exported).
 async function biFromChat(ui) {

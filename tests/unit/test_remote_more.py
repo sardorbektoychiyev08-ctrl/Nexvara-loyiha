@@ -4,6 +4,7 @@ edits and DXF. Real HTTPS on localhost; fake screen, fake AI; nothing is opened 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from urllib.parse import quote
 
 import pytest
@@ -101,6 +102,56 @@ def test_phone_zips_found_files_and_unzips(env):
     r = post(srv, "/api/v1/files/unzip", {"path": paths[0]}, token)
     assert r[0] == 400  # not a .zip
     assert call(srv, "POST", "/api/v1/files/zip", {"paths": paths})[0] == 401
+
+
+def test_phone_renames_moves_and_makes_pdf(env, monkeypatch, tmp_path):
+    from nexvara import remote_v1_sections as sec
+
+    api, srv, token, docs, _ = env
+    (docs / "Hisobot oktabr.docx").write_bytes(b"docx")
+    found = j(call(srv, "GET", "/api/v1/files/search?q=hisobot", token=token))["data"]["files"]
+    word = next(f["path"] for f in found if f["name"].endswith(".docx"))
+    xlsx = str(docs / "Oylik hisobot.xlsx")
+    # rename: the extension stays, bad names and taken names are refused
+    out = j(post(srv, "/api/v1/files/rename", {"path": word, "name": "Hisobot noyabr"}, token))
+    new = out["data"]["path"]
+    assert out["data"]["name"] == "Hisobot noyabr.docx" and (docs / "Hisobot noyabr.docx").exists()
+    assert post(srv, "/api/v1/files/rename", {"path": new, "name": "a/b"}, token)[0] == 400
+    assert post(srv, "/api/v1/files/rename", {"path": new, "name": "Oylik hisobot.xlsx"},
+                token)[0] == 400  # fmt: skip
+    # PDF: a task on the PC; only Office files
+    seen = []
+    api._overrides["files_to_pdf"] = lambda task: (
+        seen.append(1)
+        or {"files": [new[:-5] + ".pdf"], "path": new[:-5] + ".pdf", "report": ["1 ta PDF"]}
+    )
+    r = j(post(srv, "/api/v1/files/pdf", {"paths": [new, xlsx]}, token))["data"]["task"]
+    assert r["id"] and r["title"].startswith("PDF")
+    assert post(srv, "/api/v1/files/pdf", {"paths": [str(docs / "hisobot.exe")]}, token)[0] in (
+        400,
+        404,
+    )
+    # move: into the owner's Documents / a new subfolder there; never anything else
+    target = tmp_path / "MyDocs"
+    target.mkdir()
+    monkeypatch.setattr(sec, "_known_folder", lambda name: target if name == "documents"
+                        else (_ for _ in ()).throw(sec.ApiError("BAD_REQUEST", "joy")))  # fmt: skip
+    out = j(post(srv, "/api/v1/files/move", {"paths": [new, xlsx], "to": "documents",
+                                            "folder": "Arxiv 2026"}, token))["data"]  # fmt: skip
+    assert out["folder"] == str(target / "Arxiv 2026")
+    assert sorted(Path(f).name for f in out["files"]) == [
+        "Hisobot noyabr.docx",
+        "Oylik hisobot.xlsx",
+    ]
+    assert not (docs / "Oylik hisobot.xlsx").exists()
+    moved = out["files"][0]
+    for bad in ({"to": "windows"}, {"to": "documents", "folder": r"..\..\Windows"},
+                {"to": "documents", "folder": "C:x"}):  # fmt: skip
+        assert post(srv, "/api/v1/files/move", {"paths": [moved], **bad}, token)[0] == 400
+    # a path never found by a search is refused
+    assert post(srv, "/api/v1/files/move", {"paths": [str(tmp_path / "x.txt")], "to": "documents"},
+                token)[0] == 404  # fmt: skip
+    assert call(srv, "POST", "/api/v1/files/rename", {"path": new, "name": "x"})[0] == 401
 
 
 def test_other_networks_and_stable_certificate(env, tmp_path):

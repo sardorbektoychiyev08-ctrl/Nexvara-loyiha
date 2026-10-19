@@ -1,5 +1,5 @@
 """Chizmalar in a real window: the professional tools (trim, extend, fillet, chamfer, offset,
-hatch, dimensions, array, scale, rotate, explode, layers) and a clean AutoCAD DXF at the end."""
+hatch, dimensions, array, scale, rotate, explode, layers), a clean AutoCAD DXF, PDF and Word."""
 
 import json
 import math
@@ -20,7 +20,11 @@ from nexvara.app.api import Api
 from nexvara.app.main import UI_DIR
 
 target = tmp / "asboblar.dxf"
-api = Api(output_dir=tmp, overrides={"cad_dialog": lambda _save: str(target)})
+api = Api(
+    output_dir=tmp,
+    overrides={"cad_dialog": lambda _save: str(target),
+               "cad_album_dialog": lambda: [str(target), str(target)]},
+)  # fmt: skip
 win = webview.create_window(
     "NEXVARA Chizma asboblari", url=str(UI_DIR / "index.html"), js_api=api, width=1500, height=900
 )
@@ -176,6 +180,16 @@ def run():
         ex("COLOR BYLAYER")  # with nothing selected: only the colour of new objects
         js("document.querySelector('[data-cad=save]').click()")
         res["saved"] = until("document.getElementById('cad-log').textContent.includes('Saqlandi:')")
+        # 13) PDF and Word buttons: files next to the drawing (Word: the drawing on an A4 page)
+        js("document.querySelector('[data-cad=album]').click()")
+        res["album"] = until(
+            "document.getElementById('cad-log').textContent.includes('2 sahifa')", 40
+        )
+        for kind, ext in (("pdf", ".pdf"), ("word", ".docx")):
+            js(f"document.querySelector('[data-cad={kind}]').click()")
+            res[f"export_{kind}"] = until(
+                f"document.getElementById('cad-log').textContent.includes('{ext}')", 40
+            )
         res["errors"] = json.loads(js("JSON.stringify(window.__errors)"))
         res["log"] = js("document.getElementById('cad-log').textContent")[-600:]
         res["doc"] = js("JSON.stringify(cad.doc)")
@@ -191,6 +205,9 @@ if target.exists():
     res["dxf_colors"] = sorted({e.dxf.color for e in d.modelspace() if e.dxf.hasattr("color")})
 else:
     res["dxf_audit"] = ["file missing"]
+docx = sorted(tmp.glob("chizma_*.docx"))
+res["docx_ok"] = bool(docx) and docx[-1].read_bytes()[:2] == b"PK"
+res["pdf_ok"] = any(p.read_bytes()[:5] == b"%PDF-" for p in tmp.glob("chizma_*.pdf"))
 print(json.dumps(res, ensure_ascii=False, indent=1))
 ok = res.get("trim") == [(0.0, 50.0)] or res.get("trim") == [[0, 50]]
 checks = {
@@ -212,6 +229,11 @@ checks = {
     and res.get("color_pick") == 30
     and (res.get("palette") or 0) >= 255
     and 30 in res.get("dxf_colors", []),
+    "album": bool(res.get("album")),
+    "pdf_word": bool(res.get("export_pdf"))
+    and bool(res.get("export_word"))
+    and res.get("pdf_ok")
+    and res.get("docx_ok"),
     "no_js_errors": not res.get("errors"),
 }
 print(json.dumps(checks, indent=1))

@@ -20,6 +20,9 @@ VSVersionInfo(ffi=FixedFileInfo(filevers=($v), prodvers=($v)), kids=[
     StringStruct('ProductVersion', '$version')])]), VarFileInfo([VarStruct('Translation', [1033, 1200])])])
 "@ | Set-Content -Encoding utf8 build\version_info.txt
 
+# PyInstaller and ISCC write progress to stderr: with "Stop" and the output redirected
+# (build.ps1 *> log.txt) the first progress line would end the build. Exit codes decide.
+$ErrorActionPreference = "Continue"
 & $py -m PyInstaller --noconfirm --clean --distpath dist --workpath build\pyi installer\nexvara.spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 

@@ -501,6 +501,8 @@ class Api(
             return self._run_image(payload)
         if kind == "vision":
             return self._run_vision(payload)
+        if kind == "web":
+            return self._run_web(payload)
         snap = self.make_test({**payload, "approved": True})
         if "id" not in snap:
             return {"reply": snap.get("error") or "Test boshlanmadi"}

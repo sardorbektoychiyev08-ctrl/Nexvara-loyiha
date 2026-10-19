@@ -290,6 +290,9 @@ fun PcFilesPanel(m: AppModel, act: PhoneActions) {
     var ext by rememberSaveable { mutableStateOf("") }
     val picked = remember { mutableStateListOf<String>() }
     var zip by remember { mutableStateOf<String?>(null) }
+    var renaming by remember { mutableStateOf<PcFile?>(null) }
+    var moving by remember { mutableStateOf(false) }
+    val office = listOf(".docx", ".doc", ".rtf", ".xlsx", ".xls", ".xlsm", ".csv", ".pptx", ".ppt")
     Panel {
         Text("Kompyuterdan qidirish", style = MaterialTheme.typography.titleMedium)
         Text("Hujjatlar, Ish stoli, Yuklanmalar va OneDrive’dan nomi bo‘yicha", style = MaterialTheme.typography.bodySmall, color = x.muted)
@@ -303,10 +306,19 @@ fun PcFilesPanel(m: AppModel, act: PhoneActions) {
         picked.retainAll(m.pcFiles.map { it.path }.toSet())
         if (m.pcFiles.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (picked.isEmpty()) "ZIP uchun fayllarni belgilang" else "Belgilandi: ${picked.size} ta",
+                Text(if (picked.isEmpty()) "Bir nechta fayl bilan ishlash uchun belgilang" else "Belgilandi: ${picked.size} ta",
                     style = MaterialTheme.typography.bodySmall, color = x.muted, modifier = Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth().horizontalScrollSafe(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilledTonalButton(onClick = { m.zipOnPc(picked.toList()) { zip = it }; picked.clear() }, enabled = picked.isNotEmpty()) {
                     Icon(Icons.Default.FolderZip, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("ZIP qilish")
+                }
+                val canPdf = picked.isNotEmpty() && picked.all { p -> office.any { p.lowercase().endsWith(it) } }
+                FilledTonalButton(onClick = { m.pdfOnPc(picked.toList()); picked.clear() }, enabled = canPdf) {
+                    Icon(Icons.Default.PictureAsPdf, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("PDF qilish")
+                }
+                FilledTonalButton(onClick = { moving = true }, enabled = picked.isNotEmpty()) {
+                    Icon(Icons.Default.DriveFileMove, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Ko‘chirish")
                 }
             }
         }
@@ -330,11 +342,37 @@ fun PcFilesPanel(m: AppModel, act: PhoneActions) {
                 TextButton(onClick = { m.shareToPhone(f) { act.saveResult(it) } }) {
                     Icon(Icons.Default.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Telefonga")
                 }
+                TextButton(onClick = { renaming = f }) { Text("Nomlash") }
+                if (office.any { f.name.lowercase().endsWith(it) }) TextButton(onClick = { m.pdfOnPc(listOf(f.path)) }) { Text("PDF") }
                 if (f.name.endsWith(".zip", ignoreCase = true)) TextButton(onClick = { m.unzipOnPc(f) }) { Text("Chiqarish") }
                 else TextButton(onClick = { m.compose("«${f.path}» ni och, ") }) { Text("Buyruq") }
             }
         }
     }
+    renaming?.let { f ->
+        TextInputDialog("Nomini o‘zgartirish", initial = f.name.substringBeforeLast('.'), label = "Yangi nomi (kengaytmasi o‘zgarmaydi)",
+            confirm = "Nomlash", onSave = { m.renameOnPc(f, it) }, onDismiss = { renaming = null })
+    }
+    if (moving) MoveDialog(picked.size, onMove = { to, folder -> m.moveOnPc(picked.toList(), to, folder); picked.clear() },
+        onDismiss = { moving = false })
+}
+
+/** Where to move the picked PC files: the owner's Desktop / Documents / Downloads, optionally a new subfolder. */
+@Composable
+private fun MoveDialog(count: Int, onMove: (String, String) -> Unit, onDismiss: () -> Unit) {
+    var to by remember { mutableStateOf("documents") }
+    var folder by remember { mutableStateOf("") }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("$count ta faylni ko‘chirish") },
+        text = { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("documents" to "Hujjatlar", "desktop" to "Ish stoli", "downloads" to "Yuklanmalar").forEach { (k, label) ->
+                Row(verticalAlignment = Alignment.CenterVertically) { RadioButton(to == k, { to = k }); Text(label) }
+            }
+            OutlinedTextField(folder, { folder = it }, label = { Text("Ichidagi papka (ixtiyoriy)") }, singleLine = true,
+                placeholder = { Text("masalan: Arxiv 2026") }, modifier = Modifier.fillMaxWidth())
+            Text("Bir xil nomli fayl ustidan yozilmaydi — yangi nom beriladi.", style = MaterialTheme.typography.bodySmall)
+        } },
+        confirmButton = { Button(onClick = { onMove(to, folder.trim()); onDismiss() }) { Text("Ko‘chirish") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Bekor") } })
 }
 
 // ---------------- other networks (Tailscale) ----------------

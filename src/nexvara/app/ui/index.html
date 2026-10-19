@@ -270,6 +270,7 @@
           <label>Sinxron paroli (barcha qurilmalarda bir xil, 8+ belgi)
             <input id="sync-pass" type="password" autocomplete="new-password" placeholder="saqlangan bo‘lsa bo‘sh qoldiring"></label>
           <label class="check-label"><input id="sync-drive" type="checkbox"> Google Drive orqali ham (Google hisobi kerak)</label>
+          <label class="check-label"><input id="sync-chat" type="checkbox"> Suhbat tarixini ham (oxirgi 30 kun, shifrlangan)</label>
           <div class="row"><button class="btn" type="submit">Saqlash</button>
             <button class="btn primary" id="sync-now" type="button">Hozir sinxronlash</button></div>
         </form>
@@ -571,6 +572,7 @@
           <button class="btn primary" id="bi-source" type="button">Fayl tanlash</button>
           <button class="btn" id="bi-folder" type="button">Papka (bir nechta fayl)</button>
           <select id="bi-sheet" hidden></select>
+          <input id="bi-sql" hidden placeholder="Bazadan so‘rov yozing va Enter bosing" title="Faqat o‘qish: bazaga hech narsa yozilmaydi">
           <select id="bi-saved"></select>
           <button class="btn" id="bi-open" type="button">Ochish</button>
           <button class="btn danger" id="bi-del" type="button">O‘chirish</button>
@@ -624,7 +626,8 @@
           <button class="cad-btn" data-cad="saveas" title="Boshqa nom bilan saqlash">Nomini o‘zgartirib</button>
           <button class="cad-btn" data-cad="pdf" title="Chop etish uchun PDF">PDF</button>
           <button class="cad-btn" data-cad="png" title="Rasm (PNG)">PNG</button>
-          <button class="cad-btn" data-cad="word" title="Word fayl (chizma A4 sahifada)">Word</button>
+          <button class="cad-btn" data-cad="word" title="Word fayl (chizma A4 sahifada, o‘lchamlar jadvali bilan)">Word</button>
+          <button class="cad-btn" data-cad="album" title="Bir nechta chizmani bitta PDF albomga yig‘ish">Albom</button>
         </div>
         <div class="cad-group" data-group="Chizish">
           <button class="cad-btn tool" data-tool="line" title="Chiziq (L)">Chiziq</button>

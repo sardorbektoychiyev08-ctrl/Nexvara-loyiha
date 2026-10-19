@@ -217,3 +217,43 @@ def test_chat_turns_a_dxf_into_pdf(tmp_path, monkeypatch):
     (tmp_path / "eski.dwg").write_bytes(b"AC1032")
     api.set_context_file(str(tmp_path / "eski.dwg"))
     assert "DXF" in api.chat("shu dwg faylni PDF qil")["reply"]
+
+
+def test_measurements_table_album_and_word_insert(tmp_path, monkeypatch):
+    import zipfile
+
+    import pymupdf
+
+    monkeypatch.setenv("NEXVARA_DATA", str(tmp_path / "data"))
+    p = tmp_path / "Plastina.dxf"
+    p.write_text(drawing.to_dxf(SPEC), encoding="utf-8")
+    doc = cad.read(p)
+    rows = dict(cad.measurements(doc))
+    assert rows["Aylanalar diametri"] == "Ø30"  # the hole, r = 15
+    assert "100" in rows["Chizmadagi o‘lchamlar"] and "60" in rows["Chizmadagi o‘lchamlar"]
+    assert rows["Obyektlar"].endswith("ta") and "×" in rows["Umumiy o‘lcham"]
+    # the Word file carries the table under the picture
+    cad.render(doc, None, tmp_path / "c.png")
+    w = cad.png_to_docx(tmp_path / "c.png", tmp_path / "c.docx", "Plastina", cad.measurements(doc))
+    xml = zipfile.ZipFile(w).read("word/document.xml").decode("utf-8")
+    assert "<w:tbl>" in xml and "Aylanalar diametri" in xml and "Ø30" in xml
+    # an album: two drawings, two pages, a bookmark each
+    q = tmp_path / "Ikkinchi.dxf"
+    q.write_text(drawing.to_dxf(SPEC), encoding="utf-8")
+    api = _api(tmp_path)
+    api._overrides["cad_album_dialog"] = lambda: [str(p), str(q)]
+    out = api.cad_album([])
+    assert out["ok"] and out["pages"] == 2
+    with pymupdf.open(out["path"]) as book:
+        assert book.page_count == 2 and [t[1] for t in book.get_toc()] == ["Plastina", "Ikkinchi"]
+    assert not api.cad_album([str(tmp_path / "yoq.dxf")])["ok"]
+    # chat: «… ni … ga qo‘y» puts the drawing into an existing Word document
+    target = tmp_path / "Hisobot.docx"
+    target.write_bytes(b"docx")
+    got = []
+    api._overrides["word_insert_drawing"] = lambda *a: got.append(a)
+    res = api.chat(f"«{p}» ni «{target}» ga qo‘y")
+    assert "Word" in res["reply"]
+    t = _done(api, res)
+    assert t.result["path"] == str(target) and got[0][0] == target and got[0][2] == "Plastina"
+    assert ("Aylanalar diametri", "Ø30") in got[0][3]

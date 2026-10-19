@@ -3,7 +3,8 @@ or a photo of a hand-drawn sketch + "shu chizmani mukammal chiz". See nexvara/dr
 
 Simple parts ("100x60 plastina, markazida 20 mm teshik") are drawn exactly and for free,
 without AI (nexvara/drawing_offline.py). An AutoCAD DXF the user has ("chizma.dxf ni PDF qil")
-is shown as PDF/PNG (nexvara/cad.py)."""
+is shown as PDF/PNG/Word (nexvara/cad.py); «chizma.dxf ni Hisobot.docx ga qo‘y» puts the
+drawing (with its measurements) at the end of that Word document, in visible Word."""
 
 from __future__ import annotations
 
@@ -16,6 +17,11 @@ _DXF_FILE = re.compile(
     r"[«\"“]([^«»\"“”]+?\.(?:dxf|dwg))[»\"”]|((?:[A-Za-z]:[\\/])?[\w\\/.\-‘’()]+?\.(?:dxf|dwg))\b",
     re.IGNORECASE,
 )
+_DOCX_FILE = re.compile(
+    r"[«\"“]([^«»\"“”]+?\.docx?)[»\"”]|((?:[A-Za-z]:[\\/])?[\w\\/.\-‘’()]+?\.docx?)\b",
+    re.IGNORECASE,
+)
+_INTO = re.compile(r"\b(qo[‘’']?y\w*|joyla\w*|qo[‘’']?sh\w*|kirit\w*|ichiga)", re.IGNORECASE)
 _DXF_VERBS = re.compile(
     r"\b(pdf|png|word|docx|rasm\w*|ko[‘’']?rsat\w*|korsat\w*|och\w*|aylantir\w*|ko[‘’']?r\b|chop|"
     r"ichida nima|tarkib\w*|tekshir\w*)",
@@ -231,15 +237,53 @@ class DrawingApi:
                                          re.IGNORECASE)):  # fmt: skip
                 return None
             name = cur
-        if not _DXF_VERBS.search(text):
+        into = _DOCX_FILE.search(text)
+        if not (_DXF_VERBS.search(text) or (into and _INTO.search(text))):
             return None
         try:
             near = Path(cur).parent if cur else None
             path = files.resolve(name, near)
+            target = files.resolve((into.group(1) or into.group(2)).strip(), path.parent) if (
+                into and _INTO.search(text)) else None  # fmt: skip
         except LookupError as e:
             return {"reply": str(e)}
         self._context_file = str(path)
+        if target is not None:
+            return self._run_dxf_into_word(path, target)
         return self._run_dxf_view(path, bool(re.search(r"\b(word|docx)\b", text, re.I)))
+
+    def _run_dxf_into_word(self, dxf: Path, docx: Path) -> dict[str, Any]:
+        """The drawing picture and its measurements table at the end of an existing Word
+        document; Word stays visible and the document is saved in place."""
+        import tempfile
+
+        from nexvara import cad
+
+        if dxf.suffix.lower() == ".dwg":
+            return {"reply": "DWG’ni avval AutoCAD’da DXF qilib saqlang."}
+        keep = bool(self.get_settings().get("keep_office_open", True))
+        writer = self._overrides.get("word_insert_drawing")
+
+        def fn(task: Any) -> dict[str, Any]:
+            with task.step(f"AutoCAD faylini o‘qish: {dxf.name}") as s:
+                doc = cad.read(dxf)
+                rows = cad.measurements(doc)
+                s.detail = rows[0][1]
+            with tempfile.TemporaryDirectory() as tmp:
+                png = Path(tmp) / f"{dxf.stem}.png"
+                with task.step("Rasm qilish"):
+                    cad.render(doc, None, png, dpi=200)
+                with task.step(f"Word’ga qo‘yish: {docx.name}") as s:
+                    (writer or _word_insert)(docx, png, dxf.stem, rows, keep)
+                    s.detail = "hujjat oxiriga, o‘lchamlar jadvali bilan"
+            done = (
+                f"«{dxf.name}» chizmasi «{docx.name}» oxiriga qo‘yildi (o‘lchamlar jadvali bilan)"
+            )
+            return {"path": str(docx), "report": [done]}
+
+        snap = self._runner.start(f"Chizma → Word: {docx.name}", fn).snapshot()
+        return {"reply": f"«{dxf.name}» chizmasini «{docx.name}» ga qo‘yyapman — Word ekranda "
+                "ochiladi.", "task": snap}  # fmt: skip
 
     def _run_dxf_view(self, path: Path, word: bool = False) -> dict[str, Any]:
         from nexvara import cad
@@ -268,8 +312,9 @@ class DrawingApi:
                 s.detail = Path(out["pdf"]).name
             if word:
                 with task.step("Word fayl qilish") as s:
-                    out["docx"] = str(cad.png_to_docx(Path(out["png"]), folder / f"{stem}.docx",
-                                                      path.stem))  # fmt: skip
+                    docx = folder / f"{stem}.docx"
+                    rows = cad.measurements(doc)
+                    out["docx"] = str(cad.png_to_docx(Path(out["png"]), docx, path.stem, rows))
                     s.detail = Path(out["docx"]).name
             if show:
                 with task.step("Kompyuter ekranida ochish"):
@@ -287,3 +332,21 @@ class DrawingApi:
         what = "PDF, rasm va Word’ga" if word else "PDF va rasmga"
         return {"reply": f"«{path.name}» chizmasini {what} aylantiryapman — tayyor "
                 "bo‘lgach ochiladi.", "task": snap}  # fmt: skip
+
+
+def _word_insert(docx: Path, png: Path, title: str, rows: list[tuple[str, str]],
+                 keep_open: bool) -> None:  # fmt: skip
+    """Real Word (visible): heading, picture fitted to the page width, measurements table."""
+    from nexvara.skills.word import ops
+
+    with ops.WordSession(visible=True, keep_open=keep_open) as w:
+        doc = w.open_document(docx)
+        ops.add_paragraph(doc, f"Chizma: {title}", ops.STYLE_HEADING[2])
+        ops.add_paragraph(doc, "")
+        sec = doc.Sections(1).PageSetup
+        usable_cm = (sec.PageWidth - sec.LeftMargin - sec.RightMargin) / 28.3465
+        ops.add_picture(doc, png, width_cm=round(usable_cm, 1))
+        ops.add_table(doc, [["Ko‘rsatkich", "Qiymat"]] + [[a.strip(), v] for a, v in rows])
+        w.show()
+        doc.Save()
+        del doc

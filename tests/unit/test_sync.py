@@ -70,6 +70,42 @@ def test_last_edit_wins_and_deletes_propagate(two):
     assert b.mem.facts() == [] and b.mem.rule(rule.id).enabled is False
 
 
+def test_chat_history_only_when_turned_on(two):
+    """The chat goes to the other PC only after both owners' PCs turned on sync.chat; «unut»
+    deletes there too; messages that only grew old are not deleted anywhere."""
+    a, b, shared = two
+    a.mem.log_chat("user", "Baholar.xlsx ni PDF qil")
+    a.mem.log_chat("nexvara", "Tayyor: Baholar.pdf")
+    a.sync(FolderTransport(shared, PW))
+    b.sync(FolderTransport(shared, PW))
+    assert b.mem.chat() == []  # off by default
+    raw = next(shared.glob("NEXVARA-sync/pc-a.nxsync")).read_bytes()
+    assert b"Baholar" not in unseal(raw, PW).__repr__().encode()  # chat not even sent
+    for eng in (a, b):
+        eng.settings.update({"sync": {"chat": True}})
+    b.mem.log_chat("user", "salom")
+    a.sync(FolderTransport(shared, PW))
+    b.sync(FolderTransport(shared, PW))
+    a.sync(FolderTransport(shared, PW))
+    want = ["Baholar.xlsx ni PDF qil", "Tayyor: Baholar.pdf", "salom"]
+    assert [m["text"] for m in a.mem.chat()] == want  # in time order on both PCs
+    assert [m["text"] for m in b.mem.chat()] == want
+    assert b.mem.recent_turns()[0]["text"] == "Baholar.xlsx ni PDF qil"
+    a.sync(FolderTransport(shared, PW))  # nothing doubles on repeated syncs
+    b.sync(FolderTransport(shared, PW))
+    assert len(b.mem.chat()) == 3
+    # «… ni unut» on one PC removes the message on the other one too
+    assert a.mem.forget_chat("Baholar xlsx") == 1
+    a.sync(FolderTransport(shared, PW))
+    b.sync(FolderTransport(shared, PW))
+    assert [m["text"] for m in b.mem.chat()] == ["Tayyor: Baholar.pdf", "salom"]
+    # Turning chat sync off on a PC stops sending, and deletes nothing elsewhere.
+    a.settings.update({"sync": {"chat": False}})
+    a.sync(FolderTransport(shared, PW))
+    b.sync(FolderTransport(shared, PW))
+    assert len(b.mem.chat()) == 2 and len(a.mem.chat()) == 2
+
+
 def test_safety_rules(two, tmp_path):
     a, b, shared = two
     a.settings.update({"ai": {"enabled": True, "daily_budget_usd": 3.0}})

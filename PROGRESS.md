@@ -4,6 +4,42 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-19 (37) — Claude Code — 1–12 ishlar: sozlamalar poygasi, BI bazalari, suhbat sinxroni, internetdan qidirish, telefondan fayl amallari, chizma albomi/Word, qo‘llanma; Windows 1.5.0, Android 1.6.0
+
+**Foydalanuvchi talabi:** «men bilan qiladigan ishlar qolsin, qolgan barcha ishlarni qil 1 dan 12 gacha» (ro‘yxat: 1 media_tools beqarorligi, 2 Word tugmasi oyna testi, 3 android_build yo‘li, 4 build.ps1, 5 ROADMAP, 6 telefondan arxivni ochish, 7 BI bazalari, 8 suhbat tarixi sinxroni, 9 internetdan qidirish, 10 telefondan nomlash/PDF/ko‘chirish, 11 chizma albomi/Word’ga qo‘yish/o‘lchamlar jadvali, 12 yakuniy versiyaga tayyorgarlik).
+
+**Qilindi** (tarmoq `claude/qolgan-ishlar`, `main` dan):
+1. **Haqiqiy xato topildi:** `Settings.load()` fayl boshqa oqimda almashtirilayotganda (Windows PermissionError) standart sozlamalarni qaytarardi → AI vaqtincha «o‘chiq», va o‘sha lahzada saqlash egasining sozlamalarini standartlar bilan yozib yuborishi mumkin edi. Endi kutib qayta o‘qiydi, standartga qaytmaydi. `media_tools` beqarorligining sababi shu edi. Test (eski kodda FAIL).
+2. `cad_tools.py` oyna testi: PDF, Word va Albom tugmalari.
+3. `android_build.ps1` `.worktrees/android/.tools` ni ham topadi. 4. `build.ps1` chiqishi `*>` bilan faylga yo‘naltirilsa ham to‘xtamaydi (1.5.0 shunday yig‘ildi).
+5. ROADMAP yangilandi (M5, M7, M8, M9, M10, M11, M13).
+6. Telefondan ZIP’ni chiqarish haqiqiy telefonda sinaldi.
+7. **BI bazalari** (`bi/db.py`): SQLite va Access (Access COM orqali, oynasiz), faqat o‘qish (mode=ro + query_only; DAO read-only), jadvallar varaq kabi, bitta SELECT so‘rovi (yozuvchi so‘zlar rad etiladi); BI sahifasida so‘rov maydoni.
+8. **Suhbat tarixi sinxroni**: oxirgi 30 kun, faqat Sozlamalar → Sinxronlash → «Suhbat tarixini ham» yoqilsa; «unut» boshqa kompyuterda ham o‘chiradi, eskirgan xabar hech qayerda o‘chmaydi; suhbat vaqt tartibida.
+9. **Internetdan qidirish** («web» yo‘nalishi): OpenAI Responses `web_search`, Gemini Interactions `google_search` (rasmiy hujjatlar 2026-10-19 tekshirildi; Gemini 3+ oyiga 5 000 bepul qidiruv). Savol `privacy.Guard` dan o‘tadi, javob manbalar bilan; bepul Gemini darhol, pullik «Ha» bilan; 🧠 menyuda va telefonda. Claude/DeepSeek orqali emas.
+10. **Telefondan fayl**: `POST /api/v1/files/rename|pdf|move` (faqat qidiruvda topilgan fayllar; ko‘chirish faqat egasining Hujjatlar/Ish stoli/Yuklanmalar papkasiga, ixtiyoriy yangi ichki papka; ustidan yozmaydi), Android tugmalari. `task_dto` endi natijadagi barcha fayllarni beradi.
+11. **Chizma**: `cad.measurements` (umumiy o‘lcham, obyektlar, aylanalar Ø, chiziqlar uzunligi, chizmadagi o‘lchamlar) Word faylida rasm ostida jadval; `cad.album_pdf` + «Albom» tugmasi (har chizma bir sahifa, mundarija); chatda «chizma.dxf ni Hisobot.docx ga qo‘y» — haqiqiy Word’da (ko‘rinadigan) hujjat oxiriga sarlavha, rasm (sahifa kengligida) va jadval.
+12. `docs/QOLLANMA.md` — o‘zbekcha foydalanuvchi qo‘llanmasi. Windows 1.5.0 yig‘ildi, imzolab kanalga joylandi, o‘rnatilgan 1.4.0 dan **haqiqiy yangilash yo‘li** bilan (check → imzo → yuklab olish → SHA-256 → jim o‘rnatish → dastur o‘zi qayta ochildi, pending.json «updated» bo‘lib yopildi) 1.5.0 ga yangilandi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| `scripts/test.ps1 -Office` | 619 PASS + 2 FAIL (`uzbek_ui`: placeholder’da «SELECT»; `test_failed_office_task_is_repaired_in_the_background`: 5 s kutish band kompyuterda yetmadi) → tuzatildi |
+| `scripts/test.ps1` (tuzatishdan keyin) | PASS — 534 passed, 87 skipped; smoke v1.5.0 PASS |
+| Yangi: settings poygasi, SQLite BI (4), Access BI (haqiqiy Access), suhbat sinxroni, web qidiruv (4: HTTP shakllari, bepul darhol + maxfiylik, pullik «Ha», Office bilan adashmaydi), telefon nomlash/PDF/ko‘chirish, chizma o‘lchamlari/albom/Word’ga qo‘yish (soxta va haqiqiy Word), `cad_tools` oyna (Albom, PDF, Word) | PASS |
+| Haqiqiy telefon (USB, 1.6.0 ↔ PC 1.5.0): ZIP chiqarish; nomlash (`nxsinov eslatma yangi.txt`); docx → PDF (345 KB); 2 faylni `Hujjatlar\NEXVARA sinov2` ga ko‘chirish; PDF tugmasi .txt bilan to‘g‘ri o‘chiq | PASS |
+| Windows 1.5.0: yig‘ish (`*>` bilan), imzo, kanal, 1.4.0 → 1.5.0 haqiqiy yangilash, selftest `ok: true` | PASS — SHA-256 `705fc3baa83b337c3a20faf7fc9f56e2c17ddc14a8c5e0c95d5a8c05eace82fa`; zaxira `D:\NEXVARA-zaxira` |
+| Android 1.6.0 build + unit, telefonga o‘rnatildi | PASS — SHA-256 `383cf66df861bd3fd27a984da9658c3cbb90fef9f167d0f8cea24048c87b39c7` |
+| Haqiqiy internet qidiruvi (OpenAI/Gemini) | NOT TESTED — kalit va ruxsat, egasi bilan |
+| SQL Server/MySQL | TODO — 64-bit drayver/pyodbc yo‘q |
+
+Eslatma: telefonni adb bilan boshqarishda «orqaga» tugmasi klaviatura yopiq bo‘lsa ilovadan chiqaradi va keyingi bosishlar boshqa ilovaga tushadi (bir marta qo‘ng‘iroqlar ro‘yxati ochildi, hech narsa bosilmadi). Har bosishdan oldin `mCurrentFocus` va `mInputShown` tekshiring.
+
+**Keyingi qadam:** egasi bilan: haqiqiy AI (internet qidiruvi, ovoz, kamera, jonli suhbat), Google; `claude/qolgan-ishlar` ni `main` ga merge va push — egasi tasdig‘i bilan; xotinining noutbukiga o‘rnatish (yangi kompyuter = alohida NEXVARA, alohida bog‘lash).
+
+---
+
 ## 2026-10-19 (36) — Claude Code — Telefon sensorli panel, telefondan ZIP, chizma → Word; Android 1.5.0
 
 **Foydalanuvchi talabi:** «telefon sensoridan kompyuterni boshqarsa bo‘ladimi; zip fayl qiladigan funksiya qo‘sh»; «AutoCAD’da chizilgan chizmani PDF, Word fayl qilib saqlasa bo‘ladimi, bo‘lmasa qo‘sh».

@@ -7,6 +7,9 @@
 - 🔊 the answer read aloud (TTS). Personal data is never spoken to the provider: found items
   are replaced by «yashirin ma’lumot» before the text is sent.
 - 🎤 speech → text on the STT direction (Gemini free, or OpenAI transcription).
+- 🌐 «internetdan qidir: …»: the provider's web search (Gemini free monthly searches first,
+  else after «Ha» with the price); the answer comes with its source links. Personal data in
+  the question is masked first, like every other request.
 """
 
 from __future__ import annotations
@@ -48,6 +51,17 @@ OPENAI_STT_HINT = (
     "ochib, jami qo‘shing. O‘quvchilar ro‘yxatini tuzing."
 )
 _PRIVATE = re.compile(r"⟦[A-Z_]+_\d+⟧")
+# «internetdan qidir: …», «internetda … ni top», «webdan izla …», «so‘nggi yangiliklar …»
+_WEB = re.compile(
+    r"\b(internet\w*|web\w*|onlayn|google\w*)\b.{0,40}?\b(qidir\w*|top\w*|izla\w*|"
+    r"ma.?lumot\w*|bil\w*|search)|\b(search|look up)\s+(the\s+)?(web|internet)|"
+    r"\b(so.?nggi|eng yangi|bugungi)\s+yangilik\w*",
+    re.IGNORECASE,
+)
+WEB_SYSTEM = (
+    "O‘zbek tilida (lotin) qisqa va aniq javob ber. Faqat internetda topilgan ma’lumotga "
+    "tayan, topilmasa ochiq ayt. ⟦…⟧ belgilarini o‘zgartirmasdan qoldir."
+)
 
 
 def _clean_for_voice(text: str) -> str:
@@ -76,7 +90,7 @@ class MediaApi:
         from nexvara.ai.router import TIER_FOR, AiUnavailable
 
         r = self._router()
-        if cap not in ("text", "vision", "image", "stt", "tts", "realtime"):
+        if cap not in ("text", "vision", "image", "stt", "tts", "realtime", "web"):
             return {"ok": False, "error": "Noma’lum yo‘nalish", "mode": "AUTO"}
         if not r.config().get("enabled"):
             return {"ok": False, "error": "AI o‘chirilgan", "mode": "AUTO"}
@@ -245,6 +259,8 @@ class MediaApi:
             return self._ask_image(f, cur)
         if _MAKE.search(f):
             return self._ask_image(f, None)
+        if _WEB.search(f):
+            return self._ask_web(f)
         if image_open and _ASK.search(f):
             return self._ask_vision(f, cur)
         return None
@@ -319,6 +335,55 @@ class MediaApi:
                 "o‘zgartir» deb yana tahrirlash mumkin.", "image": str(out),
                 "image_data": f"data:{mime};base64," + base64.b64encode(png).decode(),
                 "files": [str(out)]}  # fmt: skip
+
+    def _ask_web(self, question: str) -> dict[str, Any]:
+        from nexvara.ai.router import AiUnavailable, BudgetExceeded
+
+        need = self._need_ai()
+        if need:
+            return need
+        try:
+            est = self._router().media_estimate("web", 1)
+            self._router().check_budget(est, approved=True)
+        except (AiUnavailable, BudgetExceeded) as e:
+            return {"reply": str(e)}
+        if est.free:  # Gemini's free monthly searches: no question needed
+            return self._run_web({"question": question})
+        token = uuid.uuid4().hex[:12]
+        self._pending[token] = ("web", {"question": question})
+        return {"reply": f"🌐 Internetdan qidiraman: {est.describe()} (1 ta qidiruv).\n"
+                "Savol AI provayderiga yuboriladi (shaxsiy ma’lumotlar yashiriladi).\n\n"
+                "Davom etaymi?", "confirm": token}  # fmt: skip
+
+    def _run_web(self, payload: dict[str, Any]) -> dict[str, Any]:
+        from nexvara.ai.privacy import Guard
+        from nexvara.core.task import UserError
+
+        lead = r"^\s*(ai\s+bilan\s+)?(internet\w*|web\w*)\s*(qidir\w*|top\w*|izla\w*)?\s*[:\-–]?\s*"
+        question = re.sub(lead, "", payload["question"], flags=re.I).strip() or payload["question"]
+        guard = Guard()
+        try:
+            safe = guard.mask(question)
+        except UserError as e:
+            return {"reply": str(e)}
+        prompt = f"{WEB_SYSTEM}\n\nSavol: {safe}"
+
+        def call(client: Any, model: str) -> dict[str, Any]:
+            return client.web_search(model, prompt)
+
+        try:
+            out, est = self._router().media("web", 1, call, approved=True, purpose="web")
+        except Exception as e:  # noqa: BLE001
+            return {"reply": self._media_error(e)["error"], "error": True}
+        text = guard.restore(out["text"])
+        price = "bepul" if est.free else f"≈${est.cost:.3f}"
+        lines = [f"🌐 {text}", "", f"({est.model}, {price})"]
+        if out["sources"]:
+            lines += ["", "Manbalar:"] + [f"{i}. {s['title'] or s['url']} — {s['url']}"
+                                          for i, s in enumerate(out["sources"], 1)]  # fmt: skip
+        else:
+            lines += ["", "Manba ko‘rsatilmadi — javobni tekshirib ko‘ring."]
+        return {"reply": "\n".join(lines), "sources": out["sources"]}
 
     def _ask_vision(self, question: str, image: str) -> dict[str, Any]:
         from nexvara.ai.router import AiUnavailable, NeedsConfirmation

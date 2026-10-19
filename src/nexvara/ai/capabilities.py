@@ -8,6 +8,7 @@ Directions (each set separately in settings.json "ai" -> "capabilities"):
   tts       text -> speech (the speaker button)
   realtime  hands-free spoken conversation (NEXVARA chains stt -> chat -> tts turn by turn;
             the providers' streaming Realtime/Live APIs are not used)
+  web       answers from the internet with their sources (the provider's own search tool)
 
 Model ids and prices were checked against the official pages on 2026-10-18:
 - OpenAI: developers.openai.com/api/docs/pricing, guides/image-generation, text-to-speech,
@@ -15,6 +16,11 @@ Model ids and prices were checked against the official pages on 2026-10-18:
   /v1/audio/transcriptions);
 - Gemini: ai.google.dev/gemini-api/docs/models, /pricing, /image-generation,
   /speech-generation (Interactions API; image models have no free tier, TTS and Flash do).
+Web search (checked 2026-10-19): OpenAI Responses API tool "web_search" ($10 / 1k calls +
+search content tokens at the model's input rate; developers.openai.com/api/docs/guides/
+tools-web-search, /pricing); Gemini Interactions API tool "google_search" (Gemini 3 and newer:
+5 000 free search requests a month, then $14 / 1k; ai.google.dev/gemini-api/docs/google-search,
+/pricing). A "web" price below = one search with ~8k search tokens and a short answer.
 Anthropic and DeepSeek have no image generation, speech or voice models; DeepSeek Flash
 accepts image input for analysis.
 A model is offered only if the key check found it in the account's own model list.
@@ -24,7 +30,7 @@ from __future__ import annotations
 
 from typing import Any
 
-CAPABILITIES = ("text", "vision", "image", "stt", "tts", "realtime")
+CAPABILITIES = ("text", "vision", "image", "stt", "tts", "realtime", "web")
 CAP_LABELS = {
     "text": "Matn va suhbat",
     "vision": "Rasmni ko‘rish (Vision/OCR)",
@@ -32,6 +38,7 @@ CAP_LABELS = {
     "stt": "Ovoz → matn (STT)",
     "tts": "Matn → ovoz (TTS)",
     "realtime": "Jonli ovozli suhbat",
+    "web": "Internetdan qidirish",
 }
 
 # provider -> direction -> models, cheapest first. "price": USD per unit (see `unit`);
@@ -52,6 +59,10 @@ MEDIA: dict[str, dict[str, list[dict[str, Any]]]] = {
         ],
         # $12 per 1M audio tokens; ~1 000 characters ≈ 1 minute ≈ 1 250 audio tokens
         "tts": [{"model": "gpt-4o-mini-tts", "price": 0.016, "unit": "minute"}],
+        "web": [  # $0.01 a call + ~8k search tokens + ~1k answer tokens
+            {"model": "gpt-5.4", "price": 0.045, "unit": "search"},
+            {"model": "gpt-5.5", "price": 0.08, "unit": "search"},
+        ],
         "vision": [],  # the text tier models read photos
     },
     "gemini": {
@@ -70,6 +81,10 @@ MEDIA: dict[str, dict[str, list[dict[str, Any]]]] = {
             {"model": "gemini-3.8-flash-lite-tts", "price": None, "unit": "minute", "free": True},
             {"model": "gemini-3.8-flash-tts", "price": None, "unit": "minute", "free": True},
         ],  # fmt: skip
+        "web": [  # 5 000 free searches a month (Gemini 3+), then $0.014 + tokens
+            {"model": "gemini-3.5-flash-lite", "price": 0.017, "unit": "search", "free": True},
+            {"model": "gemini-3.8-flash", "price": 0.025, "unit": "search", "free": True},
+        ],
         "vision": [],
     },
     "anthropic": {"vision": []},
