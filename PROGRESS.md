@@ -4,6 +4,35 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-19 (34) — Claude Code — Telefon sensorli panel, telefondan ZIP, chizma → Word; Android 1.4.0
+
+**Foydalanuvchi talabi:** «telefon sensoridan kompyuterni boshqarsa bo‘ladimi; zip fayl qiladigan funksiya qo‘sh»; «AutoCAD’da chizilgan chizmani PDF, Word fayl qilib saqlasa bo‘ladimi, bo‘lmasa qo‘sh».
+
+**Holat oldin:** telefondan boshqarish bor edi (ekran rasmiga bosish), kompyuterda ZIP (Fayllar bo‘limi va chat) va chizma → PDF/PNG bor edi. Yo‘q edi: telefonda sensorli panel, telefondan ZIP, chizma → Word.
+
+**Qilindi** (tarmoq `claude/ai-multimodal`):
+- `control.py`: `nudge` (kursorni dx, dy piksel siljitish, ±800), `tap`/`tap_double`/`tap_right` (kursor turgan joyda), `drag_start`/`drag_end`. `/api/v1/control` `dx` ni ham qabul qiladi. `screen.py`: ekran rasmiga sichqoncha ko‘rsatkichi chiziladi (BitBlt uni olmaydi).
+- Telefon API: `POST /api/v1/files/zip` (qidiruvda topilgan 1–50 fayl, arxiv birinchi fayl yonida, kichik bo‘lsa darhol telefonga olinadi), `POST /api/v1/files/unzip` (faqat topilgan .zip, yonidagi yangi papkaga). Maxfiy fayllar (kalit, baza) baribir rad etiladi.
+- Chizma → Word: `cad.png_to_docx` (Word ochilmaydi, OOXML: chizma A4 sahifada, keng bo‘lsa albom). Chizmalar oynasida «Word» tugmasi; chat: «chizma.dxf ni Word qil»; telefondan saqlangan chizma DXF + PDF + PNG + Word.
+- Android 1.4.0 (versionCode 11): Kompyuter ekrani → boshqarish → «Sensorli panel» (barmoq suring = kursor, bosish = chap, uzoq = o‘ng, ikki marta = ochish, ikki barmoq = aylantirish, «Ushlab sudrash»); Kompyuterdan qidirish → fayllarni belgilab «ZIP qilish» va «Telefonga», .zip uchun «Chiqarish», «ZIP» filtri; Chizma saqlangach «Telefonga olish: PDF / Word / PNG / DXF».
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| `.\scripts	est.ps1` (Office’siz) | PASS — 503 passed, 85 skipped; oyna smoke PASS |
+| Yangi: telefondan ZIP/unzip marshruti, `nudge` dx uzatilishi va chegarasi, chizma → docx (albom, sarlavha), chat «Word qil», telefon chizmasida docx | PASS |
+| Ekran rasmida kursor (haqiqiy ekran, bir marta) | PASS (ko‘z bilan tekshirildi) |
+| Android assembleDebug + unit testlar | PASS — APK SHA-256 `9a8c494741cddf79195fcd47ed4e147681f8d5ec16104e22c2003ed1d9f30d02` |
+| Haqiqiy telefonda sensorli panel, ZIP, Word yuklab olish | NOT TESTED — telefon kompyuterga ulanmagan (adb: qurilma yo‘q) |
+| Word faylini haqiqiy Word’da ochish | NOT TESTED — Office testi ruxsat bilan |
+
+Eslatma: `scripts/android_build.ps1` `.tools` ni asosiy papkada qidiradi, vositalar esa `.worktrees/android/.tools` da — yig‘ish shu yo‘l bilan qo‘lda qilindi.
+
+**Keyingi qadam:** telefon ulanganda 1.4.0 ni o‘rnatib, sensorli panel va ZIP’ni haqiqiy qurilmada sinash; ruxsat bilan `-Office` (Chizmalar oynasidagi Word tugmasi, docx Word’da ochilishi); Windows yangi versiyani yig‘ish; `main` ga merge — egasi tasdig‘i bilan.
+
+---
+
 ## 2026-10-18 (33) — Claude Code — Multi-AI router: yo‘nalishlar bo‘yicha AUTO/MANUAL, rasm va ovoz; Windows 1.3.0
 
 **Foydalanuvchi talabi:** OpenAI, Gemini, Claude, DeepSeek bitta tizimda; CHEAP/BALANCED/POWERFUL/SPECIALIST va AUTO; har yo‘nalish (matn, vision/OCR, rasm yaratish/tahrirlash, STT, TTS, jonli suhbat) uchun AUTO yoki qo‘lda tanlash, qo‘lda tanlangan model almashtirilmasin; chatda doim ko‘rinadigan 🎤 🔊 🖼️ 📷 ✨ 🧠; API va xarajat boshqaruvi; model nomlarini rasmiy hujjatdan tekshirish; pullik sinov faqat ruxsat bilan; Android tomonda Codex ishiga xalaqit bermaslik.
