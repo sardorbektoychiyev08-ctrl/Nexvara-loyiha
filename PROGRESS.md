@@ -12,7 +12,9 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 **Testlar:** telefon Wi‑Fi o‘chiq, faqat 4G + Tailscale → NEXVARA «Ulangan» (PC’da 100.118.62.7 dan ulanish) — PASS. NEXVARA Windows bilan birga ishga tushadi — yoqiq.
 
-**Ochiq:** noutbukda hali egasining AI kalitlari (OpenAI/Gemini) va sinxron sozlamasi turibdi — egasi qarori kutilmoqda. Egasining telefoni ham shu noutbukka bog‘langan (qurilma yozuvi o‘chirilmadi). **Mahsulotga taklif:** Tailscale uchun himoya devori qoidasini NEXVARA o‘zi taklif qilsin (hozir qo‘lda, admin kerak).
+**Davomi (shu kun):** Android **release** imzo: kalit `D:\NEXVARA\release\android-release.jks` (Git’da emas; egasiga zaxiralash aytildi), paroli Credential Manager `NEXVARA/release/android`; `android_build.ps1 -Release` uni o‘zi topadi. APK SHA-256 `137e3b4564d87e8726d7f208c5354cc318ae2cdefb110d91f2e89fb26b48b5fb`. Ikkala telefonda debug o‘chirilib release o‘rnatildi (Xiaomi «USB orqali o‘rnatish» va Play Protect tasdiqlarini egasi o‘zi bosdi), QR bilan qayta bog‘landi; release (R8) da bosh sahifa, AI xarajatlari, jonli ekran ishladi — PASS. `NEXVARA-Setup-1.5.0.exe` egasining telefoniga (Download) yozildi, SHA-256 mos — ishxona kompyuteri uchun. Internet orqali yangilanish: GitHub’da ochiq `nexvara-yangilanish` omborini yaratishni xavfsizlik tizimi to‘xtatdi (ochiq narsa yaratish) — fayllar `dist\yangilanish` da tayyor; egasi omborni yaratib release qo‘ygach, kanal `https://github.com/<egasi>/nexvara-yangilanish/releases/latest/download` ga o‘zgartiriladi (NOT DONE).
+
+**Egasi qarori:** AI kalitlari noutbukda qoladi; egasining telefoni ham shu noutbukka bog‘langan qoladi. **Mahsulotga taklif:** Tailscale uchun himoya devori qoidasini NEXVARA o‘zi taklif qilsin (hozir qo‘lda, admin kerak).
 
 ---
 
