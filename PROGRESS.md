@@ -30,13 +30,16 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 | Haqiqiy telefon: 2 ta sinov faylini topish → belgilash → «ZIP qilish» → arxiv PC’da, «Telefonga» → Download’da 276 bayt | PASS |
 | Haqiqiy telefon: to‘rtburchak chizib saqlash → DXF+PDF+PNG+Word, Word telefonga yuklandi; rang tuzatishidan keyin PNG’da chiziq bor | PASS |
 | Telefonda bosish (tap) PC’da | NOT TESTED — egasining ochiq oynalarida tasodifiy bosmaslik uchun (marshrut unit testda PASS) |
-| Word faylini haqiqiy Word’da ochish | NOT TESTED — Office testi ruxsat bilan |
+| Word faylini haqiqiy Word’da ochish (egasi ruxsati bilan) | PASS — 1 sahifa, A4 albom, sarlavha, 1 rasm; Word’dan PDF qilinganda qora to‘rtburchak va qizil aylana ko‘rinadi |
 | Windows 1.4.0 yig‘ish, imzolab joylash, jim o‘rnatish, ishga tushirish, telefon ulanishi | PASS |
-| O‘rnatilgan 1.4.0 `--selftest-installed` | NOT TESTED — Excel/Word ekranda ochiladi, alohida ruxsat kerak |
+| O‘rnatilgan 1.4.0 `--selftest-installed` | PASS — `ok: true` (12 sahifa, Excel/dashboard/Word/PowerPoint, BI 8 vidjet, AI 4 provayder, Google, sinxron) |
+| `scripts/test.ps1 -Office` to‘liq | 606 PASS + 1 FAIL (`media_tools.py`: to‘liq yuklamada vaqt/holat — 33/35-yozuvlarda ham bir marta bo‘lgan) → alohida 2 marta qayta: PASS |
 
 Eslatma: `scripts/android_build.ps1` `.tools` ni asosiy papkada qidiradi, vositalar esa `.worktrees/android/.tools` da — yig‘ish shu yo‘l bilan qo‘lda qilindi.
 
-**Keyingi qadam:** ruxsat bilan o‘rnatilgan 1.4.0 selftesti; ruxsat bilan `-Office` (Chizmalar oynasidagi Word tugmasi, docx Word’da ochilishi); `main` ga merge — egasi tasdig‘i bilan.
+Egasi tasdig‘i bilan `main` ga merge qilindi va `origin` ga push qilindi (oldin maxfiy ma’lumot tekshiruvi: kalit/token/maxfiy fayl yo‘q).
+
+**Keyingi qadam:** `media_tools.py` oyna testining to‘liq yuklamada ba’zan yiqilishi sababini topish; Chizmalar oynasidagi «Word» tugmasini oyna testiga (`cad_tools.py`) qo‘shish.
 
 ---
 
