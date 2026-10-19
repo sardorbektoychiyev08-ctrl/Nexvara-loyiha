@@ -38,6 +38,7 @@ TIER_FOR = {
     "classify": "cheap", "command": "cheap", "chat": "cheap",
     "plan": "balanced", "qa": "balanced", "test": "balanced",
     "analysis": "powerful", "special": "special", "drawing": "powerful", "ocr": "balanced",
+    "translate": "balanced",
 }  # fmt: skip
 PURPOSE_LABELS = {
     "classify": "Buyruqni tushunish",
@@ -51,6 +52,7 @@ PURPOSE_LABELS = {
     "check": "Kalitni tekshirish",
     "drawing": "Chizma",
     "ocr": "Rasmdan matn",
+    "translate": "Tarjima / qayta yozish",
     "vision": "Rasmni tahlil qilish",
     "image": "Rasm yaratish",
     "image_edit": "Rasmni tahrirlash",

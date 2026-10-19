@@ -342,3 +342,22 @@ body.cad-compact .cad-log { height: 32px; }
 .cap-info.bad { color: var(--danger, #ef4444); }
 .ai-caps-title { margin: 16px 0 4px; font-size: 15px; }
 @media (max-width: 720px) { .cap-row { grid-template-columns: 1fr 1fr; } .cap-info { grid-column: 1 / -1; } }
+/* Devices: Tailscale found, firewall rule missing */
+.notice { margin: 10px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.notice[hidden] { display: none; }
+.notice .row { margin-top: 8px; gap: 10px; align-items: center; flex-wrap: wrap; }
+/* first start guide */
+.onboard { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 8, 20, .62); }
+.onboard[hidden] { display: none; }
+.onboard-card { width: min(620px, calc(100vw - 48px)); max-height: calc(100vh - 48px); overflow: auto;
+  padding: 22px 24px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border);
+  box-shadow: 0 18px 50px rgba(0,0,0,.45); }
+.onboard-card h2 { margin: 6px 0 10px; }
+.ob-list { list-style: none; padding: 0; margin: 8px 0; }
+.ob-list li { padding: 4px 0; }
+.ob-list li.ok { color: var(--ok, #3ecf8e); }
+.ob-list li.bad { color: var(--warn, #f5a524); }
+.ob-buttons { margin-top: 16px; gap: 8px; align-items: center; }
+.ob-buttons .grow { flex: 1; }

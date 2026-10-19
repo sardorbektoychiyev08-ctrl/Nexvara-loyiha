@@ -1412,6 +1412,7 @@ let devTimer = null;
 async function renderDevices() {
   renderDeviceOptions();
   if (!api()) return;
+  renderTailscale();
   drawDevices(await api().devices_status());
   clearInterval(devTimer);
   devTimer = setInterval(async () => {
@@ -1458,6 +1459,20 @@ function drawDevices(st) {
   });
 }
 
+// Tailscale found but the firewall rule missing: offer one button (firewall.py).
+async function renderTailscale() {
+  if (!api().devices_tailscale) return;
+  const t = await api().devices_tailscale();
+  $("#dev-ts").hidden = !t.needed;
+}
+$("#dev-ts-allow").addEventListener("click", async () => {
+  $("#dev-ts-allow").disabled = true;
+  const r = await api().devices_allow_tailscale();
+  $("#dev-ts-allow").disabled = false;
+  $("#dev-ts").hidden = !r.needed;
+  $("#dev-error").hidden = r.ok; $("#dev-error").textContent = r.ok ? "" : r.error;
+});
+
 // What a paired phone may do: see the screen, control mouse/keyboard, NEXVARA at sign-in.
 async function renderDeviceOptions() {
   if (!api() || !api().devices_options) return;
@@ -1487,6 +1502,49 @@ $("#dev-toggle").addEventListener("click", async () => {
 });
 $("#dev-newcode").addEventListener("click", async () => drawDevices(await api().devices_new_code()));
 
+// ---- first start on a new PC (api_onboarding.py) ----
+let obStep = 1;
+function obShow(n) {
+  obStep = n;
+  document.querySelectorAll("#onboard .ob-page").forEach((p) => { p.hidden = Number(p.dataset.ob) !== n; });
+  $("#ob-step").textContent = `${n} / 4`;
+  $("#ob-back").hidden = n === 1;
+  $("#ob-next").textContent = n === 4 ? "Boshlash" : "Keyingi";
+  if (n === 2) obPhoneState();
+}
+async function startOnboarding() {
+  if (!api().onboarding_status) return;
+  const st = await api().onboarding_status();
+  if (!st.show) return;
+  const ul = $("#ob-office");
+  ul.textContent = "";
+  const names = { excel: "Excel", word: "Word", powerpoint: "PowerPoint" };
+  Object.entries(names).forEach(([k, label]) => {
+    const ok = st.office && st.office[k];
+    ul.appendChild(el("li", ok ? "ok" : "bad", ok ? `✓ ${label} topildi` : `✗ ${label} topilmadi — ${label} ishlari bajarilmaydi`));
+  });
+  $("#onboard").hidden = false;
+  obShow(1);
+}
+async function obPhoneState() {
+  const st = await api().devices_status();
+  $("#ob-phone").disabled = !st.available || st.running;
+  $("#ob-phone-state").textContent = st.running ? "Yoqildi ✓ — QR kod «Qurilmalar» bo‘limida" : "";
+  const t = await api().devices_tailscale();
+  $("#ob-ts").hidden = !t.needed;
+}
+async function obFinish() {
+  if ($("#ob-autostart").checked) { try { await api().devices_set_option("autostart", true); } catch (e) { /* not on this PC */ } }
+  await api().onboarding_done();
+  $("#onboard").hidden = true;
+}
+$("#ob-next").addEventListener("click", () => (obStep === 4 ? obFinish() : obShow(obStep + 1)));
+$("#ob-back").addEventListener("click", () => obShow(Math.max(1, obStep - 1)));
+$("#ob-skip").addEventListener("click", async () => { await api().onboarding_done(); $("#onboard").hidden = true; });
+$("#ob-phone").addEventListener("click", async () => { await api().devices_start(); obPhoneState(); });
+$("#ob-ts-allow").addEventListener("click", async () => { await api().devices_allow_tailscale(); obPhoneState(); });
+$("#ob-ai").addEventListener("click", async () => { await obFinish(); show("settings"); });
+
 // ---- boot ----
 window.addEventListener("pywebviewready", async () => {
   const info = await api().get_info();
@@ -1498,6 +1556,7 @@ window.addEventListener("pywebviewready", async () => {
   refreshAiStatus();
   renderAiMoney();
   checkUpdateBanner();
+  startOnboarding();
   // The conversation continues where it stopped last time.
   (await api().memory_chat(30)).forEach((c) => addMsg(c.text, c.role === "user"));
   settings = await api().get_settings();

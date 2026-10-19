@@ -406,6 +406,19 @@ def files_pdf(api, a):
     return {"reply": f"{len(paths)} ta fayl PDF qilinmoqda — jarayon o‘ng panelda.", "task": snap}
 
 
+@tool("excel.combine", "Excel fayllarini bitta kitobga yig‘ish (har biri varaq)",
+      paths=("array", True, "Excel/CSV fayllar"))  # fmt: skip
+def excel_combine(api, a):
+    paths = resolve_files(api, a.get("paths") or [])
+    if len(paths) < 2:
+        raise ToolError("Kamida 2 ta Excel fayli kerak")
+    snap = api.excel_combine(paths)
+    if "id" not in snap:
+        raise ToolError(snap.get("error", "Boshlanmadi"))
+    return {"reply": f"{len(paths)} ta fayl bitta kitobga yig‘ilmoqda — Excel ekranda ochiladi.",
+            "task": snap}  # fmt: skip
+
+
 # =====================================================================
 # NEXVARA BI
 # =====================================================================

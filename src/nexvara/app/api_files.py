@@ -124,6 +124,22 @@ class FilesApi:
 
         return self._runner.start(f"PDF'ga aylantirish: {len(paths)} ta fayl", fn).snapshot()
 
+    def excel_combine(self, paths: list[str]) -> dict[str, Any]:
+        """Several workbooks (or CSV) into one new workbook next to the first, a sheet each
+        (the first sheet of every file, named after the file); the originals are not changed."""
+        from nexvara.fileagent import combine_workbooks
+
+        if len(paths) < 2:
+            return {"error": "Kamida 2 ta fayl kerak"}
+        fn = self._overrides.get("excel_combine")
+        if fn is None:
+            keep = bool(self.get_settings().get("keep_office_open", True))
+
+            def fn(task: Any) -> dict[str, Any]:
+                return combine_workbooks(task, list(paths), keep_open=keep)
+
+        return self._runner.start(f"Excel fayllarini yig‘ish: {len(paths)} ta", fn).snapshot()
+
     def open_file(self, path: str) -> bool:
         p = Path(path)
         if not p.is_absolute() or not p.exists():

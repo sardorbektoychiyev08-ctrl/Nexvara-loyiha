@@ -23,6 +23,8 @@ from nexvara.app.api_drawing import DrawingApi
 from nexvara.app.api_files import FilesApi
 from nexvara.app.api_media import MediaApi
 from nexvara.app.api_memory import MemoryApi
+from nexvara.app.api_officeai import OfficeAiApi
+from nexvara.app.api_onboarding import OnboardingApi
 from nexvara.app.api_reading import ReadingApi
 from nexvara.app.api_sections import SectionsChatApi
 from nexvara.app.api_sync import SyncApi
@@ -76,6 +78,8 @@ class Api(
     VoiceApi,
     MediaApi,
     ReadingApi,
+    OnboardingApi,
+    OfficeAiApi,
 ):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
@@ -211,6 +215,9 @@ class Api(
         drawn = self._chat_drawing(text)  # "... chizib ber", a photo of a hand-drawn sketch
         if drawn is not None:
             return drawn
+        officeai = self._chat_officeai(text)  # «Xat.docx ni ingliz tiliga tarjima qil»
+        if officeai is not None:
+            return officeai
         media = self._chat_media(text)  # ✨ «rasm yarat: …», a question about the open photo
         if media is not None:
             return media
@@ -503,6 +510,8 @@ class Api(
             return self._run_vision(payload)
         if kind == "web":
             return self._run_web(payload)
+        if kind == "officeai":
+            return self._run_officeai(payload)
         snap = self.make_test({**payload, "approved": True})
         if "id" not in snap:
             return {"reply": snap.get("error") or "Test boshlanmadi"}
