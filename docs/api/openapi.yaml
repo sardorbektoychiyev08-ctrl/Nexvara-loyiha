@@ -471,6 +471,36 @@ paths:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "400": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/v1/files/rename:
+    post:
+      summary: "Rename a found file {path, name} (no extension = keep it; existing names and bad characters are refused) -> {path, name}"
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {path: {}, name: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/files/pdf:
+    post:
+      summary: "Word/Excel/PowerPoint found files -> PDF next to each (1..20, a task on the PC; the PDFs are the task's files) -> {task}"
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {paths: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/files/move:
+    post:
+      summary: "Move found files {paths 1..50, to desktop|documents|downloads, folder (optional new subfolder)}; never overwrites (a free name is used) -> {folder, files}"
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {paths: {}, to: {}, folder: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
   /api/v1/omr:
     get:
       summary: "Answer-sheet sets (title, questions, variants, keys, last results) and whether the last generated test has answer keys"

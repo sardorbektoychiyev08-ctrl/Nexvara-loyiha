@@ -55,6 +55,9 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("POST", "/api/v1/files/open", True),
     ("POST", "/api/v1/files/zip", True),
     ("POST", "/api/v1/files/unzip", True),
+    ("POST", "/api/v1/files/rename", True),
+    ("POST", "/api/v1/files/pdf", True),
+    ("POST", "/api/v1/files/move", True),
 ]
 HANDLED = {p for _m, p, _a in ROUTES}
 
@@ -262,6 +265,35 @@ def _found_file(srv: Any, dev: dict[str, Any], path: str) -> Path:
     if not p.is_file() or _secret(p.resolve()):
         raise ApiError("NOT_FOUND", "Fayl topilmadi")
     return p
+
+
+# Where the phone may move files: the owner's own Desktop / Documents / Downloads (the real
+# folders Windows uses, e.g. inside OneDrive), optionally a new subfolder there.
+_SHELL = {"desktop": "Desktop", "documents": "Personal",
+          "downloads": "{374DE290-123F-4565-9164-39C4925E467B}"}  # fmt: skip
+_FALLBACK = {"desktop": "Desktop", "documents": "Documents", "downloads": "Downloads"}
+
+
+def _known_folder(name: str) -> Path:
+    if name not in _SHELL:
+        raise ApiError("BAD_REQUEST", "Joy: desktop, documents yoki downloads")
+    try:
+        import winreg
+
+        key = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key) as k:
+            folder = Path(winreg.QueryValueEx(k, _SHELL[name])[0])
+        if folder.is_dir():
+            return folder
+    except OSError:
+        pass
+    return Path.home() / _FALLBACK[name]
+
+
+def _found_files(srv: Any, dev: dict[str, Any], paths: Any, most: int) -> list[Path]:
+    if not isinstance(paths, list) or not 1 <= len(paths) <= most:
+        raise ApiError("BAD_REQUEST", f"1–{most} ta fayl tanlang")
+    return [_found_file(srv, dev, str(x)) for x in dict.fromkeys(map(str, paths))]
 
 
 def _screen(h: Any, api: Any) -> None:
@@ -506,6 +538,47 @@ def route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list[
         api.ui_push({"kind": "phone_file", "name": out.name, "path": str(out)})
         return {"path": str(out), "name": out.name, "size": size, "files": len(items),
                 "downloadable": size <= MAX_UPLOAD}  # fmt: skip
+    if route == "/api/v1/files/rename":
+        from nexvara import fileagent
+
+        b = body()
+        p = _found_file(srv, dev, str(b.get("path", "")))
+        try:
+            new = Path(fileagent.rename(str(p), str(b.get("name") or "")[:200]))
+        except (OSError, ValueError) as e:
+            raise ApiError("BAD_REQUEST", str(e)) from e
+        _grant(srv, dev, str(new), "found", FOUND_TTL)
+        return {"path": str(new), "name": new.name}
+    if route == "/api/v1/files/pdf":
+        from nexvara.fileagent import PDF_FROM
+
+        items = _found_files(srv, dev, body().get("paths"), 20)
+        if not all(p.suffix.lower() in PDF_FROM for p in items):
+            raise ApiError("BAD_REQUEST", "PDF faqat Word, Excel va PowerPoint fayllaridan")
+        snap = api.files_to_pdf([str(p) for p in items])
+        if "id" not in snap:
+            raise ApiError("BAD_REQUEST", snap.get("error") or "Boshlanmadi")
+        api.ui_push({"kind": "task", "task": snap})
+        return {"task": task_dto(snap)}
+    if route == "/api/v1/files/move":
+        from nexvara import fileagent
+
+        b = body()
+        items = _found_files(srv, dev, b.get("paths"), 50)
+        dest = _known_folder(str(b.get("to") or ""))
+        sub = str(b.get("folder") or "").strip()
+        if sub:
+            if len(sub) > 80 or sub in (".", "..") or any(c in '<>:"/\\|?*' for c in sub):
+                raise ApiError("BAD_REQUEST", "Papka nomida ruxsat etilmagan belgi bor")
+            dest = dest / sub
+        try:
+            moved = fileagent.move_to([str(p) for p in items], dest)
+        except (OSError, ValueError) as e:
+            raise ApiError("BAD_REQUEST", f"Ko‘chirib bo‘lmadi: {e}") from e
+        for m in moved:
+            _grant(srv, dev, m, "found", FOUND_TTL)
+        api.ui_push({"kind": "phone_file", "name": dest.name, "path": str(dest)})
+        return {"folder": str(dest), "files": moved}
     if route == "/api/v1/files/unzip":
         import zipfile
 
