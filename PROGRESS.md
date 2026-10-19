@@ -4,6 +4,20 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-20 (40) — Claude Code — Ayolining noutbukini tozalash; rasmli foydalanish kitobi
+
+**Foydalanuvchi talabi:** «tozala, keyin NEXVARA’ni qanday ishlatish bo‘yicha rasmli kitob yarat, tushunarli qilib».
+
+**Tozalash** (egasi rozi bo‘lgan doirada; avval zaxira `D:\NEXVARA-zaxira\20261020-011603`): egasining suhbat tarixi (18) va vazifalar tarixi (4) o‘chirildi; sinxron sozlamalari standartga qaytarildi, `NEXVARA/sync/passphrase` o‘chirildi; sinov papkalari (AI rasmlar, Ovoz, Telefondan, Chizmalar, Testlar) va OneDrive’dagi eski `.nxsync` fayli `…\eski-sinov-papkalari` ga KO‘CHIRILDI (o‘chirilmadi). Qoldi: AI kalitlari, xarajatlar hisobi, telefon bog‘lanishlari. OneDrive’da bo‘sh `NEXVARA-SYNC` papkasi qoldi (OneDrive band qilgan).
+
+**Kitob:** `scripts/guide_shots.py` (haqiqiy oyna, namunaviy ma’lumotlar — egasining ma’lumoti yo‘q; 17 ta kompyuter rasmi, pastdagi qora bo‘shliq avtomatik kesiladi) + 8 ta telefon rasmi (adb, oldingi sinovlardan) + `scripts/make_guide.py` (haqiqiy Word, 15 bob, mundarija, jadvallar, eslatmalar) → `D:\NEXVARA\Qollanma\NEXVARA-qollanma.docx` va `.pdf` (21 sahifa); PDF nusxasi noutbuk ish stolida. Ko‘rib chiqildi va tuzatildi: qora bo‘shliq, raqamlash davomi, katta telefon rasmlari, bo‘sh sahifa.
+
+**Testlar:** kitob sahifalari ko‘z bilan tekshirildi — PASS; dastur kodi o‘zgarmadi (faqat skriptlar), ruff PASS.
+
+**Keyingi qadam:** kitobni egasining telefoni/OneDrive’iga qo‘yish (telefon ulanganda); `main` ga merge va push — egasi tasdig‘i bilan.
+
+---
+
 ## 2026-10-20 (39) — Claude Code — 5–11: Tailscale ulashish, kalitlar zaxirasi tekshiruvi, Tailscale tugmasi, 1.5.1/1.5.2 GitHub orqali, birinchi ishga tushirish yordamchisi, Excel cheklash va yig‘ish, AI tarjima/qayta yozish, SmartArt
 
 **Foydalanuvchi talabi:** «4,5 dan boshla, keyin qolganini davom ettiraver» (4 — Drive sinxroni ertaga ishxonada egasi hisobi bilan qoldirildi; 12 — SQL Server/MySQL kerak emas, egasi bilan kelishildi).
