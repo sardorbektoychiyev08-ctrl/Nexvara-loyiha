@@ -792,6 +792,54 @@
     </div>
   </aside>
 
+
+  <!-- First start on a new PC (app/api_onboarding.py): shown once, every step can be skipped -->
+  <div class="onboard" id="onboard" role="dialog" aria-modal="true" aria-labelledby="ob-title" hidden>
+    <div class="onboard-card">
+      <div class="muted small" id="ob-step">1 / 4</div>
+      <section class="ob-page" data-ob="1">
+        <h2 id="ob-title">NEXVARA’ga xush kelibsiz</h2>
+        <p>Buyruqni oddiy o‘zbek tilida yozasiz yoki aytasiz — NEXVARA Excel, Word, PowerPoint’da
+          ishlaydi, darslikdan test tuzadi, hisobot va chizma qiladi. Avval bu kompyuterni tekshiraman:</p>
+        <ul class="ob-list" id="ob-office"></ul>
+      </section>
+      <section class="ob-page" data-ob="2" hidden>
+        <h2>Telefon</h2>
+        <p>Telefondagi NEXVARA ilovasidan buyruq berasiz, ekranni ko‘rasiz va fayllarni olasiz.</p>
+        <div class="row"><button class="btn primary" id="ob-phone" type="button">Telefondan boshqarishni yoqish</button>
+          <span class="muted small" id="ob-phone-state"></span></div>
+        <label class="check-label"><input id="ob-autostart" type="checkbox" checked> NEXVARA Windows bilan birga ishga tushsin
+          (telefon kompyuter yoqilganda ham ulanadi)</label>
+        <div class="notice" id="ob-ts" hidden>Tailscale topildi. Telefon boshqa tarmoqdan ham ulanishi uchun
+          Windows himoya devoriga ruxsat kerak.
+          <div class="row"><button class="btn small-btn primary" id="ob-ts-allow" type="button">Tailscale uchun ruxsat berish</button></div></div>
+        <p class="muted small">QR kod «Qurilmalar» bo‘limida chiqadi. Uydan tashqarida ishlatish uchun telefon va
+          kompyuterga bepul Tailscale o‘rnatiladi (bitta hisob bilan).</p>
+      </section>
+      <section class="ob-page" data-ob="3" hidden>
+        <h2>AI (ixtiyoriy)</h2>
+        <p>Ko‘p ishlar AI’siz ham bajariladi. Murakkab buyruqlar, rasm, ovoz va internetdan qidirish uchun
+          AI kaliti kerak: <b>Google Gemini</b> kaliti bepul (ai.google.dev), OpenAI va Claude pullik.</p>
+        <p class="muted small">Kalit faqat Windows himoyalangan xotirasida saqlanadi. Pullik so‘rovdan oldin NEXVARA
+          narxini aytib, «Ha» kutadi; kunlik va oylik limit bor.</p>
+        <div class="row"><button class="btn" id="ob-ai" type="button">Sozlamalar → AI ni ochish</button></div>
+      </section>
+      <section class="ob-page" data-ob="4" hidden>
+        <h2>Tayyor</h2>
+        <p>Yangi versiyalar internetdan o‘zi tekshiriladi — «Yangilash» chiqsa bosasiz. Google hisobi bilan
+          kirish (sinxronlash uchun) Sozlamalarda.</p>
+        <p>Boshlash uchun chap menyudan <b>AI suhbat</b> ni oching va yozing, masalan:
+          <span class="mono">Baholar.xlsx ni och, jadvalni formatla</span></p>
+      </section>
+      <div class="row ob-buttons">
+        <button class="btn" id="ob-skip" type="button">O‘tkazib yuborish</button>
+        <span class="grow"></span>
+        <button class="btn" id="ob-back" type="button" hidden>Orqaga</button>
+        <button class="btn primary" id="ob-next" type="button">Keyingi</button>
+      </div>
+    </div>
+  </div>
+
   <script src="i18n.js"></script>
   <script src="app.js"></script>
   <script src="bi.js"></script>

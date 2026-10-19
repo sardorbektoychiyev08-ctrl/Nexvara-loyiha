@@ -30,6 +30,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # Private release channel: a folder or an https:// URL with a signed latest.json.
     # The public updates repository (only signed installers, verified before install).
     "update": {"channel": UPDATES_URL, "auto_check": True},
+    # the first-start guide (app/api_onboarding.py) was shown or skipped
+    "onboarding": {"done": False},
     # Settings, memory and Teach rules between devices (sync.py). The passphrase is in
     # Credential Manager (NEXVARA/sync/passphrase), never here.
     "sync": {

@@ -23,6 +23,7 @@ from nexvara.app.api_drawing import DrawingApi
 from nexvara.app.api_files import FilesApi
 from nexvara.app.api_media import MediaApi
 from nexvara.app.api_memory import MemoryApi
+from nexvara.app.api_onboarding import OnboardingApi
 from nexvara.app.api_reading import ReadingApi
 from nexvara.app.api_sections import SectionsChatApi
 from nexvara.app.api_sync import SyncApi
@@ -76,6 +77,7 @@ class Api(
     VoiceApi,
     MediaApi,
     ReadingApi,
+    OnboardingApi,
 ):
     """`output_dir`/`keep_office_open` exist so the UI self-test can run the real
     button flow without leaving files in Documents or Office windows open."""
