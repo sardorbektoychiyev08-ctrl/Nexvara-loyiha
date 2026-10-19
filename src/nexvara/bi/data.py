@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 SUPPORTED = (".xlsx", ".xlsm", ".csv", ".json", ".xml", ".txt", ".tsv")
+DATABASES = (".db", ".sqlite", ".sqlite3", ".accdb", ".mdb")  # bi/db.py, read-only
 MAX_ROWS = 200_000
 NULLS = {"", "-", "—", "n/a", "na", "null", "none", "nan", "#n/a", "yo‘q", "yoq"}
 
@@ -77,7 +78,12 @@ def _from_grid(grid: list[list[Any]], source: str) -> Table:
 
 
 def sheets(path: str | Path) -> list[str]:
+    """Sheets of a workbook, or tables/views of a database."""
     p = Path(path)
+    if p.suffix.lower() in DATABASES:
+        from nexvara.bi import db
+
+        return db.tables(p)
     if p.suffix.lower() not in (".xlsx", ".xlsm"):
         return []
     import openpyxl
@@ -194,9 +200,19 @@ def load(path: str | Path, sheet: str | None = None) -> Table:
         return _json(p)
     if ext == ".xml":
         return _xml(p)
+    if ext in DATABASES:  # sheet = table name or one SELECT query
+        from nexvara.bi import db
+
+        cols, rows = db.read(p, sheet, MAX_ROWS)
+        t = Table(_clean_header(cols), rows[:MAX_ROWS], source=str(p))
+        if len(rows) > MAX_ROWS:
+            t.notes.append(f"Faqat birinchi {MAX_ROWS} qator olindi")
+        if not rows:
+            t.notes.append("Jadval bo‘sh")
+        return t
     if ext == ".xls":
         raise ValueError("Eski .xls formatini Excel'da .xlsx qilib saqlang (Fayllar → PDF emas)")
-    raise ValueError(f"{ext} fayl turi qo‘llanmaydi. Mumkin: {', '.join(SUPPORTED)}")
+    raise ValueError(f"{ext} fayl turi qo‘llanmaydi. Mumkin: {', '.join(SUPPORTED + DATABASES)}")
 
 
 def load_folder(folder: Path) -> Table:
