@@ -16,7 +16,7 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 - Chizma → Word: `cad.png_to_docx` (Word ochilmaydi, OOXML: chizma A4 sahifada, keng bo‘lsa albom). Chizmalar oynasida «Word» tugmasi; chat: «chizma.dxf ni Word qil»; telefondan saqlangan chizma DXF + PDF + PNG + Word.
 - Android 1.5.0 (versionCode 12; 1.4.0 Codex/🧠 ishi bilan birlashgan): Kompyuter ekrani → boshqarish → «Sensorli panel» (barmoq suring = kursor, bosish = chap, uzoq = o‘ng, ikki marta = ochish, ikki barmoq = aylantirish, «Ushlab sudrash»); Kompyuterdan qidirish → fayllarni belgilab «ZIP qilish» va «Telefonga», .zip uchun «Chiqarish», «ZIP» filtri; Chizma saqlangach «Telefonga olish: PDF / Word / PNG / DXF». Fayl qatoridagi tugmalar sig‘masa suriladi («Buyruq» harflari ustma-ust tushardi).
 - Jonli sinovda topildi va tuzatildi: AutoCAD 7-rang (oq, 0-qatlam sukuti) chiziqlari PDF/PNG/Word’da oq fonda oq — rasm bo‘sh chiqardi (ranglar qo‘shilgandagi `COLOR_SWAP_BW`). Endi `ColorPolicy.COLOR`: 7-rang qora, boshqa ranglar o‘zgarmaydi; test qo‘shildi (eski kodda FAIL, yangisida PASS).
-- Ish yakunida: Windows versiya raqami 1.4.0 qilindi, lekin yig‘ish/kanalga joylash ruxsat berilmadi — o‘rnatilgan dastur hali 1.3.x; sinov uchun NEXVARA manba koddan (`scripts/run.ps1`) ishga tushirildi.
+- Windows 1.4.0: egasi «yangila» dedi → zaxira `D:\NEXVARA-zaxira\20261019-185529`, `build.ps1 -Publish D:\NEXVARA\releases` (imzolangan, SHA-256 `412e33865f08d9f904890bc04eb61c2a535b46f14e4521e3ea821268020f447f`), jim o‘rnatildi (`%LOCALAPPDATA%\Programs\NEXVARA`, 1.4.0), ishga tushirildi, telefon unga USB orqali ulandi. Eslatma: `build.ps1` chiqishini `*>` bilan faylga yo‘naltirsa PyInstaller’ning birinchi stderr qatorida to‘xtaydi — yo‘naltirmasdan ishga tushiring.
 
 **Testlar:**
 | Test | Natija |
@@ -31,10 +31,12 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 | Haqiqiy telefon: to‘rtburchak chizib saqlash → DXF+PDF+PNG+Word, Word telefonga yuklandi; rang tuzatishidan keyin PNG’da chiziq bor | PASS |
 | Telefonda bosish (tap) PC’da | NOT TESTED — egasining ochiq oynalarida tasodifiy bosmaslik uchun (marshrut unit testda PASS) |
 | Word faylini haqiqiy Word’da ochish | NOT TESTED — Office testi ruxsat bilan |
+| Windows 1.4.0 yig‘ish, imzolab joylash, jim o‘rnatish, ishga tushirish, telefon ulanishi | PASS |
+| O‘rnatilgan 1.4.0 `--selftest-installed` | NOT TESTED — Excel/Word ekranda ochiladi, alohida ruxsat kerak |
 
 Eslatma: `scripts/android_build.ps1` `.tools` ni asosiy papkada qidiradi, vositalar esa `.worktrees/android/.tools` da — yig‘ish shu yo‘l bilan qo‘lda qilindi.
 
-**Keyingi qadam:** egasi ruxsati bilan Windows 1.4.0 ni yig‘ib o‘rnatish (`build.ps1 -Publish`); ruxsat bilan `-Office` (Chizmalar oynasidagi Word tugmasi, docx Word’da ochilishi); Windows yangi versiyani yig‘ish; `main` ga merge — egasi tasdig‘i bilan.
+**Keyingi qadam:** ruxsat bilan o‘rnatilgan 1.4.0 selftesti; ruxsat bilan `-Office` (Chizmalar oynasidagi Word tugmasi, docx Word’da ochilishi); `main` ga merge — egasi tasdig‘i bilan.
 
 ---
 
