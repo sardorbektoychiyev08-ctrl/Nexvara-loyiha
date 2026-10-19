@@ -342,3 +342,8 @@ body.cad-compact .cad-log { height: 32px; }
 .cap-info.bad { color: var(--danger, #ef4444); }
 .ai-caps-title { margin: 16px 0 4px; font-size: 15px; }
 @media (max-width: 720px) { .cap-row { grid-template-columns: 1fr 1fr; } .cap-info { grid-column: 1 / -1; } }
+/* Devices: Tailscale found, firewall rule missing */
+.notice { margin: 10px 0; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.notice[hidden] { display: none; }
+.notice .row { margin-top: 8px; gap: 10px; align-items: center; flex-wrap: wrap; }

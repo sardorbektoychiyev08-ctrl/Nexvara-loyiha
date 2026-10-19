@@ -1412,6 +1412,7 @@ let devTimer = null;
 async function renderDevices() {
   renderDeviceOptions();
   if (!api()) return;
+  renderTailscale();
   drawDevices(await api().devices_status());
   clearInterval(devTimer);
   devTimer = setInterval(async () => {
@@ -1457,6 +1458,20 @@ function drawDevices(st) {
     box.appendChild(row);
   });
 }
+
+// Tailscale found but the firewall rule missing: offer one button (firewall.py).
+async function renderTailscale() {
+  if (!api().devices_tailscale) return;
+  const t = await api().devices_tailscale();
+  $("#dev-ts").hidden = !t.needed;
+}
+$("#dev-ts-allow").addEventListener("click", async () => {
+  $("#dev-ts-allow").disabled = true;
+  const r = await api().devices_allow_tailscale();
+  $("#dev-ts-allow").disabled = false;
+  $("#dev-ts").hidden = !r.needed;
+  $("#dev-error").hidden = r.ok; $("#dev-error").textContent = r.ok ? "" : r.error;
+});
 
 // What a paired phone may do: see the screen, control mouse/keyboard, NEXVARA at sign-in.
 async function renderDeviceOptions() {

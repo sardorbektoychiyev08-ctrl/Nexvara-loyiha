@@ -81,6 +81,26 @@ class DevicesApi:
         self._remember_remote(False)
         return self.devices_status()
 
+    # ----- Tailscale: the phone from any network (firewall.py) -----
+    def devices_tailscale(self) -> dict[str, Any]:
+        from nexvara import firewall
+        from nexvara.remote import addresses
+
+        check = self._overrides.get("firewall_status") or firewall.status
+        try:
+            return check(addresses())
+        except Exception as e:  # noqa: BLE001 - the page must still open
+            return {"tailscale": "", "needed": False, "error": str(e)}
+
+    def devices_allow_tailscale(self) -> dict[str, Any]:
+        from nexvara import firewall
+
+        port = self._server().port if self._server() is not None else 8765
+        add = self._overrides.get("firewall_add") or firewall.add_rule
+        ok = bool(add(port))
+        why = "Ruxsat qo‘shilmadi (Windows so‘rovida «Ha» bosilmagan bo‘lishi mumkin)"
+        return {"ok": ok, **self.devices_tailscale(), "error": "" if ok else why}
+
     def devices_new_code(self) -> dict[str, Any]:
         srv = self._server()
         if srv is not None and srv.running:
