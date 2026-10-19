@@ -19,6 +19,43 @@ def test_settings_defaults_merge_and_validation(tmp_path):
     assert s.load()["theme"] == "light"  # a rejected change leaves the file intact
 
 
+def test_settings_read_while_another_thread_saves(tmp_path, monkeypatch):
+    """Windows briefly refuses to open the file while it is replaced: the reader waits, it
+    never sees the defaults (AI «off») and never writes them over the owner's settings."""
+    import threading
+    from pathlib import Path
+
+    s = Settings(tmp_path / "settings.json")
+    s.update({"theme": "light", "ai": {"enabled": True}})
+    real, busy = Path.read_text, {"n": 2}
+
+    def flaky(self, *a, **k):
+        if self.name == "settings.json" and busy["n"] > 0:
+            busy["n"] -= 1
+            raise PermissionError(13, "used by another process")
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(Path, "read_text", flaky)
+    assert s.load()["ai"]["enabled"] and busy["n"] == 0
+    busy["n"] = 1
+    assert s.update({"test_count": 7})["theme"] == "light"  # not the defaults
+    monkeypatch.setattr(Path, "read_text", real)
+    # and with real threads: many saves while another thread keeps reading
+    seen, stop = [], threading.Event()
+
+    def reader():
+        while not stop.is_set():
+            seen.append(s.load()["ai"]["enabled"])
+
+    t = threading.Thread(target=reader)
+    t.start()
+    for i in range(150):
+        Settings(s.path).update({"test_count": 10 + i % 5})
+    stop.set()
+    t.join()
+    assert seen and all(seen) and s.load()["theme"] == "light"
+
+
 def test_history_survives_and_is_trimmed(tmp_path):
     h = History(tmp_path / "app.db", keep=3)
     for i in range(5):

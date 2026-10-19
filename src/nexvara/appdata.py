@@ -94,9 +94,24 @@ class Settings:
         self._lock = threading.Lock()
 
     def load(self) -> dict[str, Any]:
+        """The stored settings over the defaults. While another thread replaces the file,
+        Windows refuses to open it for a moment: wait and read again — never fall back to the
+        defaults then, or the AI would look switched off and the next save would write the
+        defaults over the owner's settings."""
+        for attempt in range(40):
+            try:
+                text = self.path.read_text(encoding="utf-8")
+                break
+            except FileNotFoundError:
+                text = "{}"
+                break
+            except PermissionError:
+                if attempt == 39:
+                    raise
+                time.sleep(0.05)
         try:
-            saved = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            saved = json.loads(text)
+        except ValueError:
             saved = {}
         return _merge(DEFAULT_SETTINGS, saved if isinstance(saved, dict) else {})
 
