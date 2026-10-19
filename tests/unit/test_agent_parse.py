@@ -253,3 +253,25 @@ def test_new_excel_table_without_count_and_with_ustunlari():
     assert kinds(parse_command("Excel’da 2 ustunli narxlar jadvali yarat — Mahsulot, Narx")) == [
         "create_table"
     ]
+
+
+def test_sort_from_the_biggest_is_descending():
+    """Live check 2026-10-19: «eng katta summadan boshlab tartibla» sorted ascending."""
+    plan = parse_command("Savdo.xlsx ni eng katta summadan boshlab tartibla")
+    sort = next(a for a in plan.actions if a.kind == "sort")
+    assert sort.args["descending"] is True
+    plan = parse_command("Savdo.xlsx ni summa bo‘yicha sarala")
+    assert next(a for a in plan.actions if a.kind == "sort").args["descending"] is False
+
+
+def test_live_phrases_official_letter_and_small_text():
+    """Live check 2026-10-19: only the PDF was made, these parts were dropped."""
+    w = parse_command(
+        "ariza.docx ni direktorga topshiriladigan rasmiy ariza ko‘rinishiga keltir va PDF ham qil"
+    )
+    assert "format" in kinds(w) and "pdf" in kinds(w) and not w.unknown, w
+    p = parse_command(
+        "taqdimot.pptx dagi slaydlarni tekshir, mayda yozuvlarni kattalashtir va "
+        "slayd raqamlarini qo‘y"
+    )
+    assert "fix" in kinds(p) and not p.unknown, p

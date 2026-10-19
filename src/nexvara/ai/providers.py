@@ -10,6 +10,7 @@ import json
 import random
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from typing import Any
@@ -17,7 +18,7 @@ from typing import Any
 from nexvara.core.task import UserError
 
 TIMEOUT = 180.0
-VISION = ("openai", "gemini", "anthropic")  # DeepSeek's API reads text only
+VISION = ("openai", "gemini", "anthropic", "deepseek")
 
 
 def _images(messages: list[dict[str, Any]]) -> bool:
@@ -66,9 +67,6 @@ class Provider:
 
 
 # ---------------- Anthropic ----------------
-
-# Opus/Sonnet 5.5 can hand a refused request to another model server-side.
-_FALLBACK_MODELS = ("claude-opus-5-5", "claude-sonnet-5-5")
 
 
 class AnthropicProvider(Provider):
@@ -128,12 +126,9 @@ class AnthropicProvider(Provider):
             "output_config": {"effort": effort},
         }
         try:
-            if model in _FALLBACK_MODELS:
-                r = self.client.beta.messages.create(
-                    betas=["server-side-fallback-2026-07-01"], fallbacks="default", **kwargs
-                )
-            else:
-                r = self.client.messages.create(**kwargs)
+            # The provider's server-side fallback may silently change the selected
+            # model. NEXVARA owns that decision, especially in MANUAL mode.
+            r = self.client.messages.create(**kwargs)
         except self._sdk.APIError as e:
             raise self._errors(e) from e
         if r.stop_reason == "refusal":
@@ -148,8 +143,12 @@ class AnthropicProvider(Provider):
         return Reply(text, r.model, tokens_in, u.output_tokens, r.stop_reason or "", 0.0, self.name)
 
     def list_models(self) -> list[str]:
+        return [m["id"] for m in self.list_model_details()]
+
+    def list_model_details(self) -> list[dict[str, Any]]:
         try:
-            return [m.id for m in self.client.models.list(limit=100)]
+            # The SDK iterator traverses all pages; do not silently stop at 20/100.
+            return [m.model_dump() for m in self.client.models.list(limit=100)]
         except self._sdk.APIError as e:
             raise self._errors(e) from e
 
@@ -199,6 +198,13 @@ class ChatCompletionsProvider(Provider):
                     raise AiError(f"{label} API kaliti noto‘g‘ri yoki ruxsat yo‘q.") from e
                 if e.code == 402:
                     raise AiError(f"{label} hisobida mablag‘ yetarli emas.") from e
+                if e.code == 429 and "limit: 0" in detail:  # the model has no free tier
+                    raise AiError(
+                        f"{label}: bu model hisobingizning bepul darajasida (Free Tier) "
+                        "ishlamaydi — limit 0. Pullik model uchun AI Studio → Billing kerak; "
+                        "NEXVARA boshqa ulangan AI’dan foydalanishi mumkin.",
+                        retryable=True,
+                    ) from e
                 if (e.code == 429 or e.code >= 500) and attempt < 2:
                     wait = e.headers.get("retry-after") if e.headers else None
                     try:
@@ -277,9 +283,44 @@ class ChatCompletionsProvider(Provider):
         )
 
     def list_models(self) -> list[str]:
-        data = self._request("GET", "/models")
-        ids = [m.get("id", "") for m in data.get("data", [])]
+        ids = [m.get("id", m.get("name", "")) for m in self.list_model_details()]
         return [i.removeprefix("models/") for i in ids if i]
+
+    def list_model_details(self) -> list[dict[str, Any]]:
+        if self.name != "gemini":
+            return [m for m in self._request("GET", "/models").get("data", [])
+                    if isinstance(m, dict)]  # fmt: skip
+        # The Gemini OpenAI-compatible endpoint does not expose the full native
+        # model catalogue. Its native list endpoint is paginated and read-only.
+        rows: list[dict[str, Any]] = []
+        page = ""
+        for _ in range(20):
+            query = {"pageSize": "1000"}
+            if page:
+                query["pageToken"] = page
+            url = "https://generativelanguage.googleapis.com/v1beta/models?" + (
+                urllib.parse.urlencode(query)
+            )
+            req = urllib.request.Request(
+                url, headers={"x-goog-api-key": self.key, "User-Agent": "NEXVARA"}
+            )
+            try:
+                with self._open(req, timeout=30) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                raise AiError(
+                    f"Gemini model ro‘yxati olinmadi ({e.code}).",
+                    retryable=e.code == 429 or e.code >= 500,
+                ) from e
+            except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:
+                raise AiError(
+                    "Gemini model ro‘yxati olinmadi: internetni tekshiring.", retryable=True
+                ) from e
+            rows.extend(m for m in data.get("models", []) if isinstance(m, dict))
+            page = str(data.get("nextPageToken") or "")
+            if not page:
+                return rows
+        raise AiError("Gemini model ro‘yxati to‘liq olinmadi.")
 
 
 def fetch_balance(name: str, key: str, opener=None) -> dict[str, Any]:

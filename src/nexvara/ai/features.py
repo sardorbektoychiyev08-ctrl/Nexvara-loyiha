@@ -76,6 +76,13 @@ def _json_from(text: str) -> Any:
     raise AiError("AI javobini tushunib bo‘lmadi (JSON emas).")
 
 
+def _is_json_object(text: str) -> bool:
+    try:
+        return isinstance(_json_from(text), dict)
+    except AiError:
+        return False
+
+
 def classify(router: AiRouter, text: str, approved: bool = False) -> Intent:
     r = router.complete(
         "classify",
@@ -116,6 +123,10 @@ foydalanuvchi aytgan nom, kontekstdagi fayl yoki "@prev" (oldingi qadam natijasi
 "nexvara.command" asbobiga ilova tushunadigan o‘zbekcha buyruq ber, masalan \
 "Hisobot.xlsx ni och, B ustun bo‘yicha saralab, PDF qilib saqla", \
 "7-sinf fizika Nyuton qonunlari 20 ta test 2 variant", "Eslab qol: ...".
+- "nexvara.command" matnini foydalanuvchi so‘zlari bilan emas, FAQAT pastdagi «Ilova \
+tushunadigan Office iboralari»dan tuzib yoz (fayl nomini saqla). Masalan «arizani rasmiy \
+ko‘rinishga keltir» → "ariza.docx ni och, hujjatni rasmiy formatla, PDF qilib saqla"; \
+«mayda yozuvlarni kattalashtir» → "taqdimot.pptx ni och, kamchiliklarni tuzat".
 - Bir nechta ish bo‘lsa, calls ro‘yxatida tartib bilan yoz.
 - API kalit, parol yoki tokenni hech qachon parametrga yozma.
 - Bilim savoli bo‘lsa {"kind": "question"}, oddiy suhbat bo‘lsa {"kind": "chat"} qaytar.
@@ -185,6 +196,15 @@ class Plan:
     intent: Intent | None = None
 
 
+def _office_phrases() -> str:
+    """The Office phrases the offline executors understand (the same list the classifier
+    gets): the planner must build nexvara.command texts from them (live check 2026-10-19:
+    it passed the user's own words on and the offline parser dropped them)."""
+    a = CLASSIFY_SYSTEM.index("  Excel:")
+    b = CLASSIFY_SYSTEM.index("  Fayl nomini")
+    return CLASSIFY_SYSTEM[a:b].strip()
+
+
 def _tool_lines(catalog: list[dict[str, Any]]) -> str:
     lines = []
     for t in catalog:
@@ -231,7 +251,8 @@ def plan(
     purpose = plan_purpose(text)
     # NEXVARA's own instructions are public; the context, rules, facts and the chat history
     # added below are the user's and are masked by the router before anything is sent.
-    system = public(PLAN_SYSTEM + "\n\nASBOBLAR (* — majburiy):\n" + _tool_lines(catalog))
+    system = public(PLAN_SYSTEM + "\n\nIlova tushunadigan Office iboralari:\n" + _office_phrases()
+                    + "\n\nASBOBLAR (* — majburiy):\n" + _tool_lines(catalog))  # fmt: skip
     ctx = {k: v for k, v in context.items() if v}
     if ctx:
         system += "\n\nKontekst: " + json.dumps(ctx, ensure_ascii=False)
@@ -251,6 +272,7 @@ def plan(
         expected_out=500,
         approved=approved,
         effort="low" if purpose == "plan" else "medium",
+        accept=_is_json_object,  # an unusable plan → one retry on the next stronger tier
     )
     data = _json_from(r.text)
     if not isinstance(data, dict):

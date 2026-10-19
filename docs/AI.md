@@ -1,5 +1,48 @@
 # AI providers, Model Router and spend control
 
+## AUTO katalog (2026-10-18)
+
+Ulangan kalitlar uchun modellar har 24 soatda va Sozlamalar/🧠 menyusidagi **Hozir
+yangilash** tugmasi orqali qayta tekshiriladi. OpenAI `GET /v1/models`, Gemini
+`GET /v1beta/models` (barcha sahifalar), Anthropic Models List va DeepSeek
+`GET /models` ishlatiladi. Model ID va hisobda mavjudligi shu javoblardan olinadi;
+yangi, o‘chgan va API `deprecated` deb belgilagan modellar qayd etiladi. Internet
+uzilsa oxirgi tekshirilgan katalog saqlanadi, 24 soatdan so‘ng **eskirgan** deb
+ko‘rsatiladi. Ilova ishlayotganda fon tekshiruvi har soatda muddati kelgan katalogni
+yangilaydi.
+
+Model API'lari umumiy narx yoki hisobning haqiqiy Free Tier limitini bermaydi.
+Matn token narxlari `ai/models.py`, rasm/ovoz narxlari `ai/capabilities.py` da
+**2026-10-18** kuni rasmiy sahifalardan tekshirilgan katalogdir. Manbalar:
+[OpenAI](https://developers.openai.com/api/docs/pricing),
+[Gemini](https://ai.google.dev/gemini-api/docs/pricing),
+[Anthropic](https://platform.claude.com/docs/en/about-claude/pricing),
+[DeepSeek](https://api-docs.deepseek.com/quick_start/pricing/).
+Yangi modelning narxi noma’lum bo‘lsa AUTO uni chaqirmaydi; qo‘lda tanlanganda ham
+pullik chaqiruv narx aniqlanmaguncha to‘xtaydi. Gemini STT/TTS uchun pullik
+daqiqalik narx taxmin qilinmaydi: faqat egasi AI Studio'da Free Tier ekanini
+tasdiqlagan hisobda ishlaydi. Hisobga tegishli bepul limit va kvotani foydalanuvchi
+AI Studio'da tekshiradi; NEXVARA ularni taxmin qilmaydi.
+Rasm yaratishdagi chop etilgan *har rasm uchun* narx faqat chiqish rasmi uchun;
+OpenAI kirish matni va rasm tahriridagi kirish rasmi uchun qo‘shimcha token haqi
+bo‘lishi mumkin. Ilovadagi rasm narxi shu sabab yakuniy hisob emas.
+
+AUTO barcha ulangan hisoblarning vazifaga mos va narxi ma’lum modellarini
+solishtiradi. Tasdiqlangan bepul model avval, so‘ng taxminiy xarajati eng arzon
+model tanlanadi. Murakkab vazifaga kuchli model qo‘yiladi; tasdiqlangan bepul
+Gemini Flash ham avval sinab ko‘rilishi mumkin. Xato/limitdagi fallback faqat
+yoqilgan bo‘lsa bajariladi; qimmatroq model uchun qayta tasdiq kerak. Har bir
+pullik so‘rov avval narxi bilan tasdiq so‘raydi. MANUAL har yo‘nalishda tanlangan
+modelni saqlaydi va xatoda o‘zboshimchalik bilan almashtirmaydi. Jonli suhbat
+streaming emas: STT → matn → TTS; qo‘lda tanlangan jonli suhbat provayderi STT va
+TTS bosqichlarida qo‘llanadi.
+
+Chat ostida AUTO/MANUAL, model, FREE/PAID, dastlabki narx taxmini va katalog vaqti
+ko‘rinadi. Javobdan keyin token bo‘yicha hisob ko‘rsatiladi; bu provayderning
+haqiqiy billing summasi emas. Agar haqiqiy dollar sarfi qaytmasa, shunday
+ko‘rsatiladi. Haqiqiy pullik API chaqiruvi va hisob limitlari bu versiyada
+sinovdan o‘tkazilmagan.
+
 Code: [src/nexvara/ai/](../src/nexvara/ai/) (`models.py` — providers, tiers, prices, official pages;
 `router.py` — routing, limits, fallback, ledger; `providers.py` — HTTP/SDK adapters and the
 DeepSeek balance call). Facts below were checked against the providers' official docs on
@@ -57,6 +100,43 @@ Outdated ids found in the check: `gemini-3.5-flash` (no longer listed), `deepsee
 
 Every request is masked locally first and restored locally after — see [PRIVACY.md](PRIVACY.md).
 Unreliable detection blocks the request. Applies to all providers and to a fallback provider.
+
+## Directions: AUTO / MANUAL per capability (2026-10-18)
+
+`ai/capabilities.py` (registry), `ai/media.py` (official HTTPS APIs), `AiRouter.candidates /
+media / set_capability / capabilities_status`, UI: chat 🧠 menu and Settings → AI.
+
+| Direction | OpenAI | Gemini | Claude | DeepSeek |
+|---|---|---|---|---|
+| Text (tiers cheap/balanced/powerful/special) | ✓ | ✓ (Flash free) | ✓ | ✓ |
+| Vision / OCR | ✓ | ✓ | ✓ | DeepSeek Flash |
+| Image make/edit | gpt-image-1-mini, gpt-image-2, gpt-image-2.5-flare/-sunburst (Image API) | gemini-3.1-flash-lite-image, gemini-nano-banana-2.1, gemini-3.1-flash-image, gemini-3-pro-image (Interactions API, no free tier) | — | — |
+| STT | gpt-4o-mini-transcribe, gpt-transcribe, whisper-1 | Flash/Flash-Lite with audio input (free) | — | — |
+| TTS | gpt-4o-mini-tts | gemini-3.8-flash-lite-tts, gemini-3.8-flash-tts (free tier) | — | — |
+| Realtime | STT → chat → TTS turn by turn | same | — | — |
+
+Checked on 2026-10-18 against developers.openai.com/api/docs (pricing, image-generation,
+text-to-speech, speech-to-text) and ai.google.dev/gemini-api/docs (models, pricing,
+image-generation, speech-generation). A model is offered only if the key check found it in the
+account's model list (`ai.catalog`). Uzbek is not listed by OpenAI TTS/STT docs; Gemini TTS lists
+«Northern Uzbek» — real quality is NOT TESTED until the owner's key.
+
+- **AUTO**: free first (Gemini free tier while «Bepul rejim» is on), then the cheapest; a busy
+  provider (429/5xx/network) falls back to the next one inside the budget; a wrong key or no
+  credit never falls back. For text an unusable answer (e.g. the planner's JSON) is retried once
+  on the next stronger tier, never above the «ask first» limit.
+- **MANUAL**: exactly the chosen provider+model, no fallback, no swapping; a choice the provider
+  cannot do is refused when saved, and a missing key gives a clear message.
+- **Money**: every media call goes through the same daily/monthly/provider/task limits and the
+  ledger; every paid direction asks «Ha» with the price, including TTS/STT. 🔊 never sends personal data: found items are spoken as
+  «yashirin ma’lumot».
+- **Realtime**: the providers' streaming Realtime/Live APIs are not used (cost, complexity);
+  🎧 chains 🎤 (silence ends a turn) → chat → 🔊 → 🎤.
+- **New provider**: add it to `models.PROVIDERS` (tiers, prices, pages), a text adapter in
+  `providers.make_provider`, and if it has media models a row in `capabilities.MEDIA` plus a
+  client in `media.media_client`. Router, menu, budget and phone API pick it up from there.
+- **Phone** (`docs/api/openapi.yaml`): `GET/POST /api/v1/ai/capabilities`, `POST
+  /api/v1/ai/speak`; ✨ from the phone chat returns `image.path` for `GET /api/v1/files`.
 
 ## Conversation memory and self-repair (2026-10-18)
 

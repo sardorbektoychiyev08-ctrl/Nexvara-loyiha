@@ -107,11 +107,11 @@ def route(
         if not saved.get("ok"):
             raise ApiError("BAD_REQUEST", saved.get("error") or "Saqlab bo‘lmadi")
         out = {"dxf": saved["path"], "entities": saved["entities"]}
-        for kind in ("pdf", "png"):
+        for kind in ("pdf", "png", "docx"):
             r = api.cad_export(drawing, kind, str(folder / f"{stem}.{kind}"))
             if r.get("ok"):
                 out[kind] = r["path"]
-        for k in ("dxf", "pdf", "png"):
+        for k in ("dxf", "pdf", "png", "docx"):
             if out.get(k):
                 sec._grant(srv, dev, out[k], "shared", sec.SHARED_TTL)
         if b.get("open_on_pc", True):

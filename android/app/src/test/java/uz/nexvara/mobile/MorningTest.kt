@@ -48,3 +48,19 @@ class CadColorTest {
         assertEquals(null, back.colorOf[back.items[1]])
     }
 }
+
+class AiParseTest {
+    @Test fun directionsFromThePc() {
+        val o = org.json.JSONObject("""{"capabilities": {
+          "tts": {"label": "Matn → ovoz (TTS)", "mode": "auto", "provider": "", "model": "",
+                  "offers": {"gemini": {"label": "Google Gemini", "connected": true, "models": ["gemini-3.8-flash-lite-tts"]},
+                             "openai": {"label": "OpenAI", "connected": false, "models": ["gpt-4o-mini-tts"]}},
+                  "auto_pick": {"provider": "gemini", "model": "gemini-3.8-flash-lite-tts", "free": true}},
+          "image": {"label": "Rasm", "mode": "manual", "provider": "openai", "model": "gpt-image-1-mini", "offers": {}, "auto_pick": null}}}""")
+        val d = AiParse.directions(o)
+        assertEquals(listOf("image", "tts"), d.map { it.id })  // the PC's order
+        assertEquals("Google Gemini · gemini-3.8-flash-lite-tts (bepul)", d[1].autoPick)
+        assertEquals(false, d[1].offers.first { it.provider == "openai" }.connected)
+        assertEquals("gpt-image-1-mini", d[0].model)
+    }
+}

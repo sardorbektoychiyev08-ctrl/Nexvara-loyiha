@@ -31,6 +31,8 @@ def env(tmp_path, monkeypatch):
     router = AiRouter(Settings(tmp_path / "s.json"),
                       MemoryKeyStore({"openai": "sk-test-openai-123456"}),
                       Ledger(tmp_path / "l.db"), factory=lambda n, k: cap)  # fmt: skip
+    budget = router.check_budget
+    router.check_budget = lambda est, approved: budget(est, True)
     api = Api(TaskRunner(), overrides={
         "device_store": DeviceStore(tmp_path / "app.db"), "remote_port": 0,
         "memory": MemoryStore(tmp_path / "mem.db"), "ai_router": router,
@@ -152,7 +154,8 @@ def test_phone_ai_chat_is_masked_and_counted_once(env):
     assert cap.seen, "the AI path was not used"
     for s in SECRETS:
         assert s not in sent, s
-    assert len(api._router().ledger.recent()) - before <= 1
+    # one ledger row per AI call (an unusable plan may be retried once on a stronger tier)
+    assert len(api._router().ledger.recent()) - before == len(cap.seen) <= 2
 
 
 def test_phone_chat_reaches_pc_window_and_history(env):
@@ -304,3 +307,58 @@ def test_google_link_only_for_pc_owner(env, tmp_path):
     assert ok == {"linked": True, "email": "ega@gmail.com", "name": ""}
     st = j(call(srv, "GET", "/api/v1/account", token=token))["data"]
     assert st["phone"]["linked_email"] == "ega@gmail.com" and st["phone"]["ready"] is True
+
+
+def test_phone_ai_directions_speech_and_pictures(env):
+    """🧠 settings are shared with the PC; 🔊 and ✨ results come back as downloadable files."""
+    from urllib.parse import quote
+
+    from test_ai_media import MediaFake
+
+    api, srv, token, _cap, _ = env
+    router = api._router()
+    router.settings.update({"ai": {"enabled": True}})
+    log: list = []
+    router.media_factory = lambda n, k: MediaFake(n, log)
+    # this test checks the real «Ha» rule (the fixture approves everything for older tests)
+    from nexvara.ai.router import AiRouter
+
+    router.check_budget = AiRouter.check_budget.__get__(router)
+    st = j(call(srv, "GET", "/api/v1/ai/capabilities", token=token))["data"]
+    assert set(st["capabilities"]) == {"text", "vision", "image", "stt", "tts", "realtime"}
+    assert "sk-test" not in json.dumps(st)
+    bad = post(
+        srv,
+        "/api/v1/ai/capabilities",
+        {"cap": "image", "mode": "manual", "provider": "anthropic", "model": "x"},
+        token,
+    )
+    assert bad[0] == 400
+    ok = post(
+        srv,
+        "/api/v1/ai/capabilities",
+        {"cap": "tts", "mode": "manual", "provider": "openai", "model": "gpt-4o-mini-tts"},
+        token,
+    )
+    assert ok[0] == 200 and router.cap_settings()["tts"]["provider"] == "openai"  # the PC sees it
+    ask = j(post(srv, "/api/v1/ai/speak", {"text": "Salom, dars 9 da"}, token))["data"]
+    assert ask["needs_approval"] and "$" in ask["text"] and not log  # paid: price first
+    sp = j(post(srv, "/api/v1/ai/speak", {"text": "Salom, dars 9 da", "approved": True},
+                token))["data"]  # fmt: skip
+    assert sp["path"].endswith(".wav") and sp["provider"] == "openai"
+    assert call(srv, "GET", f"/api/v1/files?path={quote(sp['path'])}", token=token)[0] == 200
+    api._ai_ready = lambda: True
+    r = j(post(srv, "/api/v1/chat", {"text": "rasm yarat: maktab logotipi"}, token))["data"]
+    assert (
+        r["confirm"]
+        and "gpt-image" in r["confirm"]["text"]
+        and not any(x[1] == "image" for x in log)
+    )
+    done = j(post(srv, "/api/v1/confirm", {"token": r["confirm"]["token"], "yes": True}, token))[
+        "data"
+    ]
+    assert done["image"]["name"].endswith(".png")
+    assert (
+        call(srv, "GET", f"/api/v1/files?path={quote(done['image']['path'])}", token=token)[0]
+        == 200
+    )

@@ -4,6 +4,139 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-19 (36) — Claude Code — Telefon sensorli panel, telefondan ZIP, chizma → Word; Android 1.5.0
+
+**Foydalanuvchi talabi:** «telefon sensoridan kompyuterni boshqarsa bo‘ladimi; zip fayl qiladigan funksiya qo‘sh»; «AutoCAD’da chizilgan chizmani PDF, Word fayl qilib saqlasa bo‘ladimi, bo‘lmasa qo‘sh».
+
+**Holat oldin:** telefondan boshqarish bor edi (ekran rasmiga bosish), kompyuterda ZIP (Fayllar bo‘limi va chat) va chizma → PDF/PNG bor edi. Yo‘q edi: telefonda sensorli panel, telefondan ZIP, chizma → Word.
+
+**Qilindi** (tarmoq `claude/ai-multimodal`; keyin `codex/auto-model-router` (35-yozuv, Windows 1.3.3, Android 1.4.0 🧠) shu tarmoqqa merge qilindi, Android 1.5.0):
+- `control.py`: `nudge` (kursorni dx, dy piksel siljitish, ±800), `tap`/`tap_double`/`tap_right` (kursor turgan joyda), `drag_start`/`drag_end`. `/api/v1/control` `dx` ni ham qabul qiladi. `screen.py`: ekran rasmiga sichqoncha ko‘rsatkichi chiziladi (BitBlt uni olmaydi).
+- Telefon API: `POST /api/v1/files/zip` (qidiruvda topilgan 1–50 fayl, arxiv birinchi fayl yonida, kichik bo‘lsa darhol telefonga olinadi), `POST /api/v1/files/unzip` (faqat topilgan .zip, yonidagi yangi papkaga). Maxfiy fayllar (kalit, baza) baribir rad etiladi.
+- Chizma → Word: `cad.png_to_docx` (Word ochilmaydi, OOXML: chizma A4 sahifada, keng bo‘lsa albom). Chizmalar oynasida «Word» tugmasi; chat: «chizma.dxf ni Word qil»; telefondan saqlangan chizma DXF + PDF + PNG + Word.
+- Android 1.5.0 (versionCode 12; 1.4.0 Codex/🧠 ishi bilan birlashgan): Kompyuter ekrani → boshqarish → «Sensorli panel» (barmoq suring = kursor, bosish = chap, uzoq = o‘ng, ikki marta = ochish, ikki barmoq = aylantirish, «Ushlab sudrash»); Kompyuterdan qidirish → fayllarni belgilab «ZIP qilish» va «Telefonga», .zip uchun «Chiqarish», «ZIP» filtri; Chizma saqlangach «Telefonga olish: PDF / Word / PNG / DXF». Fayl qatoridagi tugmalar sig‘masa suriladi («Buyruq» harflari ustma-ust tushardi).
+- Jonli sinovda topildi va tuzatildi: AutoCAD 7-rang (oq, 0-qatlam sukuti) chiziqlari PDF/PNG/Word’da oq fonda oq — rasm bo‘sh chiqardi (ranglar qo‘shilgandagi `COLOR_SWAP_BW`). Endi `ColorPolicy.COLOR`: 7-rang qora, boshqa ranglar o‘zgarmaydi; test qo‘shildi (eski kodda FAIL, yangisida PASS).
+- Windows 1.4.0: egasi «yangila» dedi → zaxira `D:\NEXVARA-zaxira\20261019-185529`, `build.ps1 -Publish D:\NEXVARA\releases` (imzolangan, SHA-256 `412e33865f08d9f904890bc04eb61c2a535b46f14e4521e3ea821268020f447f`), jim o‘rnatildi (`%LOCALAPPDATA%\Programs\NEXVARA`, 1.4.0), ishga tushirildi, telefon unga USB orqali ulandi. Eslatma: `build.ps1` chiqishini `*>` bilan faylga yo‘naltirsa PyInstaller’ning birinchi stderr qatorida to‘xtaydi — yo‘naltirmasdan ishga tushiring.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| `scripts/test.ps1` (Office’siz, merge va rang tuzatishidan keyin) | PASS — 522 passed, 85 skipped; oyna smoke v1.4.0 PASS |
+| Yangi: telefondan ZIP/unzip marshruti, `nudge` dx uzatilishi va chegarasi, chizma → docx (albom, sarlavha), chat «Word qil», telefon chizmasida docx | PASS |
+| Ekran rasmida kursor (haqiqiy ekran, bir marta) | PASS (ko‘z bilan tekshirildi) |
+| Android 1.5.0 assembleDebug + unit testlar | PASS — o‘rnatildi, APK SHA-256 `c3c13d2826d20e0dfaa2a0340909fbbe0cbaa6fc1f00914eaaf691c0aeb9905e` |
+| Haqiqiy telefon (USB, egasi barmoq izi bilan tasdiqladi): sensorli panel — barmoq surilganda PC kursori (521,698)→(979,863) va qaytdi | PASS |
+| Haqiqiy telefon: 2 ta sinov faylini topish → belgilash → «ZIP qilish» → arxiv PC’da, «Telefonga» → Download’da 276 bayt | PASS |
+| Haqiqiy telefon: to‘rtburchak chizib saqlash → DXF+PDF+PNG+Word, Word telefonga yuklandi; rang tuzatishidan keyin PNG’da chiziq bor | PASS |
+| Telefonda bosish (tap) PC’da | NOT TESTED — egasining ochiq oynalarida tasodifiy bosmaslik uchun (marshrut unit testda PASS) |
+| Word faylini haqiqiy Word’da ochish | NOT TESTED — Office testi ruxsat bilan |
+| Windows 1.4.0 yig‘ish, imzolab joylash, jim o‘rnatish, ishga tushirish, telefon ulanishi | PASS |
+| O‘rnatilgan 1.4.0 `--selftest-installed` | NOT TESTED — Excel/Word ekranda ochiladi, alohida ruxsat kerak |
+
+Eslatma: `scripts/android_build.ps1` `.tools` ni asosiy papkada qidiradi, vositalar esa `.worktrees/android/.tools` da — yig‘ish shu yo‘l bilan qo‘lda qilindi.
+
+**Keyingi qadam:** ruxsat bilan o‘rnatilgan 1.4.0 selftesti; ruxsat bilan `-Office` (Chizmalar oynasidagi Word tugmasi, docx Word’da ochilishi); `main` ga merge — egasi tasdig‘i bilan.
+
+---
+
+## 2026-10-19 (35) — Claude Code — Haqiqiy AI bilan jonli sinov (≈$0.10), Office/chizma/telefon; topilgan 20+ xato tuzatildi; Windows 1.3.3
+
+**Egasi ruxsati:** «o‘zing test qilaver, AI ishlat ozroq», keyin «Office’ni AI yordamida kuchli test qil, AutoCAD ham, $2 gacha, telefon orqali ham». Kalitlar: OpenAI + Gemini (egasi ulagan). Sinovlar vaqtinchalik fayllarda; chat xotirasi vaqtinchalik bazada; haqiqiy sarf egasining hisobiga yozildi.
+
+**Haqiqiy natijalar (PASS):** matn suhbat (o‘zbekcha, maxfiylik — «Sardor» va boshqalar yashirildi), xotira (oldingi gapni esladi), vision («NEXVARA 2026» + qizil to‘rtburchak), OpenAI rasm (gpt-image-1-mini, 15 s), TTS→STT aylanma, AI rejalashtiruvchi (fayl qidirish + «ulardan» kontekst), Excel (chalkash jadval: bo‘sh qator, takror, saralash, jami, format; hududlar diagrammasi + PDF), Word (rasmiy ariza + PDF; AI notanish gapni ilova buyruqlariga aylantirdi), PowerPoint (mayda yozuv 18 pt, slayd raqamlari), yangi Excel jadval, chizma (andoza plastinka; AI L-kronshteyn, DXF tekshiruvi), **telefon orqali:** AI savol-javob «Ha» bilan, ✨ rasm telefonda ochildi, «AI ovozi» telefonda ijro etildi.
+
+**Topilgan va tuzatilgan xatolar:**
+1. AUTO matn katalogiga rasm/TTS modellari kirib qolgan (`gemini-…-image`, `-tts`) — chiqarildi.
+2. «Eslab qol degan emasman» eslatma bo‘lib saqlanardi — rad etish tanildi.
+3. Gemini rasm faqat JPEG qaytaradi (400) — `image/jpeg`, fayl turi rasmdan aniqlanadi.
+4. Bepul darajada yo‘q model (429 «limit: 0») — aniq xabar, behuda qayta urinishsiz.
+5. OpenAI STT o‘zbekchani qirg‘izcha kirillda yozardi — o‘zbek lotin ko‘rsatmasi, kirill→lotin: endi «Assalomu alaykum. Bugun yettinchi sinfda fizika darsi soat toqqizda boshlanadi.»
+6. Chat javoblarida `**` — tozalanadi.
+7–9. **Maxfiylik himoyasi o‘zini bloklab qo‘yardi:** vaqt belgili fayl nomlari (`rasm-20261019-025804.png`), ISO sanalar (`[2026-10-19]` xotira, model nomlari), NEXVARA’ning o‘z ogohlantirishi xotiradan qaytib «raqami» kalit so‘zi bilan — tuzatildi (qiymat faqat o‘z qatorida; xizmat xabarlari xotiraga olinmaydi). Haqiqiy uzun raqam hamon bloklanadi.
+10. AI papka yo‘liga «papkasi» qo‘shardi — topiladi. 11. «Excel fayllari xlsx» qidiruv so‘zi — fayl turi deb tushuniladi. 12. AI «sen» deb murojaat qilardi — «siz».
+13. **Excel:** jadval ichidagi bo‘sh qator jadvalni bo‘lardi (tozalash ko‘rmasdi, dublikat −30) — jadval bo‘sh qatordan keyin ham o‘qiladi; «tekshir» xabar qiladi, «kamchiliklarni tuzat» o‘chiradi.
+14. «Eng katta summadan boshlab» o‘sish tartibida saralardi — kamayish. 15. «Jami» Narx ustunini ham qo‘shardi — narx/foiz/yil qo‘shilmaydi.
+16. Diagramma yig‘indilari jadval yonida — 40 qator bo‘sh ramka; endi alohida «Diagramma ma’lumoti» varag‘ida (`Worksheets.Add` pozitsion argument bilan — nomli argument e’tiborsiz qolib, varaq birinchi bo‘lib qolardi; pivot ham). 17. PDF’da diagramma kesilardi — eni bir sahifaga, kerak bo‘lsa albom; PDF nomi Excel bilan bir xil.
+18. Fayl nomli buyruqning tushunilmagan qismi jim tashlanardi — AI’ga beriladi; AI rejasi faqat ilova iboralaridan tuziladi; notanish qism xato bo‘lib qaytadi (o‘zini tuzatish ishlaydi). «Rasmiy … ko‘rinishiga keltir», «mayda yozuvlarni kattalashtir» tanildi; Word’da «Hujjatni rasmiy formatlash» nomi.
+19. AI chizma: $0.051 uchun «Ha» so‘rab, keyin $0.05 limit to‘xtatardi — limit oldin; kuchli sig‘masa muvozanatli (ochiq aytiladi).
+20. **Telefon:** OpenAI WAV hajmi 0xFFFFFFFF — Android ijro etmasdi; haqiqiy hajm yoziladi (endi telefonda eshitildi). 21. AI rasmlari oq fonda (shaffof fon telefonda xira edi).
+
+**Sarf:** jami ≈$0.098 (OpenAI: rejalashtirish 14×, savol 4×, suhbat 3×, rasm 2×, chizma 1×, TTS 4×, STT 2×, vision 1×). Gemini: $0 — Google javobi kalit **Free Tier** ekanini ko‘rsatdi (rasm modellari «limit: 0 … on Free Tier»).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| pytest unit | 521 PASS |
+| To‘liq Office + oyna (oxirgi Excel tuzatishlaridan oldin) | 602 PASS, 3 FAIL → tuzatildi; Excel Office fayllari qayta 28/28 + 19/19 PASS |
+| Smoke v1.3.3, `uzbek_ui` (100%), `cad_tools`, `media_tools` (1-marta vaqt tugadi, qayta PASS; kutish 40 s ga uzaytirildi) | PASS |
+| Jonli AI (yuqoridagi ro‘yxat) | PASS |
+| Windows 1.3.3 o‘rnatildi (SHA-256 `3198dcc16639378c94aef63ef1b40a291e3322829082105e625550a070cf055b`), zaxira `auto-20261019-035456` | PASS |
+| Gemini STT/TTS haqiqiy | NOT TESTED — «Free Tier tekshirdim» belgisi egasining qarori |
+| Kamera, mikrofon, jonli suhbat (qo‘lda) | NOT TESTED — egasi bilan |
+
+**Egasi uchun:** telefonda sinov uchun yoqilgan «Ovozli suhbat» va «AI ovozi» qaytadan o‘chirildi. Merge/push — ruxsat bilan.
+
+---
+
+## 2026-10-18 (34) — Claude Code — Codex limiti tugagach davom: Codex ishi saqlandi va tekshirildi, Android 1.4.0, Windows 1.3.1
+
+**Holat:** Codex `codex/auto-model-router` (worktree `.worktrees/auto-model-router`) da AI katalogi ustida ishlab, limiti tugagan; 27 fayl commit qilinmagan, oxirgi testi 21:34 da PASS (505). Egasi: «kelgan joyidan davom et», «Android’ga ham yangilanish bo‘lsa bajar», «hamma kamchiliklarni tuzat, AI bilan test ertaga».
+
+**Codex qilgani (51b64bf, Claude saqladi):** hisobdagi modellar katalogi (24 soatda, qo‘lda «Hozir yangilash», eskirgan/o‘chgan/deprecated belgilari), narxi tasdiqlanmagan model AUTO’da chaqirilmaydi, **har bir pullik so‘rov narx bilan «Ha» kutadi** (TTS/STT ham), chatda model/FREE/PAID/narx satri, Gemini bepul darajasi faqat egasi «AI Studio’da Free Tier ekanini tekshirdim» belgisini qo‘ysa hisoblanadi, DeepSeek Flash vision (rasmiy narx sahifasida tasdiqlandi).
+
+**Claude qilgani:**
+- `claude/ai-multimodal` dagi media fallback tuzatishi bilan birlashtirildi (ziddiyat: Codex qoidasi + «bepul rejimda pullikka o‘zi o‘tmaydi»).
+- To‘liq Office/oyna sinovida 5 FAIL tahlil qilindi: 3 tasi tasodifiy Office (qayta: PASS); 2 tasi Codex qoidalari bilan eski testlar — soxta provayder model ro‘yxati, pullik AI test va 🔊 avval «Ha» — testlar moslandi.
+- Telefon 🔊 marshruti: pullik ovoz → `{needs_approval, text}`, telefon «Ha» dan keyin `approved=true` bilan qayta so‘raydi.
+- **Android 1.4.0** (versionCode 11): «AI balans» sahifasida 🧠 AI modeli (6 yo‘nalish, AUTO/qo‘lda, provayder va model chiplari, AUTO hozir nimani tanlashi; kompyuter bilan bitta sozlama), chat sarlavhasida 🧠, Sozlamalar → «AI ovozi» (javobni kompyuterdagi AI o‘qiydi; pullik bo‘lsa chatda narx va «Ha»), telefondan so‘ralgan ✨ rasm telefonda ochiladi; sahifa aloqa o‘rnatilgach o‘zi yuklanadi (sovuq ishga tushishda bo‘sh qolardi — tuzatildi). `AiParseTest`.
+- Windows 1.3.1.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| pytest to‘liq (Office + oyna), birlashtirishdan keyin | 587 PASS, 5 FAIL → yuqoridagicha tuzatildi, 5/5 qayta PASS |
+| pytest unit (oxirgi o‘zgarishlardan keyin) | 507 PASS |
+| Smoke v1.3.1, `media_tools.py`, `uzbek_ui.py` (100%) | PASS |
+| Android `assembleDebug` + 9 test to‘plami (AiParseTest bilan) | PASS |
+| Telefonga 1.4.0 `adb install -r` (ma’lumotlar saqlandi), 🧠 sahifa haqiqiy telefonda kompyuter ma’lumotlari bilan ochildi, sovuq ishga tushishda o‘zi yuklandi, crash yo‘q | PASS — APK SHA-256 `ec2fb43e49d8264c4e17971ff736138bad280bd5244aeb87aac83083123ba4dd`, `D:\NEXVARA\android\NEXVARA-Android-1.4.0-debug.apk` |
+| Zaxira `D:\NEXVARA-zaxira\auto\auto-20261018-222011`; Windows 1.3.1 yig‘ish, imzolab joylash, jim o‘rnatish; o‘rnatilgan selftest | PASS — SHA-256 `e04d338fb9484dca12f09f47b5e3e5fb3c546ed9d51e9ffc2256bed60ede7911`, `ok: true` |
+| Haqiqiy OpenAI/Gemini chaqiruvlari (matn, rasm, ovoz, STT), kamera, mikrofon, jonli suhbat | NOT TESTED — egasi bilan ertaga |
+
+**Ertaga (egasi bilan):** Sozlamalar → AI da «AI Studio hisobimda Free Tier ekanini tekshirdim» belgisini egasi o‘zi tekshirib qo‘yadi (aks holda Gemini pullik deb hisoblanadi; hozir AUTO STT OpenAI’ni tanlayapti); keyin har yo‘nalishni bittadan, narx va ruxsat bilan sinash. `codex/auto-model-router` → `main` merge va push — egasi tasdig‘i bilan.
+
+---
+
+## 2026-10-18 (33) — Claude Code — Multi-AI router: yo‘nalishlar bo‘yicha AUTO/MANUAL, rasm va ovoz; Windows 1.3.0
+
+**Foydalanuvchi talabi:** OpenAI, Gemini, Claude, DeepSeek bitta tizimda; CHEAP/BALANCED/POWERFUL/SPECIALIST va AUTO; har yo‘nalish (matn, vision/OCR, rasm yaratish/tahrirlash, STT, TTS, jonli suhbat) uchun AUTO yoki qo‘lda tanlash, qo‘lda tanlangan model almashtirilmasin; chatda doim ko‘rinadigan 🎤 🔊 🖼️ 📷 ✨ 🧠; API va xarajat boshqaruvi; model nomlarini rasmiy hujjatdan tekshirish; pullik sinov faqat ruxsat bilan; Android tomonda Codex ishiga xalaqit bermaslik.
+
+**Qilindi** (tarmoq `claude/ai-multimodal`, `main` dan):
+- `ai/capabilities.py`: yo‘nalishlar reyestri (rasmiy sahifalar 2026-10-18: OpenAI pricing/image-generation/text-to-speech/speech-to-text; Gemini models/pricing/image-generation/speech-generation). Claude — faqat matn va vision, DeepSeek — faqat matn. Model faqat hisob ro‘yxatida topilsa taklif qilinadi (`ai.catalog`, kalit tekshiruvida yoziladi).
+- `ai/media.py`: OpenAI Image API (generations/edits), `/audio/speech`, `/audio/transcriptions`; Gemini Interactions API (rasm, TTS; PCM bo‘lsa WAV ga o‘raladi). Kalit hech qachon URL yoki xato matnida yo‘q.
+- Router: `candidates/media/set_capability/capabilities_status`. AUTO — avval bepul (Gemini bepul rejim), keyin eng arzon; band provayder (429/5xx/tarmoq) → keyingisi byudjet ichida; noto‘g‘ri kalit/mablag‘ yo‘q → fallback yo‘q. MANUAL — aynan tanlangan provayder+model, fallback va almashtirish yo‘q, imkoniyati yo‘q tanlov saqlashda rad etiladi. Matnda yaroqsiz javob (planner JSON) → bitta kuchliroq darajada qayta urinish (faqat AUTO, «avval so‘ra» chegarasidan oshmaydi).
+- Chat: 🎤 Gapirish (STT yo‘nalishi: Gemini yoki OpenAI; o‘zbek/rus/ingliz aytilgan tilda yoziladi, tarjima qilinmaydi), 🔊 Ovozli javob (TTS; shaxsiy ma’lumot «yashirin ma’lumot» deb o‘qiladi), 🖼️ Rasm (savol → vision, «Ha» dan keyin, EXIF/GPS o‘chiriladi), 📷 Kamera (WebView kamerasi → `D:\NEXVARA\Kamera`), ✨ Rasm yaratish/tahrirlash (narxi aytiladi, doim «Ha»; `D:\NEXVARA\AI rasmlar`), 🎧 Jonli suhbat (🎤 jimlikda o‘zi to‘xtaydi → javob → 🔊 → yana 🎤; provayderlarning streaming Realtime/Live API’si ishlatilmaydi), 🧠 AUTO/qo‘lda menyusi. Sozlamalar → AI ichida ham yo‘nalishlar ro‘yxati.
+- Telefon API (Android kodiga tegilmadi): `GET/POST /api/v1/ai/capabilities`, `POST /api/v1/ai/speak` (WAV fayl), telefondan ✨ so‘ralsa javobda `image.path` (`GET /api/v1/files`). `docs/api/openapi.yaml` yangilandi.
+- Tuzatildi: `settings.json` ni bir vaqtda o‘qish/yozishda Windows «ruxsat yo‘q» xatosi (qayta urinish); «rasmli taqdimot yarat» kabi Office buyruqlari rasm yaratishga ketmaydi.
+- Versiya 1.3.0. Hujjat: `docs/AI.md` «Directions» bo‘limi (yangi provayder qo‘shish yo‘li bilan).
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| ruff + format | PASS |
+| pytest to‘liq, haqiqiy Office va oyna testlari bilan | 585 PASS + 1 FAIL (`uzbek_ui`: «Matn va chat» inglizcha deb topildi) → «Matn va suhbat», qayta: `uzbek_ui` PASS (100%) |
+| Yangi: `test_ai_media.py` (24: reyestr, kalit tekshiruvi katalogi, AUTO bepul→arzon, rasm «Ha» dan keyin, fallback faqat band bo‘lsa, byudjet, MANUAL almashtirilmaydi va tekshiriladi, matn/vision MANUAL, eskalatsiya, OpenAI va Gemini HTTP shakllari, xato xabarlari, chat ✨/🖼️/🔊/🧠/📷), `test_voice` (OpenAI transkripsiya), telefon marshrutlari | PASS (soxta provayder, pul sarflanmadi) |
+| Oyna: `tests/ui_scripts/media_tools.py` (7 tugma ko‘rinadi, 🧠 menyu 7 qator, TTS qo‘lda OpenAI, 🔊, ✨ faqat «Ha» dan keyin va rasm chatda, 🖼️, Sozlamalarda yo‘nalishlar, JS xatosi yo‘q) | PASS |
+| Windows 1.3.0 yig‘ish, imzolab joylash, jim o‘rnatish | PASS — o‘rnatildi (`%LOCALAPPDATA%\Programs\NEXVARA`, 1.3.0), SHA-256 `1dd383caa9c9454ab299e9993e7b1eae3db146394d4965ada0073419d3813fdc`; zaxira `D:\NEXVARA-zaxira\auto\auto-20261018-210221`; o‘rnatilgan dastur selftesti `ok: true` |
+| 📷 haqiqiy veb-kamera, 🎤 haqiqiy mikrofon, 🎧 jonli suhbat | NOT TESTED — haqiqiy kalit va qurilma bilan egasi sinaydi |
+| Haqiqiy OpenAI/Gemini rasm, TTS, STT chaqiruvlari; o‘zbekcha ovoz sifati | NOT TESTED — pullik/kalit kerak, ruxsat kutilmoqda |
+
+**Keyingi qadam:** egasi kalitlarni ulaydi (Gemini — bepul matn, STT, TTS; rasm uchun OpenAI yoki Gemini pullik), ruxsat bilan har yo‘nalishni bittadan sinash; Codex: Android’da 🧠 va 🔊 uchun yangi marshrutlar (pastdagi HANDOFF eslatmasi); `main` ga merge va push — egasi tasdig‘i bilan.
+
+---
+
 ## 2026-10-18 (32) — Claude Code — Egasi ruxsati bilan: osilgan PowerPoint, telefon tekshiruvi, merge va push; Windows 1.2.1
 
 **Foydalanuvchi talabi:** «2, 3, 4 ni tugat va hisobot ber» (telefonni ko‘z bilan tekshirish; osilgan PowerPoint’ni yopish; main ga merge va push); «AutoCAD’da ranglarni ko‘rmayapman, ko‘rsat».

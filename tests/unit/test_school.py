@@ -198,6 +198,8 @@ def test_control_rejects_bad_input_before_touching_anything():
         {"action": "key", "key": "format c:"},
         {"action": "type", "text": ""},
         {"action": "shell"},
+        {"action": "nudge", "dx": 5000},
+        {"action": "nudge", "dy": -900},
     ):
         with pytest.raises(ValueError):
             control.act(**kwargs)
@@ -334,6 +336,9 @@ def test_routes_control_and_autostart(env):
     api.devices_set_option("control", True)
     assert post(srv, "/api/v1/control", {"action": "key", "key": "enter"}, token)[0] == 200
     assert done["control"][0][0] == "key" and {"kind": "phone_control"} in api.ui_events()
+    # touchpad: the finger's move in pixels reaches the PC as dx, dy
+    assert post(srv, "/api/v1/control", {"action": "nudge", "dx": 12, "dy": -7}, token)[0] == 200
+    assert done["control"][1] == ("nudge", None, None, -7, "", "", 12)
     assert call(srv, "POST", "/api/v1/control", {"action": "click"})[0] == 401  # token needed
     assert j(post(srv, "/api/v1/autostart", {"on": True}, token))["data"] == {"on": True}
     assert j(call(srv, "GET", "/api/v1/autostart", token=token))["data"] == {"on": True}

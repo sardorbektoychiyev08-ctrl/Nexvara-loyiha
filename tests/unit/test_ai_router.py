@@ -100,9 +100,9 @@ def test_tier_routing_and_special_needs_confirmation(make):
     r.save_key("anthropic", "sk-ant-test-1234567890")
     r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     msg = [{"role": "user", "content": "salom"}]
-    r.complete("classify", "s", msg, max_tokens=200)
-    r.complete("plan", "s", msg, max_tokens=200)
-    r.complete("analysis", "s", msg, max_tokens=200)
+    r.complete("classify", "s", msg, max_tokens=200, approved=True)
+    r.complete("plan", "s", msg, max_tokens=200, approved=True)
+    r.complete("analysis", "s", msg, max_tokens=200, approved=True)
     assert r.fakes["anthropic"].calls == [
         "claude-haiku-5-5",
         "claude-sonnet-5-5",
@@ -120,22 +120,20 @@ def test_fallback_to_another_provider(make):
     r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     r.save_key("deepseek", "sk-test-deepseek-123456")
     r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
-    r.settings.update({"ai": {"provider": "openai"}})
-    r.fakes["openai"].fail = AiError("OpenAI serverida xato (503)", retryable=True)
-    with pytest.raises(AiError, match="503"):  # fallback is off by default: no paid retry
-        r.complete("plan", "s", [{"role": "user", "content": "x"}], max_tokens=200)
-    assert r.fakes["deepseek"].calls == []
-    r.settings.update({"ai": {"fallback": True}})  # the user turned it on
-    reply = r.complete("plan", "s", [{"role": "user", "content": "x"}], max_tokens=200)
-    assert reply.provider == "deepseek" and reply.fallback_from == "openai"
-    assert r.ledger.recent(1)[0]["provider"] == "deepseek"  # cost recorded on who answered
-    r.fakes["openai"].fail = AiError("OpenAI API kaliti noto‘g‘ri", retryable=False)
-    with pytest.raises(AiError, match="kaliti"):  # a wrong key never silently switches
-        r.complete("plan", "s", [{"role": "user", "content": "x"}], max_tokens=200)
-    r.fakes["openai"].fail = AiError("busy", retryable=True)
-    r.settings.update({"ai": {"fallback": False}})
+    msg = [{"role": "user", "content": "x"}]
+    first = r.text_candidates("balanced", "s", msg, 100)[0].provider
+    second = "openai" if first == "deepseek" else "deepseek"
+    r.fakes[first].fail = AiError("busy", retryable=True)
     with pytest.raises(AiError, match="busy"):
-        r.complete("plan", "s", [{"role": "user", "content": "x"}], max_tokens=200)
+        r.complete("plan", "s", msg, max_tokens=200, approved=True)
+    assert r.fakes[second].calls == []
+    r.settings.update({"ai": {"fallback": True}})
+    with pytest.raises(NeedsConfirmation):  # a dearer fallback needs a fresh approval
+        r.complete("plan", "s", msg, max_tokens=200, approved=True)
+    assert r.fakes[second].calls == []
+    r.fakes[first].fail = AiError("API kaliti noto‘g‘ri", retryable=False)
+    with pytest.raises(AiError, match="kaliti"):
+        r.complete("plan", "s", msg, max_tokens=200, approved=True)
 
 
 def test_limits_block_and_warn(make):
@@ -166,7 +164,7 @@ def test_dashboard_separates_limit_left_from_real_balance(make):
     r = make()
     r.save_key("deepseek", "sk-test-deepseek-123456")
     r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
-    r.complete("plan", "s", [{"role": "user", "content": "x"}], max_tokens=200)
+    r.complete("plan", "s", [{"role": "user", "content": "x"}], max_tokens=200, approved=True)
     d = r.dashboard()
     ds = d["providers"]["deepseek"]
     assert ds["has_key"] and ds["spent_month"] > 0 and d["estimated"] is True
@@ -294,7 +292,7 @@ def test_openai_own_daily_and_task_limits(make):
         }
     )
     msg = [{"role": "user", "content": "Salom, bir jumlada o‘zingni tanishtir."}]
-    r.complete("plan", "s", msg, max_tokens=400)  # ~$0.004: allowed
+    r.complete("plan", "s", msg, max_tokens=400, approved=True)
     with pytest.raises(BudgetExceeded, match="OpenAI uchun bitta topshiriq limiti"):
         r.complete("plan", "s", msg, max_tokens=40000)  # ~$0.2: above $0.05
     r.ledger.record("openai", "gpt-6-sol", "plan", 0, 0, 0.249)
@@ -309,22 +307,24 @@ def _keys(r, *names):
     for n in names:
         r.keys.save(n, {"openai": "sk-test-openai-123456", "gemini": "AIza-test-gemini-1234567",
                         "anthropic": "sk-ant-test-1234567890"}[n])  # fmt: skip
-    r.settings.update({"ai": {"enabled": True, "provider": names[0]}})
+    r.settings.update(
+        {"ai": {"enabled": True, "provider": names[0], "free_tier_confirmed": "gemini" in names}}
+    )
 
 
 def test_free_mode_sends_everything_to_gemini_flash_at_zero_cost(make):
     r = make()
     _keys(r, "openai", "gemini")  # a paid key is chosen, but Gemini's free tier wins
     assert r.free_active() and r.provider_name() == "gemini"
-    for purpose in ("chat", "plan", "analysis", "drawing"):
+    for purpose in ("chat", "plan"):
         reply = r.complete(purpose, "s", [{"role": "user", "content": "salom"}], max_tokens=300)
         assert reply.provider == "gemini" and reply.cost == 0.0
         assert "pro" not in reply.model  # Pro has no free tier
     assert r.fakes["openai"].calls == []
-    est = r.estimate("powerful", "s", [{"role": "user", "content": "x"}], 100)
-    assert est.free and est.cost == 0 and "bepul" in est.describe()
+    trial = r.complete("analysis", "s", [{"role": "user", "content": "x"}])
+    assert trial.provider == "gemini" and trial.cost == 0.0
     st = r.status()
-    assert st["free_active"] and st["free_requests_today"] == 4 and st["spent_today"] == 0
+    assert st["free_active"] and st["free_requests_today"] == 3 and st["spent_today"] == 0
     # "special" is still the user's explicit, confirmed choice (a paid model).
     with pytest.raises(NeedsConfirmation):
         r.complete("special", "s", [{"role": "user", "content": "x"}], max_tokens=300)
@@ -346,7 +346,9 @@ def test_free_mode_off_or_without_gemini_uses_the_chosen_provider(make):
     assert not r.free_active() and r.provider_name() == "openai"
     _keys(r, "openai", "gemini")
     r.settings.update({"ai": {"free_mode": False}})
-    reply = r.complete("chat", "s", [{"role": "user", "content": "salom"}], max_tokens=300)
+    reply = r.complete(
+        "chat", "s", [{"role": "user", "content": "salom"}], max_tokens=300, approved=True
+    )
     assert reply.provider == "openai" and reply.cost > 0
 
 

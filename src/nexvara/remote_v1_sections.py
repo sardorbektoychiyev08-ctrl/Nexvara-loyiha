@@ -25,6 +25,9 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("POST", "/api/v1/tasks/{id}/resume", True),
     ("GET", "/api/v1/ai", True),
     ("POST", "/api/v1/ai/{provider}/balance", True),
+    ("GET", "/api/v1/ai/capabilities", True),
+    ("POST", "/api/v1/ai/capabilities", True),
+    ("POST", "/api/v1/ai/speak", True),
     ("GET", "/api/v1/memory", True),
     ("POST", "/api/v1/memory", True),
     ("GET", "/api/v1/memory/search", True),
@@ -50,6 +53,8 @@ ROUTES: list[tuple[str, str, bool]] = [
     ("GET", "/api/v1/files/search", True),
     ("POST", "/api/v1/files/share", True),
     ("POST", "/api/v1/files/open", True),
+    ("POST", "/api/v1/files/zip", True),
+    ("POST", "/api/v1/files/unzip", True),
 ]
 HANDLED = {p for _m, p, _a in ROUTES}
 
@@ -327,6 +332,40 @@ def route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list[
         if args["provider"] not in models.PROVIDERS:
             raise ApiError("NOT_FOUND", "Noma’lum provayder")
         return api.ai_balance(args["provider"])  # official balance API only; no model call
+    # ----- 🧠 directions (AUTO/MANUAL) and 🔊 speech, shared with the PC's settings -----
+    if route == "/api/v1/ai/capabilities" and h.command == "GET":
+        return api.ai_capabilities()
+    if route == "/api/v1/ai/capabilities":
+        b = body()
+        out = api.ai_set_capability(
+            str(b.get("cap", "")),
+            str(b.get("mode", "")),
+            str(b.get("provider", "")),
+            str(b.get("model", "")),
+        )
+        if not out.get("ok"):
+            raise ApiError("BAD_REQUEST", out.get("error") or "Saqlanmadi")
+        return out
+    if route == "/api/v1/ai/speak":
+        import base64
+        import time as _time
+
+        b = body()
+        text = str(b.get("text", "")).strip()[:3000]
+        if not text:
+            raise ApiError("BAD_REQUEST", "Matn bo‘sh")
+        out = api.ai_speak(text, bool(b.get("approved")), bool(b.get("live")))
+        if out.get("needs_approval"):  # a paid voice: the phone shows the price and asks «Ha»
+            return {"needs_approval": True, "text": out.get("error", "")}
+        if not out.get("ok"):
+            raise ApiError("BAD_REQUEST", out.get("error") or "Ovoz tayyorlanmadi")
+        folder = config.data_dir() / "Ovoz"
+        folder.mkdir(parents=True, exist_ok=True)
+        wav = folder / f"javob-{_time.strftime('%Y%m%d-%H%M%S')}.wav"
+        wav.write_bytes(base64.b64decode(out["audio"]))
+        _grant(srv, dev, str(wav), "shared", SHARED_TTL)
+        return {"path": str(wav), "provider": out["provider"], "model": out["model"],
+                "cost": out["cost"]}  # fmt: skip
     # ----- Memory -----
     if route == "/api/v1/memory" and h.command == "GET":
         return {"facts": api.memory_facts()}
@@ -448,6 +487,39 @@ def route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list[
             )
         api.ui_push({"kind": "phone_file", "name": p.name, "path": str(p)})
         return {"opened": bool(api.open_file(str(p)))}
+    if route == "/api/v1/files/zip":
+        from nexvara import fileagent
+        from nexvara.remote import MAX_UPLOAD
+
+        paths = body().get("paths") or []
+        if not isinstance(paths, list) or not 1 <= len(paths) <= 50:
+            raise ApiError("BAD_REQUEST", "1–50 ta fayl tanlang")
+        items = [str(_found_file(srv, dev, str(x))) for x in dict.fromkeys(map(str, paths))]
+        try:
+            out = Path(fileagent.make_zip(items))
+        except (OSError, ValueError) as e:
+            raise ApiError("BAD_REQUEST", f"ZIP qilib bo‘lmadi: {e}") from e
+        size = out.stat().st_size
+        _grant(srv, dev, str(out), "found", FOUND_TTL)
+        if size <= MAX_UPLOAD:  # the phone may take the archive right away
+            _grant(srv, dev, str(out), "shared", SHARED_TTL)
+        api.ui_push({"kind": "phone_file", "name": out.name, "path": str(out)})
+        return {"path": str(out), "name": out.name, "size": size, "files": len(items),
+                "downloadable": size <= MAX_UPLOAD}  # fmt: skip
+    if route == "/api/v1/files/unzip":
+        import zipfile
+
+        from nexvara import fileagent
+
+        p = _found_file(srv, dev, str(body().get("path", "")))
+        if p.suffix.lower() != ".zip":
+            raise ApiError("BAD_REQUEST", "Faqat .zip faylni ochish mumkin")
+        try:
+            folder = Path(fileagent.unzip(str(p)))
+        except (OSError, ValueError, zipfile.BadZipFile) as e:
+            raise ApiError("BAD_REQUEST", f"Arxivdan chiqarib bo‘lmadi: {e}") from e
+        count = sum(1 for f in folder.rglob("*") if f.is_file())
+        return {"folder": str(folder), "name": folder.name, "files": count}
     # ----- Google -----
     if route == "/api/v1/account":
         return _account(api, dev, srv.store)

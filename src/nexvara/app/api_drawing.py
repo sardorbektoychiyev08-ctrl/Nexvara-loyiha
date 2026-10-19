@@ -17,7 +17,7 @@ _DXF_FILE = re.compile(
     re.IGNORECASE,
 )
 _DXF_VERBS = re.compile(
-    r"\b(pdf|png|rasm\w*|ko[‘’']?rsat\w*|korsat\w*|och\w*|aylantir\w*|ko[‘’']?r\b|chop|"
+    r"\b(pdf|png|word|docx|rasm\w*|ko[‘’']?rsat\w*|korsat\w*|och\w*|aylantir\w*|ko[‘’']?r\b|chop|"
     r"ichida nima|tarkib\w*|tekshir\w*)",
     re.IGNORECASE,
 )
@@ -85,22 +85,41 @@ class DrawingApi:
 
         router = self._router()
         if image and self._vision_provider() is None:
-            return {"reply": "Rasmni o‘qiydigan AI ulanmagan: OpenAI, Gemini yoki Claude "
-                    "kalitini kiriting (DeepSeek rasmni o‘qimaydi)."}  # fmt: skip
+            return {"reply": "Rasmni o‘qiydigan AI ulanmagan: OpenAI, Gemini, Claude "
+                    "yoki DeepSeek Flash kalitini kiriting."}  # fmt: skip
         system, msgs = drawing.ai_messages(text, ("image/jpeg", "") if image else None,
                                            last if edit else None)  # fmt: skip
-        try:
-            est = router.estimate(TIER_FOR["drawing"], system, msgs, 5000, self._vision_provider()
-                                  if image else None)  # fmt: skip
-        except AiUnavailable as e:
-            return {"reply": str(e)}
+        from nexvara.ai.router import BudgetExceeded
+
+        # The limits are checked before asking (live check 2026-10-19: «Ha» was asked for
+        # $0.051, then the $0.05 task limit stopped it): the strong model if it fits, else the
+        # balanced one (said openly), else a clear refusal — never a «Ha» that cannot run.
+        est, tier, refusal = None, TIER_FOR["drawing"], ""
+        for t in dict.fromkeys((TIER_FOR["drawing"], "balanced")):
+            try:
+                cand = router.text_candidates(t, system, msgs, 5000,
+                                              "vision" if image else "text")[0]  # fmt: skip
+                router.check_budget(cand, approved=True)
+            except AiUnavailable as e:  # no fitting model at all: say so (no weaker fallback)
+                refusal = refusal or str(e)
+                break
+            except BudgetExceeded as e:  # a strong model exists but the limit is lower
+                refusal = refusal or str(e)
+                continue
+            est, tier = cand, t
+            break
+        if est is None:
+            return {"reply": refusal}
         import uuid
 
         token = uuid.uuid4().hex[:12]
         self._pending[token] = ("drawing", {"text": text, "image": image, "background": bg,
-                                            "edit": edit})  # fmt: skip
+                                            "edit": edit, "tier": tier})  # fmt: skip
         what = f"«{last['title']}» chizmasini o‘zgartiraman" if edit else "Chizmani AI tuzadi"
         reply = f"{what}, NEXVARA chizadi (PDF, PNG, AutoCAD DXF): {est.describe()}."
+        if tier != TIER_FOR["drawing"]:
+            reply += ("\n\nKuchli model limitingizga sig‘madi — muvozanatli model bilan chizaman "
+                      "(limitni Sozlamalar → AI da o‘zgartirish mumkin).")  # fmt: skip
         if image:
             reply += (f"\n\n📷 Rasm: {Path(image).name}. U AI’ga yuboriladi — joylashuv (GPS) va "
                       "boshqa yashirin ma’lumotlari o‘chiriladi, lekin rasmning o‘zini yashirib "
@@ -185,7 +204,8 @@ class DrawingApi:
             with task.step("AI chizmani tuzmoqda") as s:
                 system, msgs = drawing.ai_messages(text, img, previous)
                 reply = router.complete("drawing", system, msgs, max_tokens=8000,
-                                        expected_out=5000, approved=True)  # fmt: skip
+                                        expected_out=5000, approved=True,
+                                        tier=payload.get("tier"))  # fmt: skip
                 spec = drawing.parse_reply(reply.text)
                 s.detail = f"{len(spec['shapes'])} ta element, ≈${reply.cost:.3f}"
             res = self._finish_drawing(task, spec, show)
@@ -219,9 +239,9 @@ class DrawingApi:
         except LookupError as e:
             return {"reply": str(e)}
         self._context_file = str(path)
-        return self._run_dxf_view(path)
+        return self._run_dxf_view(path, bool(re.search(r"\b(word|docx)\b", text, re.I)))
 
-    def _run_dxf_view(self, path: Path) -> dict[str, Any]:
+    def _run_dxf_view(self, path: Path, word: bool = False) -> dict[str, Any]:
         from nexvara import cad
 
         if path.suffix.lower() == ".dwg":
@@ -246,15 +266,24 @@ class DrawingApi:
                 stem = path.stem[:60]
                 out = cad.render(doc, folder / f"{stem}.pdf", folder / f"{stem}.png")
                 s.detail = Path(out["pdf"]).name
+            if word:
+                with task.step("Word fayl qilish") as s:
+                    out["docx"] = str(cad.png_to_docx(Path(out["png"]), folder / f"{stem}.docx",
+                                                      path.stem))  # fmt: skip
+                    s.detail = Path(out["docx"]).name
             if show:
                 with task.step("Kompyuter ekranida ochish"):
                     opener = self._overrides.get("open_file") or os.startfile
-                    opener(out["pdf"])  # noqa: S606 - our own file
+                    opener(out["docx" if word else "pdf"])  # noqa: S606 - our own file
             w, h = info["size"]
             report = [f"{path.name}: {info['entities']} ta obyekt, {len(info['layers'])} ta qatlam",
                       f"O‘lchami: {w:g} × {h:g} {info['units']}".strip()]  # fmt: skip
-            return {"path": out["png"], "pdf": out["pdf"], "source": str(path), "report": report}
+            res = {"path": out["png"], "pdf": out["pdf"], "source": str(path), "report": report}
+            if word:
+                res["docx"] = out["docx"]
+            return res
 
         snap = self._runner.start(f"AutoCAD fayli: {path.name}", fn).snapshot()
-        return {"reply": f"«{path.name}» chizmasini PDF va rasmga aylantiryapman — tayyor "
+        what = "PDF, rasm va Word’ga" if word else "PDF va rasmga"
+        return {"reply": f"«{path.name}» chizmasini {what} aylantiryapman — tayyor "
                 "bo‘lgach ochiladi.", "task": snap}  # fmt: skip

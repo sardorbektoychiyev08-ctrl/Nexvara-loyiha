@@ -1,8 +1,11 @@
 "use strict";
 
-// 🎤 in the chat: record a short WAV (16 kHz mono), Gemini writes it down, the text is sent as a
-// normal chat message. Click once to start, again to stop (stops by itself after 45 s).
-const voice = { ctx: null, stream: null, node: null, chunks: [], rate: 16000, timer: null };
+// 🎤 in the chat: record a short WAV (16 kHz mono); the STT direction (Gemini free, or OpenAI)
+// writes it down in the spoken language (Uzbek Latin, Russian, English) and the text is sent as
+// a normal chat message. Click once to start, again to stop (stops by itself after 45 s).
+// 🎧 live mode: recording stops by itself after ~1.3 s of silence once speech was heard.
+const voice = { ctx: null, stream: null, node: null, chunks: [], rate: 16000, timer: null,
+  live: false, heard: false, quietSince: 0 };
 
 function voiceWav(samples, rate) {
   const buf = new ArrayBuffer(44 + samples.length * 2), v = new DataView(buf);
@@ -25,37 +28,63 @@ function voiceDownsample(chunks, from, to) {
   return out;
 }
 
-async function voiceStart() {
+function voiceLevel(c) { let s = 0; for (let i = 0; i < c.length; i++) s += c[i] * c[i]; return Math.sqrt(s / c.length); }
+
+async function voiceStart(opts = {}) {
+  if (voice.ctx) return;
   const st = await api().voice_status();
-  if (!st.ready) { addMsg("Ovozli buyruq uchun Gemini kaliti kerak: Sozlamalar → AI (aistudio.google.com da bepul).", false); return; }
-  if (!st.consent && !window.confirm(st.consent_text)) return;
+  if (!st.ready) { addMsg("Ovozli buyruq uchun AI kerak: Sozlamalar → AI da Gemini (bepul) yoki OpenAI kalitini ulang va «AI yoqilgan» ni yoqing.", false); return; }
+  if (!st.consent && !voice.consent && !window.confirm(st.consent_text)) return;
   voice.consent = true;
   try {
     voice.stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
   } catch (e) { addMsg(`Mikrofon ochilmadi: ${e.message || e}. Windows sozlamalarida mikrofonga ruxsat bering.`, false); return; }
+  voice.live = !!opts.live; voice.heard = false; voice.quietSince = 0;
   voice.ctx = new AudioContext();
   const src = voice.ctx.createMediaStreamSource(voice.stream);
   voice.node = voice.ctx.createScriptProcessor(4096, 1, 1);
   voice.chunks = [];
-  voice.node.onaudioprocess = (e) => voice.chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  voice.node.onaudioprocess = (e) => {
+    const c = new Float32Array(e.inputBuffer.getChannelData(0));
+    voice.chunks.push(c);
+    if (!voice.live) return;
+    const loud = voiceLevel(c) > 0.02, now = performance.now();
+    if (loud) { voice.heard = true; voice.quietSince = 0; }
+    else if (voice.heard) {
+      if (!voice.quietSince) voice.quietSince = now;
+      else if (now - voice.quietSince > 1300) voiceStop();
+    }
+  };
   src.connect(voice.node); voice.node.connect(voice.ctx.destination);
-  $("#chat-mic").classList.add("recording"); $("#chat-mic").textContent = "⏹";
-  $("#chat-text").placeholder = "Gapiring… tugatgach ⏹ ni bosing";
+  $("#chat-mic").classList.add("recording"); $("#chat-mic").textContent = "⏹ To‘xtatish";
+  $("#chat-text").placeholder = voice.live ? "🎧 Tinglayapman… gapiring" : "Gapiring… tugatgach ⏹ ni bosing";
   voice.timer = setTimeout(voiceStop, 45000);
 }
 
-async function voiceStop() {
+async function voiceClose() {
   clearTimeout(voice.timer);
-  if (!voice.ctx) return;
-  const rate = voice.ctx.sampleRate;
+  if (!voice.ctx) return null;
+  const rate = voice.ctx.sampleRate, ctx = voice.ctx;
+  voice.ctx = null;
   voice.node.disconnect(); voice.stream.getTracks().forEach((t) => t.stop());
-  await voice.ctx.close(); voice.ctx = null;
-  $("#chat-mic").classList.remove("recording"); $("#chat-mic").textContent = "🎤";
+  await ctx.close();
+  $("#chat-mic").classList.remove("recording"); $("#chat-mic").textContent = "🎤 Gapirish";
+  return rate;
+}
+
+async function voiceCancel() { await voiceClose(); $("#chat-text").placeholder = "Masalan: 7-sinf fizika Nyuton qonunlari 20 ta test"; }
+
+async function voiceStop() {
+  const rate = await voiceClose();
+  if (!rate) return;
+  if (voice.live && !voice.heard) { liveListen(); return; } // nothing said: keep listening
   $("#chat-text").placeholder = "Ovoz matnga aylantirilmoqda…";
   const b64 = voiceWav(voiceDownsample(voice.chunks, rate, voice.rate), voice.rate);
-  const r = await api().voice_command(b64, "audio/wav", !!voice.consent);
+  let r = await api().voice_command(b64, "audio/wav", !!voice.consent, false, !!voice.live);
+  if (r.needs_approval && window.confirm(`${r.error}\nOvozni matnga aylantirish uchun pullik so‘rovni tasdiqlaysizmi?`))
+    r = await api().voice_command(b64, "audio/wav", !!voice.consent, true, !!voice.live);
   $("#chat-text").placeholder = "Masalan: 7-sinf fizika Nyuton qonunlari 20 ta test";
-  if (!r.ok) { addMsg(r.error || r.needs_consent || "Ovoz tushunilmadi.", false); return; }
+  if (!r.ok) { addMsg(r.error || r.needs_consent || "Ovoz tushunilmadi.", false); if (voice.live) liveListen(); return; }
   $("#chat-text").value = r.text;
   $("#chat-form").requestSubmit(); // the spoken command runs like a typed one
 }

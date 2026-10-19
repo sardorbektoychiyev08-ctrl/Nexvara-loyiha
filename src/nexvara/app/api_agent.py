@@ -27,6 +27,20 @@ _OFFICE_EXT = (".xlsx", ".xlsm", ".xls", ".csv", ".docx", ".doc", ".rtf", ".pptx
 _FAILED = ("Buni tushunmadim", "Qaysi", "Bajara olmadim", "Xato", "Bu rejimda")
 
 
+_SERVICE = re.compile(
+    r"^\s*(ha|yo[‘’']?q|ha, davom et|so[‘’']?rov yuborilmadi|bu ish pullik ai|tasdiq kerak|"
+    r"bekor qilindi|eslab qolaman:|✨ rasm yarataman|🖼️ rasmni ai ko[‘’']?radi)",
+    re.IGNORECASE,
+)
+
+
+def _service_line(text: str) -> bool:
+    """«Ha», «Bu ish pullik AI … Davom etaymi?», «So‘rov yuborilmadi…»: NEXVARA's own prompts
+    and the user's yes/no carry no meaning for the AI's memory (and once kept a privacy
+    warning looping back into every request — live check 2026-10-19)."""
+    return bool(_SERVICE.match(text or ""))
+
+
 def looks_like_secret(text: str) -> bool:
     return bool(_KEY_LIKE.search(text or ""))
 
@@ -272,10 +286,11 @@ class AgentApi:
         turns = mem.recent_turns(n + 1, days) if n else []
         if turns and turns[-1]["role"] == "user" and turns[-1]["text"].strip() == text.strip():
             turns = turns[:-1]  # chat() logged the current message already
+        turns = [t for t in turns if not _service_line(t["text"])]
         turns = turns[-n:] if n else []
-        return Recall(
-            turns, mem.recall(text, days, skip_last=n + 1), mem.day_summaries(min(days, 7))
-        )
+        older = [x for x in mem.recall(text, days, skip_last=n + 1)
+                 if not _service_line(x["user"]) and not _service_line(x["nexvara"])]  # fmt: skip
+        return Recall(turns, older, mem.day_summaries(min(days, 7)))
 
     def _chat_forget(self, text: str) -> dict[str, Any] | None:
         """«buni unut» (the last exchange), «Savdo hisoboti haqidagi gaplarni unut»."""

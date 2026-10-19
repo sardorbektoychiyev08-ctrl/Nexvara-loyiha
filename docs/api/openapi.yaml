@@ -186,6 +186,31 @@ paths:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "400": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/v1/ai/capabilities:
+    get:
+      summary: "🧠 Directions text, vision, image, stt, tts, realtime: mode auto|manual, chosen provider/model, what each provider offers (only models found in the account), the AUTO pick (free first, then cheapest), voices, speak_replies. Shared with the PC (one settings file); keys never included"
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "401": {$ref: "#/components/responses/Error"}
+    post:
+      summary: "Set one direction {cap, mode auto|manual, provider, model}; a model the provider/account cannot use for it is refused (400) — a MANUAL choice is never swapped later"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {cap: {}, mode: {}, provider: {}, model: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+  /api/v1/ai/speak:
+    post:
+      summary: "🔊 Text → speech on the TTS direction (Gemini free tier first in AUTO). {text, approved, live} → {path (WAV, downloadable with GET /api/v1/files), provider, model, cost}; a paid voice not yet approved → {needs_approval: true, text (price)} and the phone repeats with approved=true after «Ha». Personal data is replaced before sending; budget limits apply"
+      parameters:
+        - {$ref: "#/components/parameters/RequestId"}
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {text: {}, approved: {}, live: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
   /api/v1/ai/{provider}/balance:
     post:
       summary: "Refresh the real balance where the provider has an official balance API (DeepSeek). No model is called (free). Others return {supported:false}"
@@ -426,6 +451,26 @@ paths:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "400": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
+  /api/v1/files/zip:
+    post:
+      summary: "ZIP found files on the PC {paths: 1..50 paths from /files/search}: the archive is made next to the first file and, if small enough, shared for download -> {path, name, size, files, downloadable}"
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {paths: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
+  /api/v1/files/unzip:
+    post:
+      summary: "Extract a found .zip into a new folder next to it (entries outside the folder are refused) -> {folder, name, files}"
+      parameters: [{$ref: "#/components/parameters/RequestId"}]
+      requestBody:
+        content: {application/json: {schema: {type: object, properties: {path: {}}}}}
+      responses:
+        "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
+        "400": {$ref: "#/components/responses/Error"}
+        "404": {$ref: "#/components/responses/Error"}
   /api/v1/omr:
     get:
       summary: "Answer-sheet sets (title, questions, variants, keys, last results) and whether the last generated test has answer keys"
@@ -475,7 +520,7 @@ paths:
         "400": {$ref: "#/components/responses/Error"}
         "404": {$ref: "#/components/responses/Error"}
     post:
-      summary: "Save a drawing made on the phone {name, drawing (same JSON as the PC editor: layers, entities line/polyline/circle/arc/ellipse/text/dim/ldim/rdim/hatch, mm, y up), open_on_pc}: AutoCAD DXF + PDF + PNG on the PC, files shared with the phone"
+      summary: "Save a drawing made on the phone {name, drawing (same JSON as the PC editor: layers, entities line/polyline/circle/arc/ellipse/text/dim/ldim/rdim/hatch, mm, y up), open_on_pc}: AutoCAD DXF + PDF + PNG + Word (docx, the drawing on an A4 page) on the PC, files shared with the phone"
       parameters:
         - {$ref: "#/components/parameters/RequestId"}
       requestBody:
@@ -667,11 +712,11 @@ paths:
         "404": {$ref: "#/components/responses/Error"}
   /api/v1/control:
     post:
-      summary: "Mouse/keyboard of the PC {action click|double|right|move|scroll|type|key, x, y (0..1), dy, text, key}; refused unless settings remote.control is on"
+      summary: "Mouse/keyboard of the PC {action click|double|right|move|scroll|type|key, x, y (0..1), dy, text, key}; touchpad: nudge {dx, dy pixels, -800..800}, tap|tap_double|tap_right (where the cursor is), drag_start|drag_end (left button down/up); refused unless settings remote.control is on"
       parameters:
         - {$ref: "#/components/parameters/RequestId"}
       requestBody:
-        content: {application/json: {schema: {type: object, properties: {action: {}, x: {}, y: {}, dy: {}, text: {}, key: {}}}}}
+        content: {application/json: {schema: {type: object, properties: {action: {}, x: {}, y: {}, dx: {}, dy: {}, text: {}, key: {}}}}}
       responses:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "400": {$ref: "#/components/responses/Error"}

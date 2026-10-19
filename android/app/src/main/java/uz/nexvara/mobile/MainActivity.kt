@@ -54,7 +54,7 @@ class MainActivity : FragmentActivity() {
         BuildConfigInfo.version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull().orEmpty()
         Notifier.channel(this)
         Notifier.schedule(this, model.backgroundAlerts)
-        model.onReply = { text -> if (model.speakReplies) speak(text) }
+        model.onReply = { text -> if (model.speakReplies) { if (model.aiVoice) model.speakAi(text) else speak(text) } }
         model.onTaskDone = { t -> if (model.background) Notifier.taskDone(this, t) }
         handleShare(intent)
         handleOpen(intent)
@@ -311,7 +311,7 @@ class MainActivity : FragmentActivity() {
         }
     }
 
-    private fun stopSpeaking() { tts?.stop() }
+    private fun stopSpeaking() { tts?.stop(); model.stopAiVoice() }
 
     // ---------------- Google (Android Credential Manager; the PC verifies the token) ----------------
     private fun googleSignIn(webClientId: String) {

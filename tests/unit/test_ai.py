@@ -55,7 +55,7 @@ def router(tmp_path):
 def test_prices_and_model_picking():
     assert models.price("claude-opus-5-5") == (4.00, 20.00)
     assert models.price("gemini-3.1-pro-preview-06", "gemini") == (2.00, 12.00)
-    assert models.price("mystery-model", "openai") == (30.00, 180.00)  # never under-count
+    assert models.price("mystery-model", "openai") is None
     assert models.price("gpt-5.4", "openai", {"gpt-5.4": [1, 2]}) == (1, 2)
     assert models.cost("claude-haiku-5-5", "anthropic", 1_000_000, 1_000_000) == pytest.approx(0.6)
     avail = ["gemini-3.1-pro-preview", "gemini-3.1-pro-preview-06", "gemini-3.5-flash"]
@@ -92,7 +92,9 @@ def test_complete_records_cost_and_tiers(router):
     router.save_key("anthropic", "sk-ant-test-1234567890")
     router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     router.fake.replies = ["salom"]
-    r = router.complete("classify", "sys", [{"role": "user", "content": "hi"}], max_tokens=100)
+    r = router.complete(
+        "classify", "sys", [{"role": "user", "content": "hi"}], max_tokens=100, approved=True
+    )
     assert r.text == "salom" and r.provider == "anthropic"
     assert router.fake.calls[-1]["model"] == "claude-haiku-5-5"  # classify -> cheap tier
     assert r.cost == pytest.approx((1000 * 0.10 + 500 * 0.50) / 1e6)
@@ -120,14 +122,14 @@ def test_classify_reads_fenced_json(router):
     router.fake.replies = [
         '```json\n{"kind": "test", "command": "7-sinf fizika 10 ta test", "grade": "7"}\n```'
     ]
-    intent = features.classify(router, "fizikadan 7 sinfga 10ta savol kerak")
+    intent = features.classify(router, "fizikadan 7 sinfga 10ta savol kerak", approved=True)
     assert intent.kind == "test" and intent.grade == 7
     assert router.fake.calls[-1]["effort"] == "low"
     router.fake.replies = ['{"kind": "weird"}']
-    assert features.classify(router, "x").kind == "chat"
+    assert features.classify(router, "x", approved=True).kind == "chat"
     router.fake.replies = ["not json at all"]
     with pytest.raises(AiError):
-        features.classify(router, "x")
+        features.classify(router, "x", approved=True)
 
 
 def test_parse_questions_validates():
@@ -233,7 +235,9 @@ def test_ai_quizzes_reject_untraceable_answer(router, monkeypatch):
         )
     ]
     with pytest.raises(AiError, match="dalili tekshirilgan"):
-        features.make_ai_quizzes(router, service.TestRequest(7, "Fizika", "Kuch", count=1))
+        features.make_ai_quizzes(
+            router, service.TestRequest(7, "Fizika", "Kuch", count=1), approved=True
+        )
 
 
 class _Resp(io.BytesIO):
@@ -300,7 +304,7 @@ def test_anthropic_provider_shape():
     )
     r = p.complete("claude-opus-5-5", "s", [{"role": "user", "content": "x"}], 500, "high")
     assert r.text == "javob" and r.input_tokens == 10
-    assert captured["fallbacks"] == "default" and captured["output_config"] == {"effort": "high"}
+    assert "fallbacks" not in captured and captured["output_config"] == {"effort": "high"}
     captured.clear()
     p.complete("claude-haiku-5-5", "s", [{"role": "user", "content": "x"}], 500)
     assert "fallbacks" not in captured
@@ -316,6 +320,8 @@ def test_api_chat_with_ai(router, monkeypatch):
     assert api.get_info()["ai_connected"]
     router.fake.replies = ['{"kind": "question"}', "Nyutonning birinchi qonuni — inersiya."]
     out = api.chat("inersiya nima o'zi")
+    assert out.get("confirm") and router.fake.calls == []
+    out = api.confirm_ai(out["confirm"])
     assert "inersiya" in out["reply"]
     # An expensive answer waits for "Ha".
     router.settings.update({"ai": {"confirm_over_usd": 0.0}})

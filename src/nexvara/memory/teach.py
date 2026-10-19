@@ -135,6 +135,11 @@ def parse_teach(text: str) -> TeachRequest | None:
     rule = _RULE_TRIGGER.search(f)
     if not fact and not rule:
         return None
+    # «… eslab qol degan emasman», «eslab qolish shart emas», «eslab qolma» — a refusal, not a
+    # request: nothing is saved («unutma» alone still means «remember»).
+    if re.search(r"\b(eslab qol\w*|yodda tut\w*|esla\w*)\b[^.!?]{0,30}\b(emas\w*|shart emas|"
+                 r"kerak emas|keragi yo\w*)\b|\beslab qolma\b|\byodda tutma\b", f):  # fmt: skip
+        return None
     app = _app_of(f)
     if rule and app:
         body = re.sub(_NOISE, " ", f)

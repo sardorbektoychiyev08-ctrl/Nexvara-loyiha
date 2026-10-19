@@ -1,6 +1,25 @@
 # HANDOFF → Codex (Windows side)
 
+## ▶ STATUS (2026-10-18 22:35, Claude) — Codex's auto-model-router work was saved and continued
+
+Codex ran out of limit with 27 uncommitted files; Claude committed them (51b64bf), merged
+`claude/ai-multimodal`, fixed the 5 failing Office/UI tests, added Android 1.4.0 (🧠 directions,
+AI voice, ✨ picture opens on the phone) and installed Windows 1.3.1 + APK 1.4.0. Everything is on
+branch `codex/auto-model-router` (worktree `.worktrees/auto-model-router`); NOT merged to `main`,
+NOT pushed — owner's approval needed. Next: the owner's live AI test (PROGRESS (34)).
+
+
 2026-10-18 Codex: CURRENT TASK 4 yakunlandi (`PROGRESS.md` (30)). Windows 1.1.1 o‘rnatildi va selftest PASS. Office sinovlari 83 PASS, 1 PowerPoint COM sinovi osilgani uchun chetga olindi. `main` ga merge/push qilinmadi. Quyidagi topshiriq 4 matni tarixiy izoh sifatida qoldirildi.
+
+## ▶ NOTE for Codex (2026-10-18 night, Claude) — Android: new AI routes are ready on the PC
+
+Branch `claude/ai-multimodal`. The PC has per-direction AI settings (text, vision, image, stt, tts,
+realtime; AUTO or MANUAL). Android can use them without new logic on the phone:
+`GET/POST /api/v1/ai/capabilities` (same settings as the PC 🧠 menu), `POST /api/v1/ai/speak`
+{text} → WAV `path` for `GET /api/v1/files` (🔊), and a ✨ picture asked in the phone chat comes
+back after `/api/v1/confirm` as `image.path`. A photo uploaded with `/api/v1/files` + a question
+in chat goes to the vision model after «Ha». Contract: `docs/api/openapi.yaml`. Claude did not
+touch `android/` in this task.
 
 ## ▶ CURRENT TASK 5 (2026-10-18 evening, Claude) — continue from here if Claude stopped
 

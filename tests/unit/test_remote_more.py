@@ -73,6 +73,36 @@ def test_file_search_share_open(env):
     assert post(srv, "/api/v1/files/share", {"path": other}, token)[0] == 404
 
 
+def test_phone_zips_found_files_and_unzips(env):
+    import zipfile
+
+    api, srv, token, docs, _ = env
+    (docs / "hisobot 2.docx").write_bytes(b"docx-data")
+    found = j(call(srv, "GET", "/api/v1/files/search?q=hisobot", token=token))["data"]["files"]
+    paths = [f["path"] for f in found if f["name"].endswith((".xlsx", ".docx"))]
+    assert len(paths) == 2
+    out = j(post(srv, "/api/v1/files/zip", {"paths": paths}, token))["data"]
+    assert out["files"] == 2 and out["downloadable"] and out["name"].endswith(".zip")
+    with zipfile.ZipFile(out["path"]) as z:
+        assert sorted(z.namelist()) == ["Oylik hisobot.xlsx", "hisobot 2.docx"]
+    r = call(srv, "GET", f"/api/v1/files?path={quote(out['path'])}", token=token)
+    assert r[0] == 200 and r[1][:2] == b"PK"  # the phone takes the archive at once
+    # Only files found by a search; never a key, never nothing.
+    assert (
+        post(srv, "/api/v1/files/zip", {"paths": [str(docs / "hisobot kalit.pem")]}, token)[0]
+        == 404
+    )
+    assert post(srv, "/api/v1/files/zip", {"paths": []}, token)[0] == 400
+    # Back out of the archive: a new folder next to it.
+    back = j(post(srv, "/api/v1/files/unzip", {"path": out["path"]}, token))["data"]
+    assert (
+        back["files"] == 2 and (docs / back["name"] / "hisobot 2.docx").read_bytes() == b"docx-data"
+    )
+    r = post(srv, "/api/v1/files/unzip", {"path": paths[0]}, token)
+    assert r[0] == 400  # not a .zip
+    assert call(srv, "POST", "/api/v1/files/zip", {"paths": paths})[0] == 401
+
+
 def test_other_networks_and_stable_certificate(env, tmp_path):
     from nexvara.remote import allowed_client, ensure_certificate
 

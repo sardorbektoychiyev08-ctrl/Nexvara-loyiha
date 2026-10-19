@@ -240,13 +240,13 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
         out = api.chat(text)
         # The PC window shows the phone's message and follows its task / opens the dashboard.
         api.ui_push({"kind": "phone_chat", "text": text, "reply": out})
-        return _chat_reply(out)
+        return _chat_reply(out, srv, dev)
     if route == "/api/v1/confirm":
         body = _json_body(h)
         out = api.confirm_ai(str(body.get("token", "")), bool(body.get("yes")))
         api.ui_push({"kind": "phone_chat", "text": "Ha" if body.get("yes") else "Yo‘q",
                      "reply": out})  # fmt: skip
-        return _chat_reply(out)
+        return _chat_reply(out, srv, dev)
     if route == "/api/v1/tasks":
         limit = max(1, min(int((q.get("limit") or ["20"])[0]), 100))
         tasks = api.list_tasks()[:limit]
@@ -302,8 +302,14 @@ def _route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list
     raise ApiError("NOT_FOUND")
 
 
-def _chat_reply(out: dict[str, Any]) -> dict[str, Any]:
+def _chat_reply(out: dict[str, Any], srv: Any = None, dev: Any = None) -> dict[str, Any]:
     reply: dict[str, Any] = {"reply": out.get("reply", ""), "confirm": None, "task": None}
+    if out.get("image") and srv is not None and dev is not None:
+        from nexvara.remote_v1_sections import SHARED_TTL, _grant
+
+        # ✨ a picture made from the phone: it may be downloaded with GET /api/v1/files
+        _grant(srv, dev, str(out["image"]), "shared", SHARED_TTL)
+        reply["image"] = {"path": str(out["image"]), "name": Path(out["image"]).name}
     if out.get("confirm"):
         reply["confirm"] = {"token": out["confirm"], "text": out.get("reply", "")}
     if out.get("task"):

@@ -49,6 +49,13 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         "free_mode": True,
         "voice_consent": False,  # spoken commands go to Gemini only after the user agreed
         "self_repair": True,  # a failed command: the AI reads the error and tries again (2x)
+        # 🧠 per direction: {"mode": "auto"|"manual", "provider", "model"} (ai/capabilities.py)
+        "capabilities": {},
+        "catalog": {},  # provider -> direction -> model ids of the account (key check)
+        "catalog_state": {},  # provider -> checked time, source, lifecycle and changes
+        "free_tier_confirmed": False,  # the owner checked this key's tier in AI Studio
+        "speak_replies": False,  # 🔊 read every answer aloud
+        "voice": "",  # TTS voice ("" = the provider's default)
         "send_textbook_text": True,
         "models": {},  # provider -> tier -> model id (filled when a key is checked)
         "checked": {},  # provider -> {"at": time, "models": n} of the last key check
@@ -103,7 +110,14 @@ class Settings:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self.path.with_suffix(".tmp")
             tmp.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
-            tmp.replace(self.path)
+            for attempt in range(20):  # Windows: a reader may hold the file open for a moment
+                try:
+                    tmp.replace(self.path)
+                    break
+                except PermissionError:
+                    if attempt == 19:
+                        raise
+                    time.sleep(0.05)
             return merged
 
 

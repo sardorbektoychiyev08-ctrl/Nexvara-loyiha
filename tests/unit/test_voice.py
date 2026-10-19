@@ -29,7 +29,7 @@ def _router(tmp_path, keys, answer):
         Ledger(tmp_path / "l.db"),
         factory=factory,
     )
-    r.settings.update({"ai": {"enabled": True}})
+    r.settings.update({"ai": {"enabled": True, "free_tier_confirmed": "gemini" in keys}})
     return r, wires
 
 
@@ -54,9 +54,30 @@ def test_voice_needs_consent_then_goes_to_gemini_only(tmp_path):
     assert "qisqa" in api.voice_command(base64.b64encode(b"x").decode())["error"]
 
 
-def test_voice_without_gemini_key_explains(tmp_path):
+def test_voice_with_only_openai_uses_its_transcription(tmp_path):
+    """No Gemini: the STT direction picks OpenAI's transcription endpoint (fake HTTP)."""
+    from nexvara.ai.media import OpenAIMedia
     from nexvara.app.api import Api
 
     r, wires = _router(tmp_path, {"openai": "sk-test-openai-123456"}, "x")
+    from test_ai_media import Net
+
+    ears = Net({"/audio/transcriptions": {"text": "Savdo.xlsx ni och"}})
+    r.media_factory = lambda name, key: OpenAIMedia(key, opener=ears)
+    app = Api(overrides={"ai_router": r})
+    assert app.voice_command(AUDIO, consent=True)["needs_approval"]
+    out = app.voice_command(AUDIO, consent=True, approved=True)
+    assert out == {"ok": True, "text": "Savdo.xlsx ni och"} and not wires
+    assert (
+        ears.urls[0].endswith("/audio/transcriptions")
+        and b"gpt-4o-mini-transcribe" in ears.bodies[0]
+    )
+    assert r.ledger.recent()[0]["purpose"] == "Ovoz → matn"
+
+
+def test_voice_without_any_listening_ai_explains(tmp_path):
+    from nexvara.app.api import Api
+
+    r, wires = _router(tmp_path, {"deepseek": "sk-test-deepseek-12345"}, "x")
     out = Api(overrides={"ai_router": r}).voice_command(AUDIO, consent=True)
-    assert not out["ok"] and "Gemini kaliti kerak" in out["error"] and not wires
+    assert not out["ok"] and "kaliti kerak" in out["error"] and not wires

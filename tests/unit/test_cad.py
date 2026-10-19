@@ -72,6 +72,26 @@ def test_any_dxf_becomes_pdf_and_png(tmp_path):
     out = cad.render(cad.read(p), tmp_path / "c.pdf", tmp_path / "c.png")
     assert open(out["pdf"], "rb").read(5) == b"%PDF-"
     assert open(out["png"], "rb").read(4) == b"\x89PNG"
+    # Colour «7» (white in AutoCAD, the default of layer 0) prints black on the white paper;
+    # other colours stay (a white-on-white picture was once saved for a phone sketch).
+    import ezdxf
+    from PIL import Image
+
+    d = ezdxf.new()
+    d.modelspace().add_lwpolyline([(0, 0), (100, 0), (100, 50)])
+    d.modelspace().add_line((0, 20), (100, 20), dxfattribs={"color": 1})
+    cad.render(d, None, tmp_path / "w.png")
+    pix = {c for _n, c in Image.open(tmp_path / "w.png").convert("RGB").getcolors(1 << 20)}
+    assert any(max(c) < 60 for c in pix)  # black
+    assert any(r > 200 and g < 60 and b < 60 for r, g, b in pix)  # red
+    # Word: a real .docx with the drawing picture, wide drawings on a landscape A4
+    import zipfile
+
+    w = cad.png_to_docx(tmp_path / "c.png", tmp_path / "c.docx", "Plastina <1>")
+    with zipfile.ZipFile(w) as z:
+        assert z.read("word/media/chizma.png")[:4] == b"\x89PNG"
+        xml = z.read("word/document.xml").decode("utf-8")
+    assert 'w:orient="landscape"' in xml and "Plastina &lt;1&gt;" in xml
     broken = tmp_path / "buzuq.dxf"
     broken.write_text("bu dxf emas", encoding="utf-8")
     from nexvara.core.task import UserError
@@ -187,6 +207,10 @@ def test_chat_turns_a_dxf_into_pdf(tmp_path, monkeypatch):
     out = api.chat(f"«{p}» ni PDF qil")
     t = _done(api, out)
     assert t.result["pdf"].endswith(".pdf") and open(t.result["pdf"], "rb").read(4) == b"%PDF"
+    out = api.chat(f"«{p}» ni Word qil")
+    assert "Word" in out["reply"]
+    t = _done(api, out)
+    assert t.result["docx"].endswith(".docx") and open(t.result["docx"], "rb").read(2) == b"PK"
     api.set_context_file(str(p))
     t = _done(api, api.chat("shu DXF faylni ko‘rsat"))
     assert "obyekt" in t.result["report"][0]

@@ -321,3 +321,24 @@ body.cad-compact .cad-log { height: 32px; }
 .cad-pal-sw.bylayer { width: 22px; height: 22px; background: linear-gradient(135deg, transparent 45%, var(--muted) 45% 55%, transparent 55%) !important; }
 .cad-pal-sw.on, .cad-pal-sw:hover { outline: 2px solid var(--accent, #6366f1); outline-offset: 1px; }
 .cad-pal-info { color: var(--muted); }
+
+/* chat tools: 🎤 🔊 🖼️ 📷 ✨ 🎧 🧠 */
+.chat-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.chat-tools .btn { font-size: 13px; padding: 6px 10px; }
+.chat-tools .btn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.msg.ai-image { padding: 6px; margin: 0; }
+.msg.ai-image img { max-width: 360px; width: 100%; border-radius: 10px; display: block; }
+.cam-modal { position: fixed; inset: 60px; z-index: 60; display: flex; flex-direction: column; gap: 10px;
+  padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; }
+.cam-modal video { flex: 1; min-height: 0; width: 100%; background: #000; border-radius: 10px; object-fit: contain; }
+.caps-pop { position: absolute; right: 24px; bottom: 110px; z-index: 40; width: min(760px, calc(100vw - 48px));
+  max-height: 70vh; overflow: auto; box-shadow: 0 12px 36px rgba(0,0,0,.35); }
+#page-chat { position: relative; }
+.cap-row { display: grid; grid-template-columns: 210px 110px 1fr 1fr; gap: 6px; align-items: center; padding: 6px 0;
+  border-bottom: 1px solid var(--border); }
+.cap-row select { min-width: 0; }
+.cap-label { font-weight: 600; font-size: 13px; }
+.cap-info { grid-column: 2 / -1; }
+.cap-info.bad { color: var(--danger, #ef4444); }
+.ai-caps-title { margin: 16px 0 4px; font-size: 15px; }
+@media (max-width: 720px) { .cap-row { grid-template-columns: 1fr 1fr; } .cap-info { grid-column: 1 / -1; } }
