@@ -20,7 +20,7 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 | Test | Natija |
 |---|---|
 | ruff + format | PASS |
-| `.scripts	est.ps1` (Office’siz) | PASS — 503 passed, 85 skipped; oyna smoke PASS |
+| `scripts/test.ps1` (Office’siz) | PASS — 503 passed, 85 skipped; oyna smoke PASS |
 | Yangi: telefondan ZIP/unzip marshruti, `nudge` dx uzatilishi va chegarasi, chizma → docx (albom, sarlavha), chat «Word qil», telefon chizmasida docx | PASS |
 | Ekran rasmida kursor (haqiqiy ekran, bir marta) | PASS (ko‘z bilan tekshirildi) |
 | Android assembleDebug + unit testlar | PASS — APK SHA-256 `9a8c494741cddf79195fcd47ed4e147681f8d5ec16104e22c2003ed1d9f30d02` |
