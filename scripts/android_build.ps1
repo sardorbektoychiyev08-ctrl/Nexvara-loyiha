@@ -5,6 +5,12 @@
 param([switch]$Release)
 $root = Split-Path -Parent $PSScriptRoot
 $tools = Join-Path $root ".tools"
+# The toolchain may live in the Android worktree (.worktrees\android\.tools) instead.
+if (-not (Test-Path (Join-Path $tools "jdk"))) {
+    $alt = Join-Path $root ".worktrees\android\.tools"
+    if (Test-Path (Join-Path $alt "jdk")) { $tools = $alt }
+    else { Write-Host "ANDROID: .tools topilmadi (docs/ANDROID_HANDOFF.md)" -ForegroundColor Red; exit 1 }
+}
 $env:JAVA_HOME = (Get-ChildItem (Join-Path $tools "jdk") -Directory | Select-Object -First 1).FullName
 $env:GRADLE_USER_HOME = Join-Path $tools "gradle-home"
 $env:ANDROID_USER_HOME = Join-Path $tools "android-home"
