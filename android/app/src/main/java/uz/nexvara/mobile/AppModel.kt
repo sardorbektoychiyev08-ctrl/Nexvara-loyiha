@@ -52,6 +52,9 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     var themeMode by mutableStateOf(ThemeMode.entries.getOrElse(prefs.getInt("theme", 0)) { ThemeMode.System })
         private set
     var speakReplies by mutableStateOf(prefs.getBoolean("speak", false)); private set
+    /** 🔊 read answers with the PC's AI voice (Uzbek sounds natural) instead of the phone's own. */
+    var aiVoice by mutableStateOf(prefs.getBoolean("ai_voice", false)); private set
+    fun useAiVoice(v: Boolean) { aiVoice = v; prefs.edit().putBoolean("ai_voice", v).apply() }
     var russian by mutableStateOf(prefs.getBoolean("ru", false)); private set
     fun useRussian(v: Boolean) { russian = v; prefs.edit().putBoolean("ru", v).apply() }
     var voiceLang by mutableStateOf(prefs.getString("voice_lang", "uz-UZ") ?: "uz-UZ"); private set
@@ -87,6 +90,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     var onUploaded: ((String) -> Unit)? = null  // a tool waiting for the uploaded file's PC path
     val tools = Tools()
     val cad = CadState()
+    val aiv = AiVoiceState()
     val schedule = Schedule(app)
     var favorites by mutableStateOf(secure.favorites()); private set
     fun toggleFavorite(text: String) {
@@ -411,6 +415,10 @@ class AppModel(app: Application) : AndroidViewModel(app) {
             ?.takeIf { it.token.isNotBlank() }
         track(r.optJSONObject("task"))
         if (r.optBoolean("open_bi")) notice = "Dashboard kompyuter ekranida ochildi"
+        r.optJSONObject("image")?.let { img ->  // ✨ a picture made on the PC: open it here
+            record("🖼️ Rasm tayyor: ${img.optString("name")}", false)
+            previewFile(img.optString("path"))
+        }
     }
 
     fun answer(yes: Boolean) {

@@ -176,6 +176,7 @@ class Api(
             return {"reply": "Bu API kalitga o‘xshaydi. Kalitni chatga yozmang: u Sozlamalar → AI "
                     "bo‘limida kiritiladi va Windows Credential Manager’da saqlanadi. Bu xabar "
                     "saqlanmadi."}  # fmt: skip
+        self._router()._last_call.value = None
         mem = self._mem()
         if mem is not None:
             mem.log_chat("user", text)
@@ -190,6 +191,8 @@ class Api(
         if mem is not None:
             mem.log_chat("nexvara", out.get("reply", ""))
         self._ctx.add_turn("nexvara", out.get("reply", ""))
+        if choice := getattr(self._router()._last_call, "value", None):
+            out["ai"] = choice
         return out
 
     def _chat_inner(self, text: str, _use_ai: bool = True) -> dict[str, Any]:
@@ -229,6 +232,15 @@ class Api(
         # A named file means an Office command, whatever words its path contains
         # ("D:\Testlar\hisobot.xlsx" is not a request for a test).
         if find_file(text):
+            # Part of the request not understood offline («rasmiy ariza ko‘rinishiga keltir»,
+            # «mayda yozuvlarni kattalashtir» — live check 2026-10-19: only the PDF was made):
+            # with AI on, the whole request goes to the planner, which rewrites it into
+            # commands NEXVARA knows, instead of silently dropping that part.
+            from nexvara.agent.parse import parse_command
+
+            pre = parse_command(_BACKGROUND.sub("", text), self._context_file)
+            if pre is not None and pre.unknown and _use_ai and self._ai_ready():
+                return self._chat_ai(text)
             command = self._chat_command(text)
             if command is not None:
                 return command
@@ -438,6 +450,12 @@ class Api(
             else:
                 ans = features.chat_reply(router, text, approved, facts=facts, recall=recall)
         except NeedsConfirmation as e:
+            if approved:
+                return {
+                    "reply": "Oldingi model javob bermadi. Qimmatroq model uchun "
+                    f"yangi tanlov kerak: {e.estimate.describe()}. "
+                    "🧠 menyusida uni qo‘lda tanlab, so‘rovni qayta yuboring."
+                }
             ask = self._ask("chat", text, e.estimate)
             return {"reply": ask["text"], "confirm": ask["token"]}
         except UserError as e:
@@ -450,7 +468,10 @@ class Api(
 
     def confirm_ai(self, token: str, yes: bool = True) -> dict[str, Any]:
         """The user's "Ha"/"Yo‘q" on a pending request (paid AI call or a new rule)."""
+        self._router()._last_call.value = None
         out = self._confirm(token, yes)
+        if choice := getattr(self._router()._last_call, "value", None):
+            out["ai"] = choice
         mem = self._mem()
         if mem is not None:
             mem.log_chat("user", "Ha" if yes else "Yo‘q")

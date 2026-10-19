@@ -102,7 +102,7 @@ def make(tmp_path, keys, **ai):
     r = AiRouter(Settings(tmp_path / "s.json"), MemoryKeyStore(keys), Ledger(tmp_path / "l.db"),
                  factory=lambda n, k: texts.setdefault(n, TextFake(n)),
                  media_factory=lambda n, k: MediaFake(n, log, fails.get(n)))  # fmt: skip
-    r.settings.update({"ai": {"enabled": True, **ai}})
+    r.settings.update({"ai": {"enabled": True, "free_tier_confirmed": "gemini" in keys, **ai}})
     r.texts, r.log, r.fails = texts, log, fails
     return r
 
@@ -116,7 +116,7 @@ KEYS = {"openai": "sk-test-openai-123456", "gemini": "AIza-test-gemini-1234567",
 
 def test_registry_matches_official_capabilities():
     assert caps.supports("openai", "image") and caps.supports("gemini", "image")
-    assert not caps.supports("anthropic", "image") and not caps.supports("deepseek", "vision")
+    assert not caps.supports("anthropic", "image") and caps.supports("deepseek", "vision")
     assert caps.supports("anthropic", "vision") and not caps.supports("anthropic", "tts")
     assert caps.supports("gemini", "realtime") and caps.supports("openai", "realtime")
     assert not caps.supports("deepseek", "stt")
@@ -154,7 +154,7 @@ def test_auto_prefers_free_then_cheapest(tmp_path):
     assert img[0][1]["model"] == "gpt-image-1-mini"  # $0.011 < Gemini $0.0336
     assert [p for p, _ in img].count("gemini") >= 1  # the fallback list
     r.settings.update({"ai": {"free_mode": False}})
-    assert r.candidates("tts")[0][1]["free"] is False
+    assert r.candidates("tts")[0][0] == "openai"
 
 
 def test_auto_image_asks_first_then_runs_and_records(tmp_path):
@@ -169,10 +169,12 @@ def test_auto_image_asks_first_then_runs_and_records(tmp_path):
 
 
 def test_auto_falls_back_when_provider_is_busy_not_when_key_is_wrong(tmp_path):
-    r = make(tmp_path, KEYS, fallback=True)
+    r = make(tmp_path, KEYS)
+    r.settings.update({"ai": {"fallback": True}})
     r.fails["openai"] = AiError("band", retryable=True)
-    out, est = r.media("image", 1, lambda c, m: c.generate_image(m, "x"), approved=True)
-    assert est.provider == "gemini" and [x[0] for x in r.log] == ["openai", "gemini"]
+    with pytest.raises(NeedsConfirmation):
+        r.media("image", 1, lambda c, m: c.generate_image(m, "x"), approved=True)
+    assert [x[0] for x in r.log] == ["openai"]
     r.log.clear()
     r.fails["openai"] = AiError("kalit noto‘g‘ri")
     with pytest.raises(AiError, match="kalit"):
@@ -204,7 +206,8 @@ def test_manual_media_is_never_swapped(tmp_path):
     r = make(tmp_path, KEYS)
     r.set_capability("image", "manual", "gemini", "gemini-3-pro-image")
     assert r.candidates("image") == [("gemini", {**caps.find("gemini", "image",
-                                                               "gemini-3-pro-image")})]  # fmt: skip
+                                                               "gemini-3-pro-image"),
+                                                 "free": False})]  # fmt: skip
     r.fails["gemini"] = AiError("band", retryable=True)
     with pytest.raises(AiError):  # MANUAL: no fallback to OpenAI
         r.media("image", 1, lambda c, m: c.generate_image(m, "x"), approved=True)
@@ -245,9 +248,9 @@ def test_manual_text_and_vision_models_are_used_as_chosen(tmp_path):
     assert r.complete("vision", "s", pic, approved=True).text == "anthropic:claude-sonnet-5-5"
     r.set_capability("text", "manual", "deepseek", "deepseek-flash")
     r.set_capability("vision", "auto")
-    with pytest.raises(AiUnavailable, match="rasmni o‘qiy olmaydi"):
+    with pytest.raises(AiUnavailable, match="katalogda mavjud emas"):
         r.settings.update({"ai": {"capabilities": {**r.cap_settings(), "vision": {
-            "mode": "manual", "provider": "deepseek", "model": "deepseek-flash"}}}})  # fmt: skip
+            "mode": "manual", "provider": "deepseek", "model": "removed-model"}}}})  # fmt: skip
         r.complete("vision", "s", pic, approved=True)
 
 
@@ -255,11 +258,24 @@ def test_auto_text_escalates_when_the_answer_is_not_usable(tmp_path):
     r = make(tmp_path, {"anthropic": KEYS["anthropic"]})
     ok = r.complete("chat", "s", [{"role": "user", "content": "x"}], approved=True,
                     accept=lambda t: "sonnet" in t)  # fmt: skip
-    assert ok.text == "anthropic:claude-sonnet-5-5"  # cheap answer rejected → balanced tier
+    assert ok.text == "anthropic:claude-haiku-5-5"  # no dearer retry on first approval
+    assert len(r.texts["anthropic"].calls) == 1
     r.set_capability("text", "manual", "anthropic", "claude-haiku-5-5")
     kept = r.complete("chat", "s", [{"role": "user", "content": "x"}], approved=True,
                       accept=lambda t: "sonnet" in t)  # fmt: skip
     assert kept.text == "anthropic:claude-haiku-5-5"  # MANUAL: never swapped
+
+
+def test_free_text_prefers_stronger_model_at_same_cost(tmp_path):
+    r = make(tmp_path, {"gemini": KEYS["gemini"]})
+    reply = r.complete(
+        "chat",
+        "s",
+        [{"role": "user", "content": "x"}],
+        accept=lambda text: "gemini-3.8-flash" in text,
+    )
+    assert reply.model == "gemini-3.8-flash" and reply.cost == 0
+    assert [c["model"] for c in r.texts["gemini"].calls] == ["gemini-3.8-flash"]
 
 
 def test_status_for_the_menu(tmp_path):
@@ -384,7 +400,7 @@ def test_capability_menu_api(tmp_path, monkeypatch):
     assert not bad["ok"] and "yo‘q" in bad["error"]
     good = api.ai_set_capability("tts", "manual", "openai", "gpt-4o-mini-tts")
     assert good["ok"] and good["capabilities"]["tts"]["mode"] == "manual"
-    assert api.ai_speak("salom")["provider"] == "openai"
+    assert api.ai_speak("salom", approved=True)["provider"] == "openai"
 
 
 def test_camera_photo_becomes_the_chat_photo(tmp_path, monkeypatch):
@@ -432,3 +448,83 @@ def test_fallback_off_or_free_mode_never_moves_to_another_paid_provider(tmp_path
     with pytest.raises(AiError):
         r.media("tts", 0.2, lambda c, m: c.speak(m, "salom"))
     assert [x[0] for x in r.log] == ["gemini", "gemini"]  # both free Gemini voices, no OpenAI
+
+
+def test_gemini_picture_is_jpeg_and_saved_as_jpg(tmp_path, monkeypatch):
+    """Live check 2026-10-19: Gemini image models accept only response mime image/jpeg."""
+    jpg = b"\xff\xd8\xff\xe0" + b"\0" * 32
+    net = Net({"/interactions": {"steps": [{"content": [
+        {"type": "image", "data": base64.b64encode(jpg).decode()}]}]}})  # fmt: skip
+    out = GeminiMedia("AIza-test-gemini-1234567", opener=net).generate_image(
+        "gemini-3.1-flash-lite-image", "x"
+    )
+    assert json.loads(net.bodies[0])["response_format"]["mime_type"] == "image/jpeg"
+    api, r = _api(tmp_path, monkeypatch)
+    r.set_capability("image", "manual", "gemini", "gemini-3.1-flash-lite-image")
+    r.media_factory = lambda n, k: type("M", (), {"generate_image": lambda self, m, p: out})()
+    ask = api.chat("rasm yarat: olma")
+    done = api.confirm_ai(ask["confirm"], True)
+    assert done["image"].endswith(".jpg") and done["image_data"].startswith("data:image/jpeg")
+
+
+def test_model_without_free_tier_gets_a_clear_message():
+    """Live check 2026-10-19: a Free Tier key gets 429 «limit: 0» for Gemini image models."""
+
+    class Limit0(Net):
+        def __call__(self, req, timeout):
+            self.urls.append(req.full_url)
+            msg = "Rate limit exceeded for model x (limit: 0 input tokens per minute on Free Tier)."
+            body = json.dumps({"error": {"message": msg}}).encode()
+            raise urllib.error.HTTPError(req.full_url, 429, "x", {}, io.BytesIO(body))
+
+    net = Limit0({})
+    with pytest.raises(AiError, match="bepul darajasida") as e:
+        GeminiMedia("AIza-test-gemini-1234567", opener=net).generate_image(
+            "gemini-3.1-flash-image", "x"
+        )
+    assert e.value.retryable and len(net.urls) == 1  # no pointless retries
+
+
+def test_chat_answers_have_no_markdown_stars(tmp_path):
+    """Live check 2026-10-19: a vision answer came as «**NEXVARA 2026**» — shown as stars."""
+    r = make(tmp_path, {"anthropic": KEYS["anthropic"]})
+
+    class Bold(TextFake):
+        def complete(self, model, system, messages, max_tokens, effort="medium"):
+            return Reply("Rasmda **NEXVARA 2026** va __qizil__ shakl bor.", model, 10, 10)
+
+    r.factory = lambda n, k: Bold(n)
+    out = r.complete("vision", "s", [{"role": "user", "content": "nima?"}], approved=True)
+    assert out.text == "Rasmda NEXVARA 2026 va qizil shakl bor."
+    plan = r.complete("plan", "s", [{"role": "user", "content": "x"}], approved=True)
+    assert "**" in plan.text  # JSON/plans are left untouched
+
+
+def test_openai_transcription_gets_the_uzbek_hint(tmp_path, monkeypatch):
+    """Live check 2026-10-19: without a hint OpenAI wrote Uzbek speech in Kyrgyz-like Cyrillic."""
+    api, r = _api(tmp_path, monkeypatch, {"openai": KEYS["openai"]})
+    seen = {}
+
+    class Ear(MediaFake):
+        def transcribe(self, model, audio, mime="audio/wav", prompt=""):
+            seen["prompt"] = prompt
+            return "Бугун соат тўққизда дарс бор"
+
+    r.media_factory = lambda n, k: Ear(n, [])
+    text = api._transcribe(base64.b64encode(WAV * 100).decode(), "audio/wav", "x", approved=True)
+    assert "lotin" in seen["prompt"] and text.startswith("Bugun soat to")
+
+
+def test_streamed_wav_gets_real_sizes_for_android():
+    """Live check 2026-10-19: OpenAI's WAV said 0xFFFFFFFF sizes; Android MediaPlayer refused it."""
+    import struct
+
+    from nexvara.ai.media import fix_wav_sizes, wav_from_pcm
+
+    good = wav_from_pcm(b"\x01\x00" * 50)
+    bad = bytearray(good)
+    struct.pack_into("<I", bad, 4, 0xFFFFFFFF)
+    struct.pack_into("<I", bad, 40, 0xFFFFFFFF)
+    assert fix_wav_sizes(bytes(bad)) == good
+    net = Net({"/audio/speech": bytes(bad)})
+    assert OpenAIMedia("sk-test-openai-123456", opener=net).speak("gpt-4o-mini-tts", "x") == good

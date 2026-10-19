@@ -17,14 +17,33 @@ async function mediaLoad() {
   mediaBtn("#chat-speak", media.speak);
   const t = media.caps.capabilities.text;
   $("#chat-models").textContent = `🧠 ${t.mode === "manual" ? t.model : "AUTO"}`;
+  mediaPreview();
   const panel = $("#ai-caps-settings");
   if (panel) renderCaps(panel);
 }
 
+async function mediaPreview() {
+  if (!api() || !api().ai_preview) return;
+  const text = $("#chat-text").value;
+  const r = await api().ai_preview(text, "text");
+  const rows = Object.entries(media.caps?.catalog || {}).filter(([, c]) => c.checked_at);
+  const latest = rows.length ? Math.max(...rows.map(([, c]) => c.checked_at)) : 0;
+  const stamp = latest ? new Date(latest * 1000).toLocaleString() : "tekshirilmagan";
+  $("#chat-ai-meta").textContent = r.ok
+    ? `${r.mode} · ${r.provider} · ${r.model} · ${r.free ? "FREE" : "PAID"} · taxmin ≈$${r.estimated_cost.toFixed(4)} · katalog: ${stamp}${r.catalog?.stale ? " (eskirgan)" : ""}`
+    : `${r.mode} · ${r.error} · katalog: ${stamp}`;
+}
+let mediaPreviewTimer;
+$("#chat-text").addEventListener("input", () => {
+  clearTimeout(mediaPreviewTimer); mediaPreviewTimer = setTimeout(mediaPreview, 450);
+});
+
 // ---- 🔊 speaking ----
 async function mediaSpeak(text) {
   if (!text) return;
-  const r = await api().ai_speak(text);
+  let r = await api().ai_speak(text, false, !!media.live);
+  if (r.needs_approval && window.confirm(`${r.error}\nOvozli javob uchun pullik so‘rovni tasdiqlaysizmi?`))
+    r = await api().ai_speak(text, true, !!media.live);
   if (!r.ok) { addMsg(`🔊 ${r.error}`, false); if (media.live) liveListen(); return; }
   if (media.audio) media.audio.pause();
   media.audio = new Audio(`data:${r.mime};base64,${r.audio}`);
@@ -34,6 +53,11 @@ async function mediaSpeak(text) {
 
 // Called by handleReply for every answer.
 window.mediaOnReply = (r) => {
+  if (r.ai) {
+    const a = r.ai;
+    $("#chat-ai-meta").textContent = `${a.mode} · ${a.provider} · ${a.model} · ${a.free ? "FREE" : "PAID"} · taxmin ≈$${a.estimated_cost.toFixed(4)} · ` +
+      (a.cost == null ? "haqiqiy sarf noma’lum" : `token bo‘yicha hisob ≈$${a.cost.toFixed(4)}`);
+  }
   if (r.image_data) {
     const fig = el("figure", "msg ai-image");
     const img = el("img"); img.src = r.image_data; img.alt = "AI yaratgan rasm";
@@ -167,8 +191,15 @@ $("#chat-models").addEventListener("click", async () => {
   const head = el("div", "row"); head.appendChild(el("b", "", "🧠 AI modeli: AUTO yoki qo‘lda"));
   const x = el("button", "btn small-btn", "Yopish"); x.addEventListener("click", () => pop.remove()); head.appendChild(x);
   const body = el("div"); renderCaps(body);
-  pop.append(head, body); $("#page-chat").appendChild(pop);
+  const refresh = el("button", "btn", "Hozir yangilash");
+  refresh.addEventListener("click", async () => {
+    refresh.disabled = true;
+    try { await api().ai_refresh_catalog(); await mediaLoad(); renderCaps(body); }
+    finally { refresh.disabled = false; }
+  });
+  pop.append(head, refresh, body); $("#page-chat").appendChild(pop);
 });
+window.mediaLoad = mediaLoad;
 
 window.addEventListener("pywebviewready", () => setTimeout(mediaLoad, 400));
 setTimeout(mediaLoad, 1500);

@@ -86,8 +86,8 @@ def test_ai_test_in_word_with_fake_provider(data_dir, tmp_path):
             Fake.calls += 1
             return Reply(json.dumps(questions), model, 2000, 1500)
 
-        def list_models(self):
-            return []
+        def list_models(self):  # the account's models (the key check needs a real list)
+            return ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"]
 
     router = AiRouter(
         Settings(tmp_path / "s.json"), MemoryKeyStore(), Ledger(tmp_path / "a.db"),
@@ -109,7 +109,9 @@ def test_ai_test_in_word_with_fake_provider(data_dir, tmp_path):
          "O‘zgarmas", "O‘lchovsiz"], "answer": 0, "page": 3, "evidence": evidence}
         for i in range(10)
     ]  # fmt: skip
-    reply = api.chat("AI bilan 7-sinf fizika kuch 6 ta test tuz")
+    ask = api.chat("AI bilan 7-sinf fizika kuch 6 ta test tuz")
+    assert ask.get("confirm") and "$" in ask["reply"] and Fake.calls == 0  # price, then «Ha»
+    reply = api.confirm_ai(ask["confirm"], True)
     assert "task" in reply, reply
     task = runner.get(reply["task"]["id"])
     assert task.wait(300)

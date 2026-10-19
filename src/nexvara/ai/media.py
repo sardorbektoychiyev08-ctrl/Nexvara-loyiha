@@ -45,6 +45,13 @@ def _http(opener, url: str, headers: dict[str, str], data: bytes | None, label: 
                               f"{detail}".strip()) from e  # fmt: skip
             if e.code == 402:
                 raise AiError(f"{label} hisobida mablag‘ yetarli emas.") from e
+            if e.code == 429 and "limit: 0" in detail:  # the model has no free tier
+                raise AiError(
+                    f"{label}: bu model hisobingizning bepul darajasida (Free Tier) ishlamaydi — "
+                    "limit 0. Pullik model uchun AI Studio → Billing kerak; NEXVARA boshqa ulangan "
+                    "AI’dan foydalanishi mumkin.",
+                    retryable=True,
+                ) from e
             if (e.code == 429 or e.code >= 500) and attempt < 2:
                 time.sleep(2**attempt)
                 continue
@@ -87,6 +94,25 @@ def _multipart(fields: dict[str, str], files: list[tuple[str, str, str, bytes]])
     return bytes(out), f"multipart/form-data; boundary={boundary}"
 
 
+def fix_wav_sizes(wav: bytes) -> bytes:
+    """A streamed WAV says «size unknown» (0xFFFFFFFF) in its header. Browsers play it, Android's
+    MediaPlayer refuses (live check 2026-10-19 on the phone): write the real sizes."""
+    import struct
+
+    if wav[:4] != b"RIFF" or wav[8:12] != b"WAVE":
+        return wav
+    out = bytearray(wav)
+    struct.pack_into("<I", out, 4, len(out) - 8)
+    pos = 12
+    while pos + 8 <= len(out):
+        cid, size = bytes(out[pos : pos + 4]), struct.unpack_from("<I", out, pos + 4)[0]
+        if cid == b"data":
+            struct.pack_into("<I", out, pos + 4, len(out) - pos - 8)
+            break
+        pos += 8 + size + (size & 1)
+    return bytes(out)
+
+
 def wav_from_pcm(pcm: bytes, rate: int = 24000) -> bytes:
     import struct
 
@@ -122,7 +148,7 @@ class OpenAIMedia:
     def generate_image(self, model: str, prompt: str, size: str = "1024x1024",
                        quality: str = "medium") -> bytes:  # fmt: skip
         body = {"model": model, "prompt": prompt, "n": 1, "size": size, "quality": quality,
-                "output_format": "png"}  # fmt: skip
+                "output_format": "png", "background": "opaque"}  # fmt: skip
         raw = _http(self._open, self.base + "/images/generations",
                     {**self._auth(), "Content-Type": "application/json"},
                     json.dumps(body).encode("utf-8"), self.label)  # fmt: skip
@@ -141,9 +167,10 @@ class OpenAIMedia:
 
     def speak(self, model: str, text: str, voice: str = "marin") -> bytes:
         body = {"model": model, "input": text, "voice": voice, "response_format": "wav"}
-        return _http(self._open, self.base + "/audio/speech",
-                     {**self._auth(), "Content-Type": "application/json"},
-                     json.dumps(body).encode("utf-8"), self.label)  # fmt: skip
+        wav = _http(self._open, self.base + "/audio/speech",
+                    {**self._auth(), "Content-Type": "application/json"},
+                    json.dumps(body).encode("utf-8"), self.label)  # fmt: skip
+        return fix_wav_sizes(wav)
 
     def transcribe(self, model: str, audio: bytes, mime: str = "audio/wav",
                    prompt: str = "") -> str:  # fmt: skip
@@ -192,7 +219,7 @@ class GeminiMedia:
     def _image(self, model: str, parts: list[dict], aspect: str = "1:1") -> bytes:
         data = self._interact({
             "model": model, "input": parts,
-            "response_format": {"type": "image", "mime_type": "image/png", "aspect_ratio": aspect,
+            "response_format": {"type": "image", "mime_type": "image/jpeg", "aspect_ratio": aspect,
                                 "image_size": "1K"},
         })  # fmt: skip
         block = _find_block(data, "image")
@@ -225,7 +252,7 @@ class GeminiMedia:
         audio = base64.b64decode(block["data"])
         if audio[:4] != b"RIFF":  # raw PCM (audio/l16) — wrap it so any player can open it
             audio = wav_from_pcm(audio)
-        return audio
+        return fix_wav_sizes(audio)
 
 
 def _aspect(size: str) -> str:

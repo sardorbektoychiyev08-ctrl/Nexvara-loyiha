@@ -80,7 +80,7 @@ def _api(tmp_path, answer, keys):
     pro = Draftsman(answer)
     r = AiRouter(Settings(tmp_path / "s.json"), MemoryKeyStore(keys), Ledger(tmp_path / "l.db"),
                  factory=lambda n, k: pro)  # fmt: skip
-    r.settings.update({"ai": {"enabled": True}})
+    r.settings.update({"ai": {"enabled": True, "free_tier_confirmed": "gemini" in keys}})
     return Api(overrides={"ai_router": r}, output_dir=tmp_path), pro
 
 

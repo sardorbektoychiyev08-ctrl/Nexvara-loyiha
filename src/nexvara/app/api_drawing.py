@@ -85,22 +85,41 @@ class DrawingApi:
 
         router = self._router()
         if image and self._vision_provider() is None:
-            return {"reply": "Rasmni o‘qiydigan AI ulanmagan: OpenAI, Gemini yoki Claude "
-                    "kalitini kiriting (DeepSeek rasmni o‘qimaydi)."}  # fmt: skip
+            return {"reply": "Rasmni o‘qiydigan AI ulanmagan: OpenAI, Gemini, Claude "
+                    "yoki DeepSeek Flash kalitini kiriting."}  # fmt: skip
         system, msgs = drawing.ai_messages(text, ("image/jpeg", "") if image else None,
                                            last if edit else None)  # fmt: skip
-        try:
-            est = router.estimate(TIER_FOR["drawing"], system, msgs, 5000, self._vision_provider()
-                                  if image else None)  # fmt: skip
-        except AiUnavailable as e:
-            return {"reply": str(e)}
+        from nexvara.ai.router import BudgetExceeded
+
+        # The limits are checked before asking (live check 2026-10-19: «Ha» was asked for
+        # $0.051, then the $0.05 task limit stopped it): the strong model if it fits, else the
+        # balanced one (said openly), else a clear refusal — never a «Ha» that cannot run.
+        est, tier, refusal = None, TIER_FOR["drawing"], ""
+        for t in dict.fromkeys((TIER_FOR["drawing"], "balanced")):
+            try:
+                cand = router.text_candidates(t, system, msgs, 5000,
+                                              "vision" if image else "text")[0]  # fmt: skip
+                router.check_budget(cand, approved=True)
+            except AiUnavailable as e:  # no fitting model at all: say so (no weaker fallback)
+                refusal = refusal or str(e)
+                break
+            except BudgetExceeded as e:  # a strong model exists but the limit is lower
+                refusal = refusal or str(e)
+                continue
+            est, tier = cand, t
+            break
+        if est is None:
+            return {"reply": refusal}
         import uuid
 
         token = uuid.uuid4().hex[:12]
         self._pending[token] = ("drawing", {"text": text, "image": image, "background": bg,
-                                            "edit": edit})  # fmt: skip
+                                            "edit": edit, "tier": tier})  # fmt: skip
         what = f"«{last['title']}» chizmasini o‘zgartiraman" if edit else "Chizmani AI tuzadi"
         reply = f"{what}, NEXVARA chizadi (PDF, PNG, AutoCAD DXF): {est.describe()}."
+        if tier != TIER_FOR["drawing"]:
+            reply += ("\n\nKuchli model limitingizga sig‘madi — muvozanatli model bilan chizaman "
+                      "(limitni Sozlamalar → AI da o‘zgartirish mumkin).")  # fmt: skip
         if image:
             reply += (f"\n\n📷 Rasm: {Path(image).name}. U AI’ga yuboriladi — joylashuv (GPS) va "
                       "boshqa yashirin ma’lumotlari o‘chiriladi, lekin rasmning o‘zini yashirib "
@@ -185,7 +204,8 @@ class DrawingApi:
             with task.step("AI chizmani tuzmoqda") as s:
                 system, msgs = drawing.ai_messages(text, img, previous)
                 reply = router.complete("drawing", system, msgs, max_tokens=8000,
-                                        expected_out=5000, approved=True)  # fmt: skip
+                                        expected_out=5000, approved=True,
+                                        tier=payload.get("tier"))  # fmt: skip
                 spec = drawing.parse_reply(reply.text)
                 s.detail = f"{len(spec['shapes'])} ta element, ≈${reply.cost:.3f}"
             res = self._finish_drawing(task, spec, show)

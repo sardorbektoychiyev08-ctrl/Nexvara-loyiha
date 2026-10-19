@@ -3,6 +3,8 @@ package uz.nexvara.mobile.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -609,6 +611,8 @@ fun MemoryScreen(m: AppModel) {
 @Composable
 fun AiScreen(m: AppModel, act: PhoneActions) {
     val x = LocalExtra.current
+    // fresh numbers every time it opens, and again once the PC connection is up (cold start)
+    LaunchedEffect(m.connected) { m.loadAi(); m.loadAiDirections() }
     val ai = m.ai ?: m.overview?.ai
     SubScreen(m, "AI balans va xarajatlar", "Windows va telefon birgalikda (bitta hisob)",
         actions = { IconButton(onClick = { m.loadAi() }) { Icon(Icons.Default.Refresh, "Yangilash") } }) {
@@ -634,6 +638,7 @@ fun AiScreen(m: AppModel, act: PhoneActions) {
                 ai.warnings.forEach { Text("⚠ $it", color = x.warning, style = MaterialTheme.typography.bodySmall) }
             }
         }
+        item { AiDirectionsPanel(m) }
         items(ai.providers) { p ->
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -812,6 +817,15 @@ fun SettingsScreen(m: AppModel, act: PhoneActions) {
                     }
                     Switch(m.speakReplies, { m.setSpeak(it); if (!it) act.stopSpeaking() })
                 }
+                HorizontalDivider(Modifier.padding(vertical = 10.dp), color = x.cardBorder)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("AI ovozi", style = MaterialTheme.typography.bodyLarge)
+                        Text("Javobni kompyuterdagi AI o‘qiydi (o‘zbekcha tabiiyroq). Gemini bepul; pullik bo‘lsa narxi aytilib so‘raladi.",
+                            style = MaterialTheme.typography.bodySmall, color = x.muted)
+                    }
+                    Switch(m.aiVoice, { m.useAiVoice(it) })
+                }
             }
         }
         item { SectionTitle("Ovoz tili") }
@@ -934,6 +948,52 @@ fun MorningSettings() {
                     .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName)
                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
             }) { Text("Ruxsat berish") }
+        }
+    }
+}
+
+
+/** 🧠 AUTO or a chosen model per direction — the same settings as the PC (shared). */
+@Composable
+fun AiDirectionsPanel(m: AppModel) {
+    val x = LocalExtra.current
+    LaunchedEffect(Unit) { m.loadAiDirections() }
+    Panel {
+        Text("🧠 AI modeli: AUTO yoki qo‘lda", style = MaterialTheme.typography.titleMedium)
+        Text("AUTO — avval bepul, keyin eng arzon mos model. Qo‘lda tanlangan model almashtirilmaydi. Kompyuter bilan bir xil sozlama.",
+            style = MaterialTheme.typography.bodySmall, color = x.muted)
+        if (m.aiv.directions.isEmpty()) Text("Yuklanmoqda…", color = x.muted)
+        m.aiv.directions.forEach { d ->
+            HorizontalDivider(Modifier.padding(vertical = 8.dp), color = x.cardBorder)
+            Text(d.label, style = MaterialTheme.typography.bodyLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilterChip(selected = d.mode == "auto", onClick = { m.setAiDirection(d.id, "auto") }, label = { Text("AUTO") })
+                FilterChip(selected = d.mode == "manual", onClick = {
+                    val o = d.offers.firstOrNull { it.connected && it.models.isNotEmpty() }
+                    if (o != null) m.setAiDirection(d.id, "manual", o.provider, o.models.first())
+                    else m.notice = "Bu yo‘nalish uchun ulangan AI yo‘q (kompyuterda Sozlamalar → AI)"
+                }, label = { Text("Qo‘lda") })
+            }
+            if (d.mode == "manual") {
+                val connected = d.offers.filter { it.connected }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    connected.forEach { o ->
+                        FilterChip(selected = o.provider == d.provider, onClick = {
+                            o.models.firstOrNull()?.let { m.setAiDirection(d.id, "manual", o.provider, it) }
+                        }, label = { Text(o.label) })
+                    }
+                }
+                connected.firstOrNull { it.provider == d.provider }?.let { o ->
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        o.models.forEach { mod ->
+                            FilterChip(selected = mod == d.model, onClick = { m.setAiDirection(d.id, "manual", o.provider, mod) },
+                                label = { Text(mod) })
+                        }
+                    }
+                }
+            } else if (d.autoPick.isNotBlank()) {
+                Text("AUTO hozir: ${d.autoPick}", style = MaterialTheme.typography.bodySmall, color = x.muted)
+            }
         }
     }
 }

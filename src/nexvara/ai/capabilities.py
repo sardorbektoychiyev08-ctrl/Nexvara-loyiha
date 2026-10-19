@@ -15,7 +15,8 @@ Model ids and prices were checked against the official pages on 2026-10-18:
   /v1/audio/transcriptions);
 - Gemini: ai.google.dev/gemini-api/docs/models, /pricing, /image-generation,
   /speech-generation (Interactions API; image models have no free tier, TTS and Flash do).
-Anthropic and DeepSeek have no image, speech or voice models; DeepSeek does not read images.
+Anthropic and DeepSeek have no image generation, speech or voice models; DeepSeek Flash
+accepts image input for analysis.
 A model is offered only if the key check found it in the account's own model list.
 """
 
@@ -34,16 +35,15 @@ CAP_LABELS = {
 }
 
 # provider -> direction -> models, cheapest first. "price": USD per unit (see `unit`);
-# "free": the provider's official free tier covers it (Gemini only).
+# Free eligibility depends on the account, not only the model ID.
 MEDIA: dict[str, dict[str, list[dict[str, Any]]]] = {
     "openai": {
         "image": [
             # per 1024x1024 image, medium quality (official per-image table)
             {"model": "gpt-image-1-mini", "price": 0.011, "unit": "image"},
             {"model": "gpt-image-2", "price": 0.053, "unit": "image"},
-            # 2.5 has no per-image table yet: counted at the highest listed price
-            {"model": "gpt-image-2.5-flare", "price": 0.25, "unit": "image"},
-            {"model": "gpt-image-2.5-sunburst", "price": 0.25, "unit": "image"},
+            {"model": "gpt-image-2.5-flare", "price": None, "unit": "image"},
+            {"model": "gpt-image-2.5-sunburst", "price": None, "unit": "image"},
         ],
         "stt": [
             {"model": "gpt-4o-mini-transcribe", "price": 0.003, "unit": "minute"},
@@ -63,19 +63,19 @@ MEDIA: dict[str, dict[str, list[dict[str, Any]]]] = {
         ],
         # speech is listened to by the free Flash models (audio in a normal request)
         "stt": [
-            {"model": "gemini-3.5-flash-lite", "price": 0.0, "unit": "minute", "free": True},
-            {"model": "gemini-3.8-flash", "price": 0.0, "unit": "minute", "free": True},
+            {"model": "gemini-3.5-flash-lite", "price": None, "unit": "minute", "free": True},
+            {"model": "gemini-3.8-flash", "price": None, "unit": "minute", "free": True},
         ],
         "tts": [
-            {"model": "gemini-3.8-flash-lite-tts", "price": 0.009, "unit": "minute", "free": True},
-            {"model": "gemini-3.8-flash-tts", "price": 0.0135, "unit": "minute", "free": True},
+            {"model": "gemini-3.8-flash-lite-tts", "price": None, "unit": "minute", "free": True},
+            {"model": "gemini-3.8-flash-tts", "price": None, "unit": "minute", "free": True},
         ],  # fmt: skip
         "vision": [],
     },
     "anthropic": {"vision": []},
     "deepseek": {},
 }
-VISION_PROVIDERS = ("openai", "gemini", "anthropic")
+VISION_PROVIDERS = ("openai", "gemini", "anthropic", "deepseek")
 # Default voices (official lists): OpenAI recommends marin/cedar; Gemini has 30 named voices.
 VOICES = {
     "openai": ["marin", "cedar", "alloy", "ash", "ballad", "coral", "echo", "fable", "nova",
@@ -116,7 +116,11 @@ def find(provider: str, cap: str, model: str) -> dict | None:
 
 
 def cost(row: dict, units: float) -> float:
-    return 0.0 if row.get("free") else round(float(row["price"]) * max(units, 0.0), 6)
+    if row.get("free"):
+        return 0.0
+    if row.get("price") is None:
+        raise ValueError(f"«{row['model']}» uchun tasdiqlangan narx yo‘q")
+    return round(float(row["price"]) * max(units, 0.0), 6)
 
 
 def default_settings() -> dict[str, dict[str, str]]:

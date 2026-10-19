@@ -385,6 +385,7 @@ fun ChatScreen(m: AppModel, act: PhoneActions) {
     LaunchedEffect(m.messages.size) { if (m.messages.isNotEmpty()) list.animateScrollToItem(m.messages.size - 1) }
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("AI suhbat", if (m.speakReplies) "Ovozli suhbat yoqilgan" else "Buyruqlar kompyuterda bajariladi") {
+            IconButton(onClick = { m.loadAiDirections(); m.open(Screen.Ai) }) { Text("🧠") }
             IconButton(onClick = { m.setSpeak(!m.speakReplies); if (!m.speakReplies) act.stopSpeaking() }) {
                 Icon(if (m.speakReplies) Icons.Default.RecordVoiceOver else Icons.Default.VoiceOverOff,
                     "Javoblarni ovoz bilan o‘qish", tint = if (m.speakReplies) MaterialTheme.colorScheme.primary else x.muted)
@@ -406,6 +407,18 @@ fun ChatScreen(m: AppModel, act: PhoneActions) {
                 }
             }
             items(m.messages) { msg -> Bubble(msg) { if (msg.mine) m.toggleFavorite(msg.text) else act.copyText(msg.text) } }
+            m.aiv.askSpeak?.let { (said, price) ->
+                item {
+                    Panel {
+                        Text("🔊 Ovozli javob pullik", style = MaterialTheme.typography.titleSmall)
+                        Text(price, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 8.dp)) {
+                            Button(onClick = { m.aiv.askSpeak = null; m.speakAi(said, approved = true) }, modifier = Modifier.weight(1f)) { Text("Ha, o‘qi") }
+                            OutlinedButton(onClick = { m.aiv.askSpeak = null }, modifier = Modifier.weight(1f)) { Text("Yo‘q") }
+                        }
+                    }
+                }
+            }
             m.confirm?.let { c ->
                 item {
                     Panel {

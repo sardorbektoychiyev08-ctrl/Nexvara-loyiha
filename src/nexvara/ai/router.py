@@ -25,6 +25,7 @@ from typing import Any
 
 from nexvara import config
 from nexvara.ai import capabilities as caps
+from nexvara.ai import catalog as model_catalog
 from nexvara.ai import models
 from nexvara.ai.keys import KeyStore, mask
 from nexvara.ai.privacy import Guard
@@ -63,7 +64,7 @@ FREE_PROVIDER = "gemini"  # the only provider with an official free API tier
 LATIN_RULE = (
     "\n\nTIL QOIDASI: javobni faqat o‘zbek tilida, lotin alifbosida yoz (o‘, g‘, sh, ch, ’). "
     "Kirill harflarini ishlatma. Foydalanuvchi boshqa til yoki yozuvni aniq so‘ragan bo‘lsagina "
-    "o‘sha tilda yoz."
+    "o‘sha tilda yoz. Foydalanuvchiga hurmat bilan «siz» deb murojaat qil («sen» emas)."
 )
 _OTHER_SCRIPT = re.compile(
     r"\brus\w*\s+til\w*|\bruscha\b|\bkirill\w*|\bingliz\w*|\benglish\b|"
@@ -226,6 +227,10 @@ class AiRouter:
         self.media_factory = media_factory
         self._balances: dict[str, dict] = {}  # provider -> last real balance (memory only)
         self.last_masked = 0  # personal items hidden in the last request (count only)
+        self._catalog_lock = threading.Lock()
+        self._auto_catalog = factory is None
+        self._catalog_started = False
+        self._last_call = threading.local()
 
     # ----- configuration -----
     def config(self) -> dict[str, Any]:
@@ -237,7 +242,9 @@ class AiRouter:
     def free_active(self) -> bool:
         """Free mode: every request goes to Gemini's free tier (Flash / Flash-Lite), recorded
         at $0, never to a paid provider. On only while a Gemini key is connected."""
-        return bool(self.config().get("free_mode", True)) and bool(self.keys.load(FREE_PROVIDER))
+        cfg = self.config()
+        return (bool(cfg.get("free_mode", True)) and bool(cfg.get("free_tier_confirmed"))
+                and bool(self.keys.load(FREE_PROVIDER)))  # fmt: skip
 
     def provider_name(self) -> str | None:
         """The chosen provider if it has a key, else the first provider that has one."""
@@ -272,23 +279,27 @@ class AiRouter:
         provider = provider or self.provider_name()
         if provider is None:
             raise AiUnavailable("AI kaliti kiritilmagan (Sozlamalar → AI).")
-        free = provider == FREE_PROVIDER and self.free_active() and tier != "special"
-        if free and tier == "powerful" and not model:
-            tier = "balanced"  # Pro has no free tier: Flash does the hard work for free
-        if model:
-            free = free and model in self._free_text_models()
         model = model or self.model_for(provider, tier)
         if model is None:
             raise AiUnavailable(
                 f"{models.PROVIDERS[provider]['label']} hisobida "
                 f"«{models.TIER_LABELS[tier]}» darajasiga mos model topilmadi."
             )
+        free = (
+            provider == FREE_PROVIDER
+            and self.free_active()
+            and tier != "special"
+            and model in self._free_text_models()
+        )
         tin = models.estimate_tokens(system + "".join(m["content"] for m in messages))
         tin += IMAGE_TOKENS * sum(len(m.get("images") or []) for m in messages)
         # Gemini counts 32 tokens per second of audio; 16 kHz 16-bit WAV is 32 000 bytes a second
         tin += sum(len(m["audio"]["data"]) * 3 // 4 // 1000 for m in messages if m.get("audio"))
-        c = 0.0 if free else models.cost(model, provider, tin, expected_out,
-                                         self.config().get("prices"))  # fmt: skip
+        try:
+            c = 0.0 if free else models.cost(model, provider, tin, expected_out,
+                                             self.config().get("prices"))  # fmt: skip
+        except ValueError as e:
+            raise AiUnavailable(str(e) + ". Narx tekshirilmaguncha so‘rov yuborilmaydi.") from e
         return Estimate(provider, model, tier, tin, expected_out, c, free)
 
     def check_budget(self, est: Estimate, approved: bool) -> None:
@@ -323,7 +334,7 @@ class AiRouter:
                 f"Bitta topshiriq limiti (${float(task):.2f}) dan oshadi: bu so‘rov "
                 f"≈${est.cost:.3f}. Limitni Sozlamalar → AI bo‘limida o‘zgartirish mumkin."
             )
-        if not approved and (est.cost > float(cfg["confirm_over_usd"]) or est.tier == "special"):
+        if not approved and (not est.free or est.tier == "special"):
             raise NeedsConfirmation(est)
 
     def complete(
@@ -338,19 +349,35 @@ class AiRouter:
         tier: str | None = None,
         effort: str = "medium",
         accept: Callable[[str], bool] | None = None,
+        capability: str | None = None,
+        provider_override: str | None = None,
     ) -> Reply:
         """`accept`: a check of the answer (e.g. "is it valid JSON"). In AUTO a failed check
         retries once on the next stronger tier, inside the same budget rules."""
         reply = self._complete(purpose, system, messages, max_tokens=max_tokens,
                                expected_out=expected_out, approved=approved, tier=tier,
-                               effort=effort)  # fmt: skip
+                               effort=effort, capability=capability,
+                               provider_override=provider_override)  # fmt: skip
         tier = tier or TIER_FOR.get(purpose, "balanced")
         if accept is None or accept(reply.text) or self.manual("text") or tier not in _TIER_UP:
             return reply
+        next_tier = _TIER_UP[tier]
+        cap = capability or ("vision" if any(m.get("images") for m in messages) else "text")
+        try:
+            next_choice = self.text_candidates(
+                next_tier, system, messages, expected_out or max_tokens // 2, cap, provider_override
+            )[0]
+        except AiUnavailable:
+            return reply
+        first_cost = (getattr(self._last_call, "value", None) or {}).get("estimated_cost", 0)
+        if next_choice.cost > first_cost and not next_choice.free:
+            return reply  # a stronger paid retry exceeds the approved first estimate
         try:
             better = self._complete(purpose, system, messages, max_tokens=max_tokens,
                                     expected_out=expected_out, approved=approved,
-                                    tier=_TIER_UP[tier], effort=effort)  # fmt: skip
+                                    tier=next_tier, effort=effort,
+                                    capability=capability,
+                                    provider_override=provider_override)  # fmt: skip
         except (NeedsConfirmation, BudgetExceeded, AiUnavailable, AiError):
             return reply  # the stronger model is not allowed now: keep the first answer
         better.escalated_from = reply.model  # type: ignore[attr-defined]
@@ -367,6 +394,8 @@ class AiRouter:
         approved: bool = False,
         tier: str | None = None,
         effort: str = "medium",
+        capability: str | None = None,
+        provider_override: str | None = None,
     ) -> Reply:
         cfg = self.config()
         if not cfg.get("enabled"):
@@ -386,57 +415,39 @@ class AiRouter:
         )
         if latin:
             system += LATIN_RULE
-        first = self.provider_name()
-        if first is None:
-            raise AiUnavailable("AI kaliti kiritilmagan (Sozlamalar → AI).")
-        chain = [first]
-        if self.free_active():
-            pass  # free mode never falls back to a paid provider
-        elif cfg.get("fallback", False):  # off by default: a paid fallback never starts by itself
-            chain += [p for p in self.connected() if p != first]
-        if any(m.get("audio") for m in messages):  # speech: only Gemini listens
-            if not self.keys.load(FREE_PROVIDER):
-                raise AiUnavailable("Ovozli buyruq uchun Gemini kaliti kerak (Sozlamalar → AI; "
-                                    "aistudio.google.com da bepul olinadi).")  # fmt: skip
-            chain = [FREE_PROVIDER]
-            first = FREE_PROVIDER
-        if any(m.get("images") for m in messages):  # only providers that can read a picture
-            from nexvara.ai.providers import VISION
-
-            vision = [p for p in chain if p in VISION]
-            if not vision:
-                raise AiUnavailable("Rasmni o‘qiydigan AI ulanmagan: OpenAI, Gemini yoki Claude "
-                                    "kalitini kiriting (DeepSeek rasmni o‘qimaydi).")  # fmt: skip
-            chain = vision
-            first = chain[0]
-        # MANUAL: the provider and model the user picked, for text or for photos — no
-        # fallback and no swapping; a model that cannot do it gives a clear message.
+        has_audio = any(m.get("audio") for m in messages)
         has_images = any(m.get("images") for m in messages)
-        pinned = self.manual("vision" if has_images else "text")
-        if pinned is not None and not any(m.get("audio") for m in messages):
-            first, chain = pinned["provider"], [pinned["provider"]]
-            if not self.keys.load(first):
-                raise AiUnavailable(f"Qo‘lda tanlangan {models.PROVIDERS[first]['label']} kaliti "
-                                    "kiritilmagan (Sozlamalar → AI).")  # fmt: skip
-            if has_images and not caps.supports(first, "vision"):
-                raise AiUnavailable(f"Qo‘lda tanlangan {models.PROVIDERS[first]['label']} rasmni "
-                                    "o‘qiy olmaydi. 🧠 menyusida boshqa model tanlang yoki "
-                                    "AUTO ni yoqing.")  # fmt: skip
-        est = self.estimate(tier, system, messages, expected_out or max_tokens // 2, first,
-                            pinned["model"] if pinned else None)  # fmt: skip
-        self.check_budget(est, approved)  # confirmation is asked for the main provider
+        cap = capability or ("vision" if has_images else "text")
+        pinned = self.manual(cap) if not provider_override else None
+        if pinned and has_images and not caps.supports(pinned["provider"], "vision"):
+            raise AiUnavailable("Qo‘lda tanlangan model rasmni o‘qiy olmaydi.")
+        choices = self.text_candidates(tier, system, messages,
+                                       expected_out or max_tokens // 2, cap,
+                                       provider_override)  # fmt: skip
+        if has_audio:
+            choices = [e for e in choices if e.provider == FREE_PROVIDER]
+            if not choices:
+                raise AiUnavailable("Ovozni tinglaydigan Gemini modeli topilmadi.")
+        first = choices[0].provider
+        self.check_budget(choices[0], approved)
         last_error: AiError | None = None
-        for i, provider in enumerate(chain):
+        for i, est in enumerate(choices):
+            provider = est.provider
+            if i and (pinned or provider_override):
+                break  # MANUAL never swaps models
             if i:
+                if not cfg.get("fallback"):
+                    break
                 try:
-                    est = self.estimate(tier, system, messages, expected_out or max_tokens // 2,
-                                        provider)  # fmt: skip
-                    # A fallback never costs more than what the user agreed to.
                     self.check_budget(est, approved=True)
-                    if not approved and est.cost > float(cfg["confirm_over_usd"]):
-                        continue
                 except (AiUnavailable, BudgetExceeded):
                     continue
+                # A retry cannot silently start a paid call or exceed the amount
+                # already approved for the first candidate.
+                if not approved and not est.free:
+                    continue
+                if approved and est.cost > choices[0].cost:
+                    raise NeedsConfirmation(est)
             key = self.keys.load(provider) or ""
             try:
                 reply = self.factory(provider, key).complete(
@@ -459,12 +470,31 @@ class AiRouter:
                 from nexvara.knowledge.textnorm import to_latin_if_uzbek
 
                 reply.text = to_latin_if_uzbek(reply.text)
+            if purpose in ("chat", "qa", "vision", "analysis", "special"):
+                # The chat shows plain text: «**qalin**» markdown would appear as stars.
+                reply.text = re.sub(r"\*\*(.+?)\*\*|__(.+?)__", lambda m: m.group(1) or m.group(2),
+                                    reply.text)  # fmt: skip
             reply.masked = guard.count  # type: ignore[attr-defined]
-            reply.cost = 0.0 if est.free else models.cost(
-                reply.model or est.model, provider, reply.input_tokens, reply.output_tokens,
-                cfg.get("prices"))  # fmt: skip
+            try:
+                reply.cost = 0.0 if est.free else models.cost(
+                    reply.model or est.model, provider, reply.input_tokens, reply.output_tokens,
+                    cfg.get("prices"))  # fmt: skip
+            except ValueError:
+                # A provider may report a different alias. Use the approved model's
+                # reviewed rate and retain the reported ID for the activity log.
+                reply.cost = models.cost(est.model, provider, reply.input_tokens,
+                                         reply.output_tokens, cfg.get("prices"))  # fmt: skip
             self.ledger.record(provider, reply.model or est.model, purpose, reply.input_tokens,
                                reply.output_tokens, reply.cost)  # fmt: skip
+            self._last_call.value = {
+                "provider": provider,
+                "model": reply.model or est.model,
+                "mode": "MANUAL" if pinned else "AUTO",
+                "free": est.free,
+                "estimated_cost": est.cost,
+                "cost": reply.cost,
+                "cost_kind": "token estimate",
+            }
             if i:
                 reply.fallback_from = first  # type: ignore[attr-defined]
             return reply
@@ -492,14 +522,110 @@ class AiRouter:
             return s
         return None
 
+    def _store_catalog(self, provider: str, raw: list[str | dict[str, Any]]) -> dict:
+        rows = model_catalog.normalize(provider, raw)
+        if not rows:
+            raise AiUnavailable("Model ro‘yxati bo‘sh: oldingi katalog saqlandi.")
+        cfg = self.config()
+        states = dict(cfg.get("catalog_state") or {})
+        old = states.get(provider) or {}
+        changes = model_catalog.changed(old, rows)
+        states[provider] = {
+            "checked_at": time.time(),
+            "source": model_catalog.PROVIDERS_API[provider],
+            "price_source": models.PRICE_SOURCES[provider],
+            "prices_checked_on": models.PRICES_CHECKED_ON,
+            "models": rows,
+            **changes,
+            "error": "",
+        }
+        ids = [r["id"] for r in rows if r["lifecycle"] == "active"]
+        tiers = {t: models.pick_tier(provider, t, ids) for t in models.TIERS}
+        selected = dict(cfg.get("models") or {})
+        selected[provider] = tiers
+        checked = dict(cfg.get("checked") or {})
+        checked[provider] = {"at": states[provider]["checked_at"], "models": len(ids)}
+        catalog = dict(cfg.get("catalog") or {})
+        catalog[provider] = model_catalog.by_direction(rows)
+        self.settings.update(
+            {
+                "ai": {
+                    "catalog_state": states,
+                    "models": selected,
+                    "checked": checked,
+                    "catalog": catalog,
+                }
+            }
+        )
+        return {
+            "models": {t: m for t, m in tiers.items() if m},
+            "available": len(ids),
+            "missing": [models.TIER_LABELS[t] for t, m in tiers.items() if m is None],
+            "changes": changes,
+        }
+
+    def refresh_catalog(self, force: bool = False) -> dict[str, Any]:
+        """Read only Models APIs. On failure keep the previous verified account list."""
+        result: dict[str, Any] = {}
+        with self._catalog_lock:
+            for provider in self.connected():
+                state = (self.config().get("catalog_state") or {}).get(provider) or {}
+                if not force and not model_catalog.stale(state):
+                    result[provider] = {"ok": True, "cached": True}
+                    continue
+                try:
+                    client = self.factory(provider, self.keys.load(provider) or "")
+                    details = getattr(client, "list_model_details", None)
+                    raw = details() if callable(details) else client.list_models()
+                    result[provider] = {"ok": True, **self._store_catalog(provider, raw)}
+                except (AiError, AiUnavailable, OSError, ValueError) as e:
+                    states = dict(self.config().get("catalog_state") or {})
+                    states[provider] = {**state, "error": str(e), "last_attempt": time.time()}
+                    self.settings.update({"ai": {"catalog_state": states}})
+                    result[provider] = {"ok": False, "error": str(e), "cached": bool(state)}
+        return result
+
+    def _ensure_catalog_refresh(self) -> None:
+        if not self._auto_catalog or self._catalog_started:
+            return
+        self._catalog_started = True
+
+        def work() -> None:
+            while True:
+                try:
+                    self.refresh_catalog()
+                except Exception:  # noqa: BLE001 - cache remains available offline
+                    pass
+                time.sleep(3600)
+
+        threading.Thread(target=work, name="nexvara-model-catalog", daemon=True).start()
+
+    def catalog_status(self) -> dict[str, Any]:
+        self._ensure_catalog_refresh()
+        states = self.config().get("catalog_state") or {}
+        return {
+            p: {k: v for k, v in (states.get(p) or {}).items() if k != "models"}
+            | {
+                "stale": model_catalog.stale(states.get(p) or {}),
+                "count": len((states.get(p) or {}).get("models") or []),
+            }
+            for p in models.PROVIDERS
+        }
+
     def catalog(self, provider: str) -> dict[str, list[str]]:
         """Models of this account per direction (from the last key check)."""
         saved = ((self.config().get("catalog") or {}).get(provider)) or {}
         out: dict[str, list[str]] = {}
-        text = saved.get("text") or [m for m in (self.config().get("models") or {})
-                                     .get(provider, {}).values() if m]  # fmt: skip
-        out["text"] = sorted(set(text or models.PROVIDERS[provider]["tiers"].values()))
-        out["vision"] = out["text"] if caps.supports(provider, "vision") else []
+        configured = (self.config().get("models") or {}).get(provider, {})
+        text = saved["text"] if "text" in saved else [m for m in configured.values() if m]
+        out["text"] = sorted(
+            set(text if "text" in saved else (text or models.PROVIDERS[provider]["tiers"].values()))
+        )
+        out["vision"] = (
+            saved.get("vision")
+            if "vision" in saved
+            else [m for m in out["text"] if "vision" in model_catalog.directions(provider, m)]
+        )
         for c in ("image", "stt", "tts"):
             out[c] = (
                 saved.get(c)
@@ -508,6 +634,67 @@ class AiRouter:
             )
         out["realtime"] = ["stt+tts"] if out["stt"] and out["tts"] else []
         return out
+
+    def text_candidates(
+        self,
+        tier: str,
+        system: str,
+        messages: list[dict],
+        expected_out: int,
+        cap: str = "text",
+        provider_override: str | None = None,
+    ) -> list[Estimate]:
+        """Compare the account's reviewed models across all connected providers."""
+        pinned = self.manual(cap) if not provider_override else None
+        if pinned:
+            p, model = pinned["provider"], pinned["model"]
+            if not self.keys.load(p):
+                raise AiUnavailable("Qo‘lda tanlangan AI kaliti kiritilmagan.")
+            if model not in self.catalog(p)[cap]:
+                raise AiUnavailable(f"Qo‘lda tanlangan «{model}» katalogda mavjud emas.")
+            return [self.estimate(tier, system, messages, expected_out, p, model)]
+        target = model_catalog.QUALITY[tier]
+        candidates: list[tuple[int, Estimate]] = []
+        for p in self.connected():
+            if provider_override and p != provider_override:
+                continue
+            if self.free_active() and tier != "special" and p != FREE_PROVIDER:
+                continue
+            for model in self.catalog(p)[cap]:
+                level = model_catalog.tier_of(p, model)
+                if level is None:
+                    continue
+                quality = model_catalog.QUALITY[level]
+                # A verified free Flash can attempt a strong task; output validation
+                # may then request a stronger paid model with a fresh approval.
+                free_trial = (
+                    self.free_active()
+                    and p == FREE_PROVIDER
+                    and tier == "powerful"
+                    and quality == target - 1
+                )
+                if quality < target and not free_trial:
+                    continue
+                if tier != "special" and level == "special":
+                    continue
+                if (
+                    self.free_active()
+                    and tier != "special"
+                    and model not in self._free_text_models()
+                ):
+                    continue
+                try:
+                    est = self.estimate(tier, system, messages, expected_out, p, model)
+                except AiUnavailable:
+                    continue  # unknown price: not an AUTO candidate
+                candidates.append((model_catalog.QUALITY[level], est))
+        if not candidates:
+            raise AiUnavailable(
+                "Vazifaga mos, narxi tekshirilgan AI model topilmadi. "
+                "Katalogni yangilang yoki qo‘lda model tanlang."
+            )
+        candidates.sort(key=lambda x: (not x[1].free, x[1].cost, -x[0], x[1].model))
+        return [est for _, est in candidates]
 
     def set_capability(self, cap: str, mode: str, provider: str = "", model: str = "") -> dict:
         if cap not in caps.CAPABILITIES:
@@ -521,6 +708,8 @@ class AiRouter:
                 label = models.PROVIDERS[provider]["label"]
                 raise ValueError(f"{label} da «{caps.CAP_LABELS[cap]}» imkoniyati yo‘q")
             if cap == "realtime":
+                if not self.catalog(provider)["realtime"]:
+                    raise ValueError("Bu hisobda jonli suhbat uchun STT va TTS topilmadi")
                 model = "stt+tts"
             elif model not in self.catalog(provider)[cap]:
                 label = models.PROVIDERS[provider]["label"]
@@ -532,10 +721,42 @@ class AiRouter:
         self.settings.update({"ai": {"capabilities": cur}})
         return cur[cap]
 
-    def candidates(self, cap: str) -> list[tuple[str, dict]]:
+    def candidates(self, cap: str, provider_override: str | None = None) -> list[tuple[str, dict]]:
         """(provider, model row) to try for a media direction, best first. MANUAL: exactly the
         chosen one. AUTO: connected providers, free ones first, then the cheapest."""
-        pinned = self.manual(cap)
+        if cap == "realtime":
+            realtime_pinned = self.manual("realtime")
+            providers = (
+                [provider_override]
+                if provider_override
+                else [realtime_pinned["provider"]]
+                if realtime_pinned
+                else self.connected()
+            )
+            out = []
+            for p in providers:
+                if not p or not self.keys.load(p):
+                    continue
+                try:
+                    ears = self.candidates("stt", p)[0][1]
+                    voice = self.candidates("tts", p)[0][1]
+                except AiUnavailable:
+                    continue
+                out.append(
+                    (
+                        p,
+                        {
+                            "model": "stt+tts",
+                            "price": (ears["price"] or 0) + (voice["price"] or 0),
+                            "free": ears.get("free") and voice.get("free"),
+                        },
+                    )
+                )
+            out.sort(key=lambda x: (not x[1]["free"], x[1]["price"]))
+            if not out:
+                raise AiUnavailable("Jonli suhbat uchun mos STT va TTS modellari topilmadi.")
+            return out
+        pinned = self.manual(cap) if not provider_override else None
         if pinned is not None:
             p = pinned["provider"]
             row = caps.find(p, cap, pinned["model"])
@@ -547,15 +768,22 @@ class AiRouter:
             if not self.keys.load(p):
                 raise AiUnavailable(f"Qo‘lda tanlangan {models.PROVIDERS[p]['label']} kaliti "
                                     "kiritilmagan (Sozlamalar → AI).")  # fmt: skip
-            return [(p, row)]
+            if row["model"] not in self.catalog(p)[cap]:
+                raise AiUnavailable("Qo‘lda tanlangan model hisob katalogida mavjud emas.")
+            free = bool(row.get("free") and self.free_active())
+            if row.get("price") is None and not free:
+                raise AiUnavailable("Bu modelning pullik tarif narxi tasdiqlanmagan.")
+            return [(p, {**row, "free": free})]
         out = []
         for p in self.connected():
+            if provider_override and p != provider_override:
+                continue
             have = self.catalog(p).get(cap) or []
             for row in caps.models_for(p, cap):
-                if row["model"] in have:
-                    free = bool(row.get("free")) and p == FREE_PROVIDER and self.free_active()
+                free = bool(row.get("free")) and p == FREE_PROVIDER and self.free_active()
+                if row["model"] in have and (row.get("price") is not None or free):
                     out.append((p, {**row, "free": free}))
-        out.sort(key=lambda x: (not x[1]["free"], float(x[1]["price"])))
+        out.sort(key=lambda x: (not x[1]["free"], float(x[1]["price"] or 0)))
         if not out:
             need = [models.PROVIDERS[p]["label"] for p in models.PROVIDERS if caps.supports(p, cap)]
             raise AiUnavailable(
@@ -577,13 +805,13 @@ class AiRouter:
         approved: bool = False,
         purpose: str | None = None,
         confirm_always: bool = False,
+        provider_override: str | None = None,
     ):
         """Run a picture/speech call (`call(client, model)`) on the chosen model: budget and
         «Ha» like text; in AUTO a busy provider falls back to the next candidate."""
         if not self.config().get("enabled"):
             raise AiUnavailable("AI o‘chirilgan (Sozlamalar → AI).")
-        cands = self.candidates(cap)
-        cfg = self.config()
+        cands = self.candidates(cap, provider_override)
         last: AiError | None = None
         for i, (p, row) in enumerate(cands):
             est = Estimate(p, row["model"], cap, 0, 0, caps.cost(row, units), bool(row.get("free")))
@@ -592,20 +820,19 @@ class AiRouter:
                 if confirm_always and not approved and not est.free:
                     raise NeedsConfirmation(est)
             else:
-                # Same rules as text: free mode never moves to a paid model by itself, and
-                # another provider is tried only with «boshqa provayderga o‘tish» switched on.
-                first_free = bool(cands[0][1].get("free"))
-                if (first_free and self.free_active() and not est.free) or (
-                    p != cands[0][0] and not cfg.get("fallback", False)
-                ):
+                if self.manual(cap) or provider_override or not self.config().get("fallback"):
+                    break
+                # Free mode never moves from a free model to a paid one by itself.
+                if cands[0][1].get("free") and self.free_active() and not est.free:
                     continue
                 try:
                     self.check_budget(est, approved=True)
-                except BudgetExceeded:
+                except (BudgetExceeded, AiUnavailable):
                     continue
-                if not approved and (est.cost > float(cfg["confirm_over_usd"])
-                                     or (confirm_always and not est.free)):  # fmt: skip
+                if not approved and not est.free:
                     continue
+                if approved and est.cost > caps.cost(cands[0][1], units):
+                    raise NeedsConfirmation(est)
             try:
                 out = call(self.media_factory(p, self.keys.load(p) or ""), row["model"])
             except AiError as e:
@@ -614,6 +841,15 @@ class AiRouter:
                 last = e
                 continue
             self.ledger.record(p, row["model"], purpose or cap, 0, 0, est.cost)
+            self._last_call.value = {
+                "provider": p,
+                "model": row["model"],
+                "mode": "MANUAL" if self.manual(cap) else "AUTO",
+                "free": est.free,
+                "estimated_cost": est.cost,
+                "cost": None,
+                "cost_kind": "unknown",
+            }
             return out, est
         raise last or AiUnavailable("Hech bir AI provayderi javob bermadi.")
 
@@ -645,7 +881,7 @@ class AiRouter:
                 if auto
                 else None,
             }
-        return {"capabilities": out, "voices": caps.VOICES}
+        return {"capabilities": out, "voices": caps.VOICES, "catalog": self.catalog_status()}
 
     # ----- keys -----
     def save_key(self, provider: str, key: str) -> dict[str, Any]:
@@ -656,27 +892,22 @@ class AiRouter:
         key = (key or "").strip()
         if len(key) < 10:
             raise ValueError("kalit juda qisqa — to‘liq nusxalang")
-        available = self.factory(provider, key).list_models()
-        tiers = {t: models.pick_tier(provider, t, available) for t in models.TIERS}
+        client = self.factory(provider, key)
+        details = getattr(client, "list_model_details", None)
+        available = details() if callable(details) else client.list_models()
+        if not model_catalog.normalize(provider, available):
+            raise AiUnavailable("Model ro‘yxati bo‘sh: kalit saqlanmadi.")
         self.keys.save(provider, key)
+        info = self._store_catalog(provider, available)
+        changes: dict[str, Any] = {}
+        if provider == FREE_PROVIDER:
+            changes["free_tier_confirmed"] = False
         cfg = self.config()
-        chosen = dict(cfg.get("models") or {})
-        chosen[provider] = tiers
-        checked = dict(cfg.get("checked") or {})
-        checked[provider] = {"at": time.time(), "models": len(available)}
-        catalog = dict(cfg.get("catalog") or {})
-        known = [m for m in available if any(m == k or m.startswith(k + "-")
-                                             for k in models.PRICES)]  # fmt: skip
-        catalog[provider] = {"text": sorted(set(known) | {m for m in tiers.values() if m}),
-                             **{c: [r["model"] for r in caps.models_for(provider, c, available)]
-                                for c in ("image", "stt", "tts")}}  # fmt: skip
-        changes: dict[str, Any] = {"models": chosen, "checked": checked, "catalog": catalog}
         if not cfg.get("provider") or not self.keys.load(cfg["provider"]):
             changes["provider"] = provider
-        self.settings.update({"ai": changes})
-        missing = [models.TIER_LABELS[t] for t, m in tiers.items() if m is None]
-        shown = {t: m for t, m in tiers.items() if m}
-        return {"models": shown, "available": len(available), "missing": missing}
+        if changes:
+            self.settings.update({"ai": changes})
+        return info
 
     def delete_key(self, provider: str) -> None:
         self.keys.delete(provider)
@@ -759,7 +990,9 @@ class AiRouter:
             "send_textbook_text": cfg["send_textbook_text"],
             "fallback": bool(cfg.get("fallback", False)),
             "free_mode": bool(cfg.get("free_mode", True)),
+            "free_tier_confirmed": bool(cfg.get("free_tier_confirmed")),
             "free_active": self.free_active(),
+            "catalog": self.catalog_status(),
             "free_requests_today": self.ledger.count_today(FREE_PROVIDER, free_only=True),
             "warnings": warnings,
             "blocked": today >= daily or month >= monthly,

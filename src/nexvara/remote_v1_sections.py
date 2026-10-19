@@ -350,10 +350,13 @@ def route(h: Any, srv: Any, route: str, args: dict[str, str], q: dict[str, list[
         import base64
         import time as _time
 
-        text = str(body().get("text", "")).strip()[:3000]
+        b = body()
+        text = str(b.get("text", "")).strip()[:3000]
         if not text:
             raise ApiError("BAD_REQUEST", "Matn bo‘sh")
-        out = api.ai_speak(text)
+        out = api.ai_speak(text, bool(b.get("approved")), bool(b.get("live")))
+        if out.get("needs_approval"):  # a paid voice: the phone shows the price and asks «Ha»
+            return {"needs_approval": True, "text": out.get("error", "")}
         if not out.get("ok"):
             raise ApiError("BAD_REQUEST", out.get("error") or "Ovoz tayyorlanmadi")
         folder = config.data_dir() / "Ovoz"

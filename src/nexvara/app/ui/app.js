@@ -812,17 +812,20 @@ async function renderAi(status) {
   $("#ai-task").value = st.task_limit_usd ?? "";
   $("#ai-fallback").checked = st.fallback;
   $("#ai-free").checked = st.free_mode;
+  $("#ai-free-confirmed").checked = st.free_tier_confirmed;
+  $("#ai-catalog-status").textContent = Object.entries(st.catalog || {}).filter(([, c]) => c.checked_at)
+    .map(([p, c]) => `${st.providers[p].label}: ${new Date(c.checked_at * 1000).toLocaleString()}${c.stale ? " (eskirgan)" : ""}${c.error ? " (internet/xizmat xatosi)" : ""}`)
+    .join(" · ") || "Katalog hali tekshirilmagan";
   const gem = st.providers.gemini;
   $("#ai-free-note").textContent = !gem.has_key
-    ? "Bepul rejim uchun Gemini kalitini kiriting (aistudio.google.com saytidan bepul kalit oling). " +
-      "Kalit kiritilgach, hamma AI ishlari Gemini Flash orqali bepul bajariladi."
+    ? "Gemini kalitini kiriting va AI Studio hisobingizdagi tarifni tekshiring. Bepul kvota hisobga bog‘liq."
     : (st.free_active
       ? `Bepul rejim ishlayapti: bugun ${st.free_requests_today} ta bepul so‘rov. Google bepul darajada ` +
         "kunlik so‘rovlar sonini cheklaydi — tugasa, keyinroq qayta urinasiz (pullik provayderga o‘tilmaydi). " +
         "Eslatma: bepul darajada Google so‘rovlarni o‘z xizmatlarini yaxshilash uchun ishlatishi mumkin; " +
         "NEXVARA ism, telefon, pasport kabi shaxsiy ma’lumotlarni yuborishdan oldin yashiradi. " +
         "AI Studio’da to‘lov (Billing) yoqilmagan bo‘lsin — aks holda Google haq oladi."
-      : "Bepul rejim o‘chiq: so‘rovlar tanlangan provayderga ketadi va pul sarflanadi.");
+      : "Free Tier tasdiqlanmagan yoki o‘chiq. Pullik so‘rovlar oldidan tasdiq so‘raladi.");
   $("#ai-send-text").checked = st.send_textbook_text;
   $("#ai-spent").textContent =
     `${i18n("ai.estimated")}: bugun ${money(st.spent_today)} / ${money(st.daily_budget_usd)}, shu oy ${money(st.spent_month)} / ${money(st.monthly_budget_usd)}. Narxlar taxminiy — provayder hisobidagi summa asosiy.` +
@@ -851,10 +854,24 @@ $("#ai-form").addEventListener("submit", async (e) => {
     confirm_over_usd: Number($("#ai-confirm").value), send_textbook_text: $("#ai-send-text").checked,
     task_limit_usd: $("#ai-task").value === "" ? null : Number($("#ai-task").value),
     fallback: $("#ai-fallback").checked, free_mode: $("#ai-free").checked,
+    free_tier_confirmed: $("#ai-free-confirmed").checked,
   } });
   $("#ai-error").hidden = r.ok; $("#ai-error").textContent = r.ok ? "" : r.error;
   $("#ai-saved").textContent = r.ok ? "Saqlandi ✓" : "";
   if (r.ok) { renderAi(); refreshAiStatus(); }
+});
+
+$("#ai-refresh-catalog").addEventListener("click", async () => {
+  const button = $("#ai-refresh-catalog"); button.disabled = true;
+  $("#ai-catalog-status").textContent = "Rasmiy kataloglar tekshirilmoqda…";
+  try {
+    const r = await api().ai_refresh_catalog();
+    await renderAi();
+    $("#ai-catalog-status").textContent += " · " + Object.entries(r.result)
+      .map(([p, v]) => `${p}: ${v.ok ? "yangilandi" : "oldingi katalog saqlandi"}`).join(" · ");
+    if (window.mediaLoad) window.mediaLoad();
+  } catch (e) { $("#ai-catalog-status").textContent = String(e); }
+  finally { button.disabled = false; }
 });
 
 async function refreshAiStatus() {

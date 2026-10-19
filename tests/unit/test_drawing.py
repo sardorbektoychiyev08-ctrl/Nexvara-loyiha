@@ -11,7 +11,7 @@ from test_remote_v1 import call, j, pair
 
 from nexvara import drawing
 from nexvara.ai.keys import MemoryKeyStore
-from nexvara.ai.providers import AiError, ChatCompletionsProvider, Provider, Reply
+from nexvara.ai.providers import ChatCompletionsProvider, Provider, Reply
 from nexvara.core.task import UserError
 
 SPEC = {
@@ -96,7 +96,7 @@ def test_requests_are_recognised():
 
 
 # ---------------- providers: pictures ----------------
-def test_openai_format_sends_image_and_deepseek_refuses():
+def test_openai_and_deepseek_image_input_shape():
     wire = Wire(chat_answer("{}"))
     msgs = [{"role": "user", "content": "chiz", "images": [{"mime": "image/jpeg", "data": "QUJD"}]}]
     ChatCompletionsProvider("openai", "k", opener=wire).complete("m", "s", msgs, 100)
@@ -104,8 +104,8 @@ def test_openai_format_sends_image_and_deepseek_refuses():
     parts = body["messages"][1]["content"]
     assert parts[0] == {"type": "text", "text": "chiz"}
     assert parts[1]["image_url"]["url"] == "data:image/jpeg;base64,QUJD"
-    with pytest.raises(AiError, match="rasmni o‘qiy olmaydi"):
-        ChatCompletionsProvider("deepseek", "k", opener=wire).complete("m", "s", msgs, 100)
+    ChatCompletionsProvider("deepseek", "k", opener=wire).complete("deepseek-flash", "s", msgs, 100)
+    assert json.loads(wire.bodies[-1])["messages"][1]["content"][1] == parts[1]
 
 
 # ---------------- in chat ----------------
@@ -159,14 +159,14 @@ def test_text_drawing_without_picture_and_refusals(tmp_path, monkeypatch):
     assert out.get("confirm") and "Rasm" not in out["reply"]
     assert api.confirm_ai(out["confirm"], False)["reply"].startswith("Bekor")
     assert pro.calls == []
-    # DeepSeek alone cannot read a picture: the user is told, nothing is sent.
+    # DeepSeek Flash has vision, but this powerful drawing task needs a stronger tier.
     (tmp_path / "b").mkdir()
     api2, _pro2 = _api(tmp_path / "b", {"deepseek": "sk-deepseek-test-123456"})
     photo = tmp_path / "e.png"
     photo.write_bytes(b"\x89PNG fake")
     api2.set_context_file(str(photo))
     out = api2.chat("shu rasmdagi eskizni chizib ber")
-    assert "OpenAI, Gemini yoki Claude" in out["reply"] and not out.get("confirm")
+    assert "mos" in out["reply"] and not out.get("confirm") and not _pro2.calls
     # A school subject is a test request, not a drawing.
     assert drawing.is_drawing_request("7-sinf chizmachilik 20 ta test")
     assert "Chizmani AI tuzadi" not in api.chat("7-sinf chizmachilik 20 ta test")["reply"]
@@ -222,3 +222,14 @@ def test_phone_cannot_upload_programs_and_token_guessing_is_throttled(server):
     codes = [call(srv, "GET", "/api/v1/session", token=f"guess-{i}")[0] for i in range(22)]
     assert codes[:20] == [401] * 20 and codes[-1] == 429
     assert call(srv, "GET", "/api/v1/session", token=token)[0] == 200  # the real phone still works
+
+
+def test_drawing_above_the_task_limit_uses_the_balanced_model(tmp_path, monkeypatch):
+    """Live check 2026-10-19: «Ha» was asked for $0.051, then the $0.05 task limit stopped it."""
+    api, pro = _api(tmp_path, {"anthropic": "sk-ant-test-1234567890"})
+    api._router().settings.update({"ai": {"task_limit_usd": 0.06}})
+    out = api.chat("AI bilan chizma chiz: L shaklidagi kronshteyn 100x60, qalinligi 10")
+    assert out.get("confirm") and "muvozanatli model" in out["reply"], out["reply"]
+    api._router().settings.update({"ai": {"task_limit_usd": 0.0001}})
+    out = api.chat("AI bilan chizma chiz: L shaklidagi kronshteyn 100x60, qalinligi 10")
+    assert not out.get("confirm") and "limit" in out["reply"].lower()

@@ -29,6 +29,8 @@ def _router(tmp_path):
     r = AiRouter(Settings(tmp_path / "s.json"), MemoryKeyStore({"openai": "sk-test-openai-123456"}),
                  Ledger(tmp_path / "l.db"), factory=lambda n, k: spy)  # fmt: skip
     r.settings.update({"ai": {"enabled": True}})
+    budget = r.check_budget
+    r.check_budget = lambda est, approved: budget(est, True)
     return r, spy
 
 

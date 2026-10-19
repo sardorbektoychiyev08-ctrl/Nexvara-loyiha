@@ -52,6 +52,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
         # 🧠 per direction: {"mode": "auto"|"manual", "provider", "model"} (ai/capabilities.py)
         "capabilities": {},
         "catalog": {},  # provider -> direction -> model ids of the account (key check)
+        "catalog_state": {},  # provider -> checked time, source, lifecycle and changes
+        "free_tier_confirmed": False,  # the owner checked this key's tier in AI Studio
         "speak_replies": False,  # 🔊 read every answer aloud
         "voice": "",  # TTS voice ("" = the provider's default)
         "send_textbook_text": True,
