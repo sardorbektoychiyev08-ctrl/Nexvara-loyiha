@@ -4,6 +4,34 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-20 (39) — Claude Code — 5–11: Tailscale ulashish, kalitlar zaxirasi tekshiruvi, Tailscale tugmasi, 1.5.1/1.5.2 GitHub orqali, birinchi ishga tushirish yordamchisi, Excel cheklash va yig‘ish, AI tarjima/qayta yozish, SmartArt
+
+**Foydalanuvchi talabi:** «4,5 dan boshla, keyin qolganini davom ettiraver» (4 — Drive sinxroni ertaga ishxonada egasi hisobi bilan qoldirildi; 12 — SQL Server/MySQL kerak emas, egasi bilan kelishildi).
+
+**Qilindi:**
+- 5: ayolining Tailscale’idagi «nilufar» egasining hisobiga ulashildi (egasi «Taklifni qabul qilish»ni o‘zi bosdi); egasining telefonidan 100.65.206.5:8765 — ulanish PASS.
+- 6: OneDrive «Sardorbek AI» papkasida kalitlar zaxirasi, Setup-1.5.0 va Tailscale o‘rnatuvchisi bor — PASS (ko‘z bilan).
+- 7: `firewall.py` + Qurilmalar sahifasida «Tailscale uchun ruxsat berish» (faqat TCP port, faqat 100.64.0.0/10, faqat NEXVARA, UAC).
+- 8: v1.5.1 (7-band + standart GitHub kanal) va v1.5.2 GitHub’ga chiqarildi (`publish_github.py`); 1.5.0→1.5.1, 1.5.1→1.5.2 topildi va imzo tekshirildi.
+- 9: birinchi ishga tushirish yordamchisi (`app/api_onboarding.py`, 4 qadam, bir marta; app.db da vazifa/suhbat/telefon bo‘lsa — eski foydalanuvchi, chiqmaydi).
+- 10: Excel «… ustuniga faqat 2 dan 5 gacha butun son», «musbat son», «faqat sana», «tanlash ro‘yxati: A, B» (Validation.Add pozitsion, ro‘yxat ajratgichi International[5], o‘zbekcha ogohlantirish); «A.xlsx va B.xlsx ni bitta faylga varaq qilib yig‘» (`fileagent.combine_workbooks`). Topilgan: «Soni» ustuni «son» so‘zi bilan to‘qnashardi — ustun matn bo‘yicha qidiriladi; pywin32 `International` massiv qaytaradi.
+- 11: `officeai.py` — Word/PowerPoint’ni AI bilan tarjima (17 til) yoki qayta yozish (rasmiy/sodda/qisqa/chiroyli), yangi faylga, uslub va jadval kataklari saqlanadi; narx fayl XML’idan, «Ha», maxfiylik router’da. `skills/smartart.py` — SmartArt (jarayon, aylana, ierarxiya, ro‘yxat) maket Id bo‘yicha.
+- Qo‘llanma yangilandi.
+
+**Testlar:**
+| Test | Natija |
+|---|---|
+| `scripts/test.ps1 -Office` | 637 PASS + 1 FAIL (`settings_integrations.py`: versiya matnida «0.» kutilgan — test eskirgan) → tuzatildi, qayta PASS |
+| Haqiqiy Excel: cheklash (3 tur) va yig‘ish | PASS |
+| Haqiqiy Word/PowerPoint: tarjima (soxta AI, katta harf), SmartArt (Word 2 ta, PowerPoint aylana slaydi) | PASS |
+| Oyna: onboarding (4 qadam, Office holati, eslab qolinadi) | PASS |
+| Haqiqiy AI bilan tarjima | NOT TESTED — pullik, egasi ruxsati bilan |
+| 1.5.2 GitHub’da, SHA-256 `a29a0579c18a36ea26025ffd2c2df76b5b85170bdec50434f9ef6e2c5db0a7b5` | PASS (check/imzo) |
+
+**Keyingi qadam:** noutbukda «Yangilash» (1.5.2) — internetdan birinchi haqiqiy yangilanish; ishxona: 1.5.1/1.5.2 o‘rnatish, Tailscale tugmasi, telefon bog‘lash, Drive sinxroni egasi hisobi bilan; ruxsat bilan haqiqiy AI sinovlari.
+
+---
+
 ## 2026-10-19 (38) — Claude Code — Egasining ayoli uchun sozlash: noutbuk «NILUFAR», telefon, Tailscale
 
 **Foydalanuvchi talabi:** shu noutbuk ayolining — uning Google hisobini NEXVARA’ga ulash, telefoniga ilovani o‘rnatib bog‘lash, har xil tarmoqda ham ishlashi uchun Tailscale.
