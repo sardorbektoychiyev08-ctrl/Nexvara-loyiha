@@ -100,6 +100,7 @@ DESCRIBE = {
     "check": "Sifatni tekshirish",
     "fix": "Kamchiliklarni tuzatish",
     "validate": "Kiritishni cheklash (Data Validation)",
+    "smartart": "SmartArt sxema qo‘shish",
 }
 
 
@@ -166,7 +167,7 @@ _STAT_PAIR = re.compile(
 
 
 # «Holat ustuniga tanlash ro‘yxati: Bajarildi, Jarayonda, Bekor» — those commas are the list's
-_LIST_TAIL = re.compile(r"((?:ro[‘’']?yxat\w*|tanlash)[^:,]{0,40}:)(.*?)"
+_LIST_TAIL = re.compile(r"((?:ro[‘’']?yxat\w*|tanlash|smartart\w*|sxema\w*)[^:,]{0,40}:)(.*?)"
                         r"(?=,\s*(?:keyin|so[‘’']?ng)\b|[.;]|$)", re.IGNORECASE)  # fmt: skip
 
 
@@ -474,6 +475,15 @@ def _align(clause: str, f: str) -> Action:
 def _classify_extra(clause: str, f: str, app: str | None) -> Action | None:
     """Commands added for professional use (highlighting, number formats, layout...)."""
     quoted = _QUOTED.search(clause)
+    if app in ("word", "powerpoint") and _has(f, "smartart", "sxema") and ":" in clause:
+        items = [x.strip(' .«»"') for x in re.split(r"[,;]|\s+va\s+", clause.split(":", 1)[1])]
+        items = [x for x in items if x][:12]
+        if len(items) >= 2:
+            kind = ("cycle" if _has(f, "aylana", "sikl", "takrorlan", "doira") else
+                    "hierarchy" if _has(f, "ierarxiya", "tuzilma", "boshqaruv") else
+                    "list" if _has(f, "royxat", "blok") else "process")  # fmt: skip
+            title = quoted.group(1).strip() if quoted and ":" not in quoted.group(1) else ""
+            return Action("smartart", {"kind": kind, "items": items, "title": title}, clause)
     if app == "powerpoint" or _has(f, "slayd"):
         if _has(f, "otish effekt", "animats", "otish", "perexod"):
             return Action("transition", {}, clause)

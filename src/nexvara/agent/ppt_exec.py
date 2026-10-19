@@ -245,7 +245,7 @@ def run_ppt_plan(
     from nexvara.skills.powerpoint.ops import PowerPointSession
 
     kinds = [a for a in plan.actions if a.kind not in ("open", "save")]
-    allowed = {"pdf", "replace", "font", "transition", "slide_numbers", "check", "fix"}
+    allowed = {"pdf", "replace", "font", "transition", "slide_numbers", "check", "fix", "smartart"}
     bad = [a for a in kinds if a.kind not in allowed]
     if bad:
         raise CommandError(
@@ -540,7 +540,24 @@ def _repair_overflow(pres: Any) -> int:
     return count
 
 
+def _pp_smartart(pres: Any, a: Any, ops: Any) -> tuple[str, bool]:
+    """A new slide at the end with the title and the SmartArt diagram under it."""
+    from nexvara.skills import smartart
+
+    kind, items = a.args["kind"], a.args["items"]
+    layout = smartart.find_layout(pres.Application, kind)
+    slide = pres.Slides.Add(int(pres.Slides.Count) + 1, 11)  # ppLayoutTitleOnly
+    title = a.args.get("title") or smartart.LABELS[kind].capitalize()
+    slide.Shapes.Title.TextFrame.TextRange.Text = title
+    w, h = float(pres.PageSetup.SlideWidth), float(pres.PageSetup.SlideHeight)
+    top = ops.content_top(slide)
+    shape = slide.Shapes.AddSmartArt(layout, 40, top, w - 80, h - top - 30)  # positional
+    got = smartart.fill(shape.SmartArt, kind, items)
+    return f"{int(pres.Slides.Count)}-slayd: {smartart.LABELS[kind]} sxemasi", got == items
+
+
 _PPT = {
+    "smartart": _pp_smartart,
     "replace": _pp_replace,
     "fix": _pp_fix,
     "font": _pp_font,

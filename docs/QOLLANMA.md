@@ -42,6 +42,8 @@ Office ishlari (Office ekranda ochiladi, nima qilinayotganini ko‘rib turasiz):
 - «Baholar.xlsx ni och, Baho ustuniga faqat 2 dan 5 gacha butun son kiritilsin» — noto‘g‘ri qiymat kiritilsa Excel ogohlantiradi
 - «Vazifalar.xlsx ni och, Holat ustuniga tanlash ro‘yxati: Bajarildi, Jarayonda, Bekor»
 - «Yanvar.xlsx va Fevral.xlsx ni bitta faylga varaq qilib yig‘»
+- «Hisobot.docx ni och, jarayon sxemasi qo‘sh: Reja, Bajarish, Nazorat» (SmartArt; aylana, ierarxiya, ro‘yxat ham bor)
+- «Xat.docx ni ingliz tiliga tarjima qil», «Hisobot.docx ni rasmiy uslubda qayta yoz», «Taqdimot.pptx ni rus tiliga o‘gir» (AI; natija yangi faylda, asl fayl o‘zgarmaydi)
 - «7-sinf fizika Nyuton qonunlari bo‘yicha taqdimot tayyorla»
 
 Darslik va testlar:

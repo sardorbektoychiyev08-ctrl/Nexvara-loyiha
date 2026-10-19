@@ -510,7 +510,28 @@ def _wd_fix(doc: Any, a: Any, ops: Any, expect: list) -> str:
     return "; ".join(done) if done else "Tuzatiladigan kamchilik topilmadi"
 
 
+def _wd_smartart(doc: Any, a: Any, ops: Any, expect: list) -> str:
+    """A SmartArt diagram at the end of the document (inline, page width)."""
+    from nexvara.skills import smartart
+
+    kind, items = a.args["kind"], a.args["items"]
+    app = doc.Application
+    layout = smartart.find_layout(app, kind)
+    if a.args.get("title"):
+        ops.add_paragraph(doc, a.args["title"], ops.STYLE_HEADING[2])
+    ops.add_paragraph(doc, "")
+    rng = doc.Paragraphs(doc.Paragraphs.Count).Range
+    shape = doc.InlineShapes.AddSmartArt(layout, rng)  # (Layout, Range): positional
+    sec = doc.Sections(1).PageSetup
+    shape.Width = float(sec.PageWidth - sec.LeftMargin - sec.RightMargin)
+    got = smartart.fill(shape.SmartArt, kind, items)
+    if got != items:
+        raise CommandError(f"SmartArt matnlari mos kelmadi: {got}")
+    return f"{smartart.LABELS[kind]} sxemasi, {len(items)} ta bo‘lak"
+
+
 _EXTRA = {
+    "smartart": _wd_smartart,
     "check": _wd_check,
     "fix": _wd_fix,
     "align": _wd_align, "header": _wd_header, "orientation": _wd_orientation,
