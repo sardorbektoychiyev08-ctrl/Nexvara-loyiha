@@ -16,6 +16,10 @@ from typing import Any
 
 from nexvara import config
 
+UPDATES_URL = (
+    "https://github.com/sardorbektoychiyev08-ctrl/nexvara-yangilanish/releases/latest/download"
+)
+
 DEFAULT_SETTINGS: dict[str, Any] = {
     "theme": "dark",
     "test_count": 20,
@@ -24,7 +28,8 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     # phone access over the local network; screen_view: the paired phone may see the screen
     "remote": {"enabled": False, "port": 8765, "screen_view": True, "control": False},
     # Private release channel: a folder or an https:// URL with a signed latest.json.
-    "update": {"channel": "", "auto_check": True},
+    # The public updates repository (only signed installers, verified before install).
+    "update": {"channel": UPDATES_URL, "auto_check": True},
     # Settings, memory and Teach rules between devices (sync.py). The passphrase is in
     # Credential Manager (NEXVARA/sync/passphrase), never here.
     "sync": {

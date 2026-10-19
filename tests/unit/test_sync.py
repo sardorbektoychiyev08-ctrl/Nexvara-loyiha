@@ -116,7 +116,9 @@ def test_safety_rules(two, tmp_path):
     # A forged record for a setting outside the safe list is ignored.
     b.merge([{"kind": "setting", "uid": "update.channel", "data": {"value": "https://evil"},
               "updated": time.time() + 99, "device": "x", "deleted": False}])  # fmt: skip
-    assert b.settings.load()["update"]["channel"] == ""
+    from nexvara.appdata import UPDATES_URL
+
+    assert b.settings.load()["update"]["channel"] == UPDATES_URL  # not "https://evil"
     with pytest.raises(SyncError, match="parol"):
         b.sync(FolderTransport(shared, "boshqa-parol-1"))
     with pytest.raises(SyncError, match="8 belgi"):
