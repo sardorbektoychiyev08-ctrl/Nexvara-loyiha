@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -86,7 +87,7 @@ print(json.dumps(res, ensure_ascii=False, indent=1))
 ok = (
     "BLOCKED" in (res.get("account") or "")
     and res.get("login_disabled") is True
-    and "0." in (res.get("version") or "")
+    and re.search(r"\d+\.\d+\.\d+", res.get("version") or "")
     and "o‘qilmadi" in (res.get("update_error") or "")
     and res.get("channel_saved")
     and res.get("theme_msg")
