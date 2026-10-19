@@ -14,22 +14,27 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 - `control.py`: `nudge` (kursorni dx, dy piksel siljitish, ±800), `tap`/`tap_double`/`tap_right` (kursor turgan joyda), `drag_start`/`drag_end`. `/api/v1/control` `dx` ni ham qabul qiladi. `screen.py`: ekran rasmiga sichqoncha ko‘rsatkichi chiziladi (BitBlt uni olmaydi).
 - Telefon API: `POST /api/v1/files/zip` (qidiruvda topilgan 1–50 fayl, arxiv birinchi fayl yonida, kichik bo‘lsa darhol telefonga olinadi), `POST /api/v1/files/unzip` (faqat topilgan .zip, yonidagi yangi papkaga). Maxfiy fayllar (kalit, baza) baribir rad etiladi.
 - Chizma → Word: `cad.png_to_docx` (Word ochilmaydi, OOXML: chizma A4 sahifada, keng bo‘lsa albom). Chizmalar oynasida «Word» tugmasi; chat: «chizma.dxf ni Word qil»; telefondan saqlangan chizma DXF + PDF + PNG + Word.
-- Android 1.4.0 (versionCode 11): Kompyuter ekrani → boshqarish → «Sensorli panel» (barmoq suring = kursor, bosish = chap, uzoq = o‘ng, ikki marta = ochish, ikki barmoq = aylantirish, «Ushlab sudrash»); Kompyuterdan qidirish → fayllarni belgilab «ZIP qilish» va «Telefonga», .zip uchun «Chiqarish», «ZIP» filtri; Chizma saqlangach «Telefonga olish: PDF / Word / PNG / DXF».
+- Android 1.5.0 (versionCode 12; 1.4.0 Codex/🧠 ishi bilan birlashgan): Kompyuter ekrani → boshqarish → «Sensorli panel» (barmoq suring = kursor, bosish = chap, uzoq = o‘ng, ikki marta = ochish, ikki barmoq = aylantirish, «Ushlab sudrash»); Kompyuterdan qidirish → fayllarni belgilab «ZIP qilish» va «Telefonga», .zip uchun «Chiqarish», «ZIP» filtri; Chizma saqlangach «Telefonga olish: PDF / Word / PNG / DXF». Fayl qatoridagi tugmalar sig‘masa suriladi («Buyruq» harflari ustma-ust tushardi).
+- Jonli sinovda topildi va tuzatildi: AutoCAD 7-rang (oq, 0-qatlam sukuti) chiziqlari PDF/PNG/Word’da oq fonda oq — rasm bo‘sh chiqardi (ranglar qo‘shilgandagi `COLOR_SWAP_BW`). Endi `ColorPolicy.COLOR`: 7-rang qora, boshqa ranglar o‘zgarmaydi; test qo‘shildi (eski kodda FAIL, yangisida PASS).
+- Ish yakunida: Windows versiya raqami 1.4.0 qilindi, lekin yig‘ish/kanalga joylash ruxsat berilmadi — o‘rnatilgan dastur hali 1.3.x; sinov uchun NEXVARA manba koddan (`scripts/run.ps1`) ishga tushirildi.
 
 **Testlar:**
 | Test | Natija |
 |---|---|
 | ruff + format | PASS |
-| `scripts/test.ps1` (Office’siz) | PASS — 503 passed, 85 skipped; oyna smoke PASS |
+| `scripts/test.ps1` (Office’siz, merge va rang tuzatishidan keyin) | PASS — 522 passed, 85 skipped; oyna smoke v1.4.0 PASS |
 | Yangi: telefondan ZIP/unzip marshruti, `nudge` dx uzatilishi va chegarasi, chizma → docx (albom, sarlavha), chat «Word qil», telefon chizmasida docx | PASS |
 | Ekran rasmida kursor (haqiqiy ekran, bir marta) | PASS (ko‘z bilan tekshirildi) |
-| Android assembleDebug + unit testlar | PASS — APK SHA-256 `9a8c494741cddf79195fcd47ed4e147681f8d5ec16104e22c2003ed1d9f30d02` |
-| Haqiqiy telefonda sensorli panel, ZIP, Word yuklab olish | NOT TESTED — telefon kompyuterga ulanmagan (adb: qurilma yo‘q) |
+| Android 1.5.0 assembleDebug + unit testlar | PASS — o‘rnatildi, APK SHA-256 `c3c13d2826d20e0dfaa2a0340909fbbe0cbaa6fc1f00914eaaf691c0aeb9905e` |
+| Haqiqiy telefon (USB, egasi barmoq izi bilan tasdiqladi): sensorli panel — barmoq surilganda PC kursori (521,698)→(979,863) va qaytdi | PASS |
+| Haqiqiy telefon: 2 ta sinov faylini topish → belgilash → «ZIP qilish» → arxiv PC’da, «Telefonga» → Download’da 276 bayt | PASS |
+| Haqiqiy telefon: to‘rtburchak chizib saqlash → DXF+PDF+PNG+Word, Word telefonga yuklandi; rang tuzatishidan keyin PNG’da chiziq bor | PASS |
+| Telefonda bosish (tap) PC’da | NOT TESTED — egasining ochiq oynalarida tasodifiy bosmaslik uchun (marshrut unit testda PASS) |
 | Word faylini haqiqiy Word’da ochish | NOT TESTED — Office testi ruxsat bilan |
 
 Eslatma: `scripts/android_build.ps1` `.tools` ni asosiy papkada qidiradi, vositalar esa `.worktrees/android/.tools` da — yig‘ish shu yo‘l bilan qo‘lda qilindi.
 
-**Keyingi qadam:** telefon ulanganda 1.4.0 ni o‘rnatib, sensorli panel va ZIP’ni haqiqiy qurilmada sinash; ruxsat bilan `-Office` (Chizmalar oynasidagi Word tugmasi, docx Word’da ochilishi); Windows yangi versiyani yig‘ish; `main` ga merge — egasi tasdig‘i bilan.
+**Keyingi qadam:** egasi ruxsati bilan Windows 1.4.0 ni yig‘ib o‘rnatish (`build.ps1 -Publish`); ruxsat bilan `-Office` (Chizmalar oynasidagi Word tugmasi, docx Word’da ochilishi); Windows yangi versiyani yig‘ish; `main` ga merge — egasi tasdig‘i bilan.
 
 ---
 
