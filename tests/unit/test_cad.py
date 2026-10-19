@@ -72,6 +72,18 @@ def test_any_dxf_becomes_pdf_and_png(tmp_path):
     out = cad.render(cad.read(p), tmp_path / "c.pdf", tmp_path / "c.png")
     assert open(out["pdf"], "rb").read(5) == b"%PDF-"
     assert open(out["png"], "rb").read(4) == b"\x89PNG"
+    # Colour «7» (white in AutoCAD, the default of layer 0) prints black on the white paper;
+    # other colours stay (a white-on-white picture was once saved for a phone sketch).
+    import ezdxf
+    from PIL import Image
+
+    d = ezdxf.new()
+    d.modelspace().add_lwpolyline([(0, 0), (100, 0), (100, 50)])
+    d.modelspace().add_line((0, 20), (100, 20), dxfattribs={"color": 1})
+    cad.render(d, None, tmp_path / "w.png")
+    pix = {c for _n, c in Image.open(tmp_path / "w.png").convert("RGB").getcolors(1 << 20)}
+    assert any(max(c) < 60 for c in pix)  # black
+    assert any(r > 200 and g < 60 and b < 60 for r, g, b in pix)  # red
     # Word: a real .docx with the drawing picture, wide drawings on a landscape A4
     import zipfile
 

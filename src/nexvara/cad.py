@@ -279,7 +279,7 @@ def render(doc: Any, pdf: Path | None = None, png: Path | None = None,
     backend = pymupdf.PyMuPdfBackend()
     cfg = config.Configuration(
         background_policy=config.BackgroundPolicy.WHITE,
-        color_policy=config.ColorPolicy.COLOR_SWAP_BW if colors else config.ColorPolicy.BLACK,
+        color_policy=config.ColorPolicy.COLOR if colors else config.ColorPolicy.BLACK,
         lineweight_policy=config.LineweightPolicy.ABSOLUTE,
     )
     Frontend(RenderContext(doc), backend, config=cfg).draw_layout(doc.modelspace(), finalize=True)
