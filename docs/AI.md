@@ -114,6 +114,7 @@ media / set_capability / capabilities_status`, UI: chat 🧠 menu and Settings �
 | STT | gpt-4o-mini-transcribe, gpt-transcribe, whisper-1 | Flash/Flash-Lite with audio input (free) | — | — |
 | TTS | gpt-4o-mini-tts | gemini-3.8-flash-lite-tts, gemini-3.8-flash-tts (free tier) | — | — |
 | Realtime | STT → chat → TTS turn by turn | same | — | — |
+| Web («internetdan qidir: …») | gpt-5.4, gpt-5.5 + Responses tool `web_search` ($10/1k calls + search tokens) | gemini-3.5-flash-lite, gemini-3.8-flash + Interactions tool `google_search` (5 000 free/month, then $14/1k) | — | — |
 
 Checked on 2026-10-18 against developers.openai.com/api/docs (pricing, image-generation,
 text-to-speech, speech-to-text) and ai.google.dev/gemini-api/docs (models, pricing,
@@ -130,6 +131,10 @@ account's model list (`ai.catalog`). Uzbek is not listed by OpenAI TTS/STT docs;
 - **Money**: every media call goes through the same daily/monthly/provider/task limits and the
   ledger; every paid direction asks «Ha» with the price, including TTS/STT. 🔊 never sends personal data: found items are spoken as
   «yashirin ma’lumot».
+- **Web**: the question is masked by `ai/privacy.py` first and restored in the answer; the answer
+  lists its sources (`url_citation`). Gemini's free searches run at once, a paid search asks «Ha»
+  with the price. Checked 2026-10-19 against developers.openai.com/api/docs/guides/tools-web-search,
+  /pricing and ai.google.dev/gemini-api/docs/google-search, /pricing. Real calls: NOT TESTED.
 - **Realtime**: the providers' streaming Realtime/Live APIs are not used (cost, complexity);
   🎧 chains 🎤 (silence ends a turn) → chat → 🔊 → 🎤.
 - **New provider**: add it to `models.PROVIDERS` (tiers, prices, pages), a text adapter in

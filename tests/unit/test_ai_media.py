@@ -94,6 +94,12 @@ class MediaFake:
         self._go("stt", model)
         return "salom"
 
+    def web_search(self, model, question):
+        self._go("web", model)
+        self.log.append(("question", question))
+        return {"text": "Toshkentda ertaga +18°C ⟦TEL_1⟧",
+                "sources": [{"url": "https://meteo.uz/x", "title": "Meteo"}]}  # fmt: skip
+
 
 def make(tmp_path, keys, **ai):
     texts: dict[str, TextFake] = {}
@@ -528,3 +534,63 @@ def test_streamed_wav_gets_real_sizes_for_android():
     assert fix_wav_sizes(bytes(bad)) == good
     net = Net({"/audio/speech": bytes(bad)})
     assert OpenAIMedia("sk-test-openai-123456", opener=net).speak("gpt-4o-mini-tts", "x") == good
+
+
+# ---------------- 🌐 internetdan qidirish ----------------
+
+
+def test_web_search_requests_and_sources():
+    cite = {"type": "url_citation", "url": "https://uzhydromet.uz/p", "title": "Gidromet",
+            "start_index": 0, "end_index": 5}  # fmt: skip
+    net = Net({"/responses": {"output": [
+        {"type": "web_search_call", "status": "completed", "action": {"type": "search"}},
+        {"type": "message", "content": [{"type": "output_text", "text": "Ertaga +18°C.",
+                                         "annotations": [cite, cite]}]}]}})  # fmt: skip
+    out = OpenAIMedia("sk-test-openai-123456", opener=net).web_search("gpt-5.4", "ob-havo")
+    body = json.loads(net.bodies[0])
+    assert net.urls[0].endswith("/v1/responses") and body["tools"] == [{"type": "web_search"}]
+    assert out == {"text": "Ertaga +18°C.", "sources": [{"url": "https://uzhydromet.uz/p",
+                                                         "title": "Gidromet"}]}  # fmt: skip
+    net = Net({"/interactions": {"steps": [
+        {"type": "google_search_call", "arguments": {"queries": ["ob-havo"]}},
+        {"type": "google_search_result", "result": {"search_suggestions": "<div/>"}},
+        {"type": "model_output", "content": [{"type": "text", "text": "Ertaga iliq.",
+                                              "annotations": [cite]}]}]}})  # fmt: skip
+    g = GeminiMedia("AIza-test-gemini-1234567", opener=net)
+    assert g.web_search("gemini-3.5-flash-lite", "ob-havo")["sources"][0]["title"] == "Gidromet"
+    assert json.loads(net.bodies[0])["tools"] == [{"type": "google_search"}]
+    with pytest.raises(AiError, match="internetdan javob"):
+        GeminiMedia("AIza-test-1234567", opener=Net({"/interactions": {"steps": []}})).web_search(
+            "gemini-3.5-flash-lite", "x"
+        )
+
+
+def test_chat_web_search_free_gemini_runs_at_once_with_sources(tmp_path, monkeypatch):
+    api, r = _api(tmp_path, monkeypatch)
+    out = api.chat("internetdan qidir: Toshkentda ertaga ob-havo qanday? 90 123 45 67 ga yoz")
+    assert not out.get("confirm") and ("gemini", "web", "gemini-3.5-flash-lite") in r.log
+    sent = next(x[1] for x in r.log if x[0] == "question")
+    assert "90 123 45 67" not in sent and "⟦TEL_1⟧" in sent  # personal data stays here
+    assert "Toshkentda ertaga" in sent and "internetdan qidir" not in sent
+    assert "90 123 45 67" in out["reply"]  # restored in the answer on this PC
+    assert "Manbalar:" in out["reply"] and "https://meteo.uz/x" in out["reply"]
+    assert "bepul" in out["reply"]
+
+
+def test_chat_web_search_paid_asks_first(tmp_path, monkeypatch):
+    api, r = _api(tmp_path, monkeypatch, keys={"openai": KEYS["openai"]})
+    ask = api.chat("internetda eng yangi Python versiyasini top")
+    assert ask.get("confirm") and "gpt-5.4" in ask["reply"] and r.log == []
+    assert api.confirm_ai(ask["confirm"], False).get("reply")  # «Yo‘q»: nothing is called
+    assert r.log == []
+    ask = api.chat("so‘nggi yangiliklar: maktab ta’limi")
+    done = api.confirm_ai(ask["confirm"], True)
+    assert ("openai", "web", "gpt-5.4") in r.log and "Manbalar:" in done["reply"]
+    assert r.ledger.today() > 0  # recorded in the cost ledger
+
+
+def test_web_words_do_not_catch_office_work(tmp_path, monkeypatch):
+    api, r = _api(tmp_path, monkeypatch)
+    for text in ("Baholar.xlsx ni och", "word hujjat yarat", "rasm yarat: olma"):
+        api.chat(text)
+    assert not any(x[1] == "web" for x in r.log if len(x) > 2)

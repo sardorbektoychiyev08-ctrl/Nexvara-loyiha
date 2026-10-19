@@ -5,6 +5,9 @@ OpenAI: POST /v1/images/generations and /v1/images/edits (base64 in data[0].b64_
 Gemini: POST /v1beta/interactions (x-goog-api-key) — images (response_format "image") and
         speech (response_format "audio", WAV 24 kHz mono 16-bit); the base64 data is in a
         `steps[].content[]` block of type image/audio (or `output_image` / `output_audio`).
+Web search: OpenAI POST /v1/responses with tools [{"type": "web_search"}]; Gemini
+        POST /v1beta/interactions with tools [{"type": "google_search"}]. Both answer with
+        text whose `annotations` hold {"type": "url_citation", "url", "title"} sources.
 Listening with Gemini stays in providers.py (audio inside a normal Flash request).
 Every error becomes an AiError with a short Uzbek message; the key is never in it.
 """
@@ -165,6 +168,13 @@ class OpenAIMedia:
                     {**self._auth(), "Content-Type": ctype}, body, self.label)  # fmt: skip
         return self._image_out(raw)
 
+    def web_search(self, model: str, question: str) -> dict[str, Any]:
+        raw = _http(self._open, self.base + "/responses",
+                    {**self._auth(), "Content-Type": "application/json"},
+                    json.dumps({"model": model, "tools": [{"type": "web_search"}],
+                                "input": question}).encode("utf-8"), self.label)  # fmt: skip
+        return _web_answer(_json(raw, self.label), ("output_text",), self.label)
+
     def speak(self, model: str, text: str, voice: str = "marin") -> bytes:
         body = {"model": model, "input": text, "voice": voice, "response_format": "wav"}
         wav = _http(self._open, self.base + "/audio/speech",
@@ -181,6 +191,31 @@ class OpenAIMedia:
         raw = _http(self._open, self.base + "/audio/transcriptions",
                     {**self._auth(), "Content-Type": ctype}, body, self.label)  # fmt: skip
         return str(_json(raw, self.label).get("text") or "").strip()
+
+
+def _web_answer(data: Any, text_types: tuple[str, ...], label: str) -> dict[str, Any]:
+    """The answer text and its unique sources from a Responses / Interactions reply."""
+    texts: list[str] = []
+    sources: list[dict[str, str]] = []
+
+    def walk(v: Any) -> None:
+        if isinstance(v, dict):
+            if v.get("type") in text_types and isinstance(v.get("text"), str):
+                texts.append(v["text"])
+            if v.get("type") == "url_citation" and str(v.get("url", "")).startswith("http"):
+                if all(s["url"] != v["url"] for s in sources):
+                    sources.append({"url": str(v["url"]), "title": str(v.get("title") or "")})
+            for x in v.values():
+                walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+
+    walk(data.get("output") if "output" in data else data.get("steps", data))
+    text = "\n".join(t for t in texts if t.strip()).strip()
+    if not text:
+        raise AiError(f"{label} internetdan javob qaytarmadi.")
+    return {"text": text, "sources": sources[:10]}
 
 
 def _find_block(data: Any, kind: str) -> dict | None:
@@ -238,6 +273,11 @@ class GeminiMedia:
             {"type": "image", "mime_type": mime, "data": base64.b64encode(image).decode()},
         ]
         return self._image(model, parts, _aspect(size))  # fmt: skip
+
+    def web_search(self, model: str, question: str) -> dict[str, Any]:
+        data = self._interact({"model": model, "input": question,
+                               "tools": [{"type": "google_search"}]})  # fmt: skip
+        return _web_answer(data, ("text",), self.label)
 
     def speak(self, model: str, text: str, voice: str = "Kore") -> bytes:
         data = self._interact({

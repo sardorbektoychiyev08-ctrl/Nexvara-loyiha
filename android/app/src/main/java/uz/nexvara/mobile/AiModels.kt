@@ -22,7 +22,7 @@ data class AiDirection(
 )
 
 object AiParse {
-    val ORDER = listOf("text", "vision", "image", "stt", "tts", "realtime")
+    val ORDER = listOf("text", "vision", "image", "stt", "tts", "realtime", "web")
 
     fun directions(o: JSONObject): List<AiDirection> {
         val caps = o.optJSONObject("capabilities") ?: return emptyList()

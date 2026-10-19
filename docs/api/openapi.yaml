@@ -188,7 +188,7 @@ paths:
         "404": {$ref: "#/components/responses/Error"}
   /api/v1/ai/capabilities:
     get:
-      summary: "🧠 Directions text, vision, image, stt, tts, realtime: mode auto|manual, chosen provider/model, what each provider offers (only models found in the account), the AUTO pick (free first, then cheapest), voices, speak_replies. Shared with the PC (one settings file); keys never included"
+      summary: "🧠 Directions text, vision, image, stt, tts, realtime, web: mode auto|manual, chosen provider/model, what each provider offers (only models found in the account), the AUTO pick (free first, then cheapest), voices, speak_replies. Shared with the PC (one settings file); keys never included"
       responses:
         "200": {description: OK, content: {application/json: {schema: {$ref: "#/components/schemas/Ok"}}}}
         "401": {$ref: "#/components/responses/Error"}
