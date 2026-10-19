@@ -99,6 +99,7 @@ DESCRIBE = {
     "slide_numbers": "Slayd raqamlari",
     "check": "Sifatni tekshirish",
     "fix": "Kamchiliklarni tuzatish",
+    "validate": "Kiritishni cheklash (Data Validation)",
 }
 
 
@@ -108,6 +109,41 @@ def _args_text(a: Action) -> str:
 
 
 # ---------- helpers ----------
+
+
+def _validation(clause: str, f: str) -> Action | None:
+    """«Baho ustuniga faqat 2 dan 5 gacha butun son», «Holat ustuniga tanlash ro‘yxati:
+    Bajarildi, Jarayonda», «Narx ustuniga faqat musbat son», «Sana ustuniga faqat sana»."""
+    noise = (r"faqat|kiritil\w*|kirit\w*|bolsin|ruxsat|cheklov\w*|cheklash|validatsiya|"
+             r"validation|tanlash|royxat\w*|ochiluvchi|ustun\w*|dan|gacha|butun|son\w*|"
+             r"raqam\w*|musbat|sana\w*|oraliq\w*")  # fmt: skip
+    words = re.sub(r"\d+", " ", _strip_words(f, noise, _COMMON)).split()
+    words = " ".join(words)
+    col = _column_ref(clause)
+    lst = re.search(r"(?:ro[‘’']?yxat\w*|tanlash)[^:]*:\s*(.+)$", clause, re.I)
+    if lst:
+        items = [
+            x.strip(' .«»"') for x in re.split(r"[,;]|\s+va\s+", lst.group(1)) if x.strip(" .")
+        ]
+        if len(items) >= 2:
+            pre = clause[: lst.start()]
+            head = _strip_words(fold(pre), r"tanlash|royxat\w*|ochiluvchi|ustun\w*|ga|uchun",
+                                _COMMON)  # fmt: skip
+            return Action("validate", {"kind": "list", "items": items[:50], "column": col,
+                                       "words": head}, clause)  # fmt: skip
+    nums = [float(x.replace(",", ".")) for x in re.findall(r"-?\d+(?:[.,]\d+)?", clause)]
+    whole = _has(f, "butun")
+    if _has(f, "sana") and not nums:  # «Sana ustuniga faqat sana»: the column may be «Sana»
+        return Action("validate", {"kind": "date", "column": col, "words": words or "sana"},
+                      clause)  # fmt: skip
+    if _has(f, "musbat") and not nums:
+        return Action("validate", {"kind": "whole" if whole else "decimal", "min": 0,
+                                   "max": None, "column": col, "words": words}, clause)  # fmt: skip
+    if len(nums) >= 2 and _has(f, "gacha", "oraliq", "orasida"):
+        lo, hi = sorted(nums[-2:])
+        return Action("validate", {"kind": "whole" if whole else "decimal", "min": lo, "max": hi,
+                                   "column": col, "words": words}, clause)  # fmt: skip
+    return None
 
 
 def find_file(text: str) -> str | None:
@@ -129,11 +165,17 @@ _STAT_PAIR = re.compile(
 )
 
 
+# «Holat ustuniga tanlash ro‘yxati: Bajarildi, Jarayonda, Bekor» — those commas are the list's
+_LIST_TAIL = re.compile(r"((?:ro[‘’']?yxat\w*|tanlash)[^:,]{0,40}:)(.*?)"
+                        r"(?=,\s*(?:keyin|so[‘’']?ng)\b|[.;]|$)", re.IGNORECASE)  # fmt: skip
+
+
 def split_clauses(text: str) -> list[str]:
     text = _STAT_PAIR.sub(r"\1 & ", text)  # "eng katta va eng kichik" is one request
+    text = _LIST_TAIL.sub(lambda m: m.group(1) + m.group(2).replace(",", "\x1f"), text)
     out = []
     for c in _SPLIT.split(text):
-        c = (c or "").strip()
+        c = (c or "").replace("\x1f", ",").strip()
         while c and _LEADING_CONNECTOR.match(c):  # ", keyin ..." leaves "keyin" in front
             c = _LEADING_CONNECTOR.sub("", c, count=1).strip()
         if c:
@@ -457,6 +499,20 @@ def _classify_extra(clause: str, f: str, app: str | None) -> Action | None:
     if _has(f, "ustun") and _has(f, "ochir", "olib tashla") and not _has(f, "takror", "dublikat"):
         words = _strip_words(f, r"ochir|olib|tashla", _COMMON)
         return Action("delete_column", {"words": words, "column": _column_ref(clause)}, clause)
+    if _has(
+        f,
+        "faqat",
+        "tanlash royxat",
+        "royxatdan tanla",
+        "ochiluvchi royxat",
+        "cheklov",
+        "cheklash",
+        "validatsiya",
+        "validation",
+    ):
+        v = _validation(clause, f)
+        if v is not None:
+            return v
     if _has(f, "varaq", "list") and _has(f, "nom") and quoted:
         return Action("rename_sheet", {"name": quoted.group(1).strip()}, clause)
     if _has(f, "kenglig", "moslashtir", "avtomatik kenglik", "avtopodbor"):

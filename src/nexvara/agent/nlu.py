@@ -107,6 +107,13 @@ def _files(text: str, f: str) -> list[ToolCall] | None:
             return [ToolCall("files.rename_batch", {"paths": src or refs, "pattern": name})]
         if name:
             return [ToolCall("files.rename", {"path": next(iter(src), ""), "name": name})]
+    xls = [v for v in files if v.lower().endswith((".xlsx", ".xlsm", ".xls", ".csv"))]
+    if (
+        (len(xls) >= 2 or (refs and not xls))
+        and _has(f, r"\bvaraq\w*")
+        and _has(f, r"\b(yig\w*|jamla\w*|birlashtir\w*|bitta\s+(fayl|kitob)\w*)")
+    ):
+        return [ToolCall("excel.combine", {"paths": xls or refs})]
     if _has(f, r"\b(zip|arxiv)\w*\s+(dan\s+)?(chiqar|och)\w*|\bunzip"):
         return [ToolCall("files.unzip", {"path": next(iter(files), "")})]
     if _has(f, r"\b(zip\w*|arxivla\w*|arxivga\s+(joyla|sol|qosh)\w*|arxiv\s+(qil|yarat)\w*|siqib)"):

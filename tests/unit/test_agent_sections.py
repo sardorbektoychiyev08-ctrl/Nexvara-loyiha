@@ -234,3 +234,15 @@ def test_pasted_api_key_is_refused_and_not_logged(env):
     r = api.chat("mana kalitim sk-ant-api03-abcdefghijklmnopqrstuv")
     assert "Credential Manager" in r["reply"]
     assert not any("sk-ant" in m["text"] for m in api.memory_chat())
+
+
+def test_several_excel_files_into_one_book_from_chat(env):
+    api, folder = env[0], env[1]
+    a, b = folder / "Yanvar.xlsx", folder / "Fevral.xlsx"
+    for p in (a, b):
+        p.write_bytes(b"xlsx")
+    got = []
+    api._overrides["excel_combine"] = lambda task: got.append(1) or {"path": str(folder / "Y.xlsx")}
+    r = api.chat(f"«{a}» va «{b}» ni bitta faylga varaq qilib yig‘")
+    assert "yig‘ilmoqda" in r["reply"] and r.get("task")
+    assert api._runner.get(r["task"]["id"]).wait(10) and got == [1]

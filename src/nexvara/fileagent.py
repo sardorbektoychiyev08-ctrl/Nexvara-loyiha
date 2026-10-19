@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import time
 import zipfile
@@ -383,6 +384,48 @@ def recycle(paths: list[str]) -> int:
 
 
 # ---------------- Office -> PDF ----------------
+
+
+def combine_workbooks(task: Any, paths: list[str], keep_open: bool = True) -> dict[str, Any]:
+    """«A.xlsx va B.xlsx ni bitta faylga varaq qilib yig‘»: a new workbook next to the first
+    file, one sheet per file (its first sheet, named after the file). Visible Excel; the
+    original files are opened read-only and closed unchanged."""
+    from nexvara.skills.excel.bridge import ExcelSession
+
+    items = [_existing(p) for p in paths]
+    out = free_name(items[0].parent / f"Yig‘ma_{time.strftime('%Y%m%d-%H%M%S')}.xlsx")
+    names: list[str] = []
+    with ExcelSession(visible=True, keep_open=keep_open) as xl:
+        book = xl.new_workbook()
+        first_blank = book.Worksheets(1)
+        for p in items:
+            task.check_cancelled()
+            with task.step(f"Qo‘shish: {p.name}") as s:
+                src = xl.app.Workbooks.Open(str(p.resolve()), 0, True)  # UpdateLinks, ReadOnly
+                try:
+                    sheet = src.Worksheets(1)
+                    sheet.Copy(None, book.Worksheets(book.Worksheets.Count))  # (Before, After)
+                    new = book.Worksheets(book.Worksheets.Count)
+                    base = re.sub(r"[\\/?*\[\]:]", " ", p.stem).strip()[:31] or "Varaq"
+                    name, n = base, 2
+                    taken = {book.Worksheets(i).Name for i in range(1, book.Worksheets.Count)}
+                    while name in taken:
+                        name, n = f"{base[:28]} ({n})", n + 1
+                    new.Name = name
+                    names.append(name)
+                    s.detail = f"{new.UsedRange.Rows.Count} qator"
+                finally:
+                    src.Close(False)
+        xl.app.DisplayAlerts = False
+        first_blank.Delete()
+        xl.app.DisplayAlerts = True
+        book.Worksheets(1).Activate()
+        with task.step("Saqlash") as s:
+            saved = xl.save_as(book, out)
+            s.detail = saved.name
+    log("combine", files=[str(p) for p in items], dst=str(saved))
+    return {"path": str(saved), "files": [str(saved)],
+            "report": [f"{len(names)} ta varaq: " + ", ".join(names)]}  # fmt: skip
 
 
 def convert_to_pdf(task: Any, paths: list[str], keep_open: bool = False) -> dict[str, Any]:

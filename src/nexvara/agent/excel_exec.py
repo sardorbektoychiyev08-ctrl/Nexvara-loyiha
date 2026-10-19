@@ -1138,7 +1138,60 @@ def _ex_fix(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
     return "; ".join(done) if done else "Tuzatiladigan kamchilik topilmadi"
 
 
+def _ex_validate(a, xl, ws, t, ops, col_letter, check, nums, texts) -> str:
+    """Data Validation on a column's data cells, with an Uzbek stop message. Excel COM:
+    Validation.Add(Type, AlertStyle, Operator, Formula1, Formula2) — positional only."""
+    kind = a.args.get("kind")
+    c = _strict_column(t, a.args.get("words"), _letter(a.args.get("column")))
+    if c is None:  # «Soni ustuniga …»: the header itself may look like a rule word («son»)
+        said = fold(a.text.split("ustun")[0]) if "ustun" in fold(a.text) else fold(a.text)
+        named = [i for i, h in enumerate(t.headers, 1) if h and re.search(
+            rf"\b{re.escape(fold(str(h)))}\b", said)]  # fmt: skip
+        c = named[-1] if named else None
+    if c is None:
+        raise CommandError("Qaysi ustunga cheklov qo‘yishni yozing (masalan «Baho ustuniga …»)")
+    rng = _body(ws, t, c)
+    v = rng.Validation
+    v.Delete()
+    name = t.headers[c - 1]
+    if kind == "list":
+        intl = xl.app.International  # pywin32 returns the whole array (1-based index 5 = [4])
+        # xlListSeparator: «,» or «;» depending on the Windows region
+        sep = str(intl[4] if isinstance(intl, (tuple, list)) else intl(5))
+        items = [str(x).replace(sep, " ") for x in a.args["items"]]
+        v.Add(3, 1, 1, sep.join(items))  # xlValidateList, xlValidAlertStop, xlBetween
+        v.InCellDropdown = True
+        msg = "Ro‘yxatdan tanlang: " + ", ".join(items)
+        what = f"tanlash ro‘yxati ({len(items)} ta)"
+    elif kind == "date":
+        v.Add(4, 1, 5, "1/1/1900")  # xlValidateDate, stop, xlGreaterEqual
+        msg, what = "Faqat sana kiriting", "faqat sana"
+    else:
+        typ = 1 if kind == "whole" else 2  # xlValidateWholeNumber / xlValidateDecimal
+        lo, hi = a.args.get("min"), a.args.get("max")
+
+        def n(x: float) -> str:
+            return str(int(x)) if float(x).is_integer() else str(x)
+
+        if hi is None:
+            v.Add(typ, 1, 7, n(lo))  # xlGreaterEqual
+            msg = f"Faqat {n(lo)} yoki undan katta {'butun ' if typ == 1 else ''}son kiriting"
+        else:
+            v.Add(typ, 1, 1, n(lo), n(hi))  # xlBetween
+            msg = f"Faqat {n(lo)} dan {n(hi)} gacha {'butun ' if typ == 1 else ''}son kiriting"
+        what = msg[6:].replace(" kiriting", "")
+    v.ErrorTitle = "NEXVARA: noto‘g‘ri qiymat"
+    v.ErrorMessage = msg
+    v.ShowError = True
+    v.InputTitle = name[:32]
+    v.InputMessage = msg[:255]
+    v.ShowInput = True
+    check("Cheklov qo‘yildi", int(rng.Cells(1, 1).Validation.Type) in (1, 2, 3, 4), name)
+    return f"«{name}» ustuniga: {what}"
+
+
 _EXTRA = {
+    "validate": _ex_validate,
     "check": _ex_check,
     "fix": _ex_fix,
     "highlight": _ex_highlight, "numfmt": _ex_numfmt, "autofit": _ex_autofit,
