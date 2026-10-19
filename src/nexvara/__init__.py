@@ -1,3 +1,3 @@
-﻿"""NEXVARA Personal."""
+"""NEXVARA Personal."""
 
 __version__ = "1.5.2"
