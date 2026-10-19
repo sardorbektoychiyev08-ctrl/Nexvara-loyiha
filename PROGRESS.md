@@ -4,6 +4,18 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-19 (38) — Claude Code — Egasining ayoli uchun sozlash: noutbuk «NILUFAR», telefon, Tailscale
+
+**Foydalanuvchi talabi:** shu noutbuk ayolining — uning Google hisobini NEXVARA’ga ulash, telefoniga ilovani o‘rnatib bog‘lash, har xil tarmoqda ham ishlashi uchun Tailscale.
+
+**Qilindi:** `main` ga merge va push (b5ed8aa). Ayolining telefoni (Xiaomi M2101K9AG, Android 13) ga NEXVARA 1.6.0 o‘rnatildi. NEXVARA’dan egasining Google hisobi chiqarildi (grant bekor qilindi) va egalik bo‘shatildi; ayoli o‘z hisobi bilan kirdi (ega). Telefon Wi‑Fi o‘chiq bo‘lgani uchun bog‘lanmagan edi — Wi‑Fi yoqildi, QR orqali bog‘landi. Tailscale: noutbukka winget bilan o‘rnatildi, telefonga Play Market’dan; ikkalasi ayolining Tailscale hisobida (noutbuk 100.65.206.5, telefon 100.118.62.7). Windows himoya devorida NEXVARA faqat «Public» profilda ruxsat olgan edi, Tailscale «Private» — `NEXVARA (Tailscale)` qoidasi qo‘shildi (faqat TCP 8765, faqat 100.64.0.0/10, egasi UAC bilan tasdiqladi).
+
+**Testlar:** telefon Wi‑Fi o‘chiq, faqat 4G + Tailscale → NEXVARA «Ulangan» (PC’da 100.118.62.7 dan ulanish) — PASS. NEXVARA Windows bilan birga ishga tushadi — yoqiq.
+
+**Ochiq:** noutbukda hali egasining AI kalitlari (OpenAI/Gemini) va sinxron sozlamasi turibdi — egasi qarori kutilmoqda. Egasining telefoni ham shu noutbukka bog‘langan (qurilma yozuvi o‘chirilmadi). **Mahsulotga taklif:** Tailscale uchun himoya devori qoidasini NEXVARA o‘zi taklif qilsin (hozir qo‘lda, admin kerak).
+
+---
+
 ## 2026-10-19 (37) — Claude Code — 1–12 ishlar: sozlamalar poygasi, BI bazalari, suhbat sinxroni, internetdan qidirish, telefondan fayl amallari, chizma albomi/Word, qo‘llanma; Windows 1.5.0, Android 1.6.0
 
 **Foydalanuvchi talabi:** «men bilan qiladigan ishlar qolsin, qolgan barcha ishlarni qil 1 dan 12 gacha» (ro‘yxat: 1 media_tools beqarorligi, 2 Word tugmasi oyna testi, 3 android_build yo‘li, 4 build.ps1, 5 ROADMAP, 6 telefondan arxivni ochish, 7 BI bazalari, 8 suhbat tarixi sinxroni, 9 internetdan qidirish, 10 telefondan nomlash/PDF/ko‘chirish, 11 chizma albomi/Word’ga qo‘yish/o‘lchamlar jadvali, 12 yakuniy versiyaga tayyorgarlik).
