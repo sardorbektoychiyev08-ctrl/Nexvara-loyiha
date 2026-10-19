@@ -193,8 +193,9 @@ class MemoryStore:
 
     def chat(self, limit: int = 200) -> list[dict[str, Any]]:
         with self._db() as db:
-            rows = db.execute(
-                "SELECT id, ts, role, text FROM chat_log ORDER BY id DESC LIMIT ?", (limit,)
+            rows = db.execute(  # by time: messages from another PC are added later
+                "SELECT id, ts, role, text FROM chat_log ORDER BY ts DESC, id DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return [{"id": r[0], "ts": r[1], "role": r[2], "text": r[3]} for r in reversed(rows)]
 
@@ -203,7 +204,7 @@ class MemoryStore:
         since = time.time() - days * 86400
         with self._db() as db:
             rows = db.execute(
-                "SELECT role, text FROM chat_log WHERE ts >= ? ORDER BY id DESC LIMIT ?",
+                "SELECT role, text FROM chat_log WHERE ts >= ? ORDER BY ts DESC, id DESC LIMIT ?",
                 (since, limit),
             ).fetchall()
         return [{"role": r[0], "text": r[1][:1500]} for r in reversed(rows)]
@@ -295,6 +296,43 @@ class MemoryStore:
                 db.execute("DELETE FROM chat_log WHERE id = ?", (i,))
                 db.execute("DELETE FROM chat_fts WHERE rowid = ?", (i,))
         return len(ids)
+
+    # ----- chat between this user's PCs (sync.py, only when settings sync.chat is on) -----
+    def chat_since(self, since: float, limit: int = 1000) -> list[dict[str, Any]]:
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT id, ts, role, text FROM chat_log WHERE ts >= ? ORDER BY ts DESC LIMIT ?",
+                (since, limit),
+            ).fetchall()
+        return [{"id": r[0], "ts": r[1], "role": r[2], "text": r[3]} for r in rows]
+
+    def chat_exists(self, chat_id: int) -> bool:
+        with self._db() as db:
+            return (
+                db.execute("SELECT 1 FROM chat_log WHERE id = ?", (chat_id,)).fetchone() is not None
+            )
+
+    def import_chat(self, ts: float, role: str, text: str) -> int:
+        """A message from another PC, with its own time; the same message is kept once."""
+        text = (text or "").strip()
+        with self._lock, self._db() as db:
+            same = db.execute(
+                "SELECT id FROM chat_log WHERE ts = ? AND role = ? AND text = ?", (ts, role, text)
+            ).fetchone()
+            if same:
+                return same[0]
+            cur = db.execute(
+                "INSERT INTO chat_log (ts, role, text) VALUES (?, ?, ?)", (ts, role, text)
+            )
+            db.execute(
+                "INSERT INTO chat_fts (rowid, text) VALUES (?, ?)", (cur.lastrowid, fold(text))
+            )
+            return cur.lastrowid
+
+    def delete_chat(self, chat_id: int) -> None:
+        with self._lock, self._db() as db:
+            db.execute("DELETE FROM chat_log WHERE id = ?", (chat_id,))
+            db.execute("DELETE FROM chat_fts WHERE rowid = ?", (chat_id,))
 
     def clear_chat(self) -> None:
         with self._lock, self._db() as db:

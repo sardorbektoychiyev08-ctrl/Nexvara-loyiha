@@ -5,7 +5,9 @@ device that made it. Deletions are kept as tombstones. Merging is last-writer-wi
 (ties broken by device id), so two devices that each changed something different both keep
 their change, and the same item changed on both ends converges to the newer edit.
 
-What is synced: facts, rules (text, app, on/off) and the harmless settings in SYNC_SETTINGS.
+What is synced: facts, rules (text, app, on/off) and the harmless settings in SYNC_SETTINGS;
+the chat of the last CHAT_DAYS days only when the owner turned on settings sync.chat (a message
+deleted with «… ni unut» is deleted on the other PCs too; a message that only grew old is not).
 Never synced: API keys, tokens, `ai.enabled` (a device must not switch on paid AI for
 another), machine-specific paths (update channel, sync folder, phone port).
 
@@ -39,6 +41,9 @@ SYNC_SETTINGS = (
     "ai.send_textbook_text",
 )  # fmt: skip
 FORMAT = 1
+CHAT_DAYS = 30
+CHAT_MAX = 1000
+_CHAT_ROLES = ("user", "nexvara", "workflow")
 MAGIC = b"NXS1"
 _AAD = b"NEXVARA-SYNC-1"
 
@@ -123,9 +128,18 @@ class SyncEngine:
         return sqlite3.connect(str(self.path), timeout=10)
 
     # what exists locally right now: kind -> local_id -> data
+    def _chat_on(self) -> bool:
+        return bool(self.settings.load()["sync"].get("chat"))
+
     def _local(self) -> dict[str, dict[str, dict[str, Any]]]:
         s = self.settings.load()
+        chat = {}
+        if s["sync"].get("chat") and hasattr(self.mem, "chat_since"):
+            since = time.time() - CHAT_DAYS * 86400
+            chat = {str(m["id"]): {"ts": m["ts"], "role": m["role"], "text": m["text"]}
+                    for m in self.mem.chat_since(since, CHAT_MAX)}  # fmt: skip
         return {
+            "chat": chat,
             "fact": {str(f["id"]): {"text": f["text"]} for f in self.mem.facts()},
             "rule": {
                 str(r.id): {"app": r.app, "text": r.text, "enabled": bool(r.enabled)}
@@ -154,6 +168,13 @@ class SyncEngine:
                             (_hash(item), json.dumps(item), now, self.device, kind, uid),
                         )
                         changed += 1
+                elif (
+                    kind == "chat"
+                    and not deleted
+                    and (not self._chat_on() or self.mem.chat_exists(int(local_id)))
+                ):
+                    # Only grown old (or chat sync off): forget it here, delete nowhere.
+                    db.execute("DELETE FROM sync_items WHERE kind=? AND uid=?", (kind, uid))
                 elif not deleted and kind != "setting":
                     db.execute(
                         "UPDATE sync_items SET deleted=1, data='{}', hash='', updated=?, "
@@ -193,8 +214,10 @@ class SyncEngine:
                 deleted = bool(r.get("deleted"))
             except (KeyError, TypeError, ValueError):
                 continue
-            if kind not in ("fact", "rule", "setting") or not isinstance(data, dict):
+            if kind not in ("fact", "rule", "setting", "chat") or not isinstance(data, dict):
                 continue
+            if kind == "chat" and not self._chat_on():
+                continue  # this PC did not agree to receive chat
             if kind == "setting" and uid not in SYNC_SETTINGS:
                 continue  # never let a remote change anything outside the safe list
             with self._db() as db:
@@ -218,6 +241,22 @@ class SyncEngine:
     def _apply(self, kind: str, uid: str, local_id: str, data: dict, deleted: bool) -> str:
         from nexvara.knowledge.textnorm import fold
 
+        if kind == "chat":
+            exists = bool(local_id) and self.mem.chat_exists(int(local_id))
+            if deleted:
+                if exists:
+                    self.mem.delete_chat(int(local_id))
+                return local_id
+            text, role = str(data.get("text", "")), str(data.get("role", ""))
+            try:
+                ts = float(data.get("ts"))
+            except (TypeError, ValueError):
+                return local_id
+            if exists or not text.strip() or role not in _CHAT_ROLES:
+                return local_id
+            if ts < time.time() - CHAT_DAYS * 86400 or ts > time.time() + 86400:
+                return local_id
+            return str(self.mem.import_chat(ts, role, text[:20000]))
         if kind == "setting":
             if not deleted:
                 try:
