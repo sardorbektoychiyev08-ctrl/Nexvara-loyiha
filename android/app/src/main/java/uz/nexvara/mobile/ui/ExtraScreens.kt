@@ -325,7 +325,7 @@ fun PcFilesPanel(m: AppModel, act: PhoneActions) {
             }
             Text("${f.folder} · ${Fmt.size(f.size)} · ${Fmt.ago(f.modified)}", style = MaterialTheme.typography.bodySmall, color = x.muted,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScrollSafe(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { m.openOnPc(f) }) { Icon(Icons.Default.DesktopWindows, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Kompyuterda ochish") }
                 TextButton(onClick = { m.shareToPhone(f) { act.saveResult(it) } }) {
                     Icon(Icons.Default.Download, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Telefonga")
