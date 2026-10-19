@@ -1,4 +1,4 @@
-"""AutoCAD files: a NEXVARA drawing as a proper DXF, and any DXF shown as PDF/PNG.
+"""AutoCAD files: a NEXVARA drawing as a proper DXF, and any DXF shown as PDF/PNG/Word.
 
 The DXF is what an engineer expects when it opens in AutoCAD:
 - R2010 (AutoCAD 2010+ opens it directly; Unicode text, so «o‘», «ғ», «Ø» survive);
@@ -291,4 +291,73 @@ def render(doc: Any, pdf: Path | None = None, png: Path | None = None,
     if png is not None:
         png.write_bytes(backend.get_pixmap_bytes(page, fmt="png", dpi=dpi))
         out["png"] = str(png)
+    return out
+
+
+# ---------------- drawing -> Word (.docx) without opening Word ----------------
+_NS = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+       'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+       'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+       'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+       'xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"')  # fmt: skip
+_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+
+
+def png_to_docx(png: Path, out: Path, title: str = "") -> Path:
+    """A Word file with the drawing picture on one A4 page (landscape when the drawing is
+    wide), written as plain OOXML: no Word window, the same on any Office language."""
+    import zipfile
+    from xml.sax.saxutils import escape
+
+    from PIL import Image
+
+    with Image.open(png) as im:
+        w_px, h_px = im.size
+    land = w_px > h_px
+    page_w, page_h = (16838, 11906) if land else (11906, 16838)  # A4, twentieths of a point
+    margin = 851  # 1.5 cm
+    # The picture fills the free area and keeps its shape; 1 twip = 635 EMU.
+    box_w = (page_w - 2 * margin) * 635
+    box_h = (page_h - 2 * margin - (900 if title else 300)) * 635
+    k = min(box_w / w_px, box_h / h_px)
+    cx, cy = int(w_px * k), int(h_px * k)
+    center = '<w:pPr><w:jc w:val="center"/></w:pPr>'
+    bold = '<w:rPr><w:b/><w:sz w:val="28"/></w:rPr>'
+    text = f'<w:t xml:space="preserve">{escape(title)}</w:t>'
+    head = f"<w:p>{center}<w:r>{bold}{text}</w:r></w:p>" if title else ""
+    orient = ' w:orient="landscape"' if land else ""
+    body = (
+        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document {_NS}><w:body>{head}'
+        f"<w:p>{center}<w:r><w:drawing>"
+        f'<wp:inline><wp:extent cx="{cx}" cy="{cy}"/><wp:docPr id="1" name="Chizma"/>'
+        '<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        '<pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="chizma.png"/><pic:cNvPicPr/></pic:nvPicPr>'
+        '<pic:blipFill><a:blip r:embed="rImg"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
+        f'<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm>'
+        '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>'
+        "</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"
+        f'<w:sectPr><w:pgSz w:w="{page_w}" w:h="{page_h}"{orient}/>'
+        f'<w:pgMar w:top="{margin}" w:right="{margin}" w:bottom="{margin}" w:left="{margin}" '
+        'w:header="0" w:footer="0" w:gutter="0"/></w:sectPr></w:body></w:document>'
+    )
+    xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    pkg = "http://schemas.openxmlformats.org/package/2006/"
+    types = (f'{xml}<Types xmlns="{pkg}content-types">'
+             '<Default Extension="rels" ContentType="application/'
+             'vnd.openxmlformats-package.relationships+xml"/>'
+             '<Default Extension="xml" ContentType="application/xml"/>'
+             '<Default Extension="png" ContentType="image/png"/>'
+             '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-'
+             'officedocument.wordprocessingml.document.main+xml"/></Types>')  # fmt: skip
+    rels = (f'{xml}<Relationships xmlns="{pkg}relationships"><Relationship Id="rId1" '
+            f'Type="{_REL}officeDocument" Target="word/document.xml"/>'
+            "</Relationships>")  # fmt: skip
+    doc_rels = (f'{xml}<Relationships xmlns="{pkg}relationships"><Relationship Id="rImg" '
+                f'Type="{_REL}image" Target="media/chizma.png"/></Relationships>')  # fmt: skip
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", types)
+        z.writestr("_rels/.rels", rels)
+        z.writestr("word/document.xml", body)
+        z.writestr("word/_rels/document.xml.rels", doc_rels)
+        z.write(png, "word/media/chizma.png")
     return out

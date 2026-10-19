@@ -17,7 +17,7 @@ _DXF_FILE = re.compile(
     re.IGNORECASE,
 )
 _DXF_VERBS = re.compile(
-    r"\b(pdf|png|rasm\w*|ko[‘’']?rsat\w*|korsat\w*|och\w*|aylantir\w*|ko[‘’']?r\b|chop|"
+    r"\b(pdf|png|word|docx|rasm\w*|ko[‘’']?rsat\w*|korsat\w*|och\w*|aylantir\w*|ko[‘’']?r\b|chop|"
     r"ichida nima|tarkib\w*|tekshir\w*)",
     re.IGNORECASE,
 )
@@ -219,9 +219,9 @@ class DrawingApi:
         except LookupError as e:
             return {"reply": str(e)}
         self._context_file = str(path)
-        return self._run_dxf_view(path)
+        return self._run_dxf_view(path, bool(re.search(r"\b(word|docx)\b", text, re.I)))
 
-    def _run_dxf_view(self, path: Path) -> dict[str, Any]:
+    def _run_dxf_view(self, path: Path, word: bool = False) -> dict[str, Any]:
         from nexvara import cad
 
         if path.suffix.lower() == ".dwg":
@@ -246,15 +246,24 @@ class DrawingApi:
                 stem = path.stem[:60]
                 out = cad.render(doc, folder / f"{stem}.pdf", folder / f"{stem}.png")
                 s.detail = Path(out["pdf"]).name
+            if word:
+                with task.step("Word fayl qilish") as s:
+                    out["docx"] = str(cad.png_to_docx(Path(out["png"]), folder / f"{stem}.docx",
+                                                      path.stem))  # fmt: skip
+                    s.detail = Path(out["docx"]).name
             if show:
                 with task.step("Kompyuter ekranida ochish"):
                     opener = self._overrides.get("open_file") or os.startfile
-                    opener(out["pdf"])  # noqa: S606 - our own file
+                    opener(out["docx" if word else "pdf"])  # noqa: S606 - our own file
             w, h = info["size"]
             report = [f"{path.name}: {info['entities']} ta obyekt, {len(info['layers'])} ta qatlam",
                       f"O‘lchami: {w:g} × {h:g} {info['units']}".strip()]  # fmt: skip
-            return {"path": out["png"], "pdf": out["pdf"], "source": str(path), "report": report}
+            res = {"path": out["png"], "pdf": out["pdf"], "source": str(path), "report": report}
+            if word:
+                res["docx"] = out["docx"]
+            return res
 
         snap = self._runner.start(f"AutoCAD fayli: {path.name}", fn).snapshot()
-        return {"reply": f"«{path.name}» chizmasini PDF va rasmga aylantiryapman — tayyor "
+        what = "PDF, rasm va Word’ga" if word else "PDF va rasmga"
+        return {"reply": f"«{path.name}» chizmasini {what} aylantiryapman — tayyor "
                 "bo‘lgach ochiladi.", "task": snap}  # fmt: skip

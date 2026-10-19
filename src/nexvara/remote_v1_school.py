@@ -284,6 +284,7 @@ def route(
                 int(b.get("dy") or 0),
                 str(b.get("text") or ""),
                 str(b.get("key") or ""),
+                int(b.get("dx") or 0),
             )
         except ValueError as e:
             raise ApiError("BAD_REQUEST", str(e)) from e

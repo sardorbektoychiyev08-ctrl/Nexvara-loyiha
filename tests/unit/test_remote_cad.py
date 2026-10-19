@@ -30,6 +30,7 @@ def test_phone_drawing_is_saved_as_dxf_and_opens_on_the_pc(env, tmp_path):  # no
     assert (
         out["dxf"].endswith(".dxf") and out["pdf"].endswith(".pdf") and out["png"].endswith(".png")
     )
+    assert out["docx"].endswith(".docx") and open(out["docx"], "rb").read(2) == b"PK"
     assert out["entities"] == 4
     doc = cad.read(out["dxf"])
     assert cad.audit(doc) == [] and cad.summary(doc)["types"]["DIMENSION"] == 1

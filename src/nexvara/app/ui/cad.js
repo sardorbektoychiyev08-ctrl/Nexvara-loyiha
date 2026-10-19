@@ -1339,7 +1339,7 @@ async function cadAction(action) {
       cadLog(`${r.reply} Yoqmasa — «Orqaga» (Ctrl+Z).`);
       return;
     }
-    if (action === "pdf" || action === "png") {
+    if (action === "pdf" || action === "png" || action === "word") {
       const r = await api().cad_export(cadState.doc, action);
       cadLog(r.ok ? `Tayyor: ${r.path}` : (r.error || "Eksport bajarilmadi."));
     }

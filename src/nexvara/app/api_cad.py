@@ -353,13 +353,16 @@ class CadApi:
 
     def cad_export(self, drawing: dict[str, Any], kind: str = "pdf",
                    path: str = "") -> dict[str, Any]:  # fmt: skip
-        """PDF (vector, for printing) or PNG next to the drawing, or in Chizmalar."""
+        """PDF (vector, for printing), PNG or Word (the picture on an A4 page) next to the
+        drawing, or in Chizmalar."""
+        import tempfile
         import time
 
         from nexvara import cad, config
 
-        if kind not in ("pdf", "png"):
-            return {"ok": False, "error": "Faqat PDF yoki PNG"}
+        kind = "docx" if kind == "word" else kind
+        if kind not in ("pdf", "png", "docx"):
+            return {"ok": False, "error": "Faqat PDF, PNG yoki Word"}
         try:
             doc = json_to_doc(drawing)
         except ValueError as e:
@@ -372,7 +375,13 @@ class CadApi:
             folder = getattr(self, "_output_dir", None) or (config.data_dir() / "Chizmalar")
             Path(folder).mkdir(parents=True, exist_ok=True)
             out = Path(folder) / f"chizma_{time.strftime('%Y%m%d-%H%M%S')}.{kind}"
-        cad.render(doc, out if kind == "pdf" else None, out if kind == "png" else None)
+        if kind == "docx":
+            with tempfile.TemporaryDirectory() as tmp:
+                png = Path(tmp) / "chizma.png"
+                cad.render(doc, None, png, dpi=200)
+                cad.png_to_docx(png, out, out.stem.replace("_", " "))
+        else:
+            cad.render(doc, out if kind == "pdf" else None, out if kind == "png" else None)
         opener = self._overrides.get("open_file")
         if opener:
             opener(str(out))
