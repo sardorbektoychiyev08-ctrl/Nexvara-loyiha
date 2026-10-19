@@ -57,13 +57,19 @@ Tools: `pip install pyinstaller` in `.venv`, `winget install JRSoftware.InnoSetu
 - Settings are migrated by merging with defaults (`appdata.DEFAULT_SETTINGS`); unknown keys
   are kept, missing keys get defaults. Device table columns are added by `DeviceStore`.
 
-## Not done
+## Internet updates (GitHub, 2026-10-19)
 
-- **Internet updates: no HTTPS server yet.** The code accepts an `https://` channel, but it has
-  not been tested against a real server. Today's channel is a local folder
-  (`D:\NEXVARA\releases`) — that is a local update, not an internet one.
+- The public repository `sardorbektoychiyev08-ctrl/nexvara-yangilanish` holds only signed
+  installers (Windows .exe, Android .apk) and the signed manifest — never source code or keys.
+  The source repository stays private.
+- Channel (the default for new installs, `appdata.UPDATES_URL`):
+  `https://github.com/sardorbektoychiyev08-ctrl/nexvara-yangilanish/releases/latest/download`.
+- Publish: `.\scripts\build.ps1 -Publish <folder>`, copy the release APK into the folder, then
+  `python scripts\publish_github.py <folder> v<version>` (token from `git credential`).
+- Tested with v1.5.0: check → Ed25519 signature → download → size + SHA-256 from GitHub;
+  1.4.0 sees 1.5.0, 1.5.0 sees nothing new.
+
+## Not done
 
 - Code signing of the .exe (Authenticode) needs a certificate — **BLOCKED** (SmartScreen
   shows "unknown publisher" on first run).
-- GitHub Releases as a channel: the repository is private, so downloads need a token; use a
-  folder or another https host instead.
