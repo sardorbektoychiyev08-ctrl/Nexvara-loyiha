@@ -10,7 +10,8 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 **Qilindi:** `features.small_talk` — faqat salom/rahmat so‘zlaridan iborat qisqa xabar rejalashtiruvchisiz, `cheap` darajada, effort low.
 **Testlar:** `scripts/test.ps1` — 548 PASS, smoke PASS.
 **Egasi qarori («ikkovini ham»):** bepul Gemini birinchi, band yoki bepul limit tugasa — OpenAI. Endi bepul rejim + «boshqa provayderga o‘tish» yoqiq bo‘lsa pullik provayderlar Gemini ortida zaxirada turadi (o‘chiq bo‘lsa — avvalgidek faqat bepul); zaxira «Ha» qoidasi `_cheap`. Egasining settings.json: `free_tier_confirmed: true` (Google 429 javobi bilan tasdiqlangan). Testlar: 548 PASS, smoke PASS.
-**Keyingi qadam:** v1.5.5 chiqarish (egasi tasdiqladi).
+**Reliz:** v1.5.5 GitHub’da (push e91e924); internetdan imzo, hajm, SHA-256 `6eee7fbb5bf4618425598d3fff9f0a0b3b35f033b4ebf40e65345d54ec774ff6` — PASS.
+**Keyingi qadam:** noutbuk va ishxonada «Yangilash» (1.5.5); kalitlarni ko‘chirish; ishxonada telefon ulanishi.
 
 ---
 
