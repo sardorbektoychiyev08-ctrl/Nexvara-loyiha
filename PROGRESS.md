@@ -15,7 +15,8 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 - Bir xil narxdagi bepul Gemini modellaridan shu darajaga mosi tanlanadi (salom → Flash-Lite).
 
 **Testlar:** `scripts/test.ps1` — 553 PASS, 94 skipped, smoke PASS; ruff (format tuzatilgandan keyin) PASS. Haqiqiy Excel/Word’ga yozish (`write_to_office`) — NOT TESTED (Office ochiladi, egasi ruxsati kerak).
-**Keyingi qadam:** egasi ruxsati bilan `-Office` sinovi (javobni Excel/Word’ga yozish); keyin `main` ga merge, versiya va reliz — egasi tasdig‘i bilan.
+**Office sinovi (egasi ruxsati bilan):** yangi `tests/office/test_write_answer_office.py` — Excel test jadvali va Word matni — 2 PASS. `test.ps1 -Office` to‘liq yugurishi `test_officeai_office.py::test_powerpoint_text_boxes` da PowerPoint osilib qoldi (25 daq.); jarayon to‘xtatildi, sinov alohida — PASS; qolgan fayllar (powerpoint, smartart, task4, ui_pages, word, workflow_excel, write_answer) — 33 PASS. `test_library.py::test_ai_test_in_word_with_fake_provider` FAIL edi: (41) dagi «Ha faqat chegaradan qimmatda» qoidasidan keyin eskirgan — sinovda `confirm_over_usd: 0` qo‘yildi, PASS. `test_library_page_in_real_ui` bir marta FAIL (selftest vaqti), alohida 2 marta PASS — beqaror.
+**Keyingi qadam:** `main` ga merge; versiya va reliz — egasi tasdig‘i bilan.
 
 ---
 
