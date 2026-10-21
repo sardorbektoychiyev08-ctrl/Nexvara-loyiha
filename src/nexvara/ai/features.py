@@ -117,6 +117,9 @@ hozirgi kontekst quyida. Vazifang: so‘rovni quyidagi ASBOBLAR chaqiruvlariga a
 Asboblarni o‘zing bajarmaysan — faqat JSON reja qaytarasan, ilova uni tekshirib bajaradi.
 
 Qoidalar:
+- Foydalanuvchi xato yozishi mumkin (harf tushib qolgan, qo‘shilib ketgan, «exsel», «vord», \
+«sinif», og‘zaki yoki aralash til). Ma’nosini tiklab tushun va buyruq matnini to‘g‘ri yozilgan \
+holda ber; aniq bo‘lmasa, eng ehtimolli ma’noni tanla va «say» da qisqa ayt.
 - Faqat ro‘yxatdagi asbob nomlari va parametrlaridan foydalan. Yo‘l (path) to‘qib chiqarma: \
 foydalanuvchi aytgan nom, kontekstdagi fayl yoki "@prev" (oldingi qadam natijasi) ishlatiladi.
 - Office fayl ichidagi ishlar, darslikdan test/mavzu/taqdimot, xotira va Teach uchun \

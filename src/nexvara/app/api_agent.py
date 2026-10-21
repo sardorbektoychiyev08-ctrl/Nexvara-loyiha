@@ -29,7 +29,10 @@ _FAILED = ("Buni tushunmadim", "Qaysi", "Bajara olmadim", "Xato", "Bu rejimda")
 
 _SERVICE = re.compile(
     r"^\s*(ha|yo[‘’']?q|ha, davom et|so[‘’']?rov yuborilmadi|bu ish pullik ai|tasdiq kerak|"
-    r"bekor qilindi|eslab qolaman:|✨ rasm yarataman|🖼️ rasmni ai ko[‘’']?radi)",
+    r"bekor qilindi|eslab qolaman:|✨ rasm yarataman|🖼️ rasmni ai ko[‘’']?radi|"
+    # provider errors: the AI must not "remember" an outage and apologise for it later
+    r"[\w ()]+ xatosi \(\d+\)|[\w ()]+ serveri hozir band|internetga ulanib bo|"
+    r"gemini bepul limiti|hech bir ai provayderi)",
     re.IGNORECASE,
 )
 

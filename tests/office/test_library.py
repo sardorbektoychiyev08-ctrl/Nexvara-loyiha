@@ -95,6 +95,8 @@ def test_ai_test_in_word_with_fake_provider(data_dir, tmp_path):
     )  # fmt: skip
     router.save_key("anthropic", "sk-ant-fake-0123456789")
     router.settings.update({"ai": {"enabled": True}})  # the user switches AI on
+    # a price question even for a cheap test (the owner's threshold is $0.05)
+    router.settings.update({"ai": {"confirm_over_usd": 0.0}})
     runner = TaskRunner()
     api = Api(runner, output_dir=tmp_path / "out", keep_office_open=False,
               overrides={"ai_router": router})  # fmt: skip

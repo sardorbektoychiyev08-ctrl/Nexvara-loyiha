@@ -209,6 +209,14 @@ class MemoryStore:
             ).fetchall()
         return [{"role": r[0], "text": r[1][:1500]} for r in reversed(rows)]
 
+    def last_replies(self, limit: int = 8) -> list[str]:
+        """NEXVARA's latest answers in full, newest first («shuni Excel’ga yoz»)."""
+        with self._db() as db:
+            rows = db.execute(
+                "SELECT text FROM chat_log WHERE role = 'nexvara' ORDER BY ts DESC, id DESC "
+                "LIMIT ?", (limit,)).fetchall()  # fmt: skip
+        return [r[0] for r in rows]
+
     def recall(
         self, text: str, days: int = 30, limit: int = 6, skip_last: int = 15
     ) -> list[dict[str, Any]]:

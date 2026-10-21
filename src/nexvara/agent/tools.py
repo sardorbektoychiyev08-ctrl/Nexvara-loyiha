@@ -419,6 +419,19 @@ def excel_combine(api, a):
             "task": snap}  # fmt: skip
 
 
+@tool("office.write", "Javobni Excel yoki Word fayliga yozish (ekranda ochiladi)",
+      app=("string", True, "excel yoki word"),
+      text=("string", False, "yoziladigan matn; bo‘sh bo‘lsa NEXVARA’ning oxirgi javobi"),
+      title=("string", False, "fayl sarlavhasi"))  # fmt: skip
+def office_write(api, a):
+    snap = api.office_write(str(a.get("app") or "excel"), str(a.get("text") or ""),
+                            str(a.get("title") or ""))  # fmt: skip
+    if "id" not in snap:
+        raise ToolError(snap.get("error", "Boshlanmadi"))
+    name = "Word" if str(a.get("app") or "").lower().startswith(("w", "v")) else "Excel"
+    return {"reply": f"{name} ochilmoqda — javobni yangi faylga yozyapman.", "task": snap}
+
+
 # =====================================================================
 # NEXVARA BI
 # =====================================================================

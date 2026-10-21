@@ -140,6 +140,39 @@ class FilesApi:
 
         return self._runner.start(f"Excel fayllarini yig‘ish: {len(paths)} ta", fn).snapshot()
 
+    def _last_answer(self) -> str:
+        """The latest real answer: not a question back, a plan or a «Davom etaymi?» prompt."""
+        from nexvara.app.api_agent import _service_line
+
+        mem = self._mem()
+        replies = mem.last_replies() if mem is not None else [
+            t["text"] for t in reversed(self._ctx.turns) if t["role"] != "user"]  # fmt: skip
+        for text in replies:
+            t = (text or "").strip()
+            if (t and not _service_line(t) and not t.startswith("Tushundim")
+                    and not t.rstrip().endswith("?")):  # fmt: skip
+                return t
+        return ""
+
+    def office_write(self, app: str, text: str = "", title: str = "") -> dict[str, Any]:
+        """«Excel’ni ochib o‘sha yerga yoz»: the given text, or NEXVARA's last answer, into a
+        new Excel/Word file opened on the screen."""
+        from nexvara.fileagent import write_to_office
+
+        app = "word" if app.lower().startswith(("w", "v")) else "excel"
+        body = (text or "").strip() or self._last_answer()
+        if not body:
+            return {"error": "Yoziladigan javob topilmadi: avval savol bering yoki matnni yozing"}
+        fn = self._overrides.get("office_write")
+        if fn is None:
+            keep = bool(self.get_settings().get("keep_office_open", True))
+
+            def fn(task: Any) -> dict[str, Any]:
+                return write_to_office(task, body, app, title, keep_open=keep)
+
+        name = "Excel" if app == "excel" else "Word"
+        return self._runner.start(f"{name}’ga yozish", fn).snapshot()
+
     def open_file(self, path: str) -> bool:
         p = Path(path)
         if not p.is_absolute() or not p.exists():

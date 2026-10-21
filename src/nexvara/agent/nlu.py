@@ -560,9 +560,33 @@ def _settings(text: str, f: str) -> list[ToolCall] | None:
     return None
 
 
+_WRITE_ANSWER = re.compile(
+    r"^(?:(?:buni|shuni|uni|osha|o\W?sha|javobni|testni|savollarni)\s+)*"
+    r"(?P<app>e[kx]s?cel|exsel|word|vord)\w*\s+"
+    r"(?:(?:ochib|och|ga|da|ni|faylga|fayliga|fayl)\s+)*"
+    r"(?:(?:osha|o\W?sha|shu|bu)\s+(?:yerga|joyga|faylga)\s+|(?:buni|shuni|uni)\s+)*"
+    r"(?:yoz|ko\W?chir|joyla|tushir|qo\W?y)\w*$"
+)
+_WRITE_ANSWER_2 = re.compile(
+    r"^(?:buni|shuni|uni|javobni|testni|savollarni)\s+(?P<app>e[kx]s?cel|exsel|word|vord)\w*\s*"
+    r"(?:ga\s+)?(?:yoz|ko\W?chir|joyla|tushir|qo\W?y)\w*$"
+)
+
+
+def _write_answer(text: str, f: str) -> list[ToolCall] | None:
+    """«Excel’ni ochib o‘sha yerga yoz», «buni Word’ga yoz»: the last answer into a new file."""
+    f = re.sub(r"[^\w\s]", " ", f)
+    f = re.sub(r"\s+", " ", f).strip()
+    m = _WRITE_ANSWER.match(f) or _WRITE_ANSWER_2.match(f)
+    if not m:
+        return None
+    app = "word" if m.group("app").startswith(("w", "v")) else "excel"
+    return [ToolCall("office.write", {"app": app})]
+
+
 def parse(text: str) -> list[ToolCall] | None:
     f = fold(text).strip()
-    for fn in (_workflow, _bi, _settings, _files):
+    for fn in (_write_answer, _workflow, _bi, _settings, _files):
         calls = fn(text, f)
         if calls:
             return calls

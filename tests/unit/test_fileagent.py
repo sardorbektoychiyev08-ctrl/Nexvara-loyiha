@@ -117,3 +117,50 @@ def test_api_files_and_chat(box):
     snap = api.files_to_pdf([str(box / "Hisobot 2026.xlsx")])
     assert runner.get(snap["id"]).wait(5)
     assert api.chat("fayl top")["reply"].startswith("Qaysi faylni")
+
+
+def test_answer_text_becomes_a_test_table():
+    from nexvara.fileagent import test_rows
+
+    text = """6-sinf informatika testi
+1. Kompyuterning «miyasi» qaysi qurilma?
+A) Monitor
+B) Protsessor
+C) Sichqoncha
+D) Printer
+Javob: B
+2) Axborot o‘lchov birligi?
+a) Metr
+b) Bayt
+c) Litr
+d) Gramm
+To‘g‘ri javob: b"""
+    rows = test_rows(text)
+    assert rows[0] == ["№", "Savol", "A", "B", "C", "D", "Javob"]
+    assert rows[1] == ["1", "Kompyuterning «miyasi» qaysi qurilma?", "Monitor", "Protsessor",
+                       "Sichqoncha", "Printer", "B"]  # fmt: skip
+    assert rows[2][1:3] == ["Axborot o‘lchov birligi?", "Metr"] and rows[2][6] == "B"
+    assert test_rows("Salom! Bugun nima qilamiz?") is None
+
+
+def test_write_answer_commands_and_last_answer(tmp_path):
+    from nexvara.agent.nlu import parse
+    from nexvara.app.api import Api
+    from nexvara.core.task import TaskRunner
+    from nexvara.memory.store import MemoryStore
+
+    assert parse("exselni ochib osha yerga yoz")[0].args == {"app": "excel"}
+    assert parse("buni Word’ga yoz")[0].args == {"app": "word"}
+    assert parse("Savdo.xlsx ni och") is None
+    mem = MemoryStore(tmp_path / "app.db")
+    mem.log_chat("user", "test tuz")
+    mem.log_chat("nexvara", "1. Savol?\nA) x\nB) y")
+    mem.log_chat("user", "exselni ochib osha yerga yoz")
+    mem.log_chat("nexvara", "Bu ish pullik AI orqali bajariladi … Davom etaymi?")
+    api = Api(TaskRunner(), overrides={"memory": mem})
+    assert api._last_answer() == "1. Savol?\nA) x\nB) y"  # the prompt is skipped
+    api._overrides["office_write"] = lambda task: {"files": []}
+    snap = api.office_write("exsel")
+    assert "id" in snap and "Excel" in snap["title"]
+    assert "error" in Api(TaskRunner(), overrides={"memory": MemoryStore(tmp_path / "b.db")}
+                          ).office_write("word")  # fmt: skip

@@ -509,3 +509,93 @@ def convert_to_pdf(task: Any, paths: list[str], keep_open: bool = False) -> dict
     if failed:
         report.append("Xato: " + "; ".join(failed))
     return {"report": report, "files": made, "path": made[0] if made else ""}
+
+
+# ---------------- an answer from the chat into a new Excel / Word file ----------------
+
+_Q_LINE = re.compile(r"^\s*(\d{1,3})\s*[.)]\s*(.+)$")
+_OPT_LINE = re.compile(r"^\s*([A-Da-d])\s*[).]\s*(.+)$")
+_KEY_LINE = re.compile(r"^\s*(?:to[‘’']?g[‘’']?ri\s+)?javob\w*\s*[:\-–]\s*([A-Da-d])\b", re.I)
+
+
+def _clean_line(line: str) -> str:
+    return re.sub(r"^[#>*\s]+|\*\*", "", line).strip()
+
+
+def test_rows(text: str) -> list[list[str]] | None:
+    """«1. Savol / A) … B) … / Javob: B» -> rows (№, Savol, A, B, C, D, Javob); None when the
+    text is not a test (fewer than two numbered questions with options)."""
+    rows: list[list[str]] = []
+    for raw in text.splitlines():
+        line = _clean_line(raw)
+        if not line:
+            continue
+        if m := _Q_LINE.match(line):
+            rows.append([m.group(1), m.group(2).strip(), "", "", "", "", ""])
+        elif rows and (k := _KEY_LINE.match(line)):
+            rows[-1][6] = k.group(1).upper()
+        elif rows and (o := _OPT_LINE.match(line)):
+            rows[-1][2 + "ABCD".index(o.group(1).upper())] = o.group(2).strip()
+        elif rows and not any(rows[-1][2:6]):
+            rows[-1][1] += " " + line  # the question continues on the next line
+    if sum(1 for r in rows if any(r[2:6])) < 2:
+        return None
+    return [["№", "Savol", "A", "B", "C", "D", "Javob"], *rows]
+
+
+def write_to_office(task: Any, text: str, app: str, title: str = "",
+                    keep_open: bool = True) -> dict[str, Any]:  # fmt: skip
+    """«Excel’ni ochib o‘sha yerga yoz»: the text (usually NEXVARA's last answer) into a new
+    visible Excel or Word file in Documents/NEXVARA; a test becomes a table."""
+    text = (text or "").strip()
+    if not text:
+        raise ValueError("Yoziladigan matn yo‘q")
+    title = (title or "NEXVARA").strip()[:60]
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    safe = re.sub(r"[\/:*?\"<>|]", " ", title).strip() or "NEXVARA"
+    folder = Path.home() / "Documents" / "NEXVARA"
+    lines = [_clean_line(x) for x in text.splitlines()]
+    table = test_rows(text)
+    if app == "excel":
+        from nexvara.skills.excel import ops as xl_ops
+        from nexvara.skills.excel.bridge import ExcelSession
+
+        rows = table or [["Matn"], *[[x] for x in lines if x]]
+        out = free_name(folder / f"{safe} {stamp}.xlsx")
+        with ExcelSession(visible=True, keep_open=keep_open) as xl:
+            with task.step("Excel’ga yozish") as s:
+                book = xl.new_workbook()
+                ws = book.Worksheets(1)
+                rng = xl_ops.write_rows(ws, rows)
+                ws.Rows(1).Font.Bold = True
+                rng.WrapText = True
+                rng.VerticalAlignment = -4160  # xlTop
+                widths = [5, 60, 25, 25, 25, 25, 8] if table else [100]
+                for i, w in enumerate(widths, start=1):
+                    ws.Columns(i).ColumnWidth = w
+                s.detail = f"{len(rows) - 1} qator" + (" (test jadvali)" if table else "")
+            with task.step("Saqlash") as s:
+                saved = xl.save_as(book, out)
+                s.detail = saved.name
+            xl.show()
+    elif app == "word":
+        from nexvara.skills.word import ops as wd_ops
+
+        out = free_name(folder / f"{safe} {stamp}.docx")
+        with wd_ops.WordSession(visible=True, keep_open=keep_open) as wd:
+            with task.step("Word’ga yozish") as s:
+                doc = wd.new_document()
+                wd_ops.add_heading(doc, title, 1)
+                for line in lines:
+                    if line:
+                        wd_ops.add_paragraph(doc, line)
+                s.detail = f"{sum(1 for x in lines if x)} xatboshi"
+            with task.step("Saqlash") as s:
+                saved = wd.save_as(doc, out)
+                s.detail = saved.name
+            wd.show()
+    else:
+        raise ValueError("Qaysi dastur: excel yoki word")
+    log("write_to_office", app=app, dst=str(saved))
+    return {"path": str(saved), "files": [str(saved)],
+            "report": [f"{saved.name} — ekranda ochiq"]}  # fmt: skip
