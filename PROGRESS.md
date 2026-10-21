@@ -17,7 +17,9 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 **Testlar:** `scripts/test.ps1` — 546 PASS, 94 skipped, smoke PASS. Yangi: kalitlar ko‘chishi (parol, ustidan yozmaslik, API), tanlangan provayder birinchi, arzon so‘rovda «Ha» yo‘q. Eski 8 ta test yangi qoidaga moslandi. Haqiqiy AI bilan suhbat sifati — NOT TESTED (pullik, egasi ruxsati bilan). Office — NOT TESTED (Office kodi o‘zgarmadi).
 
-**Keyingi qadam:** egasi tasdig‘i bilan `main` ga merge, yangi versiya (1.5.3) va ishxona kompyuterida yangilash; noutbukda kalitlarni faylga saqlab, ishxonada tiklash.
+**Reliz:** egasi tasdig‘i bilan `main` ga merge va push (46f1472); v1.5.3 yig‘ildi, imzolandi va GitHub’ga chiqarildi (APK 1.6.0 ham ilova qilindi). Internetdan `latest/download` orqali: imzo, hajm, SHA-256 `e66e5214c7f6cd8efabf5079df4b5f5a97a8f35439271cdfd2446923ddb87055` — PASS.
+
+**Keyingi qadam:** noutbukda kalitlarni faylga saqlash, ishxonada «Yangilash» (1.5.3) va kalitlarni tiklash; ishxona kompyuterida telefon ulanmagani — u yerda Claude Code bilan tekshirish (telefon ulanishi yoqilganmi, himoya devori, tarmoq/Tailscale).
 
 ---
 
