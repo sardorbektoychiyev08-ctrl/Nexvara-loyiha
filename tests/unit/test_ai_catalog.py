@@ -77,10 +77,11 @@ def test_auto_compares_all_connected_models_and_requires_paid_approval(tmp_path)
     msg = [{"role": "user", "content": "salom"}]
     choice = r.text_candidates("cheap", "s", msg, 50)[0]
     assert choice.provider in ("openai", "anthropic")
+    r.settings.update({"ai": {"confirm_over_usd": 0.0}})  # paid above the limit: asks first
     with pytest.raises(NeedsConfirmation):
-        r.complete("chat", "s", msg)
+        r.complete("command", "s", msg)
     assert not any(fake.calls for fake in f.values())
-    reply = r.complete("chat", "s", msg, approved=True)
+    reply = r.complete("command", "s", msg, approved=True)
     assert reply.provider == choice.provider
     assert r.ledger.recent(1)[0]["model"] == reply.model
 

@@ -863,6 +863,19 @@ $("#ai-form").addEventListener("submit", async (e) => {
   if (r.ok) { renderAi(); refreshAiStatus(); }
 });
 
+$("#ai-keys-export").addEventListener("click", async () => {
+  const r = await api().ai_keys_export($("#ai-keys-pass").value);
+  $("#ai-keys-msg").textContent = r.ok ? `Saqlandi ✓ ${r.path}` : `Xatolik yuz berdi: ${r.error}`;
+});
+$("#ai-keys-import").addEventListener("click", async () => {
+  $("#ai-keys-msg").textContent = "Tiklanmoqda…";
+  const r = await api().ai_keys_import($("#ai-keys-pass").value);
+  if (!r.ok) { $("#ai-keys-msg").textContent = `Xatolik yuz berdi: ${r.error}`; return; }
+  $("#ai-keys-pass").value = "";
+  $("#ai-keys-msg").textContent = `Tiklandi ✓ ${r.added.join(", ") || "yangi kalit yo‘q"}` +
+    (r.kept.length ? ` (bor edi, tegilmadi: ${r.kept.join(", ")})` : "");
+  renderAi(r.status); refreshAiStatus();
+});
 $("#ai-refresh-catalog").addEventListener("click", async () => {
   const button = $("#ai-refresh-catalog"); button.disabled = true;
   $("#ai-catalog-status").textContent = "Rasmiy kataloglar tekshirilmoqda…";

@@ -262,12 +262,12 @@ def test_manual_text_and_vision_models_are_used_as_chosen(tmp_path):
 
 def test_auto_text_escalates_when_the_answer_is_not_usable(tmp_path):
     r = make(tmp_path, {"anthropic": KEYS["anthropic"]})
-    ok = r.complete("chat", "s", [{"role": "user", "content": "x"}], approved=True,
+    ok = r.complete("command", "s", [{"role": "user", "content": "x"}], approved=True,
                     accept=lambda t: "sonnet" in t)  # fmt: skip
     assert ok.text == "anthropic:claude-haiku-5-5"  # no dearer retry on first approval
     assert len(r.texts["anthropic"].calls) == 1
     r.set_capability("text", "manual", "anthropic", "claude-haiku-5-5")
-    kept = r.complete("chat", "s", [{"role": "user", "content": "x"}], approved=True,
+    kept = r.complete("command", "s", [{"role": "user", "content": "x"}], approved=True,
                       accept=lambda t: "sonnet" in t)  # fmt: skip
     assert kept.text == "anthropic:claude-haiku-5-5"  # MANUAL: never swapped
 

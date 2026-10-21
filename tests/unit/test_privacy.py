@@ -186,9 +186,9 @@ def test_fallback_provider_also_gets_masked_text(wired):
     r.settings.update({"ai": {"fallback": True}})  # off by default; the user turned it on
     wires["openai"] = Wire(chat_answer("x"), status=503)
     wires["gemini"] = Wire(chat_answer("Javob: ⟦ISM_1⟧"))
-    with pytest.raises(NeedsConfirmation):
+    with pytest.raises(NeedsConfirmation):  # a dearer fallback needs a fresh approval
         r.complete(
-            "chat", "sys", [{"role": "user", "content": PERSON}], max_tokens=300, approved=True
+            "command", "sys", [{"role": "user", "content": PERSON}], max_tokens=300, approved=True
         )
     _no_secret_left(wires["openai"].bodies)
     assert wires["openai"].bodies and not wires["gemini"].bodies

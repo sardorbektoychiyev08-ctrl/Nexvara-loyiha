@@ -319,10 +319,9 @@ def test_api_chat_with_ai(router, monkeypatch):
     api = Api(overrides={"ai_router": router})
     assert api.get_info()["ai_connected"]
     router.fake.replies = ['{"kind": "question"}', "Nyutonning birinchi qonuni — inersiya."]
+    # A cheap paid answer (below confirm_over_usd) goes without asking every time.
     out = api.chat("inersiya nima o'zi")
-    assert out.get("confirm") and router.fake.calls == []
-    out = api.confirm_ai(out["confirm"])
-    assert "inersiya" in out["reply"]
+    assert not out.get("confirm") and "inersiya" in out["reply"]
     # An expensive answer waits for "Ha".
     router.settings.update({"ai": {"confirm_over_usd": 0.0}})
     out = api.chat("yana bir narsani bilmoqchiman")
@@ -375,3 +374,57 @@ def test_key_from_clipboard_is_checked_saved_and_cleared(router, tmp_path, monke
     assert api.ai_save_key_from_clipboard("anthropic")["ok"] is False  # empty clipboard
     board["text"] = "short"
     assert api.ai_save_key_from_clipboard("openai")["ok"] is False and board["text"] == "short"
+
+
+def test_keys_travel_to_another_pc(router, tmp_path):
+    from nexvara.app.api import Api
+
+    router.keys.save("openai", "sk-openai-test-1234567890")
+    router.keys.save("gemini", "AIza-test-1234567890abcdefgh")
+    router.settings.update({"ai": {"provider": "gemini"}})
+    with pytest.raises(ValueError):
+        router.export_keys("short")
+    blob = router.export_keys("uzun-parol-123")
+    assert b"sk-openai" not in blob and b"AIza" not in blob  # sealed, not readable
+
+    old = MemoryKeyStore({"openai": "sk-old-0000000000"})
+    other = AiRouter(Settings(tmp_path / "s2.json"), old, Ledger(tmp_path / "a2.db"),
+                     factory=lambda n, k: router.fake)  # fmt: skip
+    with pytest.raises(ValueError):
+        other.import_keys(blob, "noto'g'ri-parol")
+    out = other.import_keys(blob, "uzun-parol-123")
+    assert out == {"added": ["gemini"], "kept": ["openai"]}
+    assert other.keys.load("openai") == "sk-old-0000000000"  # never overwritten
+    assert other.keys.load("gemini") == "AIza-test-1234567890abcdefgh"
+
+    f = tmp_path / "k.nxkeys"
+    api = Api(overrides={"ai_router": router, "keys_dialog": lambda save: str(f)})
+    assert api.ai_keys_export("uzun-parol-123")["ok"] and f.exists()
+    assert api.ai_keys_import("uzun-parol-123")["kept"] == ["openai", "gemini"]
+
+
+def test_chosen_provider_goes_first_and_cheap_call_needs_no_yes(router):
+    router.keys.save("openai", "sk-openai-test-1234567890")
+    router.keys.save("anthropic", "sk-ant-test-1234567890")
+    router.settings.update(
+        {
+            "ai": {
+                "enabled": True,
+                "provider": "anthropic",
+                "catalog": {
+                    "openai": {"text": ["gpt-6-luna"]},
+                    "anthropic": {"text": ["claude-haiku-5-5"]},
+                },
+            }
+        }
+    )
+    # gpt-6-luna and claude-haiku-5-5 cost the same; the chosen provider wins either way
+    first = router.text_candidates("cheap", "", [{"role": "user", "content": "salom"}], 100)[0]
+    assert first.provider == "anthropic"
+    router.settings.update({"ai": {"provider": "openai"}})
+    first = router.text_candidates("cheap", "", [{"role": "user", "content": "salom"}], 100)[0]
+    assert first.provider == "openai"
+    router.check_budget(first, approved=False)  # below confirm_over_usd: no "Ha"
+    router.settings.update({"ai": {"confirm_over_usd": 0.0}})
+    with pytest.raises(NeedsConfirmation):
+        router.check_budget(first, approved=False)

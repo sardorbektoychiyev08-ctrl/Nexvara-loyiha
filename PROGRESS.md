@@ -4,6 +4,23 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-21 (41) — Claude Code — Gemini tanlovi, ortiqcha «Ha», kalitlarni ko‘chirish, insondek suhbat
+
+**Foydalanuvchi talabi:** «faqat OpenAI ishlatyapti, Gemini’dan yo‘q; har yozganimda ruxsat so‘rayapti»; «API kalitlar boshqa kompyuterga birga yursin»; «NEXVARA insondek gaplashsin, fikrlasin, tushunsin».
+
+**Sabablar va tuzatishlar:**
+- AUTO tanlov Sozlamalardagi «Asosiy provayder»ga qaramasdan eng arzon modelni olardi (gpt-6-luna) → endi tanlangan provayder birinchi, qolganlari zaxira (`text_candidates`, `candidates`).
+- Codex (51b64bf) «har pullik so‘rovda tasdiq» qo‘shgan, `confirm_over_usd` e’tiborsiz edi → endi «Ha» faqat chegaradan qimmat (standart $0.05) yoki «Maxsus» so‘rovda (`check_budget`). Kunlik/oylik/topshiriq limitlari o‘zgarmadi.
+- Egasining sozlamasida «Free Tier’ni tekshirdim» belgisi yo‘q — Gemini pullik hisoblanadi; belgini faqat egasi AI Studio’da tekshirib qo‘yadi.
+- Kalitlarni ko‘chirish: Sozlamalar → AI → «Kalitlarni faylga saqlash» / «Fayldan kalitlarni tiklash» (`.nxkeys`, parol ≥8, scrypt + AES-GCM — `sync.seal`). Bor kalit ustidan yozilmaydi. Kalitlar o‘rnatuvchiga qo‘shilmadi: u GitHub’da ochiq, kalitni har kim olib pulingizni sarflashi mumkin edi.
+- Suhbat: `HUMAN_STYLE` ko‘rsatmasi (tabiiy gapirish, ma’nosiga qarab tushunish, uzunlikni moslash, noaniqda bitta savol, kayfiyatni sezish, to‘qimaslik) chat va savol-javobga; oxirgi gaplar haqiqiy user/assistant dialog sifatida yuboriladi (`chat_messages`); chat darajasi `cheap` → `balanced`, effort `medium` (bir xabar taxminan $0.003–0.005, bepul rejimda $0).
+
+**Testlar:** `scripts/test.ps1` — 546 PASS, 94 skipped, smoke PASS. Yangi: kalitlar ko‘chishi (parol, ustidan yozmaslik, API), tanlangan provayder birinchi, arzon so‘rovda «Ha» yo‘q. Eski 8 ta test yangi qoidaga moslandi. Haqiqiy AI bilan suhbat sifati — NOT TESTED (pullik, egasi ruxsati bilan). Office — NOT TESTED (Office kodi o‘zgarmadi).
+
+**Keyingi qadam:** egasi tasdig‘i bilan `main` ga merge, yangi versiya (1.5.3) va ishxona kompyuterida yangilash; noutbukda kalitlarni faylga saqlab, ishxonada tiklash.
+
+---
+
 ## 2026-10-20 (40) — Claude Code — Ayolining noutbukini tozalash; rasmli foydalanish kitobi
 
 **Foydalanuvchi talabi:** «tozala, keyin NEXVARA’ni qanday ishlatish bo‘yicha rasmli kitob yarat, tushunarli qilib».
