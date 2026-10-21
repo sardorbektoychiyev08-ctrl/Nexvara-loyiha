@@ -16,7 +16,8 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 **Testlar:** `scripts/test.ps1` — 553 PASS, 94 skipped, smoke PASS; ruff (format tuzatilgandan keyin) PASS. Haqiqiy Excel/Word’ga yozish (`write_to_office`) — NOT TESTED (Office ochiladi, egasi ruxsati kerak).
 **Office sinovi (egasi ruxsati bilan):** yangi `tests/office/test_write_answer_office.py` — Excel test jadvali va Word matni — 2 PASS. `test.ps1 -Office` to‘liq yugurishi `test_officeai_office.py::test_powerpoint_text_boxes` da PowerPoint osilib qoldi (25 daq.); jarayon to‘xtatildi, sinov alohida — PASS; qolgan fayllar (powerpoint, smartart, task4, ui_pages, word, workflow_excel, write_answer) — 33 PASS. `test_library.py::test_ai_test_in_word_with_fake_provider` FAIL edi: (41) dagi «Ha faqat chegaradan qimmatda» qoidasidan keyin eskirgan — sinovda `confirm_over_usd: 0` qo‘yildi, PASS. `test_library_page_in_real_ui` bir marta FAIL (selftest vaqti), alohida 2 marta PASS — beqaror.
-**Keyingi qadam:** `main` ga merge; versiya va reliz — egasi tasdig‘i bilan.
+**Reliz:** egasi tasdig‘i bilan v1.5.6 GitHub’da (APK 1.6.0 ham ilova). Internetdan `latest/download`: Ed25519 imzo, hajm 64794987, SHA-256 `702eac66610b4ab75e9ee789324b5458ab44ed8739900e46afe498fb5fef2f73` — PASS. Eslatma: birinchi `build.ps1` yugurishida `dist\NEXVARA\_internal` yig‘ilgandan keyin yo‘qolib qoldi (ISCC «yo‘l topilmadi», o‘rnatuvchi 27 MB) — qayta yig‘ishda to‘g‘ri chiqdi; chiqarishdan oldin o‘rnatuvchi hajmini (~64 MB) tekshiring. Claude Code «auto» rejimida yig‘ish/chiqarish to‘silgani uchun egasi roziligi bilan `.claude/settings.local.json` ga ruxsat qoidasi qo‘shildi (Git’ga kirmaydi).
+**Keyingi qadam:** noutbuk va ishxonada «Yangilash» (1.5.6); ishxonada telefon ulanishi.
 
 ---
 
