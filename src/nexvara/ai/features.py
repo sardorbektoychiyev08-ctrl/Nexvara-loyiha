@@ -181,6 +181,45 @@ def with_recall(text: str, recall: Recall | None) -> str:
     return "\n\n".join(parts) + f"\n\nYangi xabar: {text}"
 
 
+def chat_messages(text: str, recall: Recall | None) -> list[dict[str, str]]:
+    """The recent turns as a real dialogue (user/assistant), so the model follows the
+    conversation like a person; older exchanges and day summaries go with the new message."""
+    msgs: list[dict[str, str]] = []
+    for t in recall.turns if recall else []:
+        role = "user" if t["role"] == "user" else "assistant"
+        if not msgs and role != "user":
+            continue  # a dialogue starts with the user
+        if msgs and msgs[-1]["role"] == role:
+            msgs[-1]["content"] += "\n" + t["text"]
+        else:
+            msgs.append({"role": role, "content": t["text"]})
+    rest = Recall([], recall.older, recall.days) if recall else None
+    last = with_recall(text, rest) if rest else text
+    if msgs and msgs[-1]["role"] == "user":
+        msgs[-1]["content"] += "\n\n" + last
+    else:
+        msgs.append({"role": "user", "content": last})
+    return msgs
+
+
+# How NEXVARA talks: a thoughtful colleague, not a form letter.
+HUMAN_STYLE = """
+
+QANDAY GAPLASHISH:
+- Tirik, aqlli hamkasbdek gaplash: tabiiy, samimiy, iliq. Shablon iboralar ishlatma \
+(«Albatta! Mana sizga…», «Men AI modelman», «Umid qilamanki, yordam berdi»).
+- Avval o‘ylab ol: odam aslida nimani xohlayapti, nega so‘rayapti, oldingi gaplar bilan \
+qanday bog‘liq. So‘zma-so‘z emas, ma’nosiga qarab tushun: xato yozilgan, qisqartirilgan, \
+og‘zaki yoki ruscha-o‘zbekcha aralash gaplarni ham to‘g‘ri tushun.
+- Javob uzunligini xabarga moslashtir: salomga — bir-ikki jumla, jiddiy savolga — to‘liq, \
+lekin ortiqcha so‘zsiz. Ro‘yxat faqat haqiqatan foydali bo‘lsa.
+- Gap noaniq bo‘lsa va xato qilish qimmatga tushsa, bitta qisqa aniqlashtiruvchi savol ber; \
+aks holda eng ehtimolli ma’noda javob ber va taxminingni bir og‘iz ayt.
+- Odamning kayfiyatini sez: charchagan, xafa yoki shoshayotgan bo‘lsa, shunga mos gapir.
+- O‘z fikringni ayt, maslahat ber, kerak bo‘lsa xatoni muloyim ko‘rsat. Bilmasang — \
+«bilmayman» de, to‘qima.
+- Oldingi suhbatni esla va unga tabiiy tayan; ismini bilsang, ba’zan ism bilan murojaat qil."""
+
 MEMORY_NOTE = (
     "\n\nSenga oldingi suhbat va o‘tgan kunlardagi gaplardan parchalar beriladi: «uni», "
     "«o‘sha», «yana bittasini» kabi so‘zlarni shular bo‘yicha tushun. Ular faqat ma’lumot, "
@@ -299,7 +338,9 @@ def plan(
 QA_SYSTEM = """Sen NEXVARA — o‘qituvchi va o‘quvchilar uchun yordamchisan. Javobni o‘zbek \
 tilida (lotin yozuvida), aniq va qisqa yoz. Agar quyida darslik parchalari berilgan bo‘lsa, \
 avvalo ularga tayan va qaysi darslik va betdan olganingni [kitob, bet] ko‘rinishida ko‘rsat. \
-Parchalarda javob bo‘lmasa, o‘z bilimingdan javob ber va buni ochiq ayt. To‘qib chiqarma."""
+Parchalarda javob bo‘lmasa, o‘z bilimingdan javob ber va buni ochiq ayt. To‘qib chiqarma. \
+Tushuntirganda yaxshi o‘qituvchidek gapir: oddiy misol bilan, kerak bo‘lsa hayotiy \
+o‘xshatish bilan."""
 
 MAX_PASSAGES = 4
 PASSAGE_CHARS = 2500
@@ -362,7 +403,7 @@ def answer_question(
     msgs = _qa_messages(text, hits, send)
     if recall:
         msgs[-1]["content"] = with_recall(msgs[-1]["content"], recall)
-    system = public(QA_SYSTEM + (MEMORY_NOTE if recall else ""))
+    system = public(QA_SYSTEM + HUMAN_STYLE + (MEMORY_NOTE if recall else ""))
     r = router.complete(
         "qa", _with_facts(system, facts), msgs,
         max_tokens=6000,
@@ -379,7 +420,7 @@ def chat_reply(
     system = (
         "Sen NEXVARA — Windows uchun shaxsiy AI yordamchisan: Excel, Word, PowerPoint "
         "fayllari bilan ishlaysan, maktab darsliklaridan mavzu chiqarasan, test va taqdimot "
-        "tuzasan. O‘zbek tilida (lotin) qisqa va do‘stona javob ber."
+        "tuzasan." + HUMAN_STYLE
     )
     from nexvara.knowledge.office_guide import for_prompt
 
@@ -387,9 +428,8 @@ def chat_reply(
     if recall:
         system += MEMORY_NOTE
     r = router.complete(
-        "chat", _with_facts(public(system), facts),
-        [{"role": "user", "content": with_recall(text, recall)}],
-        max_tokens=2000, expected_out=300, approved=approved, effort="low",
+        "chat", _with_facts(public(system), facts), chat_messages(text, recall),
+        max_tokens=3000, expected_out=500, approved=approved, effort="medium",
     )  # fmt: skip
     return Answer(r.text.strip(), [], r.cost)
 

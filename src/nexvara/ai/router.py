@@ -5,6 +5,7 @@ Rules (spec: no surprise spending):
 - a call whose estimate would cross the daily or monthly budget (overall, or the
   provider's own limit) is refused; so is a single task above `task_limit_usd`;
 - a call estimated above `confirm_over_usd` — and every "special" tier call — waits for "Ha";
+- AUTO tries the provider chosen in Settings first, the other connected ones after it;
 - a busy/down/unreachable provider falls back to another connected provider at the same
   tier (`fallback`), with the same budget checks; a wrong key or missing credit never does;
 - the real cost (from the provider's token counts) is written to app.db. It is an
@@ -35,7 +36,7 @@ from nexvara.core.task import UserError
 # purpose -> tier. Understanding a command is easy; daily work is balanced; analysis and
 # planning of big tasks use the strong tier; "special" only when the user asks for it.
 TIER_FOR = {
-    "classify": "cheap", "command": "cheap", "chat": "cheap",
+    "classify": "cheap", "command": "cheap", "chat": "balanced",
     "plan": "balanced", "qa": "balanced", "test": "balanced",
     "analysis": "powerful", "special": "special", "drawing": "powerful", "ocr": "balanced",
     "translate": "balanced",
@@ -336,7 +337,9 @@ class AiRouter:
                 f"Bitta topshiriq limiti (${float(task):.2f}) dan oshadi: bu so‘rov "
                 f"≈${est.cost:.3f}. Limitni Sozlamalar → AI bo‘limida o‘zgartirish mumkin."
             )
-        if not approved and (not est.free or est.tier == "special"):
+        if approved or est.free and est.tier != "special":
+            return
+        if est.tier == "special" or est.cost > float(cfg.get("confirm_over_usd") or 0):
             raise NeedsConfirmation(est)
 
     def complete(
@@ -695,7 +698,10 @@ class AiRouter:
                 "Vazifaga mos, narxi tekshirilgan AI model topilmadi. "
                 "Katalogni yangilang yoki qo‘lda model tanlang."
             )
-        candidates.sort(key=lambda x: (not x[1].free, x[1].cost, -x[0], x[1].model))
+        # The provider the owner chose in Settings goes first; the others are the fallback.
+        chosen = self.config().get("provider") or ""
+        candidates.sort(key=lambda x: (not x[1].free, x[1].provider != chosen, x[1].cost,
+                                       -x[0], x[1].model))  # fmt: skip
         return [est for _, est in candidates]
 
     def set_capability(self, cap: str, mode: str, provider: str = "", model: str = "") -> dict:
@@ -785,7 +791,8 @@ class AiRouter:
                 free = bool(row.get("free")) and p == FREE_PROVIDER and self.free_active()
                 if row["model"] in have and (row.get("price") is not None or free):
                     out.append((p, {**row, "free": free}))
-        out.sort(key=lambda x: (not x[1]["free"], float(x[1]["price"] or 0)))
+        chosen = self.config().get("provider") or ""
+        out.sort(key=lambda x: (not x[1]["free"], x[0] != chosen, float(x[1]["price"] or 0)))
         if not out:
             need = [models.PROVIDERS[p]["label"] for p in models.PROVIDERS if caps.supports(p, cap)]
             raise AiUnavailable(
@@ -914,6 +921,46 @@ class AiRouter:
     def delete_key(self, provider: str) -> None:
         self.keys.delete(provider)
         self._balances.pop(provider, None)
+
+    # ----- carrying keys to another PC: one password-sealed file (scrypt + AES-GCM) -----
+    def export_keys(self, password: str) -> bytes:
+        from nexvara.sync import seal
+
+        if len(password or "") < 8:
+            raise ValueError("Parol kamida 8 belgi bo‘lsin")
+        keys = {p: k for p in models.PROVIDERS if (k := self.keys.load(p))}
+        if not keys:
+            raise ValueError("Saqlanadigan AI kaliti yo‘q")
+        return seal({"kind": "nexvara-ai-keys", "keys": keys,
+                     "provider": self.config().get("provider") or ""}, password)  # fmt: skip
+
+    def import_keys(self, blob: bytes, password: str) -> dict[str, list[str]]:
+        """Restore keys from `export_keys`. A provider that already has a key here is left as is
+        (never overwritten). Each key is checked with the free model list when online."""
+        from nexvara.sync import SyncError, unseal
+
+        try:
+            data = unseal(blob, password)
+        except SyncError as e:
+            raise ValueError("Parol noto‘g‘ri yoki fayl buzilgan") from e
+        if not isinstance(data, dict) or data.get("kind") != "nexvara-ai-keys":
+            raise ValueError("Bu NEXVARA AI kalitlari fayli emas")
+        added, kept = [], []
+        for p, key in (data.get("keys") or {}).items():
+            if p not in models.PROVIDERS:
+                continue
+            if self.keys.load(p):
+                kept.append(p)
+                continue
+            try:
+                self.save_key(p, key)
+            except Exception:  # noqa: BLE001 - offline: store now, the catalog refreshes later
+                self.keys.save(p, key)
+            added.append(p)
+        chosen = data.get("provider") or ""
+        if chosen in added and not self.config().get("provider"):
+            self.settings.update({"ai": {"provider": chosen}})
+        return {"added": added, "kept": kept}
 
     # ----- real balance (only where the provider offers it officially) -----
     def balance(self, provider: str) -> dict[str, Any]:

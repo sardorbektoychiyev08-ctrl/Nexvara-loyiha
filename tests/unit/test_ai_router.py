@@ -120,8 +120,10 @@ def test_fallback_to_another_provider(make):
     r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     r.save_key("deepseek", "sk-test-deepseek-123456")
     r.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
+    r.settings.update({"ai": {"provider": "deepseek"}})  # the chosen one is also the cheaper
     msg = [{"role": "user", "content": "x"}]
     first = r.text_candidates("balanced", "s", msg, 100)[0].provider
+    assert first == "deepseek"
     second = "openai" if first == "deepseek" else "deepseek"
     r.fakes[first].fail = AiError("busy", retryable=True)
     with pytest.raises(AiError, match="busy"):

@@ -551,6 +551,43 @@ class Api(
         self._router().delete_key(provider)
         return self._router().status()
 
+    def _keys_dialog(self, save: bool) -> str:
+        if "keys_dialog" in self._overrides:
+            return self._overrides["keys_dialog"](save)
+        import webview
+
+        if not webview.windows:
+            return ""
+        kind = webview.SAVE_DIALOG if save else webview.OPEN_DIALOG
+        chosen = webview.windows[0].create_file_dialog(
+            kind, save_filename="NEXVARA-AI-kalitlar.nxkeys",
+            file_types=("NEXVARA kalitlari (*.nxkeys)",))  # fmt: skip
+        if not chosen:
+            return ""
+        return str(chosen if isinstance(chosen, str) else chosen[0])
+
+    def ai_keys_export(self, password: str) -> dict[str, Any]:
+        """All AI keys into one password-sealed file (for OneDrive/flash) to carry to a new PC."""
+        try:
+            blob = self._router().export_keys(password)
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+        path = self._keys_dialog(True)
+        if not path:
+            return {"ok": False, "error": "Fayl tanlanmadi"}
+        Path(path).write_bytes(blob)
+        return {"ok": True, "path": path}
+
+    def ai_keys_import(self, password: str) -> dict[str, Any]:
+        path = self._keys_dialog(False)
+        if not path:
+            return {"ok": False, "error": "Fayl tanlanmadi"}
+        try:
+            out = self._router().import_keys(Path(path).read_bytes(), password)
+        except (ValueError, OSError) as e:
+            return {"ok": False, "error": str(e)}
+        return {"ok": True, **out, "status": self._router().status()}
+
     def ai_usage(self) -> list[dict[str, Any]]:
         return self._router().ledger.recent()
 

@@ -341,6 +341,7 @@ def test_phone_ai_directions_speech_and_pictures(env):
         token,
     )
     assert ok[0] == 200 and router.cap_settings()["tts"]["provider"] == "openai"  # the PC sees it
+    router.settings.update({"ai": {"confirm_over_usd": 0.0}})  # above the limit: price first
     ask = j(post(srv, "/api/v1/ai/speak", {"text": "Salom, dars 9 da"}, token))["data"]
     assert ask["needs_approval"] and "$" in ask["text"] and not log  # paid: price first
     sp = j(post(srv, "/api/v1/ai/speak", {"text": "Salom, dars 9 da", "approved": True},

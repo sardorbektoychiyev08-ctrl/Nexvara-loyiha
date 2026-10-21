@@ -89,10 +89,16 @@ def test_ai_chat_gets_recent_and_month_old_conversation(env):
     api.chat("salom")
     api.fake.replies = ['{"kind": "chat"}', "Juma kuni."]
     api.chat("hisobotni qachon topshiraman?")
-    sent = api.fake.calls[-1]["messages"][0]["content"]
-    assert "Oxirgi suhbat" in sent and "salom" in sent.lower()  # the recent turn
-    assert "har juma topshiraman" in sent  # the matching exchange from 12 days ago
-    assert sent.rstrip().endswith("Yangi xabar: hisobotni qachon topshiraman?")
+    msgs = api.fake.calls[-1]["messages"]
+    roles = [m["role"] for m in msgs]
+    assert roles[0] == roles[-1] == "user"  # a real dialogue, user and NEXVARA in turn
+    assert all(a != b for a, b in zip(roles, roles[1:], strict=False))
+    assert {"role": "assistant", "content": "Salom!"} in msgs  # the recent turn
+    assert any(m["role"] == "user" and "salom" in m["content"] for m in msgs[:-1])
+    sent = msgs[-1]["content"]
+    # the exchange from 12 days ago (still among the recent turns)
+    assert any("har juma topshiraman" in m["content"] for m in msgs)
+    assert sent.rstrip().endswith("hisobotni qachon topshiraman?")
     # the planner sees them too
     planner = api.fake.calls[-2]["messages"][0]["content"]
     assert "har juma" in planner
