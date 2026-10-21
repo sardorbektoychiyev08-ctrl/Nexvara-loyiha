@@ -219,9 +219,13 @@ class ChatCompletionsProvider(Provider):
                     ) from e
                 if e.code == 404:
                     raise AiError(f"{label}: model topilmadi. {detail}".strip()) from e
-                raise AiError(
-                    f"{label} xatosi ({e.code}): {detail or e.reason}", retryable=e.code >= 500
-                ) from e
+                if e.code >= 500:
+                    raise AiError(
+                        f"{label} serveri hozir band yoki ishlamayapti ({e.code}). Bir ozdan "
+                        "keyin qayta yozing.",
+                        retryable=True,
+                    ) from e
+                raise AiError(f"{label} xatosi ({e.code}): {detail or e.reason}") from e
             except (urllib.error.URLError, TimeoutError, OSError) as e:
                 if attempt < 2:
                     time.sleep(2**attempt)
