@@ -9,7 +9,8 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 **Topildi:** Gemini serveri band (503, provayder 3 marta qayta urindi). `fallback` yoqiq bo‘lsa ham OpenAI’ga o‘tilmadi: zaxira yo‘l hali «har pullik so‘rovda Ha» qoidasida qolgan edi.
 **Tuzatildi:** zaxira provayder ham birinchi so‘rov kabi `confirm_over_usd` qoidasida (`AiRouter._cheap`, matn va media); 5xx xabari o‘zbekcha («… serveri hozir band …»).
 **Testlar:** `scripts/test.ps1` — 547 PASS, smoke PASS; yangi `test_busy_chosen_provider_falls_back_without_asking`.
-**Keyingi qadam:** egasi tasdig‘i bilan push va v1.5.4.
+**Reliz:** egasi tasdig‘i bilan push (7338b57) va v1.5.4 GitHub’da; internetdan imzo, hajm, SHA-256 `a9ee1d708d6db9cc738b6919030838816a7544642a5d8021f511b80e44dd5ac2` — PASS.
+**Keyingi qadam:** noutbuk va ishxonada «Yangilash» (1.5.4); kalitlarni ko‘chirish; ishxonada telefon ulanishini tekshirish.
 
 ---
 
