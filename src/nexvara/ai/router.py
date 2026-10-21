@@ -337,10 +337,14 @@ class AiRouter:
                 f"Bitta topshiriq limiti (${float(task):.2f}) dan oshadi: bu so‘rov "
                 f"≈${est.cost:.3f}. Limitni Sozlamalar → AI bo‘limida o‘zgartirish mumkin."
             )
-        if approved or est.free and est.tier != "special":
-            return
-        if est.tier == "special" or est.cost > float(cfg.get("confirm_over_usd") or 0):
+        if not approved and not self._cheap(est):
             raise NeedsConfirmation(est)
+
+    def _cheap(self, est: Estimate) -> bool:
+        """Goes without «Ha»: free, or paid below `confirm_over_usd` (never "special")."""
+        if est.tier == "special":
+            return False
+        return est.free or est.cost <= float(self.config().get("confirm_over_usd") or 0)
 
     def complete(
         self,
@@ -447,9 +451,9 @@ class AiRouter:
                     self.check_budget(est, approved=True)
                 except (AiUnavailable, BudgetExceeded):
                     continue
-                # A retry cannot silently start a paid call or exceed the amount
-                # already approved for the first candidate.
-                if not approved and not est.free:
+                # A retry follows the same «Ha» rule as the first call and never exceeds
+                # the amount already approved for the first candidate.
+                if not approved and not self._cheap(est):
                     continue
                 if approved and est.cost > choices[0].cost:
                     raise NeedsConfirmation(est)
@@ -838,7 +842,7 @@ class AiRouter:
                     self.check_budget(est, approved=True)
                 except (BudgetExceeded, AiUnavailable):
                     continue
-                if not approved and not est.free:
+                if not approved and not self._cheap(est):
                     continue
                 if approved and est.cost > caps.cost(cands[0][1], units):
                     raise NeedsConfirmation(est)

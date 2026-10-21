@@ -4,6 +4,15 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-21 (42) — Claude Code — «salom» → «Gemini xatosi (503)»
+
+**Topildi:** Gemini serveri band (503, provayder 3 marta qayta urindi). `fallback` yoqiq bo‘lsa ham OpenAI’ga o‘tilmadi: zaxira yo‘l hali «har pullik so‘rovda Ha» qoidasida qolgan edi.
+**Tuzatildi:** zaxira provayder ham birinchi so‘rov kabi `confirm_over_usd` qoidasida (`AiRouter._cheap`, matn va media); 5xx xabari o‘zbekcha («… serveri hozir band …»).
+**Testlar:** `scripts/test.ps1` — 547 PASS, smoke PASS; yangi `test_busy_chosen_provider_falls_back_without_asking`.
+**Keyingi qadam:** egasi tasdig‘i bilan push va v1.5.4.
+
+---
+
 ## 2026-10-21 (41) — Claude Code — Gemini tanlovi, ortiqcha «Ha», kalitlarni ko‘chirish, insondek suhbat
 
 **Foydalanuvchi talabi:** «faqat OpenAI ishlatyapti, Gemini’dan yo‘q; har yozganimda ruxsat so‘rayapti»; «API kalitlar boshqa kompyuterga birga yursin»; «NEXVARA insondek gaplashsin, fikrlasin, tushunsin».

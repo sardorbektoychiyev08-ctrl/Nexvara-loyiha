@@ -138,6 +138,20 @@ def test_fallback_to_another_provider(make):
         r.complete("plan", "s", msg, max_tokens=200, approved=True)
 
 
+def test_busy_chosen_provider_falls_back_without_asking(make):
+    r = make()
+    r.save_key("gemini", "AIza-test-1234567890abcdefgh")
+    r.save_key("openai", "sk-test-openai-123456")
+    r.settings.update({"ai": {"enabled": True, "provider": "gemini", "fallback": True}})
+    msg = [{"role": "user", "content": "salom"}]
+    r.fakes["gemini"].fail = AiError("Gemini serveri hozir band (503)", retryable=True)
+    reply = r.complete("chat", "s", msg, max_tokens=200)  # cheap: no «Ha» for the fallback
+    assert reply.provider == "openai" and reply.fallback_from == "gemini"
+    r.settings.update({"ai": {"confirm_over_usd": 0.0}})
+    with pytest.raises(NeedsConfirmation):  # above the limit the first call asks as before
+        r.complete("chat", "s", msg, max_tokens=200)
+
+
 def test_limits_block_and_warn(make):
     r = make()
     r.save_key("anthropic", "sk-ant-test-1234567890")
