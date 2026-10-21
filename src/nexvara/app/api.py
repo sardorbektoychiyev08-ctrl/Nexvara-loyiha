@@ -429,6 +429,10 @@ class Api(
             facts = mem.relevant_facts(text) if mem is not None else []
             rules = [f"{r.label()}: {r.text}" for r in mem.rules(enabled_only=True)] if mem else []
             recall = self._recall(text)
+            if features.small_talk(text):  # «salom», «rahmat»: no planner, a fast model
+                ans = features.chat_reply(router, text, approved, facts=facts, recall=recall,
+                                          quick=True)  # fmt: skip
+                return {"reply": ans.text, "sources": []}
             p = features.plan(router, text, agent_tools.catalog(), self._ctx.snapshot(),
                               recall.turns, facts, rules, approved, recall.older)  # fmt: skip
             if p.kind == "tools":

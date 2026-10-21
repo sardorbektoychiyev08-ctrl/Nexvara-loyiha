@@ -414,8 +414,30 @@ def answer_question(
     return Answer(r.text.strip(), sources, r.cost)
 
 
+# Greetings and thanks: every word is from this list. They get a fast model and skip the
+# planner, so «salom» is answered in a second or two instead of ten.
+_SMALL_TALK = set(
+    "salom assalom assalomu alaykum aleykum alekum hayrli xayrli tong kun kech qalay qalaysan "
+    "qalaysiz yaxshimisiz yaxshimisan ishlar ishlaringiz yaxshi rahmat raxmat katta kop "
+    "tashakkur ok okey xop zor ajoyib barakalla xayr korishguncha privet spasibo hello hi "
+    "thanks nexvara aka opa dostim ham sizga sizni sen siz".split()
+)
+
+
+def small_talk(text: str) -> bool:
+    from nexvara.knowledge.textnorm import fold
+
+    words = re.findall(r"\w+", fold(text))
+    return 0 < len(words) <= 6 and all(w in _SMALL_TALK for w in words)
+
+
 def chat_reply(
-    router: AiRouter, text: str, approved: bool = False, facts=(), recall: Recall | None = None
+    router: AiRouter,
+    text: str,
+    approved: bool = False,
+    facts=(),
+    recall: Recall | None = None,
+    quick: bool = False,
 ) -> Answer:
     system = (
         "Sen NEXVARA — Windows uchun shaxsiy AI yordamchisan: Excel, Word, PowerPoint "
@@ -429,7 +451,9 @@ def chat_reply(
         system += MEMORY_NOTE
     r = router.complete(
         "chat", _with_facts(public(system), facts), chat_messages(text, recall),
-        max_tokens=3000, expected_out=500, approved=approved, effort="medium",
+        max_tokens=1000 if quick else 3000, expected_out=150 if quick else 500,
+        approved=approved, effort="low" if quick else "medium",
+        tier="cheap" if quick else None,
     )  # fmt: skip
     return Answer(r.text.strip(), [], r.cost)
 
