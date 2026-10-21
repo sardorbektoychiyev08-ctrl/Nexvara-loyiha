@@ -187,7 +187,13 @@ class Api(
         self._ctx.add_turn("user", text)
         self._repair_origin = [text, 0]  # a new message: its failures may be repaired again
         forget = self._chat_forget(text)
-        out = forget if forget is not None else self._chat_inner(self._expand_aliases(text))
+        from nexvara.agent import typos
+
+        out = (
+            forget
+            if forget is not None
+            else self._chat_inner(self._expand_aliases(typos.fix(text)))
+        )
         if out.get("error") and not out.get("confirm") and self._self_repair_on():
             fixed = self._repair(text, out.get("reply", ""))
             if fixed is not None:

@@ -243,3 +243,26 @@ def test_picture_questions_use_captions_as_answers(tmp_path):
 def test_english_named_rtm_files(tmp_path, name, grade, subject):
     info = catalog.describe(tmp_path / name, "", None)
     assert (info.grade, info.subject) == (grade, subject)
+
+
+def test_test_request_with_typos_and_where_to_write():
+    """Live 2026-10-21: «menga6-sinif … 20 talik» lost the grade and «Excel faylida» became
+    the topic, so the textbook search failed and Word never opened."""
+    from nexvara.knowledge.service import parse_test_request
+
+    r = parse_test_request("menga6-sinif informatikasidan test tuz 20 talik")
+    assert (r.grade, r.subject, r.topic, r.count) == (6, "Informatika", "", 20)
+    r = parse_test_request("6-sinf informatika 20 ta test Excel faylida tuz")
+    assert (r.grade, r.topic) == (6, "")
+    r = parse_test_request("5-sinf matematika kasrlar 2 ta variant 10 talik test")
+    assert (r.topic, r.count, r.variants) == ("kasrlar", 10, 2)
+
+
+def test_typo_fixed_request_keeps_count_out_of_the_topic():
+    from nexvara.agent.typos import fix
+    from nexvara.knowledge.service import parse_test_request
+
+    r = parse_test_request(fix("menga6-sinif informatikasidan test tuz 20 talik"))
+    assert (r.grade, r.topic, r.count) == (6, "", 20)
+    r = parse_test_request("8-sinf tarix 2 ta variant test 30 ta")
+    assert (r.topic, r.count, r.variants) == ("", 30, 2)

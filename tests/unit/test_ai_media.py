@@ -282,6 +282,9 @@ def test_free_text_prefers_stronger_model_at_same_cost(tmp_path):
     )
     assert reply.model == "gemini-3.8-flash" and reply.cost == 0
     assert [c["model"] for c in r.texts["gemini"].calls] == ["gemini-3.8-flash"]
+    # a greeting (cheap tier) gets the fast free Flash-Lite, not the slower Flash
+    quick = r.complete("chat", "s", [{"role": "user", "content": "salom"}], tier="cheap")
+    assert quick.model == "gemini-3.5-flash-lite" and quick.cost == 0
 
 
 def test_status_for_the_menu(tmp_path):

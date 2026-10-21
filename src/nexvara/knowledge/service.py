@@ -39,7 +39,9 @@ class TestRequest:
             raise ValueError("sinf 1–11 oralig‘ida bo‘lsin")
 
 
-_COUNT = re.compile(r"(\d{1,3})\s*(?:ta)?\s*(?:test|savol)")
+_COUNT = re.compile(
+    r"(\d{1,3})\s*(?:ta)?\s*(?:test|savol)|(\d{1,3})\s*ta(?:lik|li)?\b(?!\s*variant)"
+)
 _VARIANTS = re.compile(r"(\d)\s*(?:ta)?\s*variant")
 _TEST_WORDS = ("test", "savol", "nazorat ishi", "viktorina")
 
@@ -60,7 +62,7 @@ def parse_test_request(text: str) -> TestRequest | None:
     grade = detect_grade(text)
     subject = detect_subject(text)
     m = _COUNT.search(f)
-    count = int(m.group(1)) if m else 20
+    count = int(m.group(1) or m.group(2)) if m else 20
     v = _VARIANTS.search(f)
     variants = int(v.group(1)) if v else 1
     return TestRequest(grade, subject, _remaining_topic(f, subject), count, variants)
@@ -101,8 +103,11 @@ def _remaining_topic(folded: str, subject: str | None) -> str:
     """Drop what we understood (grade, counts, subject, filler words); the rest is the topic."""
     topic = folded
     for pat in (
-        r"\d{1,2}\s*-?\s*sinf\w*",
+        r"\d{1,2}\s*-?\s*sini?f\w*",
         r"\d{1,3}\s*(?:ta)?\s*(?:test|savol)\w*",
+        r"\d{1,3}\s*ta(?:lik|li)?\b(?!\s*variant)",
+        # where to write it is not the topic: «Excel faylida», «Word’da»
+        r"\b(?:excel|exsel|eksel|word|vord|fayl|varaq|jadval)\w*",
         r"\d\s*(?:ta)?\s*variant\w*",
         _FILLER,
     ):

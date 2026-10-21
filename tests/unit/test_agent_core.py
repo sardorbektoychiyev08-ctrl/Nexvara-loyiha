@@ -210,3 +210,19 @@ def test_search_query_made_of_file_kind_words_lists_the_files(env):
     args = {"folder": str(work), "query": "Excel fayllari xlsx"}
     out = tools.run(api, tools.ToolCall("files.search", args))
     assert len(out["files"]) == 3, out
+
+
+def test_typing_mistakes_are_fixed_before_understanding():
+    from nexvara.agent.typos import fix
+
+    assert fix("menga6-sinif informatkadan test tuz 20 talik") == (
+        "menga 6-sinf informatikadan test tuz 20 ta"
+    )
+    assert fix("exselni ochib osha yerga yoz") == "Excelni ochib osha yerga yoz"
+    assert fix("vordga yoz") == "Wordga yoz"
+    assert fix("prezintatsiya tayyorla") == "prezentatsiya tayyorla"
+    # file names, paths and quoted text stay as written; ordinary words are not touched
+    assert fix(r"D:\Exsel\exsel.xlsx ni och") == r"D:\Exsel\exsel.xlsx ni och"
+    assert fix("«Exsel kursi» mavzusi") == "«Exsel kursi» mavzusi"
+    for same in ("excellent ish", "salom qalaysan", "7-sinf fizika Nyuton qonunlari"):
+        assert fix(same) == same

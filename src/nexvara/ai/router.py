@@ -712,8 +712,10 @@ class AiRouter:
             )
         # The provider the owner chose in Settings goes first; the others are the fallback.
         chosen = self.config().get("provider") or ""
+        # At the same price (two free Gemini models) the one made for this tier wins: a
+        # greeting gets the fast Flash-Lite, not the slower thinking Flash.
         candidates.sort(key=lambda x: (not x[1].free, x[1].provider != chosen, x[1].cost,
-                                       -x[0], x[1].model))  # fmt: skip
+                                       x[0] != target, -x[0], x[1].model))  # fmt: skip
         return [est for _, est in candidates]
 
     def set_capability(self, cap: str, mode: str, provider: str = "", model: str = "") -> dict:

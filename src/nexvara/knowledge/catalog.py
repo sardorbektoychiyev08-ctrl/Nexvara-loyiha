@@ -53,8 +53,8 @@ SUBJECTS: list[tuple[str, tuple[str, ...]]] = [
 ]
 
 _GRADE_PATTERNS = [
-    re.compile(r"(?<!\d)(1[01]|[1-9])\s*[-_ ]?\s*sinf"),
-    re.compile(r"sinf\s*[-_ ]?\s*(1[01]|[1-9])(?!\d)"),
+    re.compile(r"(?<!\d)(1[01]|[1-9])\s*[-_ ]?\s*sini?f"),  # also «sinif», «menga6-sinf»
+    re.compile(r"sini?f\s*[-_ ]?\s*(1[01]|[1-9])(?!\d)"),
     re.compile(r"(?:^|[^a-z])(?:g|grade\s*)(1[01]|[1-9])(?!\d)"),  # "G6", "Grade 6"
     re.compile(r"(?:^|[_\- .(])(1[01]|[1-9])(?:[_\- .)]|$)"),
 ]
