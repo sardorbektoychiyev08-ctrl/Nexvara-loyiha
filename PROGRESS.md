@@ -4,6 +4,21 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-21 (44) — Claude Code — xato yozilgan buyruqlar, javobni Excel/Word’ga yozish
+
+**Foydalanuvchi holati (jonli):** «menga6-sinif informatikasidan test tuz 20 talik» — sinf yo‘qoldi, «Excel faylida» mavzu deb olindi, darslik topilmadi; «exselni ochib osha yerga yoz» tushunilmadi.
+**Qilindi:**
+- `agent/typos.py`: tez-tez uchraydigan xatolar tushunishdan oldin tuzatiladi (exsel/vord/powerpoint, «sinif», «menga6-sinf», «20 talik», fan nomlari yaqin moslik bilan). Fayl yo‘llari va qo‘shtirnoqdagi matn o‘zgarmaydi.
+- Test so‘rovi: «20 talik» soni, «sinif», «Excel/Word/fayl» so‘zlari mavzuga kirmaydi.
+- Yangi buyruq `office.write`: «Excel’ni ochib o‘sha yerga yoz», «buni Word’ga yoz» — NEXVARA’ning oxirgi haqiqiy javobi (savol yoki «Davom etaymi?» emas) yangi faylga, ekranda; test bo‘lsa Excel’da jadval (№, Savol, A–D, Javob). Fayl: Hujjatlar/NEXVARA.
+- Rejalashtiruvchi AI’ga: xato yozilgan so‘rovning ma’nosini tiklash qoidasi. Provayder xatolari suhbat xotirasiga «javob» sifatida kirmaydi.
+- Bir xil narxdagi bepul Gemini modellaridan shu darajaga mosi tanlanadi (salom → Flash-Lite).
+
+**Testlar:** `scripts/test.ps1` — 553 PASS, 94 skipped, smoke PASS; ruff (format tuzatilgandan keyin) PASS. Haqiqiy Excel/Word’ga yozish (`write_to_office`) — NOT TESTED (Office ochiladi, egasi ruxsati kerak).
+**Keyingi qadam:** egasi ruxsati bilan `-Office` sinovi (javobni Excel/Word’ga yozish); keyin `main` ga merge, versiya va reliz — egasi tasdig‘i bilan.
+
+---
+
 ## 2026-10-21 (43) — Claude Code — Gemini tekshiruvi, «salom» tez javob
 
 **Gemini tekshiruvi (haqiqiy, egasi so‘radi):** kalit ishlaydi, model ro‘yxati 0.7 s; flash-lite «salom» 1.4 s; 3.8-flash 8–12 s (o‘ylaydi), 503 qaytmadi. Pro → 429 `generate_content_free_tier_* limit: 0` — kalit **Free Tier** (Billing yoqilmagan). Egasining sozlamasida `free_tier_confirmed` hali false (egasi qaror qiladi).
