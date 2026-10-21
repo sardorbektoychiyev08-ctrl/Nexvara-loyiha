@@ -4,6 +4,16 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-21 (43) — Claude Code — Gemini tekshiruvi, «salom» tez javob
+
+**Gemini tekshiruvi (haqiqiy, egasi so‘radi):** kalit ishlaydi, model ro‘yxati 0.7 s; flash-lite «salom» 1.4 s; 3.8-flash 8–12 s (o‘ylaydi), 503 qaytmadi. Pro → 429 `generate_content_free_tier_* limit: 0` — kalit **Free Tier** (Billing yoqilmagan). Egasining sozlamasida `free_tier_confirmed` hali false (egasi qaror qiladi).
+**Qilindi:** `features.small_talk` — faqat salom/rahmat so‘zlaridan iborat qisqa xabar rejalashtiruvchisiz, `cheap` darajada, effort low.
+**Testlar:** `scripts/test.ps1` — 548 PASS, smoke PASS.
+**Egasi qarori («ikkovini ham»):** bepul Gemini birinchi, band yoki bepul limit tugasa — OpenAI. Endi bepul rejim + «boshqa provayderga o‘tish» yoqiq bo‘lsa pullik provayderlar Gemini ortida zaxirada turadi (o‘chiq bo‘lsa — avvalgidek faqat bepul); zaxira «Ha» qoidasi `_cheap`. Egasining settings.json: `free_tier_confirmed: true` (Google 429 javobi bilan tasdiqlangan). Testlar: 548 PASS, smoke PASS.
+**Keyingi qadam:** v1.5.5 chiqarish (egasi tasdiqladi).
+
+---
+
 ## 2026-10-21 (42) — Claude Code — «salom» → «Gemini xatosi (503)»
 
 **Topildi:** Gemini serveri band (503, provayder 3 marta qayta urindi). `fallback` yoqiq bo‘lsa ham OpenAI’ga o‘tilmadi: zaxira yo‘l hali «har pullik so‘rovda Ha» qoidasida qolgan edi.

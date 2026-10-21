@@ -428,3 +428,21 @@ def test_chosen_provider_goes_first_and_cheap_call_needs_no_yes(router):
     router.settings.update({"ai": {"confirm_over_usd": 0.0}})
     with pytest.raises(NeedsConfirmation):
         router.check_budget(first, approved=False)
+
+
+def test_small_talk_skips_the_planner_and_uses_a_fast_model(router, monkeypatch):
+    from nexvara.app.api import Api
+
+    assert features.small_talk("Salom!") and features.small_talk("assalomu alaykum, qalaysiz?")
+    assert features.small_talk("katta rahmat")
+    assert not features.small_talk("salom, Savdo.xlsx ni och")
+    assert not features.small_talk("inersiya nima")
+    monkeypatch.setattr(features, "find_passages", lambda *a, **k: [])
+    router.save_key("anthropic", "sk-ant-test-1234567890")
+    router.settings.update({"ai": {"enabled": True}})
+    api = Api(overrides={"ai_router": router})
+    router.fake.replies = ["Salom! Yaxshimisiz?"]
+    calls = len(router.fake.calls)
+    assert api.chat("salom")["reply"] == "Salom! Yaxshimisiz?"
+    assert len(router.fake.calls) == calls + 1  # one call: no planner
+    assert router.fake.calls[-1]["model"] == "claude-haiku-5-5"  # the fast tier

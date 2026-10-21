@@ -455,7 +455,7 @@ class AiRouter:
                 # the amount already approved for the first candidate.
                 if not approved and not self._cheap(est):
                     continue
-                if approved and est.cost > choices[0].cost:
+                if approved and est.cost > choices[0].cost and not self._cheap(est):
                     raise NeedsConfirmation(est)
             key = self.keys.load(provider) or ""
             try:
@@ -463,12 +463,16 @@ class AiRouter:
                     est.model, system, messages, max_tokens, effort
                 )
             except AiError as e:
-                if est.free and "chegara" in str(e):
+                if est.free and "chegara" in str(e) and not cfg.get("fallback"):
                     raise AiUnavailable(
                         "Gemini bepul limiti hozircha tugadi (daqiqalik yoki kunlik so‘rovlar "
                         "soni). Bir necha daqiqadan keyin yoki ertaga qayta urinib ko‘ring. "
-                        "Pullik provayderga o‘zim o‘tmayman."
+                        "Pullik provayderga o‘zim o‘tmayman (Sozlamalar → AI → «boshqa "
+                        "provayderga o‘tish» o‘chiq)."
                     ) from e
+                if est.free and "chegara" in str(e):
+                    last_error = e  # free quota used up: the paid fallback answers
+                    continue
                 if not e.retryable:
                     raise
                 last_error = e
@@ -667,7 +671,10 @@ class AiRouter:
         for p in self.connected():
             if provider_override and p != provider_override:
                 continue
-            if self.free_active() and tier != "special" and p != FREE_PROVIDER:
+            # Free mode: Gemini's free tier only; with «fallback» on, the paid providers stay
+            # behind it for when Gemini is busy or its free quota is used up.
+            if (self.free_active() and tier != "special" and p != FREE_PROVIDER
+                    and not self.config().get("fallback")):  # fmt: skip
                 continue
             for model in self.catalog(p)[cap]:
                 level = model_catalog.tier_of(p, model)
@@ -688,6 +695,7 @@ class AiRouter:
                     continue
                 if (
                     self.free_active()
+                    and p == FREE_PROVIDER
                     and tier != "special"
                     and model not in self._free_text_models()
                 ):
@@ -835,9 +843,6 @@ class AiRouter:
             else:
                 if self.manual(cap) or provider_override or not self.config().get("fallback"):
                     break
-                # Free mode never moves from a free model to a paid one by itself.
-                if cands[0][1].get("free") and self.free_active() and not est.free:
-                    continue
                 try:
                     self.check_budget(est, approved=True)
                 except (BudgetExceeded, AiUnavailable):

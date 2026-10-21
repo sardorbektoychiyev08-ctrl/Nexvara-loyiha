@@ -183,7 +183,8 @@ def test_provider_receives_only_placeholders(wired, provider):
 
 def test_fallback_provider_also_gets_masked_text(wired):
     r, wires = wired
-    r.settings.update({"ai": {"fallback": True}})  # off by default; the user turned it on
+    # off by default; the user turned it on. Above the «Ha» limit a dearer fallback asks.
+    r.settings.update({"ai": {"fallback": True, "confirm_over_usd": 0.0}})
     wires["openai"] = Wire(chat_answer("x"), status=503)
     wires["gemini"] = Wire(chat_answer("Javob: ⟦ISM_1⟧"))
     with pytest.raises(NeedsConfirmation):  # a dearer fallback needs a fresh approval

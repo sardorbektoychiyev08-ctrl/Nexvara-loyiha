@@ -85,7 +85,7 @@ def test_ai_chat_gets_recent_and_month_old_conversation(env):
     mem.log_chat("user", "Mening maktabim 5-maktab, hisobotni har juma topshiraman")
     mem.log_chat("nexvara", "Yaxshi, eslab turaman.")
     _age(mem, 12)
-    api.fake.replies = ['{"kind": "chat"}', "Salom!"]
+    api.fake.replies = ["Salom!"]  # small talk: no planner call
     api.chat("salom")
     api.fake.replies = ['{"kind": "chat"}', "Juma kuni."]
     api.chat("hisobotni qachon topshiraman?")
