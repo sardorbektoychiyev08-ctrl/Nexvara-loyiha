@@ -129,8 +129,8 @@ def test_fallback_to_another_provider(make):
     with pytest.raises(AiError, match="busy"):
         r.complete("plan", "s", msg, max_tokens=200, approved=True)
     assert r.fakes[second].calls == []
-    r.settings.update({"ai": {"fallback": True}})
-    with pytest.raises(NeedsConfirmation):  # a dearer fallback needs a fresh approval
+    r.settings.update({"ai": {"fallback": True, "confirm_over_usd": 0.0}})
+    with pytest.raises(NeedsConfirmation):  # a dearer fallback above the limit asks again
         r.complete("plan", "s", msg, max_tokens=200, approved=True)
     assert r.fakes[second].calls == []
     r.fakes[first].fail = AiError("API kaliti noto‘g‘ri", retryable=False)
@@ -346,14 +346,17 @@ def test_free_mode_sends_everything_to_gemini_flash_at_zero_cost(make):
         r.complete("special", "s", [{"role": "user", "content": "x"}], max_tokens=300)
 
 
-def test_free_limit_reached_never_switches_to_a_paid_provider(make):
+def test_free_limit_reached_switches_only_when_fallback_is_on(make):
     r = make()
     _keys(r, "gemini", "openai")
-    r.settings.update({"ai": {"fallback": True}})
     r.fakes["gemini"].fail = AiError("Gemini: so‘rovlar chegarasi yoki kvota tugagan.", True)
-    with pytest.raises(AiUnavailable, match="bepul limiti"):
-        r.complete("chat", "s", [{"role": "user", "content": "salom"}], max_tokens=300)
+    msg = [{"role": "user", "content": "salom"}]
+    with pytest.raises(AiUnavailable, match="bepul limiti"):  # fallback off: free only
+        r.complete("chat", "s", msg, max_tokens=300)
     assert r.fakes["openai"].calls == []
+    r.settings.update({"ai": {"fallback": True}})  # the owner allowed a paid fallback
+    reply = r.complete("chat", "s", msg, max_tokens=300)  # cheap: no «Ha»
+    assert reply.provider == "openai" and reply.cost > 0
 
 
 def test_free_mode_off_or_without_gemini_uses_the_chosen_provider(make):
