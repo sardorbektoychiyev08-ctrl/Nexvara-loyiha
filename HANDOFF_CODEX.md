@@ -1,5 +1,10 @@
 # HANDOFF → Codex (Windows side)
 
+## ▶ CURRENT TASK (2026-10-22, Claude) — «Avval AI»: [docs/TASK_AI_FIRST.md](docs/TASK_AI_FIRST.md)
+
+Branch: `codex/ai-first` from `claude/qolgan-ishlar` (HEAD after PROGRESS (46)). Claude reviews it
+when done. No push / release without the owner.
+
 ## ▶ STATUS (2026-10-18 22:35, Claude) — Codex's auto-model-router work was saved and continued
 
 Codex ran out of limit with 27 uncommitted files; Claude committed them (51b64bf), merged
