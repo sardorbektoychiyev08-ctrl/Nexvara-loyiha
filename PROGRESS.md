@@ -4,6 +4,16 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-22 (46) — Claude Code — «telefondan bog‘lana olmayapman»
+
+**Tekshirildi (shu kompyuter):** NEXVARA ishlayapti, 8765-port hamma manzilda ochiq (Wi-Fi 192.168.0.43, Tailscale 100.65.206.5 — `/api/v1/info` 200), himoya devori qoidalari hozirgi `NEXVARA.exe` ga mos. Telefon 24115RA8EG bugun 09:48 da Wi-Fi (192.168.0.237) orqali ulangan, ping o‘tadi. Mi 11 Lite’ning Tailscale’i 1 kundan beri offline.
+**Topilgan haqiqiy xato:** telefondan yuborilgan rasm yo‘li `D:\NEXVARA\Telefondan\1000003519.jpg` maxfiylik filtrida «telefon» kalit so‘zi + raqam deb o‘qilib, keyingi har AI so‘rovi «So‘rov yuborilmadi: «Telefondan» yonidagi…» bilan to‘silgan (jurnalda 09:38, 09:44) — egasi buni ulanish uzilishi deb tushungan.
+**Tuzatildi:** `ai/privacy.py` — fayl yo‘li ichidagi kalit so‘z va kalit so‘zdan keyingi fayl nomlari qiymat hisoblanmaydi (`_FILE`); haqiqiy telefon raqami avvalgidek yashiriladi. «noutbukimdagi Excel’ni och» → `app.open` (avval AI uni «javobni yozish» deb tushungan edi).
+**Testlar:** `scripts/test.ps1` — 555 PASS, 96 skipped, smoke PASS, ruff PASS. Yangi: `test_phone_folder_path_does_not_block`; `test_open_app_commands` kengaydi.
+**Keyingi qadam:** egasidan telefonda aniq qanday xabar chiqqanini so‘rash; yangi reliz (1.5.7) faqat egasi tasdig‘i bilan.
+
+---
+
 ## 2026-10-22 (45) — Claude Code — «Excel’ni och» ishlamasdi
 
 **Foydalanuvchi holati (jonli):** «Excel’ni och» desa ochilmaydi (egasi: «kamchiliklar juda ko‘p, bu bitta misol»). Sabab: fayl nomisiz «dasturni och» buyrug‘i umuman yo‘q edi — «Buni tushunmadim».
