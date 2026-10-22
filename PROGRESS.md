@@ -4,6 +4,16 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-22 (49) — Claude Code — Office sinovi, `main` ga merge, 1.5.7 (yig‘ish to‘xtadi)
+
+**Egasi ruxsati:** Office sinovi va 1.5.7 reliz («1,2»).
+**Office (`test.ps1 -Office`):** 667 PASS, 2 FAIL → (a) `test_ai_test_in_word_with_fake_provider`: haqiqiy xato — «Avval AI» rejasining narxiga «Ha» dan keyin AI reja bermasa, eski zanjirga o‘tmasdi (`_after_plan` bilan tuzatildi, yangi unit sinov); (b) `test_ui_button_runs_real_excel`: faqat PowerPoint demo vaqtida «running» qoldi (avvalgi PowerPoint beqarorligi). Ikkalasi alohida qayta — 2 PASS. Yangi `tests/office/test_photo_excel_office.py` haqiqiy xatoni topdi: «Jami» qatori bo‘lsa sana ustuni 46317 son bo‘lib chiqardi — format endi har katak turiga qarab; PASS.
+**Unit:** `scripts/test.ps1` — 573 PASS, 97 skipped, smoke PASS, ruff PASS.
+**Git:** `codex/ai-first` → `main` (`e40d03c`), versiya 1.5.7. Push qilinmadi.
+**To‘xtadi:** `build.ps1 -Publish D:\NEXVARA\tmp\rel-1.5.7` ni Claude Code avtomatik ruxsat tizimi («Production Deploy») to‘sdi. Egasi ruxsat berishi yoki o‘zi ishga tushirishi kerak; keyin APK 1.6.0 ni (`D:\NEXVARA\tmp\NEXVARA-1.6.0.apk`) papkaga nusxalash, `python scripts\publish_github.py D:\NEXVARA\tmp\rel-1.5.7 v1.5.7`, o‘rnatuvchi hajmi ~64 MB ekanini tekshirish, internetdan imzo/SHA-256 sinovi, `git push` (main).
+
+---
+
 ## 2026-10-22 (48) — Claude Code — telefon uchun NEXVARA oynasini ochiq tutish shart emas
 
 **Foydalanuvchi:** «telefonda boshqarish uchun NEXVARA Windows’ni ochib qo‘yishim kerak ekan».
