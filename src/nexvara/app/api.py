@@ -119,6 +119,7 @@ class Api(
                 prev_hook(t)
             self._ctx.task_done(snap)  # its output becomes "uni" / "natija"
             self._repair_task(snap)  # a failed chat command: the AI may fix and retry
+            self._verify_task(snap)  # a document the AI asked for: read it back, fix mistakes
 
         self._runner.on_finish = on_finish
         if excel_demo:

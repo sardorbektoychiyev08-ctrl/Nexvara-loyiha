@@ -62,6 +62,13 @@ CREATES_NEW = frozenset({
     "report.weekly", "media.image",
 })  # fmt: skip
 
+# Documents an AI plan made: when the task is done the AI reads the file back and checks it
+# against the request («bajar → tekshir → tuzat», ai/verify.py).
+VERIFIED = frozenset({
+    "office.write", "document.official", "photo.to_office", "education.test",
+    "education.lesson", "education.presentation", "education.topic", "report.weekly",
+})  # fmt: skip
+
 
 def tool(tool_name: str, title: str, /, risky: bool = False, **params: tuple[str, bool, str]):
     def deco(fn):
