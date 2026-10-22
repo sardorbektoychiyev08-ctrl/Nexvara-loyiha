@@ -187,6 +187,52 @@ def test_chat_idempotent_and_task_flow(env):
     assert call(srv, "GET", f"/api/v1/files?path={other}", token=token)[0] == 404
 
 
+def test_retry_while_first_run_is_going_is_not_run_again(env):
+    """Live 2026-10-22: a slow AI reply, the phone gave up after 35 s and resent the same
+    request when the connection was back — the message ran three times."""
+    api, srv, _out = env
+    token = pair(srv)
+    calls, gate = [], threading.Event()
+
+    def slow(text):
+        calls.append(text)
+        gate.wait(10)
+        return {"reply": "tayyor"}
+
+    api.chat = slow
+    h = {"X-Request-Id": "r-slow", "Content-Type": "application/json"}
+    first = {}
+    t = threading.Thread(target=lambda: first.update(r=call(srv, "POST", "/api/v1/chat",
+                                                            {"text": "a"}, token, h)))  # fmt: skip
+    t.start()
+    while not calls:
+        time.sleep(0.02)
+    srv.retry_wait = 0.2  # still running: the phone is told to keep it queued
+    busy = call(srv, "POST", "/api/v1/chat", {"text": "a"}, token, h)
+    assert busy[0] == 429 and j(busy)["error"]["retry"]
+    srv.retry_wait = 10  # the retry waits for the first run's reply
+    second = {}
+    t2 = threading.Thread(target=lambda: second.update(r=call(srv, "POST", "/api/v1/chat",
+                                                             {"text": "a"}, token, h)))  # fmt: skip
+    t2.start()
+    time.sleep(0.3)
+    gate.set()
+    t.join(15)
+    t2.join(15)
+    assert calls == ["a"]
+    assert j(first["r"])["data"]["reply"] == j(second["r"])["data"]["reply"] == "tayyor"
+
+    def broken(text):
+        calls.append(text)
+        raise RuntimeError("x")
+
+    api.chat = broken  # an error is not remembered: the retry runs again
+    h2 = {"X-Request-Id": "r-err", "Content-Type": "application/json"}
+    assert call(srv, "POST", "/api/v1/chat", {"text": "b"}, token, h2)[0] == 500
+    assert call(srv, "POST", "/api/v1/chat", {"text": "b"}, token, h2)[0] == 500
+    assert calls == ["a", "b", "b"]
+
+
 def test_upload_checks_integrity(env):
     api, srv, _ = env
     token = pair(srv)
