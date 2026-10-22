@@ -63,6 +63,21 @@ class DevicesApi:
             raise ValueError(name)
         return self.devices_options()
 
+    def quit_app(self) -> dict[str, Any]:
+        """«NEXVARA’ni to‘liq yopish»: the phone is disconnected until NEXVARA is opened again."""
+        import threading
+
+        import webview
+
+        self._quitting = True
+
+        def close() -> None:
+            for w in list(webview.windows):
+                w.destroy()
+
+        threading.Timer(0.3, close).start()
+        return {"ok": True}
+
     def devices_start(self) -> dict[str, Any]:
         srv = self._server()
         if srv is None:

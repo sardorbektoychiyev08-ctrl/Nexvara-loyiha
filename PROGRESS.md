@@ -4,6 +4,16 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-22 (48) — Claude Code — telefon uchun NEXVARA oynasini ochiq tutish shart emas
+
+**Foydalanuvchi:** «telefonda boshqarish uchun NEXVARA Windows’ni ochib qo‘yishim kerak ekan».
+**Sabab:** oynani yopish dasturni butunlay o‘chirardi (telefon serveri ham). Autostart bor edi, lekin oyna bilan ochilardi.
+**Qilindi (`app/background.py`, `main.py`):** telefon ulanishi yoqiq bo‘lsa oynani yopish uni faqat yashiradi, NEXVARA fonda ishlaydi; Windows bilan ishga tushganda (`--background`, Run kaliti avtomatik yangilanadi — `pcpower.refresh_autostart`) yashirin ochiladi; NEXVARA’ni qayta ishga tushirish ikkinchi nusxa ochmaydi — fondagi oynani ko‘rsatadi (127.0.0.1:8764); «Qurilmalar» → «NEXVARA’ni to‘liq yopish» (tasdiq bilan); yangilanishda oyna haqiqatan yopiladi (`_quitting`). Telefon ulanishi o‘chiq bo‘lsa — avvalgidek yopiladi.
+**Testlar:** `scripts/test.ps1` — 572 PASS, 96 skipped, smoke PASS, ruff PASS. Haqiqiy oyna (manba koddan, vaqtinchalik ma’lumot papkasi): yopish → yashirindi, jarayon tirik — PASS; ikkinchi ishga tushirish → chiqdi, oyna qaytdi — PASS; telefon o‘chiq → yopildi — PASS; `--background` → ko‘rinadigan oyna yo‘q, jarayon tirik — PASS. O‘rnatilgan exe (PyInstaller) bilan — NOT TESTED (reliz yig‘ilgach).
+**Keyingi qadam:** egasi ruxsati bilan Office sinovi (rasm → Excel), so‘ng `main` ga merge va 1.5.7 reliz — egasi tasdig‘i bilan.
+
+---
+
 ## 2026-10-22 (47) — Codex → Claude Code — «Avval AI» (docs/TASK_AI_FIRST.md)
 
 **Kim:** Codex boshladi (`codex/ai-first`, commit qilinmagan 16 fayl qoldi — limit tugadi), Claude tekshirib davom ettirdi va yakunladi.

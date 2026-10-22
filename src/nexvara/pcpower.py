@@ -18,10 +18,24 @@ NAME = "NEXVARA"
 
 
 def _command() -> str:
+    # --background: with phone access on, NEXVARA starts hidden and only serves the phone
     if getattr(sys, "frozen", False):  # the installed NEXVARA.exe
-        return f'"{sys.executable}"'
+        return f'"{sys.executable}" --background'
     pyw = Path(sys.executable).with_name("pythonw.exe")
-    return f'"{pyw if pyw.exists() else sys.executable}" -m nexvara.app.main'
+    return f'"{pyw if pyw.exists() else sys.executable}" -m nexvara.app.main --background'
+
+
+def refresh_autostart() -> None:
+    """An older version wrote the Run key without --background: rewrite it once."""
+    import winreg
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+            value = winreg.QueryValueEx(k, NAME)[0]
+    except OSError:
+        return  # autostart is off
+    if value != _command():
+        set_autostart(True)
 
 
 def autostart_enabled() -> bool:

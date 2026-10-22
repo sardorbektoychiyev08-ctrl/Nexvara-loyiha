@@ -1488,6 +1488,13 @@ $("#dev-ts-allow").addEventListener("click", async () => {
   $("#dev-error").hidden = r.ok; $("#dev-error").textContent = r.ok ? "" : r.error;
 });
 
+// Phone access keeps NEXVARA running when its window is closed; this button really quits.
+const quitBtn = document.getElementById("btn-quit-app");
+if (quitBtn) quitBtn.addEventListener("click", async () => {
+  if (!confirm("NEXVARA to‘liq yopiladi va telefon ulanishi uziladi. Yopilsinmi?")) return;
+  await api().quit_app();
+});
+
 // What a paired phone may do: see the screen, control mouse/keyboard, NEXVARA at sign-in.
 async function renderDeviceOptions() {
   if (!api() || !api().devices_options) return;
