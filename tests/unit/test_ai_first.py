@@ -175,3 +175,15 @@ def test_ai_table_json_builds_typed_office_free_workbook(tmp_path):
     assert ws["A2"].value.date().isoformat() == "2026-10-22"
     assert ws["C2"].value == 1250.5 and ws["C2"].number_format == "#,##0.00"
     assert list(ws.merged_cells.ranges)[0].coord == "A2:A3"
+
+
+def test_unclear_plan_after_yes_falls_back_to_old_chain(tmp_path):
+    """Live-like: the plan's price was confirmed with «Ha», then the AI did not answer with a
+    plan — the old chain handles the message instead of «AI javobini tushunib bo‘lmadi»."""
+    api, fake, router = _api(tmp_path)
+    router.settings.update({"ai": {"confirm_over_usd": 0.0}})
+    ask = api.chat("Excel’ni och")
+    assert ask.get("confirm")
+    fake.replies = ["bu reja emas"]
+    out = api.confirm_ai(ask["confirm"], True)
+    assert out["reply"].startswith("Excel ochildi"), out

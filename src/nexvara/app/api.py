@@ -212,15 +212,7 @@ class Api(
         # is unavailable, the exact old offline chain below remains the fallback.
         if _use_ai and self._ai_first_on() and not getattr(self._local, "skip_first", False):
             if self._ai_ready():
-                planned = self._chat_ai(text, ai_first=True)
-                if planned.pop("plan_unclear", False):  # the AI works, its plan did not parse
-                    self._local.skip_first = True
-                    try:
-                        return self._chat_inner(text, _use_ai=True)
-                    finally:
-                        self._local.skip_first = False
-                if not planned.pop("ai_failed", False):
-                    return planned
+                return self._after_plan(text, self._chat_ai(text, ai_first=True))
             return self._ordinary_fallback(text)
 
         if _use_ai:
@@ -339,6 +331,19 @@ class Api(
                 "uchun Sozlamalar → AI bo‘limida API kalit kiriting."
             )
         }
+
+    def _after_plan(self, text: str, planned: dict[str, Any]) -> dict[str, Any]:
+        """«Avval AI» result: a plan that did not parse → the old chain with AI; the provider
+        down or over the limit → the old chain offline (also after «Ha» for the plan's price)."""
+        if planned.pop("plan_unclear", False):  # the AI works, its plan did not parse
+            self._local.skip_first = True
+            try:
+                return self._chat_inner(text, _use_ai=True)
+            finally:
+                self._local.skip_first = False
+        if planned.pop("ai_failed", False):
+            return self._ordinary_fallback(text)
+        return planned
 
     def _ai_first_on(self) -> bool:
         """AI switched on and «Avval AI» kept on. With AI off the old chain runs silently."""
@@ -577,7 +582,7 @@ class Api(
         if kind == "chat":
             return self._chat_ai(payload, approved=True)
         if kind == "chat_first":
-            return self._chat_ai(payload, approved=True, ai_first=True)
+            return self._after_plan(payload, self._chat_ai(payload, approved=True, ai_first=True))
         if kind == "drawing":
             return self._run_drawing(payload)
         if kind == "read":
