@@ -10,7 +10,8 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 **Office (`test.ps1 -Office`):** 667 PASS, 2 FAIL → (a) `test_ai_test_in_word_with_fake_provider`: haqiqiy xato — «Avval AI» rejasining narxiga «Ha» dan keyin AI reja bermasa, eski zanjirga o‘tmasdi (`_after_plan` bilan tuzatildi, yangi unit sinov); (b) `test_ui_button_runs_real_excel`: faqat PowerPoint demo vaqtida «running» qoldi (avvalgi PowerPoint beqarorligi). Ikkalasi alohida qayta — 2 PASS. Yangi `tests/office/test_photo_excel_office.py` haqiqiy xatoni topdi: «Jami» qatori bo‘lsa sana ustuni 46317 son bo‘lib chiqardi — format endi har katak turiga qarab; PASS.
 **Unit:** `scripts/test.ps1` — 573 PASS, 97 skipped, smoke PASS, ruff PASS.
 **Git:** `codex/ai-first` → `main` (`e40d03c`), versiya 1.5.7. Push qilinmadi.
-**To‘xtadi:** `build.ps1 -Publish D:\NEXVARA\tmp\rel-1.5.7` ni Claude Code avtomatik ruxsat tizimi («Production Deploy») to‘sdi. Egasi ruxsat berishi yoki o‘zi ishga tushirishi kerak; keyin APK 1.6.0 ni (`D:\NEXVARA\tmp\NEXVARA-1.6.0.apk`) papkaga nusxalash, `python scripts\publish_github.py D:\NEXVARA\tmp\rel-1.5.7 v1.5.7`, o‘rnatuvchi hajmi ~64 MB ekanini tekshirish, internetdan imzo/SHA-256 sinovi, `git push` (main).
+**Reliz:** avval avtomatik ruxsat tizimi to‘sdi; egasi «build.ps1 va publish_github.py ni ishga tushirishga ruxsat beraman» dedi. v1.5.7 yig‘ildi (64819029 bayt), APK 1.6.0 bilan GitHub’da (`nexvara-yangilanish` v1.5.7). Internetdan: 1.5.6 → 1.5.7 topildi, Ed25519 imzo, hajm, SHA-256 `285d210655560aca61c0148357b8c2e75fed54cef8b380ed404499edc6975236` — PASS; 1.5.7 → yangisi yo‘q — PASS. Manba `main` push qilindi (maxfiy fayl/kalit tekshirildi — yo‘q). O‘rnatilgan exe’da fon rejimi — NOT TESTED (egasi yangilagach).
+**Keyingi qadam:** egasi kompyuterda «Yangilash» (1.5.7); fon rejimi va «Avval AI» ni jonli sinash.
 
 ---
 
