@@ -4,6 +4,15 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-22 (55) — Claude Code — «saqlay olmayman deyapti», «o‘zi saqlasin»
+
+**Jonli (1.5.11):** rasm → Excel ishladi (`D:\NEXVARA\Telefondan\1000006389 (2)_NEXVARA.xlsx`, avtomatik saqlangan). Keyin: «chiroyli qilib ber» → buyruq «(2)_NEXVARA.xlsx» ni qidirdi (nomda bo‘sh joy va qavs) — topilmadi; «xali saqlamadingku» → AI «saqlanmagan» dedi; «beton sinovi deb d papkaga» → «saqlay olmayman, Ctrl+S bosing».
+**Qilindi:** yangi `files.save_as` (nusxa yangi nom/papkaga, ustiga yozmaydi, asl fayl qoladi; yo‘l aytilmasa — oxirgi natija; `CREATES_NEW` — «Ha»siz); `fileagent.copy_as`; `resolve_folder`: «D:» / «D disk» → `D:\`; `_bind_refs`: suhbatdagi fayl nomi (bo‘sh joy, qavs bilan) to‘liq yo‘lga almashtiriladi; rejalashtiruvchiga qoida: har natija avtomatik saqlanadi, «qayerga saqlading» — yo‘lni aytadi, «… deb saqla» — `files.save_as`, hech qachon «saqlay olmayman» demaydi.
+**Testlar:** unit 581 PASS, ruff PASS. Yangi: `test_last_result_is_saved_under_a_new_name_and_named_with_spaces`. Haqiqiy AI bilan — NOT TESTED.
+**Keyingi qadam:** egasi tasdig‘i bilan 1.5.12 reliz.
+
+---
+
 ## 2026-10-22 (54) — Claude Code — 10 soniya, kutubxonalar tekshiruvi, v1.5.11
 
 **Egasi:** «20 soniya ko‘p, uzog‘i 10»; «chiqarishdan oldin barcha kutubxonalarni o‘qiy oladimi».
