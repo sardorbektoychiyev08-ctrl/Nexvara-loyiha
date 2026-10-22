@@ -9,7 +9,8 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 **Egasi:** «xullas sen kabi bo‘lsin, 2» — taklifdagi 2-band: NEXVARA ishdan keyin natijani o‘zi tekshirib, xatoni o‘zi tuzatsin.
 **Qilindi:** `ai/verify.py` — tayyor fayl matnini o‘qish (DOCX/PPTX zip XML, XLSX openpyxl, PDF pymupdf; Office’siz) va AI sifat nazorati (so‘rovga mosligi, soni, mazmun, imlo/kelishik, rasmiy shakl; JSON `ok/problems/fixed_request`; «Ha» so‘ramaydi — limitdan qimmat bo‘lsa jim o‘tkazib yuboradi). `tools.VERIFIED` — AI rejasidagi hujjat asboblari; vazifa tugagach (`Api.on_finish` → `_verify_task`) fon oqimida tekshiriladi: mos — «✔ Tekshirdim»; kamchilik — ro‘yxat + `_repair` bilan tuzatilgan **yangi** fayl (eskisi o‘zgarmaydi), u ham bir marta tekshiriladi; ikkinchi marta ham xato bo‘lsa foydalanuvchiga aytadi. Javob kompyuter oynasiga, suhbat jurnaliga (telefon tarixi) yoziladi. Xarajat yozuvi: «Natijani tekshirish».
 **Testlar:** `scripts/test.ps1` — 577 PASS, 98 skipped, smoke PASS, ruff PASS. Yangi: `test_made_document_is_checked_and_fixed` (xato topildi → tuzatildi → qayta tekshirildi), `test_document_text_reads_word_excel_powerpoint`. Haqiqiy AI bilan — NOT TESTED.
-**Keyingi qadam:** egasi tasdig‘i bilan 1.5.8 reliz (50 + 51), keyin jonli sinov (3-band).
+**Reliz (egasi: «chiqar»):** v1.5.8 (64826432 bayt), APK 1.6.0 bilan GitHub’da. Internetdan: 1.5.7 → 1.5.8 topildi, Ed25519 imzo, hajm, SHA-256 `98ccbcd34f3c1481f38b96c3db2df32dbf69e565507ac2f70369432b89bbdde8` — PASS; 1.5.8 → yangisi yo‘q — PASS. Manba `main` push.
+**Keyingi qadam:** egasi «Yangilash» (1.5.8), ixtiyoriy «Bepul rejim»ni o‘chirish; jonli sinov (3-band): egasining kundalik so‘rovlari bilan haqiqiy AI.
 
 ---
 
