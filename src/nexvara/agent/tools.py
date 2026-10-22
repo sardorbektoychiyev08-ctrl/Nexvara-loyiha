@@ -51,6 +51,7 @@ TOOLS: dict[str, Tool] = {}
 READ_ONLY = frozenset({
     "files.search", "files.info", "files.versions", "bi.list", "bi.summary", "bi.steps",
     "bi.widgets", "workflow.list", "workflow.history", "settings.show", "settings.update_check",
+    "photo.read", "photo.compare_table",
 })  # fmt: skip
 
 
@@ -1170,6 +1171,7 @@ SETTINGS: dict[str, tuple[str, str, Any]] = {
     "test_variants": ("Variantlar soni (sukut)", "int", (1, 6)),
     "keep_office_open": ("Office oynasi ochiq qolsin", "bool", None),
     "ai.enabled": ("AI yoqilgan", "bool", None),
+    "ai.ai_first": ("Avval AI: har xabarni AI tushunadi", "bool", None),
     "ai.provider": ("Asosiy AI provayder", "choice", ("openai", "anthropic", "gemini", "deepseek")),
     "ai.daily_budget_usd": ("Kunlik AI limiti, $", "float", (0, 1000)),
     "ai.monthly_budget_usd": ("Oylik AI limiti, $", "float", (0, 10000)),
@@ -1269,7 +1271,102 @@ def sync_now(api, a):
 
 
 # =====================================================================
-# Pass-through to the offline command pipeline (Office, tests, topics ...)
+# Capabilities that used to exist only as keyword handlers in Api._chat_inner
+# =====================================================================
+
+
+def _handled(out: dict[str, Any] | None, title: str) -> dict[str, Any]:
+    if out is None or out.get("unhandled"):
+        raise ToolError(f"{title}: so‘rovni aniqroq yozing")
+    return out
+
+
+@tool("photo.to_office", "Ochiq rasmni AI ko‘rishi bilan Excel yoki Word qilish",
+      target=("string", True, "excel yoki word"),
+      request=("string", False, "qaysi qatorlar kerakligi kabi foydalanuvchi talabi"))  # fmt: skip
+def photo_to_office(api, a):
+    target = fold(a["target"])
+    target = "word" if target.startswith(("w", "v")) else "excel"
+    image = api._ctx.image or api._context_file or ""
+    if not image:
+        raise ToolError("Qaysi rasm? Avval rasmni tanlang yoki telefondan yuboring.")
+    return _handled(
+        api._chat_photo_office(image, target, True, a.get("request") or ""),
+        "Rasmni hujjatga o‘tkazish",
+    )
+
+
+@tool("photo.read", "Ochiq rasmni AI bilan o‘qish",
+      request=("string", False, "rasmdan nimani o‘qish kerak"))  # fmt: skip
+def photo_read(api, a):
+    image = api._ctx.image or api._context_file or ""
+    if not image:
+        raise ToolError("Qaysi rasm? Avval rasmni tanlang yoki telefondan yuboring.")
+    return api._ask_read_ai(image, request=a.get("request") or "")
+
+
+@tool("photo.compare_table", "Ochiq rasmni oxirgi Excel jadval bilan solishtirish",
+      request=("string", False, "tekshirish yoki tuzatish talabi"))  # fmt: skip
+def photo_compare_table(api, a):
+    return api._ask_compare_table(a.get("request") or "")
+
+
+@tool("drawing.create", "Chizma chizish yoki rasmdagi eskizni qayta chizish",
+      request=("string", True, "foydalanuvchining to‘liq talabi"))  # fmt: skip
+def drawing_create(api, a):
+    return _handled(api._chat_drawing(a["request"]), "Chizma")
+
+
+@tool("education.test", "Darslikdan test tuzish",
+      request=("string", True, "sinf, fan, mavzu, savol va variantlar soni"))  # fmt: skip
+def education_test(api, a):
+    return _handled(api._chat_inner(a["request"], _use_ai=False), "Test tuzish")
+
+
+@tool("education.lesson", "Dars ishlanmasi tuzish",
+      request=("string", True, "sinf, fan, mavzu va dars talabi"))  # fmt: skip
+def education_lesson(api, a):
+    return _handled(api._chat_inner(a["request"], _use_ai=False), "Dars ishlanmasi")
+
+
+@tool("education.presentation", "Darslik mavzusidan taqdimot tuzish",
+      request=("string", True, "sinf, fan, mavzu va slayd talabi"))  # fmt: skip
+def education_presentation(api, a):
+    return _handled(api._chat_inner(a["request"], _use_ai=False), "Taqdimot")
+
+
+@tool("education.topic", "Darslikdan mavzuni chiqarish",
+      request=("string", True, "sinf, fan va mavzu"))  # fmt: skip
+def education_topic(api, a):
+    return _handled(api._chat_inner(a["request"], _use_ai=False), "Mavzu")
+
+
+@tool("report.weekly", "Papka yoki fayllardan haftalik hisobot tuzish",
+      request=("string", True, "papka va hisobot talabi"))  # fmt: skip
+def report_weekly(api, a):
+    return _handled(api._chat_weekly(a["request"]), "Haftalik hisobot")
+
+
+@tool("office.transform", "Office hujjatini AI bilan tarjima yoki qayta yozish",
+      request=("string", True, "fayl, til yoki qayta yozish uslubi"))  # fmt: skip
+def office_transform(api, a):
+    return _handled(api._chat_officeai(a["request"]), "Office AI")
+
+
+@tool("media.image", "AI bilan rasm yaratish yoki ochiq rasmni tahrirlash",
+      request=("string", True, "yaratiladigan yoki tahrirlanadigan rasm tavsifi"))  # fmt: skip
+def media_image(api, a):
+    return _handled(api._chat_media(a["request"]), "Rasm yaratish")
+
+
+@tool("memory.teach", "NEXVARA’ga fakt yoki doimiy qoida o‘rgatish",
+      request=("string", True, "eslab qolinadigan fakt yoki qoida"))  # fmt: skip
+def memory_teach(api, a):
+    return _handled(api._chat_teach(a["request"]), "O‘rgatish")
+
+
+# =====================================================================
+# Pass-through to the offline command pipeline (Office and other exact commands)
 # =====================================================================
 
 

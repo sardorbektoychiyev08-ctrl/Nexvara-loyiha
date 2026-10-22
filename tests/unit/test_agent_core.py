@@ -54,7 +54,15 @@ def env(tmp_path, monkeypatch):
     budget = router.check_budget
     router.check_budget = lambda est, approved: budget(est, True)
     mem = MemoryStore(tmp_path / "app.db")
-    api = Api(TaskRunner(), overrides={"memory": mem, "command": office, "ai_router": router})
+    api = Api(
+        TaskRunner(),
+        overrides={
+            "memory": mem,
+            "command": office,
+            "ai_router": router,
+            "files_to_pdf": lambda task: {"path": str(work / "Hisobot.pdf")},
+        },
+    )
     api._context_file = str(work / "Hisobot.xlsx")
     api.fake, api.router, api.commands, api.work = fake, router, commands, work
     return api
@@ -185,8 +193,23 @@ def test_planner_gets_rules_and_facts(env):
     api.router.save_key("anthropic", "sk-ant-test-1234567890")
     api.router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     api.memory_add_fact("maktabim 21-maktab")
+    api.fake.replies = [
+        json.dumps(
+            {
+                "kind": "tools",
+                "calls": [
+                    {
+                        "tool": "memory.teach",
+                        "args": {"request": "Har doim Excel raqamlarini markazga joyla"},
+                    }
+                ],
+            }
+        )
+    ]
     r = api.chat("Har doim Excel raqamlarini markazga joyla")
+    r = api.confirm_ai(r["confirm"])
     api.confirm_ai(r["confirm"])
+    api.fake.calls.clear()
     api.fake.replies = ['{"kind": "chat"}', "Albatta!"]
     api.chat("21-maktab uchun nima qila olasan")
     system = api.fake.calls[0]["system"]

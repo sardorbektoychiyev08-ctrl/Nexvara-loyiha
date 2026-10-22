@@ -141,13 +141,15 @@ def test_photo_sketch_is_redrawn_after_consent(tmp_path, monkeypatch):
     api.set_context_file(str(photo))
     out = api.chat("Shu rasmdagi qo‘lda chizilgan chala chizmani mukammal chizib ber")
     assert out.get("confirm") and "GPS" in out["reply"] and "shaxsiy" in out["reply"]
-    assert pro.calls == []  # nothing is sent before "Ha"
+    assert not any(
+        "images" in m for c in pro.calls for m in c
+    )  # «Avval AI» plans from the text; the photo waits for "Ha"
     done = api.confirm_ai(out["confirm"], True)
     task = api._runner.get(done["task"]["id"])
     assert task.wait(30) and task.status == "succeeded", task.error
     res = task.result
     assert res["path"].endswith(".png") and res["pdf"].endswith(".pdf")
-    img = pro.calls[0][0]["images"][0]
+    img = next(m for c in pro.calls for m in c if "images" in m)["images"][0]
     assert img["mime"] == "image/jpeg" and "GPSLatitude" not in img["data"]
     assert api._router().ledger.recent()[0]["purpose"] == "Chizma"
 
@@ -158,7 +160,7 @@ def test_text_drawing_without_picture_and_refusals(tmp_path, monkeypatch):
     out = api.chat("Gayka chizmasini chizib ber")
     assert out.get("confirm") and "Rasm" not in out["reply"]
     assert api.confirm_ai(out["confirm"], False)["reply"].startswith("Bekor")
-    assert pro.calls == []
+    assert all(c[0].get("content") == "Gayka chizmasini chizib ber" for c in pro.calls)  # plan only
     # DeepSeek Flash has vision, but this powerful drawing task needs a stronger tier.
     (tmp_path / "b").mkdir()
     api2, _pro2 = _api(tmp_path / "b", {"deepseek": "sk-deepseek-test-123456"})
@@ -166,7 +168,8 @@ def test_text_drawing_without_picture_and_refusals(tmp_path, monkeypatch):
     photo.write_bytes(b"\x89PNG fake")
     api2.set_context_file(str(photo))
     out = api2.chat("shu rasmdagi eskizni chizib ber")
-    assert "mos" in out["reply"] and not out.get("confirm") and not _pro2.calls
+    assert "mos" in out["reply"] and not out.get("confirm")
+    assert not any("images" in m for c in _pro2.calls for m in c)  # the photo never left
     # A school subject is a test request, not a drawing.
     assert drawing.is_drawing_request("7-sinf chizmachilik 20 ta test")
     assert "Chizmani AI tuzadi" not in api.chat("7-sinf chizmachilik 20 ta test")["reply"]

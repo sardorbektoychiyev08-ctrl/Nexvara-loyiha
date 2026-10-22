@@ -105,15 +105,17 @@ def test_complete_records_cost_and_tiers(router):
 def test_budget_and_confirmation(router):
     router.save_key("anthropic", "sk-ant-test-1234567890")
     router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
-    big = [{"role": "user", "content": "x" * 60000}]  # ~20k tokens on the balanced tier
+    # max_tokens=8000 already estimates 4k output tokens (> confirmation threshold).
+    # A 60k-character filler made the privacy scan needlessly slow on Windows.
+    big = [{"role": "user", "content": "katta javob kerak"}]
     with pytest.raises(NeedsConfirmation) as e:
-        router.complete("qa", "s", big, max_tokens=8000)
+        router.complete("qa", "s", big, max_tokens=8000, expected_out=5000)
     assert "taxminan $" in e.value.estimate.describe()
     assert router.fake.calls == []  # nothing was sent
-    router.complete("qa", "s", big, max_tokens=8000, approved=True)
+    router.complete("qa", "s", big, max_tokens=8000, expected_out=5000, approved=True)
     router.settings.update({"ai": {"daily_budget_usd": 0.01}})
     with pytest.raises(BudgetExceeded, match="Kunlik"):
-        router.complete("qa", "s", big, max_tokens=8000, approved=True)
+        router.complete("qa", "s", big, max_tokens=8000, expected_out=5000, approved=True)
 
 
 def test_classify_reads_fenced_json(router):
@@ -430,7 +432,7 @@ def test_chosen_provider_goes_first_and_cheap_call_needs_no_yes(router):
         router.check_budget(first, approved=False)
 
 
-def test_small_talk_skips_the_planner_and_uses_a_fast_model(router, monkeypatch):
+def test_small_talk_uses_ai_first_planner(router, monkeypatch):
     from nexvara.app.api import Api
 
     assert features.small_talk("Salom!") and features.small_talk("assalomu alaykum, qalaysiz?")
@@ -441,8 +443,9 @@ def test_small_talk_skips_the_planner_and_uses_a_fast_model(router, monkeypatch)
     router.save_key("anthropic", "sk-ant-test-1234567890")
     router.settings.update({"ai": {"enabled": True}})
     api = Api(overrides={"ai_router": router})
-    router.fake.replies = ["Salom! Yaxshimisiz?"]
+    router.fake.replies = ['{"kind":"chat"}', "Salom! Yaxshimisiz?"]
     calls = len(router.fake.calls)
     assert api.chat("salom")["reply"] == "Salom! Yaxshimisiz?"
-    assert len(router.fake.calls) == calls + 1  # one call: no planner
-    assert router.fake.calls[-1]["model"] == "claude-haiku-5-5"  # the fast tier
+    assert len(router.fake.calls) == calls + 2
+    assert router.fake.calls[-2]["model"] == "claude-opus-5-5"  # strong planner
+    assert router.fake.calls[-1]["model"] == "claude-sonnet-5-5"  # normal chat

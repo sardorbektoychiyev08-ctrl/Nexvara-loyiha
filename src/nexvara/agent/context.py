@@ -28,6 +28,7 @@ _REF_FOLDER = re.compile(r"\b(shu papka\w*|osha papka\w*|bu papka\w*)\b")
 @dataclass
 class Context:
     file: str = ""  # the file the conversation is about ("shu fayl")
+    image: str = ""  # last photo; kept when its Excel/Word result becomes the current file
     result: str = ""  # the last output file a task produced
     files: list[str] = field(default_factory=list)  # last search / list result
     folder: str = ""
@@ -102,6 +103,7 @@ class Context:
         """For the AI planner (what "it", "those files", "that folder" mean right now)."""
         return {
             "file": self.file,
+            "open_image": self.image,
             "last_result": self.result,
             "files": self.files[:10],
             "folder": self.folder,

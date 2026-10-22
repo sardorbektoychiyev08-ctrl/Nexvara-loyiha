@@ -394,9 +394,13 @@ def test_read_photo_in_chat_offline_and_with_ai(tmp_path, monkeypatch):
     api2 = Api(overrides={"ai_router": r})
     api2.set_context_file(str(photo))
     ask = api2.chat("AI bilan shu rasmdagi qo‘lyozmani o‘qi")
-    assert ask.get("confirm") and pro.calls == []
+    assert ask.get("confirm") and not any("images" in m for c in pro.calls for m in c)
     done = api2.confirm_ai(ask["confirm"], True)
-    assert "12-mashq" in done["reply"] and "GPSLatitude" not in pro.calls[0][0]["images"][0]["data"]
+    assert (
+        "12-mashq" in done["reply"]
+        and "GPSLatitude"
+        not in next(m for c in pro.calls for m in c if "images" in m)["images"][0]["data"]
+    )
     assert r.ledger.recent()[0]["purpose"] == "Rasmdan matn"
 
 

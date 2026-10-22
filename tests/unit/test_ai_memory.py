@@ -85,7 +85,7 @@ def test_ai_chat_gets_recent_and_month_old_conversation(env):
     mem.log_chat("user", "Mening maktabim 5-maktab, hisobotni har juma topshiraman")
     mem.log_chat("nexvara", "Yaxshi, eslab turaman.")
     _age(mem, 12)
-    api.fake.replies = ["Salom!"]  # small talk: no planner call
+    api.fake.replies = ['{"kind": "chat"}', "Salom!"]
     api.chat("salom")
     api.fake.replies = ['{"kind": "chat"}', "Juma kuni."]
     api.chat("hisobotni qachon topshiraman?")
@@ -186,7 +186,17 @@ def test_failed_office_task_is_repaired_in_the_background(env):
     api = Api(TaskRunner(), overrides={"memory": api.mem, "ai_router": api.router,
                                        "command": office})  # fmt: skip
     api.fake = env.fake
+    initial = {
+        "kind": "tools",
+        "calls": [
+            {
+                "tool": "nexvara.command",
+                "args": {"text": f"{work / 'Savdo.xlsx'} ni och, Narx bo‘yicha saralab saqla"},
+            }
+        ],
+    }
     api.fake.replies = [
+        json.dumps(initial),
         json.dumps(
             {
                 "kind": "tools",
@@ -200,9 +210,10 @@ def test_failed_office_task_is_repaired_in_the_background(env):
                     }
                 ],
             }
-        )
+        ),
     ]
     r = api.chat(f"{work / 'Savdo.xlsx'} ni och, Narx bo‘yicha saralab saqla")
+    r = api.confirm_ai(r["confirm"])
     api._runner.get(r["task"]["id"]).wait(10)
     for _ in range(300):  # the repair runs in the background: give a busy PC 15 s
         ev = [e for e in api.ui_events() if e["kind"] == "nexvara_reply"]

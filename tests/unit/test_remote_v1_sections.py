@@ -349,6 +349,7 @@ def test_phone_ai_directions_speech_and_pictures(env):
     assert sp["path"].endswith(".wav") and sp["provider"] == "openai"
     assert call(srv, "GET", f"/api/v1/files?path={quote(sp['path'])}", token=token)[0] == 200
     api._ai_ready = lambda: True
+    router.settings.update({"ai": {"confirm_over_usd": 0.05}})  # the plan itself: no "Ha"
     r = j(post(srv, "/api/v1/chat", {"text": "rasm yarat: maktab logotipi"}, token))["data"]
     assert (
         r["confirm"]

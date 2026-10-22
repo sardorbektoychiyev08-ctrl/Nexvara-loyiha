@@ -9,7 +9,10 @@ plain text becomes Word paragraphs. The result is saved next to the photo as
 
 from __future__ import annotations
 
+import datetime as dt
+import json
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +21,82 @@ from nexvara.core.task import UserError
 _SPLIT = re.compile(r"\s*\|\s*|\t+| {3,}")
 _NUM = re.compile(r"^[+-]?\d{1,3}(?:[  ]?\d{3})*(?:[.,]\d+)?$|^[+-]?\d+(?:[.,]\d+)?$")
 MAX_ROWS = 5000
+_DATE = re.compile(r"^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$|^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$")
+_CELL = re.compile(r"^[A-Z]{1,3}[1-9]\d*$")
+
+
+@dataclass
+class TableData:
+    rows: list[list[Any]]
+    title: str = "Jadval"
+    merges: list[str] = field(default_factory=list)
+    formulas: dict[str, str] = field(default_factory=dict)
+
+
+def _date(cell: str) -> dt.date | None:
+    m = _DATE.fullmatch(cell.strip())
+    if not m:
+        return None
+    try:
+        if m.group(1):
+            return dt.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        return dt.date(int(m.group(6)), int(m.group(5)), int(m.group(4)))
+    except ValueError:
+        return None
+
+
+def value(cell: Any, *, header: bool = False) -> Any:
+    if not isinstance(cell, str) or header:
+        return cell
+    return _date(cell) or number(cell)
+
+
+def _clean_rows(rows: Any) -> list[list[Any]]:
+    if not isinstance(rows, list):
+        return []
+    clean = [list(r) for r in rows if isinstance(r, list) and any(str(c).strip() for c in r)]
+    if len(clean) < 2:
+        return []
+    width = max(len(r) for r in clean)
+    clean = [(r + [""] * width)[:width] for r in clean[:MAX_ROWS]]
+    keep = [c for c in range(width) if any(str(r[c]).strip() for r in clean)]
+    clean = [[r[c] for c in keep] for r in clean]
+    return [[value(c, header=i == 0) for c in r] for i, r in enumerate(clean)]
+
+
+def parse_ai_table(text: str) -> TableData:
+    """Validated vision output. A pipe table is accepted for older/fallback providers."""
+    raw = (text or "").strip()
+    data: Any = None
+    a, b = raw.find("{"), raw.rfind("}")
+    if 0 <= a < b:
+        try:
+            data = json.loads(raw[a : b + 1])
+        except ValueError:
+            data = None
+    if isinstance(data, dict):
+        rows = _clean_rows(data.get("rows"))
+        title = str(data.get("title") or "Jadval").strip()[:60] or "Jadval"
+        merges = []
+        for address in data.get("merges") or []:
+            address = str(address).upper().replace("$", "")
+            if re.fullmatch(r"[A-Z]{1,3}[1-9]\d*:[A-Z]{1,3}[1-9]\d*", address):
+                merges.append(address)
+        formulas = (
+            {
+                str(k).upper().replace("$", ""): str(v)
+                for k, v in (data.get("formulas") or {}).items()
+                if _CELL.fullmatch(str(k).upper().replace("$", "")) and str(v).startswith("=")
+            }
+            if isinstance(data.get("formulas"), dict)
+            else {}
+        )
+        if rows:
+            return TableData(rows, title, merges, formulas)
+    rows = table_rows(raw)
+    if rows:
+        return TableData(_clean_rows(rows))
+    raise UserError("AI rasmda jadval topmadi. Rasmni yaqinroq va tekisroq suratga oling.")
 
 
 def split_row(line: str) -> list[str]:
@@ -61,7 +140,12 @@ def number(cell: str) -> Any:
         return cell
 
 
-def write_excel(rows: list[list[str]], path: Path, title: str = "Jadval") -> Path:
+def write_excel(
+    rows: list[list[Any]],
+    path: Path,
+    title: str = "Jadval",
+    merges: list[str] | None = None,
+) -> Path:
     import openpyxl
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
@@ -74,7 +158,7 @@ def write_excel(rows: list[list[str]], path: Path, title: str = "Jadval") -> Pat
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
     for r, row in enumerate(rows, start=1):
         for c, cell in enumerate(row, start=1):
-            v = cell if r == 1 else number(cell)
+            v = value(cell, header=r == 1)
             x = ws.cell(row=r, column=c, value=v)
             x.border = border
             x.alignment = Alignment(vertical="center", wrap_text=r == 1,
@@ -83,15 +167,66 @@ def write_excel(rows: list[list[str]], path: Path, title: str = "Jadval") -> Pat
             if r == 1:
                 x.font = Font(bold=True, color=HEADER_FONT.lstrip("#"))
                 x.fill = PatternFill("solid", fgColor=HEADER_FILL.lstrip("#"))
+            elif isinstance(v, (dt.date, dt.datetime)):
+                x.number_format = "dd.mm.yyyy"
+            elif isinstance(v, (int, float)) and not isinstance(v, bool):
+                x.number_format = "#,##0.00" if isinstance(v, float) else "#,##0"
     for c in range(1, len(rows[0]) + 1):
         longest = max(len(str(row[c - 1])) for row in rows[:300])
         ws.column_dimensions[openpyxl.utils.get_column_letter(c)].width = min(
             max(8, longest + 3), 60
         )
     ws.freeze_panes = "A2"
+    for address in merges or []:
+        ws.merge_cells(address)
     path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(path)
     return path
+
+
+def write_excel_com(data: TableData, path: Path, keep_open: bool = True) -> Path:
+    """Create the visible workbook with the project's locale-safe Excel helpers."""
+    from nexvara.skills.excel import ops
+    from nexvara.skills.excel.bridge import ExcelSession, finish_table, freeze_header
+
+    with ExcelSession(visible=True, keep_open=keep_open) as excel:
+        wb = excel.new_workbook()
+        ws = wb.Worksheets(1)
+        ws.Name = re.sub(r"[\[\]:*?/\\]", "", data.title)[:31] or "Jadval"
+        rng = ops.write_rows(ws, data.rows)
+        excel.app.DisplayAlerts = False  # «only the upper-left value is kept» would block
+        try:
+            for address in data.merges:
+                ws.Range(address).Merge()
+        finally:
+            excel.app.DisplayAlerts = True
+        for address, formula in data.formulas.items():
+            ws.Range(address).Formula = formula
+        numeric: list[int] = []
+        dates: list[int] = []
+        for c in range(len(data.rows[0])):
+            body = [r[c] for r in data.rows[1:] if r[c] not in (None, "")]
+            if body and all(isinstance(v, (dt.date, dt.datetime)) for v in body):
+                dates.append(c + 1)
+            elif body and all(
+                isinstance(v, (int, float)) and not isinstance(v, bool) for v in body
+            ):
+                numeric.append(c + 1)
+        finish_table(ws, rng, numeric, 1, 1)
+        last = len(data.rows)
+        for c in numeric:
+            whole = all(
+                isinstance(r[c - 1], int) for r in data.rows[1:] if r[c - 1] not in (None, "")
+            )
+            ops.set_number_format(ws.Range(ws.Cells(2, c), ws.Cells(last, c)),
+                                  "integer" if whole else "decimal")  # fmt: skip
+        for c in dates:
+            ops.set_number_format(ws.Range(ws.Cells(2, c), ws.Cells(last, c)), "date")
+        freeze_header(excel.app, 1)
+        excel.show()
+        saved = excel.save_as(wb, path)
+        del rng, ws, wb
+    return saved
 
 
 def write_word(text: str, rows: list[list[str]] | None, path: Path, title: str,
@@ -124,11 +259,24 @@ def output_for(image: str | Path, ext: str) -> Path:
     return output_path(src, ext)
 
 
-def convert(text: str, image: str | Path, to: str, task: Any = None, visible: bool = True,
-            keep_open: bool = True) -> dict[str, Any]:  # fmt: skip
-    if not (text or "").strip():
+def convert(
+    text: str | TableData,
+    image: str | Path,
+    to: str,
+    task: Any = None,
+    visible: bool = True,
+    keep_open: bool = True,
+    use_com: bool = False,
+) -> dict[str, Any]:
+    if isinstance(text, TableData):
+        data = text
+        body = "\n".join(" | ".join(str(c) for c in r) for r in data.rows)
+    else:
+        body = text
+        data = None
+    if not (body or "").strip():
         raise UserError("Rasmda matn topilmadi: yaqinroq, yorug‘ joyda, tekis suratga oling.")
-    rows = table_rows(text)
+    rows = data.rows if data else table_rows(body)
     title = Path(image).stem.replace("_", " ")[:60]
     if to == "excel":
         if rows is None:
@@ -136,9 +284,15 @@ def convert(text: str, image: str | Path, to: str, task: Any = None, visible: bo
                 "Rasmda jadval topilmadi (ustunlar ajralmadi). Jadvalli rasm uchun "
                 "«AI bilan Excel qil» deb yozing yoki Word’ga aylantiring."
             )
-        out = write_excel(rows, output_for(image, ".xlsx"), title)
+        data = data or TableData(_clean_rows(rows), title)
+        out_path = output_for(image, ".xlsx")
+        out = (
+            write_excel_com(data, out_path, keep_open=keep_open)
+            if use_com
+            else write_excel(data.rows, out_path, data.title or title, data.merges)
+        )
         return {"path": str(out), "rows": len(rows) - 1, "cols": len(rows[0]), "kind": "excel"}
     if to == "word":
-        out = write_word(text, rows, output_for(image, ".docx"), title, visible, keep_open)
+        out = write_word(body, rows, output_for(image, ".docx"), title, visible, keep_open)
         return {"path": str(out), "rows": len(rows) - 1 if rows else 0, "kind": "word"}
     raise UserError("Faqat Excel yoki Word")

@@ -37,7 +37,7 @@ from nexvara.appdata import DEFAULT_SETTINGS as DEFAULTS
 
 SYNC_SETTINGS = (
     "theme", "test_count", "test_variants", "keep_office_open",
-    "ai.daily_budget_usd", "ai.monthly_budget_usd", "ai.confirm_over_usd",
+    "ai.ai_first", "ai.daily_budget_usd", "ai.monthly_budget_usd", "ai.confirm_over_usd",
     "ai.send_textbook_text",
 )  # fmt: skip
 FORMAT = 1

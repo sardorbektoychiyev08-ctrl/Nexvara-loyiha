@@ -19,6 +19,8 @@ Api._chat_inner (app/api.py)
        {"kind": "tools", "calls": [...]} → the same validate/confirm/run path
 ```
 
+AI-first routing (every message → planner first): see docs/AI.md «Avval AI».
+
 ## Tools (agent/tools.py)
 
 Every section's actions are registered once with a typed parameter list and a `risky` flag:

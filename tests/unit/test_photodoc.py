@@ -82,7 +82,7 @@ def test_chat_photo_to_word_and_ai_table(tmp_path, monkeypatch):
         Ledger(tmp_path / "l.db"),
         factory=lambda n, k: pro,
     )
-    router.settings.update({"ai": {"enabled": True, "provider": "gemini"}})
+    router.settings.update({"ai": {"enabled": True, "provider": "gemini", "ai_first": False}})
     api2 = Api(overrides={"ai_router": router})
     api2.set_context_file(str(photo))
     ask = api2.chat("AI bilan shu rasmdagi jadvalni Excel qil")

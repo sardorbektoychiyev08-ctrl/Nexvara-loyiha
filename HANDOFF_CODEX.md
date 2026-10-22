@@ -1,6 +1,6 @@
 # HANDOFF → Codex (Windows side)
 
-## ▶ CURRENT TASK (2026-10-22, Claude) — «Avval AI»: [docs/TASK_AI_FIRST.md](docs/TASK_AI_FIRST.md)
+## ▶ DONE (2026-10-22, Claude finished Codex's work, PROGRESS (47)) — «Avval AI»: [docs/TASK_AI_FIRST.md](docs/TASK_AI_FIRST.md)
 
 Branch: `codex/ai-first` from `claude/qolgan-ishlar` (HEAD after PROGRESS (46)). Claude reviews it
 when done. No push / release without the owner.

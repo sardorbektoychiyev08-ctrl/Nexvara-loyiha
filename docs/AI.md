@@ -1,5 +1,15 @@
 # AI providers, Model Router and spend control
 
+## «Avval AI» (2026-10-22)
+
+AI yoqiq va `ai.ai_first` (standart `true`) bo‘lsa, `Api._chat_inner` har xabarni birinchi
+rejalashtiruvchiga (`features.plan`, `powerful` daraja) beradi; qoida asosidagi ishlovchilar
+asbob sifatida qoladi (`photo.*`, `drawing.create`, `education.*`, `app.open` …). Undan oldin
+faqat kalit tekshiruvi, «Ha/Yo‘q» va «buni unut». Reja JSON bo‘lmasa (`PlanUnclear`) — eski
+zanjir AI bilan; provayder band/limit — eski zanjir oflayn + «AI hozir ishlamayapti» qatori;
+AI o‘chiq — eski zanjir, qo‘shimcha yozuvsiz. Matn rejalashtiruvchiga maxfiylik filtri orqali
+ketadi; rasm faqat «Ha» dan keyin.
+
 ## AUTO katalog (2026-10-18)
 
 Ulangan kalitlar uchun modellar har 24 soatda va Sozlamalar/🧠 menyusidagi **Hozir
