@@ -51,6 +51,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "backup": {"auto": True, "keep": 4, "folder": "", "last": 0.0},
     "ai": {
         "enabled": False,
+        "ai_first": True,  # every chat message is understood by the planner before rules
         "provider": "",  # openai | anthropic | gemini | deepseek
         "daily_budget_usd": 1.0,
         "monthly_budget_usd": 10.0,

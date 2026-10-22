@@ -1036,6 +1036,7 @@ class AiRouter:
                 warnings.append(f"{label} limitning {spent / lim:.0%} qismi sarflandi.")
         return {
             "enabled": bool(cfg.get("enabled")),
+            "ai_first": bool(cfg.get("ai_first", True)),
             "provider": self.provider_name() or "",
             "ready": self.ready(),
             "providers": {n: self._provider_state(n, cfg) for n in models.PROVIDERS},

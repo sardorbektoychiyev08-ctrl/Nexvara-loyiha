@@ -135,6 +135,10 @@ class Api(
     def _context_file(self, value: str | None) -> None:
         self._ctx.file = value or ""
         if value:
+            from nexvara import drawing
+
+            if drawing.is_image(value):
+                self._ctx.image = value
             self._ctx.remember_dir(value)
 
     def _keep_open(self) -> bool:
@@ -187,13 +191,7 @@ class Api(
         self._ctx.add_turn("user", text)
         self._repair_origin = [text, 0]  # a new message: its failures may be repaired again
         forget = self._chat_forget(text)
-        from nexvara.agent import typos
-
-        out = (
-            forget
-            if forget is not None
-            else self._chat_inner(self._expand_aliases(typos.fix(text)))
-        )
+        out = forget if forget is not None else self._chat_inner(text)
         if out.get("error") and not out.get("confirm") and self._self_repair_on():
             fixed = self._repair(text, out.get("reply", ""))
             if fixed is not None:
@@ -208,6 +206,17 @@ class Api(
     def _chat_inner(self, text: str, _use_ai: bool = True) -> dict[str, Any]:
         from nexvara.agent.parse import find_file
         from nexvara.knowledge.service import parse_test_request
+
+        # AI-first is deliberately above every keyword/rule handler. Secrets, confirmations
+        # and «buni unut» are handled by chat()/confirm_ai() before this method. If the model
+        # is unavailable, the exact old offline chain below remains the fallback.
+        if _use_ai and self._ai_first_on() and not getattr(self._local, "skip_first", False):
+            if self._ai_ready():
+                return self._after_plan(text, self._chat_ai(text, ai_first=True))
+            return self._ordinary_fallback(text)
+
+        if _use_ai:
+            text = self._offline_text(text)
 
         section = self._chat_sections(text)  # workflows, history, memory, devices, theme
         if section is not None:
@@ -323,6 +332,55 @@ class Api(
             )
         }
 
+    def _after_plan(self, text: str, planned: dict[str, Any]) -> dict[str, Any]:
+        """«Avval AI» result: a plan that did not parse → the old chain with AI; the provider
+        down or over the limit → the old chain offline (also after «Ha» for the plan's price)."""
+        if planned.pop("plan_unclear", False):  # the AI works, its plan did not parse
+            self._local.skip_first = True
+            try:
+                return self._chat_inner(text, _use_ai=True)
+            finally:
+                self._local.skip_first = False
+        if planned.pop("ai_failed", False):
+            return self._ordinary_fallback(text)
+        return planned
+
+    def _ai_first_on(self) -> bool:
+        """AI switched on and «Avval AI» kept on. With AI off the old chain runs silently."""
+        try:
+            cfg = self._router().config()
+        except Exception:
+            return False
+        return bool(cfg.get("enabled")) and bool(cfg.get("ai_first", True))
+
+    def _offline_text(self, text: str) -> str:
+        from nexvara.agent import typos
+
+        return self._expand_aliases(typos.fix(text))
+
+    def _ordinary_fallback(self, text: str) -> dict[str, Any]:
+        """Run the pre-AI chain unchanged and disclose that semantic planning was unavailable."""
+        self._local.ai_fallback = True
+        try:
+            out = self._chat_inner(self._offline_text(text), _use_ai=False)
+        finally:
+            self._local.ai_fallback = False
+        if out.pop("unhandled", False):
+            out = {
+                "reply": (
+                    "Buni tushunmadim. AI’siz men quyidagilarni bajaraman: «7-sinf fizika "
+                    "Nyuton qonunlari mavzusini chiqarib ber», «7-sinf fizika Nyuton "
+                    "qonunlari 20 ta test», «Hisobot.xlsx ni och, B ustun bo‘yicha saralab, "
+                    "PDF qilib saqla». Erkin savollar uchun Sozlamalar → AI bo‘limida API "
+                    "kalit kiriting."
+                )
+            }
+        note = "AI hozir ishlamayapti, oddiy rejimda bajardim"
+        reply = str(out.get("reply") or "").rstrip()
+        out["reply"] = f"{reply}\n\n{note}" if reply else note
+        out["ai_fallback"] = True
+        return out
+
     # ----- Teach NEXVARA in chat ("eslab qol ...", "har doim ...") -----
     def _chat_teach(self, text: str) -> dict[str, Any] | None:
         from nexvara.knowledge.textnorm import fold
@@ -411,11 +469,13 @@ class Api(
         text = f"Bu ish pullik AI orqali bajariladi: {estimate.describe()}. Davom etaymi?"
         return {"token": token, "text": text}
 
-    def _chat_ai(self, text: str, approved: bool = False) -> dict[str, Any]:
+    def _chat_ai(
+        self, text: str, approved: bool = False, *, ai_first: bool = False
+    ) -> dict[str, Any]:
         """The AI path, plus a note when personal data was kept on this PC."""
         router = self._router()
         before = getattr(router, "masked_total", 0)
-        out = self._chat_ai_inner(text, approved)
+        out = self._chat_ai_inner(text, approved, ai_first=ai_first)
         hidden = getattr(router, "masked_total", 0) - before
         if hidden and out.get("reply"):
             out["reply"] += (f"\n\n🔒 {hidden} ta shaxsiy ma’lumot AI’ga yuborilmadi: "
@@ -423,7 +483,9 @@ class Api(
             out["privacy_masked"] = hidden
         return out
 
-    def _chat_ai_inner(self, text: str, approved: bool = False) -> dict[str, Any]:
+    def _chat_ai_inner(
+        self, text: str, approved: bool = False, *, ai_first: bool = False
+    ) -> dict[str, Any]:
         from nexvara.agent import tools as agent_tools
         from nexvara.ai import features
         from nexvara.ai.router import NeedsConfirmation
@@ -435,7 +497,7 @@ class Api(
             facts = mem.relevant_facts(text) if mem is not None else []
             rules = [f"{r.label()}: {r.text}" for r in mem.rules(enabled_only=True)] if mem else []
             recall = self._recall(text)
-            if features.small_talk(text):  # «salom», «rahmat»: no planner, a fast model
+            if features.small_talk(text) and not ai_first:
                 ans = features.chat_reply(router, text, approved, facts=facts, recall=recall,
                                           quick=True)  # fmt: skip
                 return {"reply": ans.text, "sources": []}
@@ -473,10 +535,19 @@ class Api(
                     f"yangi tanlov kerak: {e.estimate.describe()}. "
                     "🧠 menyusida uni qo‘lda tanlab, so‘rovni qayta yuboring."
                 }
-            ask = self._ask("chat", text, e.estimate)
+            ask = self._ask("chat_first" if ai_first else "chat", text, e.estimate)
             return {"reply": ask["text"], "confirm": ask["token"]}
         except UserError as e:
-            return {"reply": str(e)}
+            from nexvara.ai.privacy import PrivacyBlocked
+            from nexvara.ai.providers import AiError
+            from nexvara.ai.router import AiUnavailable, BudgetExceeded
+
+            if ai_first and isinstance(e, features.PlanUnclear):
+                return {"reply": str(e), "plan_unclear": True}
+            failed = isinstance(e, (AiError, AiUnavailable, BudgetExceeded)) and not isinstance(
+                e, PrivacyBlocked
+            )
+            return {"reply": str(e), "ai_failed": failed}
         reply = ans.text
         if ans.sources:
             pages = "; ".join(f"{s['book']}, {s['page']}-bet" for s in ans.sources)
@@ -510,10 +581,16 @@ class Api(
             return self._start_chain(payload, approved=True)
         if kind == "chat":
             return self._chat_ai(payload, approved=True)
+        if kind == "chat_first":
+            return self._after_plan(payload, self._chat_ai(payload, approved=True, ai_first=True))
         if kind == "drawing":
             return self._run_drawing(payload)
         if kind == "read":
             return self._run_read(payload)
+        if kind == "compare_table":
+            return self._run_compare_table(payload)
+        if kind == "photo_fix":
+            return self._run_photo_fix(payload)
         if kind == "image":
             return self._run_image(payload)
         if kind == "vision":

@@ -99,5 +99,6 @@ class UpdateApi:
     def _quit_for_update(self) -> None:
         import webview
 
+        self._quitting = True  # the window closes for real, not into the background
         for w in list(webview.windows):
             w.destroy()

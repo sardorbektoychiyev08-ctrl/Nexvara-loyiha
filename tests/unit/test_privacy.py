@@ -276,3 +276,17 @@ def test_nexvara_file_names_with_timestamps_do_not_block():
     Guard().mask("[2026-10-19] Foydalanuvchi: Ha [2026-10-19] NEXVARA: gpt-5.4-mini-2026-03-17")
     with pytest.raises(PrivacyBlocked):  # a real long number still blocks
         Guard().mask("Mening hisob raqamim 2020 8000 1234 5678 9")
+
+
+def test_phone_folder_path_does_not_block():
+    r"""Live check 2026-10-22: «D:\NEXVARA\Telefondan\1000003519.jpg» (a photo sent from the
+    phone) read as «telefon» + a number — every later request answered «So‘rov yuborilmadi»."""
+    from nexvara.ai.privacy import Guard
+
+    for ok in (
+        r"Fayl: D:\NEXVARA\Telefondan\rasm-1792644054481_NEXVARA.xlsx",
+        r"D:\NEXVARA\Telefondan\1000003519.jpg ni o‘qi",
+        "telefondan 1000003519.jpg rasmini yubordim",
+    ):
+        Guard().mask(ok)  # no PrivacyBlocked
+    assert "⟦TEL_1⟧" in Guard().mask("telefon raqamim 901234567")  # a real number still masked

@@ -4,6 +4,45 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-22 (48) — Claude Code — telefon uchun NEXVARA oynasini ochiq tutish shart emas
+
+**Foydalanuvchi:** «telefonda boshqarish uchun NEXVARA Windows’ni ochib qo‘yishim kerak ekan».
+**Sabab:** oynani yopish dasturni butunlay o‘chirardi (telefon serveri ham). Autostart bor edi, lekin oyna bilan ochilardi.
+**Qilindi (`app/background.py`, `main.py`):** telefon ulanishi yoqiq bo‘lsa oynani yopish uni faqat yashiradi, NEXVARA fonda ishlaydi; Windows bilan ishga tushganda (`--background`, Run kaliti avtomatik yangilanadi — `pcpower.refresh_autostart`) yashirin ochiladi; NEXVARA’ni qayta ishga tushirish ikkinchi nusxa ochmaydi — fondagi oynani ko‘rsatadi (127.0.0.1:8764); «Qurilmalar» → «NEXVARA’ni to‘liq yopish» (tasdiq bilan); yangilanishda oyna haqiqatan yopiladi (`_quitting`). Telefon ulanishi o‘chiq bo‘lsa — avvalgidek yopiladi.
+**Testlar:** `scripts/test.ps1` — 572 PASS, 96 skipped, smoke PASS, ruff PASS. Haqiqiy oyna (manba koddan, vaqtinchalik ma’lumot papkasi): yopish → yashirindi, jarayon tirik — PASS; ikkinchi ishga tushirish → chiqdi, oyna qaytdi — PASS; telefon o‘chiq → yopildi — PASS; `--background` → ko‘rinadigan oyna yo‘q, jarayon tirik — PASS. O‘rnatilgan exe (PyInstaller) bilan — NOT TESTED (reliz yig‘ilgach).
+**Keyingi qadam:** egasi ruxsati bilan Office sinovi (rasm → Excel), so‘ng `main` ga merge va 1.5.7 reliz — egasi tasdig‘i bilan.
+
+---
+
+## 2026-10-22 (47) — Codex → Claude Code — «Avval AI» (docs/TASK_AI_FIRST.md)
+
+**Kim:** Codex boshladi (`codex/ai-first`, commit qilinmagan 16 fayl qoldi — limit tugadi), Claude tekshirib davom ettirdi va yakunladi.
+**Codex qildi:** AI yoqiq bo‘lsa har xabar avval rejalashtiruvchiga (`Api._chat_inner`), `ai.ai_first` sozlamasi (UI belgi, sync); yangi asboblar `photo.to_office/read/compare_table`, `drawing.create`, `education.test/lesson/presentation/topic`, `report.weekly`, `office.transform`, `media.image`, `memory.teach`; rejalashtiruvchi ko‘rsatmasi: rad etish/bekor qilish, «uni/o‘sha jadval» kontekstdan (`open_image`); rasm → Excel: AI JSON jadval (`photodoc.parse_ai_table`: sarlavha, son, sana, birlashgan katak, formula), Excel ekranda (`write_excel_com`); rasm ↔ Excel solishtirish va tuzatilgan yangi fayl («Ha» bilan).
+**Claude tuzatdi:** AI o‘chiq bo‘lsa ham har javobga «AI hozir ishlamayapti» qo‘shilardi → endi faqat AI yoqiq-u ishlamaganda; reja JSON bo‘lmasa xom javob chatga chiqardi → `PlanUnclear`, eski zanjir AI bilan; Excel’da katak birlashtirish ogohlantirish oynasi Excel’ni to‘xtatishi mumkin edi (DisplayAlerts); butun sonlar «12,00» → `integer` format. 5 ta eski sinov yangi qoidaga moslandi (rasm «Ha» dan oldin AI’ga ketmasligi tekshiriladi, matnli reja — mumkin).
+**Testlar:** `scripts/test.ps1` — 569 PASS, 96 skipped, smoke PASS, ruff PASS. `test_failed_office_task_is_repaired_in_the_background` bir marta to‘liq yugurishda FAIL (fon vaqti), alohida 3/3 va keyingi to‘liq yugurishda PASS — beqaror. Haqiqiy AI bilan — NOT TESTED (egasi bilan). `write_excel_com` haqiqiy Excel’da — NOT TESTED (Office ruxsati kerak).
+**Keyingi qadam:** egasi ruxsati bilan Office sinovi (rasm → Excel), keyin `main` ga merge va 1.5.7 reliz — egasi tasdig‘i bilan.
+
+---
+
+## 2026-10-22 (46) — Claude Code — «telefondan bog‘lana olmayapman»
+
+**Tekshirildi (shu kompyuter):** NEXVARA ishlayapti, 8765-port hamma manzilda ochiq (Wi-Fi 192.168.0.43, Tailscale 100.65.206.5 — `/api/v1/info` 200), himoya devori qoidalari hozirgi `NEXVARA.exe` ga mos. Telefon 24115RA8EG bugun 09:48 da Wi-Fi (192.168.0.237) orqali ulangan, ping o‘tadi. Mi 11 Lite’ning Tailscale’i 1 kundan beri offline.
+**Topilgan haqiqiy xato:** telefondan yuborilgan rasm yo‘li `D:\NEXVARA\Telefondan\1000003519.jpg` maxfiylik filtrida «telefon» kalit so‘zi + raqam deb o‘qilib, keyingi har AI so‘rovi «So‘rov yuborilmadi: «Telefondan» yonidagi…» bilan to‘silgan (jurnalda 09:38, 09:44) — egasi buni ulanish uzilishi deb tushungan.
+**Tuzatildi:** `ai/privacy.py` — fayl yo‘li ichidagi kalit so‘z va kalit so‘zdan keyingi fayl nomlari qiymat hisoblanmaydi (`_FILE`); haqiqiy telefon raqami avvalgidek yashiriladi. «noutbukimdagi Excel’ni och» → `app.open` (avval AI uni «javobni yozish» deb tushungan edi).
+**Testlar:** `scripts/test.ps1` — 555 PASS, 96 skipped, smoke PASS, ruff PASS. Yangi: `test_phone_folder_path_does_not_block`; `test_open_app_commands` kengaydi.
+**Keyingi qadam:** egasidan telefonda aniq qanday xabar chiqqanini so‘rash; yangi reliz (1.5.7) faqat egasi tasdig‘i bilan.
+
+---
+
+## 2026-10-22 (45) — Claude Code — «Excel’ni och» ishlamasdi
+
+**Foydalanuvchi holati (jonli):** «Excel’ni och» desa ochilmaydi (egasi: «kamchiliklar juda ko‘p, bu bitta misol»). Sabab: fayl nomisiz «dasturni och» buyrug‘i umuman yo‘q edi — «Buni tushunmadim».
+**Qilindi:** yangi `app.open` buyrug‘i (`nlu._open_app`, `Api.open_app`): «Excel’ni och», «Word dasturini ochib ber», «iltimos Word’ni ishga tushir», «yangi Excel fayl och», shuningdek Bloknot, Kalkulyator, Paint. Dastur Windows App Paths orqali ochiladi; topilmasa — «o‘rnatilmagan bo‘lishi mumkin». AI rejalashtiruvchisi ham shu vositani ko‘radi. Xato-tuzatish: «pauerpoint» → PowerPoint.
+**Testlar:** `scripts/test.ps1` — 554 PASS, 96 skipped, smoke PASS; ruff format birinchi yugurishda yangi testda FAIL → tuzatildi, `ruff check`/`format --check` PASS, tegishli testlar qayta 67 PASS. Registrda excel/winword/powerpnt.exe App Paths bor (tekshirildi). Haqiqiy oynani ochish — NOT TESTED (Office ekranda ochiladi).
+**Keyingi qadam:** egasidan ishlamagan boshqa buyruqlar ro‘yxatini olish va bittalab tuzatish.
+
+---
+
 ## 2026-10-21 (44) — Claude Code — xato yozilgan buyruqlar, javobni Excel/Word’ga yozish
 
 **Foydalanuvchi holati (jonli):** «menga6-sinif informatikasidan test tuz 20 talik» — sinf yo‘qoldi, «Excel faylida» mavzu deb olindi, darslik topilmadi; «exselni ochib osha yerga yoz» tushunilmadi.

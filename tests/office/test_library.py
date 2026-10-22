@@ -112,7 +112,11 @@ def test_ai_test_in_word_with_fake_provider(data_dir, tmp_path):
         for i in range(10)
     ]  # fmt: skip
     ask = api.chat("AI bilan 7-sinf fizika kuch 6 ta test tuz")
+    # «Avval AI» with a $0 threshold: the plan's price first; the fake's answer is not a plan,
+    # so the old chain takes over and asks the price of the test itself.
     assert ask.get("confirm") and "$" in ask["reply"] and Fake.calls == 0  # price, then «Ha»
+    ask = api.confirm_ai(ask["confirm"], True)
+    assert ask.get("confirm") and "$" in ask["reply"] and Fake.calls == 1, ask
     reply = api.confirm_ai(ask["confirm"], True)
     assert "task" in reply, reply
     task = runner.get(reply["task"]["id"])
@@ -122,7 +126,7 @@ def test_ai_test_in_word_with_fake_provider(data_dir, tmp_path):
     assert snap["title"].startswith("AI test")
     res = snap["result"]
     assert all(c["ok"] for c in res["checks"]), res["checks"]
-    assert res["questions"] == 6 and Fake.calls == 1
+    assert res["questions"] == 6 and Fake.calls == 2
     assert router.ledger.today() > 0
     with pymupdf.open(res["pdf"]) as pdf:
         text = "\n".join(page.get_text() for page in pdf)

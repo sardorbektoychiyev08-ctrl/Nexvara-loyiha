@@ -808,6 +808,7 @@ async function renderAi(status) {
   });
   sel.value = st.provider;
   $("#ai-enabled").checked = st.enabled;
+  $("#ai-first").checked = st.ai_first !== false;
   $("#ai-daily").value = st.daily_budget_usd;
   $("#ai-monthly").value = st.monthly_budget_usd;
   $("#ai-confirm").value = st.confirm_over_usd;
@@ -852,6 +853,7 @@ $("#ai-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const r = await api().save_settings({ ai: {
     enabled: $("#ai-enabled").checked, provider: $("#ai-provider").value || "",
+    ai_first: $("#ai-first").checked,
     daily_budget_usd: Number($("#ai-daily").value), monthly_budget_usd: Number($("#ai-monthly").value),
     confirm_over_usd: Number($("#ai-confirm").value), send_textbook_text: $("#ai-send-text").checked,
     task_limit_usd: $("#ai-task").value === "" ? null : Number($("#ai-task").value),
@@ -1484,6 +1486,13 @@ $("#dev-ts-allow").addEventListener("click", async () => {
   $("#dev-ts-allow").disabled = false;
   $("#dev-ts").hidden = !r.needed;
   $("#dev-error").hidden = r.ok; $("#dev-error").textContent = r.ok ? "" : r.error;
+});
+
+// Phone access keeps NEXVARA running when its window is closed; this button really quits.
+const quitBtn = document.getElementById("btn-quit-app");
+if (quitBtn) quitBtn.addEventListener("click", async () => {
+  if (!confirm("NEXVARA to‘liq yopiladi va telefon ulanishi uziladi. Yopilsinmi?")) return;
+  await api().quit_app();
 });
 
 // What a paired phone may do: see the screen, control mouse/keyboard, NEXVARA at sign-in.

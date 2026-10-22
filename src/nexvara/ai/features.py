@@ -93,10 +93,13 @@ def classify(router: AiRouter, text: str, approved: bool = False) -> Intent:
         approved=approved,
         effort="low",
     )
-    data = _json_from(r.text)
-    if not isinstance(data, dict):
-        raise AiError("AI javobini tushunib bo‘lmadi.")
-    kind = str(data.get("kind") or "chat")
+    try:
+        data = _json_from(r.text)
+    except AiError as e:
+        raise PlanUnclear(str(e)) from e
+    if not isinstance(data, dict) or not data.get("kind"):
+        raise PlanUnclear("AI javobini tushunib bo‘lmadi.")
+    kind = str(data["kind"])
     if kind not in ("test", "topic", "presentation", "command", "question", "chat"):
         kind = "chat"
     grade = data.get("grade")
@@ -131,6 +134,14 @@ tushunadigan Office iboralari»dan tuzib yoz (fayl nomini saqla). Masalan «ariz
 ko‘rinishga keltir» → "ariza.docx ni och, hujjatni rasmiy formatla, PDF qilib saqla"; \
 «mayda yozuvlarni kattalashtir» → "taqdimot.pptx ni och, kamchiliklarni tuzat".
 - Bir nechta ish bo‘lsa, calls ro‘yxatida tartib bilan yoz.
+- Maxsus imkoniyat uchun umumiy "nexvara.command" o‘rniga uning aniq asbobini tanla: rasmni \
+o‘qish yoki Excel/Word qilish, rasm va jadvalni solishtirish, chizma, test, dars ishlanmasi, \
+taqdimot, mavzu, haftalik hisobot, Office tarjimasi, rasm yaratish va o‘rgatish.
+- «Yo‘q», «unday demadim», «to‘xta», «bekor qil», «tozala yozganlaringni» oldingi ishni \
+rad etish yoki qaytarishdir. Oxirgi natija fayli bo‘lsa uni faqat files.recycle orqali taklif \
+qil; o‘zing o‘chirma. Noaniq bo‘lsa calls bermay, "say"da faqat bitta aniq savol ber.
+- «uni», «o‘sha jadval», «hozir qilgan ishing»ni Kontekstdagi file/open_image/last_result \
+bilan bog‘la. Faylni o‘zingcha almashtirma.
 - API kalit, parol yoki tokenni hech qachon parametrga yozma.
 - Bilim savoli bo‘lsa {"kind": "question"}, oddiy suhbat bo‘lsa {"kind": "chat"} qaytar.
 
@@ -276,6 +287,10 @@ def plan_purpose(text: str) -> str:
     return "plan"
 
 
+class PlanUnclear(AiError):
+    """The planner answered, but not with a plan: the ordinary chain handles the message."""
+
+
 def plan(
     router: AiRouter,
     text: str,
@@ -313,13 +328,17 @@ def plan(
         max_tokens=3000,
         expected_out=500,
         approved=approved,
-        effort="low" if purpose == "plan" else "medium",
+        effort="medium",
+        tier="special" if purpose == "special" else "powerful",
         accept=_is_json_object,  # an unusable plan → one retry on the next stronger tier
     )
-    data = _json_from(r.text)
-    if not isinstance(data, dict):
-        raise AiError("AI javobini tushunib bo‘lmadi.")
-    kind = str(data.get("kind") or "chat")
+    try:
+        data = _json_from(r.text)
+    except AiError as e:
+        raise PlanUnclear(str(e)) from e
+    if not isinstance(data, dict) or not data.get("kind"):
+        raise PlanUnclear("AI javobini tushunib bo‘lmadi.")
+    kind = str(data["kind"])
     if kind == "tools":
         calls = [c for c in data.get("calls") or [] if isinstance(c, dict) and c.get("tool")]
         return Plan("tools", calls, str(data.get("say") or ""))

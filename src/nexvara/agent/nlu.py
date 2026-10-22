@@ -584,9 +584,31 @@ def _write_answer(text: str, f: str) -> list[ToolCall] | None:
     return [ToolCall("office.write", {"app": app})]
 
 
+_OPEN_APP = re.compile(
+    r"^(?:(?:menga|iltimos|yangi|bosh|bitta|(?:noutbuk|kompyuter|komp)\w*)\s+)*"
+    r"(?P<app>excel|word|power\s*point|bloknot|notepad|kalkulyator|calculator|paint)\w*"
+    r"(?:\s+(?:dastur|ilova|programma|fayl|hujjat|kitob|ni)\w*)*\s+"
+    r"(?:och|ishga\s+tushir|yoq)\w*(?:\s+(?:ber|qoy|chi)\w*)?$"
+)
+_APP_NAMES = {"e": "excel", "w": "word", "p": "powerpoint", "b": "notepad", "n": "notepad",
+              "k": "calc", "c": "calc"}  # fmt: skip
+
+
+def _open_app(text: str, f: str) -> list[ToolCall] | None:
+    """«Excel’ni och», «Word dasturini ochib ber», «bloknotni och»: just start the program."""
+    f = re.sub(r"[^\w\s]", " ", f)
+    f = re.sub(r"\s+", " ", f).strip()
+    m = _OPEN_APP.match(f)
+    if not m:
+        return None
+    word = m.group("app")
+    app = "paint" if word == "paint" else _APP_NAMES[word[0]]
+    return [ToolCall("app.open", {"app": app})]
+
+
 def parse(text: str) -> list[ToolCall] | None:
     f = fold(text).strip()
-    for fn in (_write_answer, _workflow, _bi, _settings, _files):
+    for fn in (_write_answer, _open_app, _workflow, _bi, _settings, _files):
         calls = fn(text, f)
         if calls:
             return calls

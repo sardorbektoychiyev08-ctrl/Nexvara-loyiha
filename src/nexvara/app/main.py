@@ -84,6 +84,9 @@ def main(argv: list[str] | None = None) -> int:
         help="check an installed copy with the real data (read-only) + Office/BI demos in DIR",
     )
     parser.add_argument("--debug", action="store_true", help="enable WebView dev tools")
+    parser.add_argument(
+        "--background", action="store_true", help="started with Windows: hidden if phone is on"
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(
@@ -98,6 +101,8 @@ def main(argv: list[str] | None = None) -> int:
     selftest_dir = args.selftest_excel or args.selftest_library
     if args.selftest_chat is not None or args.selftest_installed is not None:
         args.smoke = True
+    hidden = False  # started with Windows and phone access on
+    shown: list = []  # the main window, once the real app (not a self-test) created it
     if args.selftest_installed is not None:
         args.selftest_installed.mkdir(parents=True, exist_ok=True)
         api = Api(persist=True)  # the real data, only read (no watchers, no update step)
@@ -110,6 +115,19 @@ def main(argv: list[str] | None = None) -> int:
     else:
         api = Api(persist=True)  # history and settings survive restarts
         if not args.smoke:
+            from nexvara.app import background
+
+            instance = background.claim_single_instance(lambda: shown and shown[0].show())
+            if instance is None:
+                return 0  # NEXVARA is already running: its window is shown instead
+            settings = api.get_settings()
+            hidden = args.background and background.keep_running(settings)
+            try:
+                from nexvara import pcpower
+
+                pcpower.refresh_autostart()
+            except Exception:  # noqa: BLE001 - not Windows, or the registry is locked
+                pass
             api.start_background()  # workflow folder watchers and daily schedules
             try:
                 api.update_after_start()  # did an update started last time succeed?
@@ -130,7 +148,27 @@ def main(argv: list[str] | None = None) -> int:
         **window_geometry(work_area()),
         min_size=MIN_SIZE,
         background_color="#0B1020",
+        hidden=hidden,
     )
+    if api._history is not None and not args.smoke:  # the real app
+        from nexvara.app import background
+
+        shown.append(window)
+
+        def on_closing() -> bool:
+            """Phone access on: closing only hides the window; NEXVARA keeps serving the phone."""
+            if getattr(api, "_quitting", False):
+                return True
+            try:
+                keep = background.keep_running(api.get_settings())
+            except Exception:  # noqa: BLE001 - when unsure, keep the phone connected
+                keep = True
+            if keep:
+                window.hide()
+                return False
+            return True
+
+        window.events.closing += on_closing
 
     result = {"ok": not args.smoke}
     ready = threading.Event()
