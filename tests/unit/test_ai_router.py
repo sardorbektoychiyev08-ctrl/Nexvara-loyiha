@@ -380,3 +380,33 @@ def test_free_mode_from_chat(tmp_path, monkeypatch):
     assert Settings().load()["ai"]["free_mode"] is False
     api.chat("bepul rejimni yoq")
     assert Settings().load()["ai"]["free_mode"] is True
+
+
+def test_busy_free_tier_hands_over_at_once(make, monkeypatch):
+    """Live 2026-10-22: free Gemini busy → 30 s waits twice per call. With a paid fallback
+    the free call is «quick»: one try, no sleeping, a short timeout."""
+    import io
+    import urllib.error
+
+    from nexvara.ai import providers
+
+    r = make()
+    _keys(r, "gemini", "openai")
+    r.settings.update({"ai": {"fallback": True}})
+    r.fakes["gemini"].fail = AiError("Gemini: so‘rovlar chegarasi yoki kvota tugagan.", True)
+    reply = r.complete("chat", "s", [{"role": "user", "content": "salom"}], max_tokens=300)
+    assert reply.provider == "openai" and r.fakes["gemini"].quick
+
+    opened = []
+
+    def busy(req, timeout):
+        opened.append(timeout)
+        raise urllib.error.HTTPError(req.full_url, 429, "busy", {"retry-after": "30"},
+                                     io.BytesIO(b"{}"))  # fmt: skip
+
+    monkeypatch.setattr(providers.time, "sleep", lambda s: pytest.fail("waited"))
+    p = providers.ChatCompletionsProvider("gemini", "k", opener=busy)
+    p.quick = True
+    with pytest.raises(AiError, match="chegara"):
+        p._request("POST", "/chat/completions", {})
+    assert opened == [providers.QUICK_TIMEOUT]

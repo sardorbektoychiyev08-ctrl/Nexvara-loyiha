@@ -18,6 +18,7 @@ from typing import Any
 from nexvara.core.task import UserError
 
 TIMEOUT = 180.0
+QUICK_TIMEOUT = 20.0  # when another AI can answer instead
 VISION = ("openai", "gemini", "anthropic", "deepseek")
 
 
@@ -51,6 +52,9 @@ class AiError(UserError):
 
 class Provider:
     name = ""
+    # Another AI can answer (free Gemini busy → a paid one): a busy or slow reply is not
+    # waited for (live 2026-10-22: 30–55 s per message on the free tier), the router moves on.
+    quick = False
 
     def complete(
         self,
@@ -185,7 +189,7 @@ class ChatCompletionsProvider(Provider):
                 },
             )
             try:
-                with self._open(req, timeout=TIMEOUT) as resp:
+                with self._open(req, timeout=QUICK_TIMEOUT if self.quick else TIMEOUT) as resp:
                     return json.loads(resp.read().decode("utf-8"))
             except urllib.error.HTTPError as e:
                 detail = ""
@@ -205,7 +209,7 @@ class ChatCompletionsProvider(Provider):
                         "NEXVARA boshqa ulangan AI’dan foydalanishi mumkin.",
                         retryable=True,
                     ) from e
-                if (e.code == 429 or e.code >= 500) and attempt < 2:
+                if (e.code == 429 or e.code >= 500) and attempt < 2 and not self.quick:
                     wait = e.headers.get("retry-after") if e.headers else None
                     try:
                         delay = min(float(wait), 30.0) if wait else 0.0
@@ -227,7 +231,7 @@ class ChatCompletionsProvider(Provider):
                     ) from e
                 raise AiError(f"{label} xatosi ({e.code}): {detail or e.reason}") from e
             except (urllib.error.URLError, TimeoutError, OSError) as e:
-                if attempt < 2:
+                if attempt < 2 and not self.quick:
                     time.sleep(2**attempt)
                     continue
                 raise AiError(f"Internetga ulanib bo‘lmadi ({label}).", retryable=True) from e
