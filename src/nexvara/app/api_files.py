@@ -52,6 +52,11 @@ class FilesApi:
 
         return _safe(lambda: fileagent.copy_to(paths, folder))
 
+    def files_save_as(self, path: str, folder: str, name: str = "") -> dict[str, Any]:
+        from nexvara import fileagent
+
+        return _safe(lambda: fileagent.copy_as(path, folder, name))
+
     def files_move(self, paths: list[str], folder: str) -> dict[str, Any]:
         from nexvara import fileagent
 

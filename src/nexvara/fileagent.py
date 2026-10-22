@@ -197,6 +197,23 @@ def copy_to(paths: list[str], folder: str | Path) -> list[str]:
     return out
 
 
+def copy_as(path: str, folder: str | Path, new_name: str = "") -> str:
+    """«beton sinovi deb D ga saqla»: a copy under a new name; the original and anything
+    already in the folder stay untouched."""
+    src = _existing(path)
+    new_name = Path(new_name.strip()).name if new_name.strip() else src.name
+    if any(c in _BAD_NAME for c in new_name) or new_name in (".", ".."):
+        raise ValueError('Nomda ruxsat etilmagan belgi bor: < > : " / \\ | ? *')
+    if Path(new_name).suffix.lower() != src.suffix.lower():
+        new_name += src.suffix  # the user typed only a name: keep the extension
+    dest = Path(folder)
+    dest.mkdir(parents=True, exist_ok=True)
+    target = free_name(dest / new_name)
+    shutil.copy2(src, target)
+    log("copy", src=str(src), dst=str(target))
+    return str(target)
+
+
 def move_to(paths: list[str], folder: str | Path) -> list[str]:
     dest = Path(folder)
     dest.mkdir(parents=True, exist_ok=True)

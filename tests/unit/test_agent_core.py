@@ -249,3 +249,27 @@ def test_typing_mistakes_are_fixed_before_understanding():
     assert fix("«Exsel kursi» mavzusi") == "«Exsel kursi» mavzusi"
     for same in ("excellent ish", "salom qalaysan", "7-sinf fizika Nyuton qonunlari"):
         assert fix(same) == same
+
+
+def test_last_result_is_saved_under_a_new_name_and_named_with_spaces(env, tmp_path):
+    """Live 2026-10-22: rasm → Excel gave «1000006389 (2)_NEXVARA.xlsx»; «chiroyli qilib ber»
+    looked for «(2)_NEXVARA.xlsx», and «beton sinovi deb D ga» got «saqlay olmayman»."""
+    api = env
+    made = api.work / "1000006389 (2)_NEXVARA.xlsx"
+    made.write_bytes(b"PK jadval")
+    api._ctx.result = str(made)
+    assert api._bind_refs("1000006389 (2)_NEXVARA.xlsx ni och, shriftni Arial 12 qil") == (
+        f"«{made}» ni och, shriftni Arial 12 qil")  # fmt: skip
+    dest = tmp_path / "D"
+    plan = {"kind": "tools", "calls": [{"tool": "files.save_as",
+            "args": {"folder": str(dest), "name": "beton sinovi"}}]}  # fmt: skip
+    api.router.save_key("anthropic", "sk-ant-test-1234567890")
+    api.router.settings.update({"ai": {"enabled": True}})
+    api.fake.replies = [json.dumps(plan)]
+    out = api.chat("beton sinovi deb d papkaga saqla")
+    assert not out.get("confirm"), out  # a copy: nothing of the user's changes, no «Ha»
+    assert (dest / "beton sinovi.xlsx").read_bytes() == b"PK jadval" and made.exists()
+    assert "beton sinovi.xlsx" in out["reply"]
+    api.fake.replies = [json.dumps(plan)]
+    api.chat("yana saqla")  # never over an existing file
+    assert (dest / "beton sinovi (2).xlsx").exists()

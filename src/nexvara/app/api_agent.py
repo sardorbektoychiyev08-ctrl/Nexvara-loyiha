@@ -108,6 +108,12 @@ class AgentApi:
         """ "uni PDF qil" right after a copy -> "«D:\\Arxiv\\A.xlsx» ni PDF qil"."""
         from nexvara.agent.parse import find_file
 
+        # A file of this conversation named without its folder: «1000006389 (2)_NEXVARA.xlsx
+        # ni och» (spaces, brackets) is read as the whole name, not «(2)_NEXVARA.xlsx».
+        for known in (self._ctx.result, self._ctx.file):
+            name = Path(known).name if known else ""
+            if name and name in text and known not in text and f"«{name}»" not in text:
+                return text.replace(name, f"«{known}»", 1)
         res = self._ctx.result
         if not res or find_file(text) or not res.lower().endswith(_OFFICE_EXT):
             return text

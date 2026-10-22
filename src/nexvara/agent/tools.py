@@ -58,6 +58,7 @@ READ_ONLY = frozenset({
 # AI plan of these runs at once, like a chat assistant would (paid AI steps ask on their own).
 CREATES_NEW = frozenset({
     "app.open", "office.write", "document.official", "photo.to_office", "drawing.create",
+    "files.save_as",
     "education.test", "education.lesson", "education.presentation", "education.topic",
     "report.weekly", "media.image",
 })  # fmt: skip
@@ -200,6 +201,8 @@ def resolve_folder(api: Any, value: str, create: bool = False) -> Path:
         if ctx.folder:
             return Path(ctx.folder)
         raise ToolError("Qaysi papka? To‘liq yo‘lini yozing, masalan D:\\Arxiv")
+    if re.fullmatch(r"[A-Za-z]:[\\/]?|[A-Za-z]\s+disk\w*", v, re.IGNORECASE):
+        v = v[0].upper() + ":\\"  # «D:» alone is relative to the current folder on D
     v = api._alias_path(v) or v
     sp = special_folder(v)
     p = sp if sp is not None else Path(v)
@@ -310,6 +313,23 @@ def files_copy(api, a):
       folder=("string", True, "qaysi papkaga"))  # fmt: skip
 def files_move(api, a):
     return _copy_or_move(api, a, move=True)
+
+
+@tool("files.save_as", "Boshqa nom bilan yoki boshqa papkaga saqlash (nusxa; asl fayl qoladi)",
+      path=("string", False, "fayl (bo‘sh — oxirgi natija)"),
+      folder=("string", False, "qaysi papkaga (bo‘sh — o‘sha papka)"),
+      name=("string", False, "yangi nom"))  # fmt: skip
+def files_save_as(api, a):
+    res = api._ctx.result  # «saqla» with no file named is about what NEXVARA just made
+    if not a.get("path") and res and Path(res).is_file():
+        p = Path(res)
+    else:
+        p = resolve_file(api, a.get("path", ""))
+    dest = resolve_folder(api, a["folder"], create=True) if a.get("folder") else p.parent
+    new = _ok(api.files_save_as(str(p), str(dest), a.get("name") or ""))
+    api._ctx.result = new
+    api._ctx.folder = str(dest)
+    return {"reply": f"Saqlandi: {new}\n(asl fayl «{p.name}» o‘z joyida qoldi)", "files": [new]}
 
 
 @tool("files.rename", "Nomini o‘zgartirish", path=("string", False, "fayl"),
