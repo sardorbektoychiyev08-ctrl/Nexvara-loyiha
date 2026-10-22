@@ -449,3 +449,23 @@ def test_small_talk_uses_ai_first_planner(router, monkeypatch):
     assert len(router.fake.calls) == calls + 2
     assert router.fake.calls[-2]["model"] == "claude-opus-5-5"  # strong planner
     assert router.fake.calls[-1]["model"] == "claude-sonnet-5-5"  # normal chat
+
+
+def test_plan_json_with_fast_model_mistakes_is_read():
+    """Live 2026-10-22 (Gemini Flash): «shuni jadvalga tushirib ber» failed three times with
+    «JSON emas» — a Windows path with single backslashes and similar slips."""
+    path = r"D:\NEXVARA\Telefondan\1000006389.jpg"
+    raw = ('```json\n{"kind": "tools", "say": "Jadval qilaman",\n "calls": [{"tool": '
+           f'"photo.to_office", "args": {{"path": "{path}", '
+           '"app": "excel",}}]}\n```')  # fmt: skip
+    data = features._json_from(raw)
+    assert data["calls"][0]["args"]["path"] == path
+    text = features._json_from('{"kind": "tools", "calls": [{"tool": "office.write", '
+                               '"args": {"text": "1-qator\n2-qator \\u2014 ok"}}]}')  # fmt: skip
+    assert text["calls"][0]["args"]["text"] == "1-qator\n2-qator — ok"  # a raw line break
+    two = features._json_from('{"kind": "chat"}\nYana: {"kind": "x"}')
+    assert two == {"kind": "chat"}
+    good = features._json_from(r'{"path": "C:\\Users\\a.xlsx", "t": "a\tb"}')
+    assert good == {"path": r"C:\Users\a.xlsx", "t": "a\tb"}  # valid JSON is unchanged
+    with pytest.raises(features.AiError):
+        features._json_from("Qaysi rasmni nazarda tutyapsiz?")

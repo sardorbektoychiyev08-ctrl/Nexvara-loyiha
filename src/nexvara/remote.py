@@ -352,6 +352,10 @@ class _QuietServer(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
+class StillRunning(Exception):
+    """A retried request whose first run has not finished yet."""
+
+
 class RemoteServer:
     """HTTPS server for paired phones; `api` is the app's Api (chat, tasks...)."""
 
@@ -367,6 +371,8 @@ class RemoteServer:
         self.code_expires = 0.0
         self.bad_codes = 0
         self._seen: dict[str, tuple[float, dict]] = {}  # request id -> reply (idempotency)
+        self._running: dict[str, threading.Event] = {}  # request id -> set when it is done
+        self.retry_wait = 25.0  # a retry waits this long for the first run (phone: 35 s)
         self._lock = threading.Lock()
         self.fingerprint = ""
         self.limiter = RateLimiter(240)  # requests per minute per address
@@ -456,16 +462,45 @@ class RemoteServer:
         return {"token": token, "device_id": device_id}
 
     def remember(self, request_id: str, reply: dict | None = None) -> dict | None:
-        """Idempotency: a retried request (same id) gets the first reply, not a second run."""
+        """Idempotency: a retried request (same id) gets the first reply, not a second run.
+
+        A lookup that finds nothing marks the id as running. A retry that comes while the
+        first run is still going (the phone gives up after 35 s and resends the same id when
+        the connection is back — live 2026-10-22: one message ran three times) waits for that
+        reply instead; still not done → `StillRunning`, the phone keeps it queued."""
         now = time.time()
         with self._lock:
             for k in [k for k, (t, _r) in self._seen.items() if now - t > 600]:
                 del self._seen[k]
-            if reply is None:
-                hit = self._seen.get(request_id)
-                return hit[1] if hit else None
-            self._seen[request_id] = (now, reply)
-            return reply
+            if reply is not None:
+                self._seen[request_id] = (now, reply)
+                ev = self._running.pop(request_id, None)
+                if ev is not None:
+                    ev.set()
+                return reply
+            hit = self._seen.get(request_id)
+            if hit:
+                return hit[1]
+            ev = self._running.get(request_id)
+            if ev is None:
+                self._running[request_id] = threading.Event()
+                return None
+        ev.wait(self.retry_wait)
+        with self._lock:
+            hit = self._seen.get(request_id)
+            if hit:
+                return hit[1]
+            if request_id in self._running:
+                raise StillRunning(request_id)
+            self._running[request_id] = threading.Event()  # the first run failed: run again
+            return None
+
+    def forget(self, request_id: str) -> None:
+        """The run of this id ended without a reply to keep (an error): a retry runs again."""
+        with self._lock:
+            ev = self._running.pop(request_id, None)
+        if ev is not None:
+            ev.set()
 
 
 def _snap(t: dict[str, Any]) -> dict[str, Any]:
@@ -577,6 +612,7 @@ class _Handler(BaseHTTPRequestHandler):
             return
         u = urlparse(self.path)
         srv = self.server_ref
+        held = ""
         try:
             if u.path == "/api/pair":
                 if not srv.pair_limiter.allow(self.client_address[0]):
@@ -594,10 +630,15 @@ class _Handler(BaseHTTPRequestHandler):
             api = srv.api
             rid = self.headers.get("X-Request-Id", "")
             if rid:
-                seen = srv.remember(f"{dev['id']}:{rid}")
+                try:
+                    seen = srv.remember(f"{dev['id']}:{rid}")
+                except StillRunning:
+                    self._json({"error": "Kompyuter shu buyruqni hali bajaryapti"}, 429)
+                    return
                 if seen is not None:
                     self._json(seen)
                     return
+                held = f"{dev['id']}:{rid}"
             if u.path == "/api/chat":
                 data = json.loads(self._body() or b"{}")
                 out = api.chat(str(data.get("text", ""))[:4000])
@@ -641,3 +682,6 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(out)
         except (ValueError, KeyError) as e:
             self._json({"error": str(e)}, 400)
+        finally:
+            if held:
+                srv.forget(held)  # ended without a reply: a retry may run it again

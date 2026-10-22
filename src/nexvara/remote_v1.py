@@ -99,15 +99,24 @@ def handle(h: Any, method: str) -> None:
                 raise ApiError("TOKEN_EXPIRED")
         rid = h.headers.get("X-Request-Id", "")[:64] if method == "POST" else ""
         if rid and dev is not None:
-            seen = srv.remember(f"v1:{dev['id']}:{rid}")
+            from nexvara.remote import StillRunning
+
+            try:
+                seen = srv.remember(f"v1:{dev['id']}:{rid}")
+            except StillRunning:  # a retry while the first run is still going
+                raise ApiError("RATE_LIMITED", "Kompyuter shu buyruqni hali bajaryapti") from None
             if seen is not None:
                 h._json(ok(seen))
                 return
-        data = _route(h, srv, route, args, q, dev)
-        if data is None:  # a file was sent
-            return
-        if rid and dev is not None:
-            srv.remember(f"v1:{dev['id']}:{rid}", data)
+        try:
+            data = _route(h, srv, route, args, q, dev)
+            if data is None:  # a file was sent
+                return
+            if rid and dev is not None:
+                srv.remember(f"v1:{dev['id']}:{rid}", data)
+        finally:
+            if rid and dev is not None:
+                srv.forget(f"v1:{dev['id']}:{rid}")  # an error: a retry may run it again
         h._json(ok(data))
     except ApiError as e:
         extra = {"Retry-After": "30"} if e.code == "RATE_LIMITED" else None

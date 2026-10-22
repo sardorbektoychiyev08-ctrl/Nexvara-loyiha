@@ -62,17 +62,39 @@ class Intent:
     subject: str = ""
 
 
+def _loose_json(text: str) -> str:
+    """Mistakes a fast model makes in JSON (live 2026-10-22, Gemini Flash: «shuni jadvalga
+    tushirib ber» failed three times): a Windows path with single backslashes, other invalid
+    escapes, a trailing comma."""
+    text = re.sub(r"[A-Za-z]:\\+[^\"\n]*", lambda m: re.sub(r"\\+", r"\\\\", m.group(0)), text)
+    text = re.sub(r'\\(\\|["/bfnrt]|u[0-9a-fA-F]{4})|\\',
+                  lambda m: m.group(0) if m.group(1) else "\\\\", text)  # fmt: skip
+    return re.sub(r",\s*([}\]])", r"\1", text)
+
+
 def _json_from(text: str) -> Any:
     """The first JSON object/array in a reply (models sometimes wrap it in ``` fences)."""
     text = text.strip()
+    decoder = json.JSONDecoder(strict=False)  # a raw line break inside a string is accepted
+    parts = []
     for opener, closer in (("{", "}"), ("[", "]")):
         start = text.find(opener)
         end = text.rfind(closer)
         if start != -1 and end > start:
+            parts.append((start, text[start : end + 1]))
+    parts = [p for _s, p in sorted(parts)]  # an array of objects starts with "["
+    for part in parts:
+        for candidate in (part, _loose_json(part)):
             try:
-                return json.loads(text[start : end + 1])
+                return decoder.decode(candidate)
             except ValueError:
-                continue
+                pass
+    for part in parts:  # one object followed by more text with braces
+        for candidate in (part, _loose_json(part)):
+            try:
+                return decoder.raw_decode(candidate)[0]
+            except ValueError:
+                pass
     raise AiError("AI javobini tushunib bo‘lmadi (JSON emas).")
 
 
