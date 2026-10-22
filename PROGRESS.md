@@ -4,6 +4,15 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-22 (51) — Claude Code — «sen kabi bo‘lsin»: bajar → tekshir → tuzat
+
+**Egasi:** «xullas sen kabi bo‘lsin, 2» — taklifdagi 2-band: NEXVARA ishdan keyin natijani o‘zi tekshirib, xatoni o‘zi tuzatsin.
+**Qilindi:** `ai/verify.py` — tayyor fayl matnini o‘qish (DOCX/PPTX zip XML, XLSX openpyxl, PDF pymupdf; Office’siz) va AI sifat nazorati (so‘rovga mosligi, soni, mazmun, imlo/kelishik, rasmiy shakl; JSON `ok/problems/fixed_request`; «Ha» so‘ramaydi — limitdan qimmat bo‘lsa jim o‘tkazib yuboradi). `tools.VERIFIED` — AI rejasidagi hujjat asboblari; vazifa tugagach (`Api.on_finish` → `_verify_task`) fon oqimida tekshiriladi: mos — «✔ Tekshirdim»; kamchilik — ro‘yxat + `_repair` bilan tuzatilgan **yangi** fayl (eskisi o‘zgarmaydi), u ham bir marta tekshiriladi; ikkinchi marta ham xato bo‘lsa foydalanuvchiga aytadi. Javob kompyuter oynasiga, suhbat jurnaliga (telefon tarixi) yoziladi. Xarajat yozuvi: «Natijani tekshirish».
+**Testlar:** `scripts/test.ps1` — 577 PASS, 98 skipped, smoke PASS, ruff PASS. Yangi: `test_made_document_is_checked_and_fixed` (xato topildi → tuzatildi → qayta tekshirildi), `test_document_text_reads_word_excel_powerpoint`. Haqiqiy AI bilan — NOT TESTED.
+**Keyingi qadam:** egasi tasdig‘i bilan 1.5.8 reliz (50 + 51), keyin jonli sinov (3-band).
+
+---
+
 ## 2026-10-22 (50) — Claude Code — «yana javob bermayapti», ariza xatolari
 
 **Foydalanuvchi (1.5.7 da, jonli):** «ishdan bo‘shash haqida ariza yozib ber» → AI (OpenAI gpt-6.1-sol, $0.01) `office.write` bilan oddiy qatorlar + Word sarlavhasi, oldin xom argumentli «Davom etaymi?»; keyin «shunday yoziladimi», «rasmiy hujjatlar shunday yoziladimi» → «So‘rov yuborilmadi: «F.I.Sh.» yonidagi…» (tarixdagi arizaning «F.I.Sh.: [...]» qatori).

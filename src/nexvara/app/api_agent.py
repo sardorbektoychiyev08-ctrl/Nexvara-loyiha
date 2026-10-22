@@ -168,6 +168,8 @@ class AgentApi:
                 return {"reply": str(e), "error": True}
             if intro:
                 out["reply"] = intro + out["reply"]
+            if from_ai:
+                self._watch_result(out, one.tool)
             return out
         return self._start_chain(calls, intro=intro, approved=True)
 
@@ -394,6 +396,77 @@ class AgentApi:
                 self.ui_push({"kind": "nexvara_reply", "reply": out})
 
         threading.Thread(target=work, daemon=True).start()
+
+    # ----- «bajar → tekshir → tuzat»: the AI reads what was made and fixes what is wrong -----
+    def _watch_result(self, out: dict[str, Any], tool: str) -> None:
+        """Remember a task an AI plan started, so its file is checked when it is done."""
+        from nexvara.agent import tools
+
+        task = out.get("task") or {}
+        if tool not in tools.VERIFIED or not task.get("id"):
+            return
+        origin = getattr(self, "_repair_origin", None) or [self._ctx.command, 0]
+        if not origin[0]:
+            return
+        if not hasattr(self, "_verify_jobs"):
+            self._verify_jobs: dict[str, tuple[str, int]] = {}
+        self._verify_jobs[task["id"]] = (origin[0], int(getattr(self._local, "verify_round", 0)))
+
+    def _verify_task(self, snap: dict[str, Any]) -> None:
+        job = getattr(self, "_verify_jobs", {}).pop(snap.get("id"), None)
+        if job is None or snap.get("status") != "succeeded" or not self._self_repair_on():
+            return
+        text, round_no = job
+
+        def work() -> None:
+            from nexvara.ai import verify
+
+            try:
+                files = verify.outputs(snap.get("result") or {})
+                res = verify.check(self._router(), text, files) if files else None
+            except Exception:  # noqa: BLE001 - a check never breaks the finished work
+                res = None
+            if res is None:
+                return
+            name = Path(files[0]).name
+            if res["ok"]:
+                self._say_later({"reply": f"✔ Tekshirdim: «{name}» so‘rovingizga mos."})
+                return
+            found = "\n".join(f"• {p}" for p in res["problems"]) or "• so‘rovga to‘liq mos emas"
+            head = f"🔎 «{name}» ni tekshirdim, kamchilik topildi:\n{found}"
+            if round_no >= 1 or not res["fixed_request"]:
+                self._say_later({"reply": head + "\n\nQolganini ko‘rib chiqing yoki nimani "
+                                 "o‘zgartirishni yozing."})  # fmt: skip
+                return
+            self._local.verify_round = round_no + 1
+            try:
+                fixed = self._repair(text, "Natija tekshirildi, kamchiliklar: "
+                                     + "; ".join(res["problems"]) + ". Ko‘rsatma: "
+                                     + res["fixed_request"], tries=1)  # fmt: skip
+            except Exception:  # noqa: BLE001
+                fixed = None
+            finally:
+                self._local.verify_round = 0
+            if fixed is None or fixed.get("error"):
+                self._say_later({"reply": head + "\n\nO‘zim tuzata olmadim — nimani o‘zgartirish "
+                                 "kerakligini yozing."})  # fmt: skip
+                return
+            fixed["reply"] = (
+                head
+                + "\n\nTuzatyapman (yangi fayl, eskisi o‘zgarmaydi):\n"
+                + (fixed.get("reply") or "")
+            )
+            self._say_later(fixed)
+
+        threading.Thread(target=work, name="verify", daemon=True).start()
+
+    def _say_later(self, out: dict[str, Any]) -> None:
+        """A reply that comes after the chat answer: the PC window, the chat log, the phone."""
+        self.ui_push({"kind": "nexvara_reply", "reply": out})
+        mem = self._mem()
+        if mem is not None:
+            mem.log_chat("nexvara", out.get("reply", ""))
+        self._ctx.add_turn("nexvara", out.get("reply", ""))
 
     def _ai_has_key(self) -> bool:
         if self._history is None and "ai_router" not in self._overrides:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import openpyxl
@@ -229,3 +230,73 @@ def test_question_about_a_document_with_fish_is_answered(tmp_path):
     api._ctx.add_turn("nexvara", "ARIZA\nMeni ozod etishingizni so‘rayman.\nF.I.Sh.: [Ism]")
     out = api.chat("rasmiy hujjatlar shunday yoziladimi")
     assert out["reply"].startswith("Ha, rasmiy ariza"), out
+
+
+def _docx(path: Path, lines: list[str]) -> None:
+    import zipfile
+
+    body = "".join(f"<w:p><w:r><w:t>{x}</w:t></w:r></w:p>" for x in lines)
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("word/document.xml", f"<w:document><w:body>{body}</w:body></w:document>")
+
+
+def test_made_document_is_checked_and_fixed(tmp_path):
+    """«Bajar → tekshir → tuzat»: the AI reads the finished ariza back, finds a mistake and a
+    corrected new file is made; the second file is checked again and passes."""
+
+    def plan(body):
+        return json.dumps(
+            {
+                "kind": "tools",
+                "calls": [
+                    {
+                        "tool": "document.official",
+                        "args": {
+                            "title": "Ariza",
+                            "kimga": "Direktorga",
+                            "kimdan": "O‘qituvchidan",
+                            "body": body,
+                        },
+                    }
+                ],
+            }
+        )
+
+    api, fake, _router = _api(tmp_path, [
+        plan("Meni ishdan ozod qilishingizni so‘rayman."),
+        json.dumps({"ok": False, "problems": ["Qaysi sanadan ekani yozilmagan"],
+                    "fixed_request": "Ariza: 1-noyabrdan ozod etish"}),
+        plan("Meni 2026-yil 1-noyabrdan ishdan ozod etishingizni so‘rayman."),
+        json.dumps({"ok": True, "problems": [], "fixed_request": ""}),
+    ])  # fmt: skip
+    made = []
+
+    def doc(task, name, blocks, out):
+        _docx(out.with_name(f"ariza{len(made)}.docx"), [t for _k, t in blocks])
+        made.append(blocks)
+        return {"path": str(out.with_name(f"ariza{len(made) - 1}.docx"))}
+
+    api._overrides["doctemplate"] = doc
+    out = api.chat("1-noyabrdan ishdan bo‘shash haqida ariza yoz")
+    assert out.get("task"), out
+    replies = []
+    for _ in range(200):
+        replies += [e["reply"]["reply"] for e in api.ui_events() if e["kind"] == "nexvara_reply"]
+        if any(r.startswith("✔ Tekshirdim") for r in replies):
+            break
+        time.sleep(0.05)
+    assert any("kamchilik topildi" in r and "Tuzatyapman" in r for r in replies), replies
+    assert any(r.startswith("✔ Tekshirdim") for r in replies), replies
+    assert len(made) == 2 and "1-noyabrdan" in made[1][3][1]
+    checked = [c for c in fake.calls if "sifat nazoratchisi" in c["system"]]
+    assert len(checked) == 2 and "Meni ishdan ozod" in checked[0]["messages"][0]["content"]
+
+
+def test_document_text_reads_word_excel_powerpoint(tmp_path):
+    from nexvara.ai import verify
+
+    _docx(tmp_path / "a.docx", ["ARIZA", "so‘rayman"])
+    assert "ARIZA\nso‘rayman" in verify.document_text(tmp_path / "a.docx")
+    photodoc.write_excel([["Sana", "Summa"], ["22.10.2026", "1250"]], tmp_path / "b.xlsx")
+    assert "Sana | Summa" in verify.document_text(tmp_path / "b.xlsx")
+    assert verify.outputs({"path": "x.docx", "pdf": "x.pdf"}) == ["x.docx"]
