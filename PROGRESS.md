@@ -9,7 +9,8 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 **Topildi (egasining jurnali):** telefondan rasm + «shuni jadvalga tushirib ber» 3 marta → «AI javobini tushunib bo‘lmadi (JSON emas)». Sabablar: (1) bepul Gemini Flash rejasi 30–55 s, telefon 35 s kutib «aloqa uzildi» deydi va aloqa tiklanganda **o‘sha** so‘rovni qayta yuboradi — kompyuter birinchisi tugamagani uchun uni qaytadan bajarardi (takror faqat tugagandan keyin tanilardi); (2) Flash JSON’ni xato yozadi (yo‘lda bitta `\`, satr ichida qator ko‘chishi, ortiqcha vergul) — reja rad etilardi.
 **Qilindi:** `remote.py` `remember`: bajarilayotgan so‘rov id’si belgilanadi, takror kelsa 25 s birinchisining javobini kutadi, hali tugamasa `RATE_LIMITED` (telefon navbatda saqlaydi, keyin o‘sha javobni oladi); xato bo‘lsa `forget` — takror qayta bajariladi (v1 va eski API). `features._json_from`: `strict=False`, Windows yo‘li va noto‘g‘ri `\` tuzatiladi, ortiqcha vergul olib tashlanadi, ortidan matn bo‘lsa birinchi obyekt olinadi; to‘g‘ri JSON o‘zgarmaydi.
 **Testlar:** `scripts/test.ps1` — 579 PASS, 98 skipped, smoke PASS (skript stderr’dagi telethon logi tufayli «FAIL» yozdi; testlar o‘tdi); ruff PASS. Yangi: `test_retry_while_first_run_is_going_is_not_run_again`, `test_plan_json_with_fast_model_mistakes_is_read`. Haqiqiy telefon va Gemini bilan — NOT TESTED (egasi limiti kam, sinov kamaytirildi).
-**Keyingi qadam:** egasi tasdig‘i bilan 1.5.9 reliz; Android `readTimeout` (35 s) AI so‘rovlari uchun uzaytirish — keyingi APK’da.
+**Reliz (egasi: «chiqar»):** v1.5.9 (64825512 bayt), APK 1.6.0 bilan GitHub’da; internetdan imzo, hajm, 1.5.8 → 1.5.9 topildi — PASS. Manba `main` push.
+**Keyingi qadam:** egasi «Yangilash» (1.5.9); Android `readTimeout` (35 s) AI so‘rovlari uchun uzaytirish — keyingi APK’da.
 
 ---
 
