@@ -18,7 +18,7 @@ from typing import Any
 from nexvara.core.task import UserError
 
 TIMEOUT = 180.0
-QUICK_TIMEOUT = 20.0  # when another AI can answer instead
+QUICK_TIMEOUT = 10.0  # when another AI can answer instead (owner: «uzog‘i 10 soniya»)
 VISION = ("openai", "gemini", "anthropic", "deepseek")
 
 
