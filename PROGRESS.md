@@ -10,7 +10,7 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 **Sabab:** bepul Gemini band bo‘lsa (429) provayder 30 s gacha kutib, 2 marta qayta urinardi (≈1 daqiqa), shundan keyingina pullik AI’ga o‘tardi.
 **Qilindi:** `Provider.quick`: bepul model chaqiruvi ortida pullik zaxira bo‘lsa (`fallback` yoqiq) — qayta urinish va kutish yo‘q, vaqt chegarasi 20 s (`QUICK_TIMEOUT`); band/sekin bo‘lsa darhol keyingi (pullik) AI javob beradi. Pullik zaxira avvalgidek arzon chegarada «Ha»siz, limitlar o‘zgarmadi.
 **Testlar:** unit 580 PASS, ruff PASS. Yangi: `test_busy_free_tier_hands_over_at_once`. Haqiqiy AI bilan — NOT TESTED.
-**Reliz (egasi: «chiqar» oqimida):** v1.5.10.
+**Reliz (egasi: «chiqar»):** v1.5.10 (64837550 bayt), APK 1.6.0 bilan GitHub’da; internetdan imzo, hajm, 1.5.9 → 1.5.10 topildi — PASS. Manba `main` push.
 
 ---
 
