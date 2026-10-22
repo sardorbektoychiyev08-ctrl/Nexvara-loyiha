@@ -184,6 +184,14 @@ def write_excel(
     return path
 
 
+def _kind(v: Any) -> str:
+    if isinstance(v, (dt.date, dt.datetime)):
+        return "date"
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return ""
+    return "integer" if isinstance(v, int) else "decimal"
+
+
 def write_excel_com(data: TableData, path: Path, keep_open: bool = True) -> Path:
     """Create the visible workbook with the project's locale-safe Excel helpers."""
     from nexvara.skills.excel import ops
@@ -202,26 +210,27 @@ def write_excel_com(data: TableData, path: Path, keep_open: bool = True) -> Path
             excel.app.DisplayAlerts = True
         for address, formula in data.formulas.items():
             ws.Range(address).Formula = formula
-        numeric: list[int] = []
-        dates: list[int] = []
-        for c in range(len(data.rows[0])):
-            body = [r[c] for r in data.rows[1:] if r[c] not in (None, "")]
-            if body and all(isinstance(v, (dt.date, dt.datetime)) for v in body):
-                dates.append(c + 1)
-            elif body and all(
-                isinstance(v, (int, float)) and not isinstance(v, bool) for v in body
-            ):
-                numeric.append(c + 1)
+        # Formats go by each cell's type: a «Jami» row or a note must not turn the dates of
+        # its column into serial numbers (Office check 2026-10-22: 46317 instead of 22.10.2026).
+        kinds = [[_kind(v) for v in r] for r in data.rows[1:]]
+        numeric = [c + 1 for c in range(len(data.rows[0]))
+                   if any(k[c] in ("integer", "decimal") for k in kinds)]  # fmt: skip
         finish_table(ws, rng, numeric, 1, 1)
-        last = len(data.rows)
-        for c in numeric:
-            whole = all(
-                isinstance(r[c - 1], int) for r in data.rows[1:] if r[c - 1] not in (None, "")
-            )
-            ops.set_number_format(ws.Range(ws.Cells(2, c), ws.Cells(last, c)),
-                                  "integer" if whole else "decimal")  # fmt: skip
-        for c in dates:
-            ops.set_number_format(ws.Range(ws.Cells(2, c), ws.Cells(last, c)), "date")
+        for c in range(len(data.rows[0])):
+            col = [k[c] for k in kinds]
+            whole = "decimal" not in col
+            r = 0
+            while r < len(col):  # one COM call per run of same-kind cells
+                kind = col[r]
+                end_r = r
+                while end_r + 1 < len(col) and col[end_r + 1] == kind:
+                    end_r += 1
+                if kind:
+                    if kind == "integer" and not whole:
+                        kind = "decimal"
+                    ops.set_number_format(ws.Range(ws.Cells(r + 2, c + 1),
+                                                   ws.Cells(end_r + 2, c + 1)), kind)  # fmt: skip
+                r = end_r + 1
         freeze_header(excel.app, 1)
         excel.show()
         saved = excel.save_as(wb, path)
