@@ -4,6 +4,16 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-22 (54) — Claude Code — 10 soniya, kutubxonalar tekshiruvi, v1.5.11
+
+**Egasi:** «20 soniya ko‘p, uzog‘i 10»; «chiqarishdan oldin barcha kutubxonalarni o‘qiy oladimi».
+**Qilindi:** `QUICK_TIMEOUT` 20 → 10 s. Yig‘ilgan exe tekshirildi: `src/nexvara` dagi 35 ta tashqi modulning hammasi PyInstaller to‘plamida (PYZ/COLLECT toc) — PASS; warn faylida ilovaga tegishli yetishmovchilik yo‘q (`collections.abc` — PyInstaller’ning ma’lum soxta ogohlantirishi).
+**Testlar:** `test_ai_router.py` 19 PASS, ruff PASS. Haqiqiy AI bilan — NOT TESTED.
+**Reliz:** v1.5.11 (64834210 bayt), APK 1.6.0 bilan GitHub’da; internetdan imzo, hajm, 1.5.10 → 1.5.11 — PASS. Manba `main` push.
+**Keyingi qadam:** egasi «Yangilash» (1.5.11) va jonli sinov.
+
+---
+
 ## 2026-10-22 (53) — Claude Code — «bepul ham, pullik ham, lekin javob tez kelsin»
 
 **Egasi:** bepul va pullik AI’dan foydalansin, javob tez kelsin, o‘zi tanlab o‘tkazsin.
