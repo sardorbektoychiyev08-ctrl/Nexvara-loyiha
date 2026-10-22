@@ -4,6 +4,16 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-22 (53) — Claude Code — «bepul ham, pullik ham, lekin javob tez kelsin»
+
+**Egasi:** bepul va pullik AI’dan foydalansin, javob tez kelsin, o‘zi tanlab o‘tkazsin.
+**Sabab:** bepul Gemini band bo‘lsa (429) provayder 30 s gacha kutib, 2 marta qayta urinardi (≈1 daqiqa), shundan keyingina pullik AI’ga o‘tardi.
+**Qilindi:** `Provider.quick`: bepul model chaqiruvi ortida pullik zaxira bo‘lsa (`fallback` yoqiq) — qayta urinish va kutish yo‘q, vaqt chegarasi 20 s (`QUICK_TIMEOUT`); band/sekin bo‘lsa darhol keyingi (pullik) AI javob beradi. Pullik zaxira avvalgidek arzon chegarada «Ha»siz, limitlar o‘zgarmadi.
+**Testlar:** unit 580 PASS, ruff PASS. Yangi: `test_busy_free_tier_hands_over_at_once`. Haqiqiy AI bilan — NOT TESTED.
+**Reliz (egasi: «chiqar» oqimida):** v1.5.10.
+
+---
+
 ## 2026-10-22 (52) — Claude Code — «tekshir, ish bajarilmayapti», «aloqa uzilib tiklanib»
 
 **Topildi (egasining jurnali):** telefondan rasm + «shuni jadvalga tushirib ber» 3 marta → «AI javobini tushunib bo‘lmadi (JSON emas)». Sabablar: (1) bepul Gemini Flash rejasi 30–55 s, telefon 35 s kutib «aloqa uzildi» deydi va aloqa tiklanganda **o‘sha** so‘rovni qayta yuboradi — kompyuter birinchisi tugamagani uchun uni qaytadan bajarardi (takror faqat tugagandan keyin tanilardi); (2) Flash JSON’ni xato yozadi (yo‘lda bitta `\`, satr ichida qator ko‘chishi, ortiqcha vergul) — reja rad etilardi.

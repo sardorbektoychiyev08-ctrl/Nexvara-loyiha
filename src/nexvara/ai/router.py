@@ -460,9 +460,10 @@ class AiRouter:
                     raise NeedsConfirmation(est)
             key = self.keys.load(provider) or ""
             try:
-                reply = self.factory(provider, key).complete(
-                    est.model, system, messages, max_tokens, effort
-                )
+                client = self.factory(provider, key)
+                if est.free and cfg.get("fallback") and any(not c.free for c in choices[i + 1 :]):
+                    client.quick = True  # a busy free tier hands over at once, not after a minute
+                reply = client.complete(est.model, system, messages, max_tokens, effort)
             except AiError as e:
                 if est.free and "chegara" in str(e) and not cfg.get("fallback"):
                     raise AiUnavailable(
