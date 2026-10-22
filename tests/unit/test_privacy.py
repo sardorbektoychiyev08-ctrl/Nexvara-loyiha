@@ -13,7 +13,7 @@ import re
 import pytest
 
 from nexvara.ai.keys import MemoryKeyStore
-from nexvara.ai.privacy import Guard, PrivacyBlocked, public
+from nexvara.ai.privacy import Guard, public
 from nexvara.ai.providers import ChatCompletionsProvider, Provider, Reply
 from nexvara.ai.router import AiRouter, Ledger, NeedsConfirmation
 from nexvara.appdata import Settings
@@ -73,9 +73,12 @@ def test_same_value_same_token_and_model_variants_restored():
     "JSHSHIR: 3123",
     "hujjat raqami 123456789012",  # an unknown long number
 ])  # fmt: skip
-def test_unreliable_detection_blocks(text):
-    with pytest.raises(PrivacyBlocked, match="yuborilmadi"):
-        Guard().mask(text)
+def test_unreliable_detection_is_hidden_not_blocked(text):
+    """Unsure whether it is personal data: that part is hidden too, the request still goes."""
+    g = Guard()
+    masked = g.mask(text)
+    assert "⟦MAXFIY_1⟧" in masked and not re.search(r"\d{2}", masked.replace("MAXFIY_1", ""))
+    assert g.restore(masked) == text
 
 
 @pytest.mark.parametrize("text", [
@@ -206,12 +209,13 @@ def test_fallback_is_off_by_default(wired):
     assert wires["gemini"].bodies == []  # no paid fallback by itself
 
 
-def test_blocked_request_sends_nothing_and_costs_nothing(wired):
+def test_unsure_value_never_leaves_the_pc(wired):
     r, wires = wired
     wires["openai"] = Wire(chat_answer("x"))
-    with pytest.raises(PrivacyBlocked):
-        r.complete("chat", "sys", [{"role": "user", "content": "pasport: A 12-34"}], max_tokens=300)
-    assert wires["openai"].bodies == [] and r.ledger.recent() == []
+    r.complete("chat", "sys", [{"role": "user", "content": "pasport: A 12-34"}], max_tokens=300,
+               approved=True)  # fmt: skip
+    sent = " ".join(wires["openai"].bodies)
+    assert sent and "12-34" not in sent and "MAXFIY" in sent
 
 
 class Capture(Provider):
@@ -265,7 +269,7 @@ def test_facts_history_context_and_plan_args_are_protected(tmp_path, monkeypatch
 
 def test_nexvara_file_names_with_timestamps_do_not_block():
     """Live check 2026-10-19: «rasm-20261019-025804.png» in the history blocked every request."""
-    from nexvara.ai.privacy import Guard, PrivacyBlocked
+    from nexvara.ai.privacy import Guard
 
     ok = (
         "Tayyor. Fayl: C:/Users/toych/AppData/Local/Temp/data/AI rasmlar/rasm-20261019-025804.png "
@@ -274,8 +278,8 @@ def test_nexvara_file_names_with_timestamps_do_not_block():
     Guard().mask(ok)  # no PrivacyBlocked
     Guard().mask("Hisobot 20261019-025804 vaqtida tuzildi")
     Guard().mask("[2026-10-19] Foydalanuvchi: Ha [2026-10-19] NEXVARA: gpt-5.4-mini-2026-03-17")
-    with pytest.raises(PrivacyBlocked):  # a real long number still blocks
-        Guard().mask("Mening hisob raqamim 2020 8000 1234 5678 9")
+    masked = Guard().mask("Mening hisob raqamim 2020 8000 1234 5678 9")  # still never sent
+    assert "8000" not in masked and "⟦MAXFIY_1⟧" in masked
 
 
 def test_phone_folder_path_does_not_block():

@@ -291,6 +291,30 @@ def render(tid: str, fields: dict[str, str]) -> list[tuple[str, str]]:
     raise LookupError("Shablon topilmadi")
 
 
+def free_blocks(title: str, body: str, kimga: str = "", kimdan: str = "", signer: str = "",
+                date: str = "") -> list[tuple[str, str]]:  # fmt: skip
+    """Any official paper the AI writes (ariza, tushuntirish xati, xizmat xati …) in the same
+    layout as the templates: address block top right, centred title, justified body, date and
+    signature on one line. Unknown parts stay as [placeholders] for the user to fill."""
+    clean = re.compile(r"[\x00-\x08\x0b-\x1f]")
+    title = clean.sub("", title).strip().upper()[:120] or "ARIZA"
+    paras = [clean.sub("", x).strip() for x in (body or "").splitlines()]
+    paras = [x[:3000] for x in paras if x]
+    if not paras:
+        raise UserError("Hujjat matni bo‘sh")
+    blocks: list[tuple[str, str]] = []
+    for part in (kimga, kimdan):
+        part = re.sub(r"\s+", " ", clean.sub("", part or "")).strip()[:250]
+        if part:
+            blocks.append(("right", part))
+    blocks.append(("title", title))
+    blocks += [("body", x) for x in paras]
+    when = (date or "").strip() or time.strftime("%d.%m.%Y")
+    who = re.sub(r"\s+", " ", signer or "").strip()[:120] or "[F.I.Sh.]"
+    blocks.append(("sign", f"{when}\t______________  {who}"))
+    return blocks
+
+
 def out_dir() -> Path:
     p = config.data_dir() / "Hujjatlar"
     p.mkdir(parents=True, exist_ok=True)
@@ -345,5 +369,6 @@ def write(
                 raise RuntimeError("Hujjat yoki PDF saqlanmadi")
         if visible:
             w.show()
-    return {"path": str(docx), "pdf": str(pdf), "report": [TEMPLATES[tid]["title"]],
+    name = TEMPLATES[tid]["title"] if tid in TEMPLATES else tid
+    return {"path": str(docx), "pdf": str(pdf), "report": [name],
             "checks": [{"name": "DOCX va PDF saqlandi", "ok": True}]}  # fmt: skip

@@ -9,6 +9,7 @@ import openpyxl
 import pytest
 
 from nexvara import photodoc
+from nexvara.agent import tools
 from nexvara.ai.keys import MemoryKeyStore
 from nexvara.ai.providers import AiError, Provider, Reply
 from nexvara.ai.router import AiRouter, Ledger
@@ -112,6 +113,8 @@ def test_planner_is_first_and_selects_expected_tool(tmp_path, message, tool_name
     assert fake.calls[0]["messages"][0]["content"].rstrip().endswith(message)
     if tool_name == "photo.compare_table":
         assert out.get("confirm") and api._pending[out["confirm"]][0] == "compare_table"
+    elif tool_name in tools.CREATES_NEW:  # makes something new: runs without «Ha» for the plan
+        assert not (out.get("confirm") and api._pending[out["confirm"]][0] == "tools"), out
     else:
         assert out.get("confirm")
         kind, calls = api._pending[out["confirm"]]
@@ -187,3 +190,42 @@ def test_unclear_plan_after_yes_falls_back_to_old_chain(tmp_path):
     fake.replies = ["bu reja emas"]
     out = api.confirm_ai(ask["confirm"], True)
     assert out["reply"].startswith("Excel ochildi"), out
+
+
+def test_ariza_is_written_in_official_layout_without_asking(tmp_path):
+    """Live 2026-10-22: «ishdan bo‘shash haqida ariza yozib ber» was plain lines under a Word
+    heading, after a «Davom etaymi?» full of raw tool arguments."""
+    plan = {
+        "kind": "tools",
+        "say": "Arizani tayyorlayman.",
+        "calls": [{"tool": "document.official", "args": {
+            "title": "Ariza",
+            "kimga": "[Tashkilot] rahbari [F.I.Sh.]ga",
+            "kimdan": "[lavozim] [F.I.Sh.]dan",
+            "body": "Meni [sana]dan o‘z xohishimga ko‘ra egallab turgan lavozimimdan ozod "
+                    "etishingizni so‘rayman.",
+        }}],
+    }  # fmt: skip
+    api, fake, _router = _api(tmp_path, [json.dumps(plan)])
+    written = {}
+
+    def doc(task, name, blocks, out):
+        written.update(name=name, blocks=blocks)
+        return {"path": str(out)}
+
+    api._overrides["doctemplate"] = doc
+    out = api.chat("menga ishdan bo‘shash haqida ariza yozib ber")
+    assert not out.get("confirm") and "rasmiy" in out["reply"], out
+    api._runner.get(out["task"]["id"]).wait(10)
+    kinds = [k for k, _t in written["blocks"]]
+    assert kinds == ["right", "right", "title", "body", "sign"]
+    assert written["blocks"][2][1] == "ARIZA" and "\t" in written["blocks"][-1][1]
+
+
+def test_question_about_a_document_with_fish_is_answered(tmp_path):
+    """Live 2026-10-22: «F.I.Sh.: [Ism-familiyangiz]» in the history blocked every later
+    question («So‘rov yuborilmadi»). Now the unsure part is hidden and the question goes."""
+    api, fake, _router = _api(tmp_path, ['{"kind": "chat"}', "Ha, rasmiy ariza shunday yoziladi."])
+    api._ctx.add_turn("nexvara", "ARIZA\nMeni ozod etishingizni so‘rayman.\nF.I.Sh.: [Ism]")
+    out = api.chat("rasmiy hujjatlar shunday yoziladimi")
+    assert out["reply"].startswith("Ha, rasmiy ariza"), out

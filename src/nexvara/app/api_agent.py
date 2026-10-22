@@ -148,7 +148,7 @@ class AgentApi:
         except tools.ToolError as e:
             return {"reply": str(e), "error": True}
         risky = [c for c in calls if tools.TOOLS[c.tool].risky]
-        changes = [c for c in calls if c.tool not in tools.READ_ONLY]
+        changes = [c for c in calls if c.tool not in tools.READ_ONLY | tools.CREATES_NEW]
         if (risky or (from_ai and changes)) and not (approved or self._approved_now()):
             token = uuid.uuid4().hex[:12]
             self._pending[token] = ("tools", calls)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
@@ -172,6 +173,28 @@ class FilesApi:
 
         name = "Excel" if app == "excel" else "Word"
         return self._runner.start(f"{name}’ga yozish", fn).snapshot()
+
+    def official_document(self, title: str, body: str, kimga: str = "", kimdan: str = "",
+                          signer: str = "", date: str = "") -> dict[str, Any]:  # fmt: skip
+        """An ariza / xat the AI wrote, in the official layout (doctemplates), DOCX + PDF."""
+        from nexvara import doctemplates
+        from nexvara.core.task import UserError
+        from nexvara.fileagent import free_name
+
+        try:
+            blocks = doctemplates.free_blocks(title, body, kimga, kimdan, signer, date)
+        except UserError as e:
+            return {"error": str(e)}
+        name = re.sub(r"[\\/:*?\"<>|]", " ", title.strip().capitalize())[:60].strip() or "Hujjat"
+        out = free_name(doctemplates.out_dir() / f"{name} {time.strftime('%Y%m%d-%H%M%S')}.docx")
+        fake = self._overrides.get("doctemplate")
+
+        def fn(task: Any) -> dict[str, Any]:
+            if fake is not None:
+                return fake(task, name, blocks, out)
+            return doctemplates.write(task, name, blocks, out, keep_open=self._keep_open())
+
+        return self._runner.start(name, fn).snapshot()
 
     def open_app(self, app: str) -> str:
         """«Excel’ni och»: start the program itself (an empty Excel/Word/PowerPoint window)."""

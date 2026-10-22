@@ -44,3 +44,32 @@ def test_ready_document_opens_and_pdf_contains_its_content(tid, tmp_path):
         assert "so‘rayman" in text
     if tid == "buyruq":
         assert "1." in text and "2." in text
+
+
+def test_ai_written_ariza_has_the_official_layout(tmp_path):
+    """The AI's own ariza (document.official): address top right, ARIZA centred, one page."""
+    import pymupdf
+
+    blocks = doctemplates.free_blocks(
+        "Ariza",
+        "Meni 2026-yil 1-noyabrdan o‘z xohishimga ko‘ra egallab turgan lavozimimdan ozod "
+        "etishingizni so‘rayman.",
+        kimga="21-maktab direktori A. Karimovga",
+        kimdan="fizika o‘qituvchisi N. Toychiyevadan",
+        signer="N. Toychiyeva",
+    )
+    out = tmp_path / "ariza.docx"
+    task = TaskRunner().start(
+        "ariza",
+        lambda t: doctemplates.write(t, "Ariza", blocks, out, visible=True, keep_open=False),
+    )
+    assert task.wait(120) and task.status == "succeeded", task.error
+    with pymupdf.open(task.result["pdf"]) as pdf:
+        page = pdf[0]
+        width = page.rect.width
+        kimga = page.search_for("Karimovga")[0]
+        title = page.search_for("ARIZA")[0]
+        sign = page.search_for("N. Toychiyeva")[-1]
+    assert kimga.x0 > width / 2  # the address block is on the right
+    assert abs((title.x0 + title.x1) / 2 - width / 2) < 30  # the title is centred
+    assert sign.x0 > width / 2 and sign.y0 > title.y1  # signature right, below

@@ -11,10 +11,12 @@ fallback provider too). Tests: [tests/unit/test_privacy.py](../tests/unit/test_p
    facts, Teach rules, file paths in the context) are scanned on this PC. Each personal item
    is replaced by a placeholder: `⟦ISM_1⟧`, `⟦TEL_1⟧`, `⟦JSHSHIR_1⟧`… The same value always
    gets the same placeholder within one request.
-2. **Block if unsure.** If a personal-data keyword has a value next to it that matches no
+2. **Hide if unsure.** If a personal-data keyword has a value next to it that matches no
    known format (e.g. "pasport: A 12-34"), or a long unknown number is left (8+ digits that
-   are not an amount like "15 000 000"), the request is **not sent**: the user gets
-   «So‘rov yuborilmadi …» and nothing is spent.
+   are not an amount like "15 000 000"), that part is hidden as well (`⟦MAXFIY_1⟧`, restored
+   in the answer) and never leaves the PC. Until 2026-10-22 the whole request was blocked
+   («So‘rov yuborilmadi …»); live use showed one «F.I.Sh.: [...]» in a written ariza then
+   blocked every later question, so the unsure part is hidden instead of the request.
 3. **Send** only the masked text. NEXVARA's own instructions and textbook passages are
    public text and are sent as they are (they need historical names such as "Amir Temur").
 4. **Restore locally.** Placeholders in the AI's answer (also `[ISM_1]`, `«ISM_1»` variants)

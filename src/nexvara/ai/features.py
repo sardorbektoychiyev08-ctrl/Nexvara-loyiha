@@ -142,6 +142,16 @@ rad etish yoki qaytarishdir. Oxirgi natija fayli bo‘lsa uni faqat files.recycl
 qil; o‘zing o‘chirma. Noaniq bo‘lsa calls bermay, "say"da faqat bitta aniq savol ber.
 - «uni», «o‘sha jadval», «hozir qilgan ishing»ni Kontekstdagi file/open_image/last_result \
 bilan bog‘la. Faylni o‘zingcha almashtirma.
+- Ariza, tushuntirish xati, xizmat xati, ma’lumotnoma, bildirishnoma — faqat \
+"document.official" (office.write emas). O‘zbek ish yuritish uslubida yoz: kimga — lavozim, \
+tashkilot va ism jo‘nalish kelishigida («21-maktab direktori A. Karimovga»), kimdan — lavozim \
+va to‘liq ism chiqish kelishigida («fizika o‘qituvchisi N. Toychiyevadan»); body — faqat \
+iltimos matni, birinchi shaxsda, aniq va qisqa («Meni 2026-yil 1-noyabrdan o‘z xohishimga \
+ko‘ra egallab turgan lavozimimdan ozod etishingizni so‘rayman.»); sarlavha, kimga/kimdan, \
+sana va imzoni body’ga takrorlama. Foydalanuvchi aytgan yoki eslab qolingan ma’lumotni ishlat; \
+bilinmaganini [qavs ichida] qoldir.
+- Foydalanuvchi oldingi ish yoki javob haqida savol bersa («shunday yoziladimi?», «nega?», \
+«to‘g‘rimi?») — hech narsa bajarma, {"kind": "chat"} qaytar.
 - API kalit, parol yoki tokenni hech qachon parametrga yozma.
 - Bilim savoli bo‘lsa {"kind": "question"}, oddiy suhbat bo‘lsa {"kind": "chat"} qaytar.
 

@@ -4,6 +4,16 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-22 (50) — Claude Code — «yana javob bermayapti», ariza xatolari
+
+**Foydalanuvchi (1.5.7 da, jonli):** «ishdan bo‘shash haqida ariza yozib ber» → AI (OpenAI gpt-6.1-sol, $0.01) `office.write` bilan oddiy qatorlar + Word sarlavhasi, oldin xom argumentli «Davom etaymi?»; keyin «shunday yoziladimi», «rasmiy hujjatlar shunday yoziladimi» → «So‘rov yuborilmadi: «F.I.Sh.» yonidagi…» (tarixdagi arizaning «F.I.Sh.: [...]» qatori).
+**Qilindi:** (1) `ai/privacy.py`: ishonchsiz qism endi bloklamaydi — `⟦MAXFIY_n⟧` bilan yashiriladi, javobda tiklanadi (PRIVACY.md, AGENTS.md yangilandi); (2) yangi `document.official` asbob → `doctemplates.free_blocks` + `doctemplates.write` (yuqori o‘ngda kimga/kimdan, o‘rtada sarlavha, xatboshi, sana+imzo bir qatorda, DOCX+PDF); rejalashtiruvchiga o‘zbek ish yuritish uslubi qoidasi; oldingi ish haqidagi savol → `chat`; (3) `tools.CREATES_NEW`: faqat yangi narsa yaratadigan/ochadigan AI rejasi «Ha»siz bajariladi (o‘chirish, ko‘chirish, sozlama — avvalgidek so‘raladi; pullik qadamlar o‘z narx tasdig‘i bilan).
+**Testlar:** `scripts/test.ps1` — 575 PASS, 98 skipped, smoke PASS, ruff PASS. Office (Word, egasi ruxsati bilan): `test_doctemplate_word.py` — 9 PASS (yangi: AI arizasi shakli PDF’da joylashuv bo‘yicha tekshirildi). Haqiqiy AI bilan suhbat — NOT TESTED.
+**Eslatma:** egasining sozlamasida «Bepul rejim» yoqiq; kuchli daraja (Gemini Pro) bepulda yo‘q → rejalashtiruvchi pullik OpenAI’ga o‘tadi (ishlaydi, ~$0.01/xabar).
+**Keyingi qadam:** egasi tasdig‘i bilan 1.5.8 reliz.
+
+---
+
 ## 2026-10-22 (49) — Claude Code — Office sinovi, `main` ga merge, 1.5.7 (yig‘ish to‘xtadi)
 
 **Egasi ruxsati:** Office sinovi va 1.5.7 reliz («1,2»).

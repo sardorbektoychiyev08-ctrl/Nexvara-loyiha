@@ -181,6 +181,7 @@ _KEYWORDS: list[tuple[re.Pattern, set[str]]] = [
     (re.compile(r"(?i)\b(tug[‘’']?ilgan\s+(sana|kun)\w*)\b"), {"SANA"}),
 ]
 _NEAR = 60  # characters after a keyword where its value must be
+_HOLD, _HOLD_END = "", ""  # private-use marks around a hidden part while masking
 # Paths and file names NEXVARA writes («D:\NEXVARA\Telefondan\…», «rasm-20261019-025804.png»).
 _FILE = re.compile(
     r"(?i)[A-Z]:[\\/][^\s«»\"“”,;]*|[\w.\-]*\d{6,}[\w.\-]*\.(?:png|jpe?g|webp|bmp|wav|mp3|pdf|"
@@ -293,10 +294,13 @@ class Guard:
         out.append(text[last:])
         return "".join(out), kinds
 
-    def _check(self, original: str, masked: str) -> None:
-        """Block when detection is unreliable."""
+    def _uncertain(self, original: str, masked: str) -> list[tuple[int, int]]:
+        """Spans of `original` that may be personal data the patterns did not recognise. They
+        are hidden too (⟦MAXFIY_n⟧), never sent. Until 2026-10-22 such a request was blocked
+        whole: after one «F.I.Sh.: [...]» in a document every later question was refused."""
+        spans: list[tuple[int, int]] = []
         # A keyword inside a path is a folder name, and a file name is not its value (live check
-        # 2026-10-22: «D:\NEXVARA\Telefondan\1000003519.jpg» blocked every request from the phone).
+        # 2026-10-22: «D:\NEXVARA\Telefondan\1000003519.jpg» was read as a phone number).
         paths = [m.span() for m in _FILE.finditer(original)]
         for pat, kinds in _KEYWORDS:
             for m in pat.finditer(original):
@@ -308,34 +312,37 @@ class Guard:
                 has_value = any(f"⟦{k}_" in window for k in kinds)
                 # the value stands on the same line as its keyword (live check 2026-10-19: a date
                 # on the next history line made «…hisob raqami bo‘lishi mumkin» look like a value)
-                after = original[m.end() : m.end() + _NEAR].split("\n", 1)[0]
-                after = _FILE.sub(" ", after)
+                line = original[m.end() : m.end() + _NEAR].split("\n", 1)[0]
+                after = _FILE.sub(" ", line)
                 looks_like_value = re.search(r"[:\-–]\s*\S|\d", after) or (
                     "ISM" in kinds and re.match(rf"\s+{_CAP}", after)
                 )
                 if looks_like_value and not has_value:
-                    raise PrivacyBlocked(
-                        f"So‘rov yuborilmadi: «{m.group(0)}» yonidagi shaxsiy ma’lumotni "
-                        "ishonchli aniqlab bo‘lmadi. Uni matndan olib tashlang yoki "
-                        "«[yashirilgan]» deb yozing."
-                    )
-        # File names and paths NEXVARA itself writes carry a timestamp («rasm-20261019-025804.png»,
-        # «D:\NEXVARA\Kamera\kamera-20261019-…»): they are not document numbers. Live check
-        # 2026-10-19: after one picture every later AI request was blocked because of it.
-        scan = _FILE.sub(" ", masked)
-        scan = re.sub(r"\b(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-_T]\d{4,6}\b",
-                      " ", scan)  # fmt: skip
-        # ISO dates («[2026-10-19]» in the recalled history, «gpt-5.4-mini-2026-03-17») are dates,
-        # not numbers; a birth date next to its keyword is still caught by the keyword check.
-        scan = re.sub(r"\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b", " ", scan)
-        for m in re.finditer(r"\d[\d\s\-]{7,}\d", scan):
+                    lead = len(line) - len(line.lstrip(" :-–\t"))
+                    a, b = m.end() + lead, m.end() + len(line.rstrip())
+                    if b > a:
+                        spans.append((a, b))
+        # Long unknown numbers (document, phone or account numbers). Paths and file names NEXVARA
+        # writes carry a timestamp («rasm-20261019-025804.png»): not document numbers (live check
+        # 2026-10-19). ISO dates («[2026-10-19]», «gpt-5.4-mini-2026-03-17») are dates.
+        skip = paths + [m.span() for m in re.finditer(
+            r"\b(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])[-_T]\d{4,6}\b|"
+            r"\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b", original)]  # fmt: skip
+        for m in re.finditer(r"\d[\d\s\-]{7,}\d", original):
+            a, b = m.span()
+            if any(x <= a < y or x < b <= y for x, y in skip):
+                continue
             if re.fullmatch(r"\d{1,3}(?:[\s.,]\d{3})+", m.group().strip()):
                 continue  # an amount like 15 000 000 (so‘m), not a document number
-            if len(re.sub(r"\D", "", m.group())) >= 8:
-                raise PrivacyBlocked(
-                    "So‘rov yuborilmadi: matnda tanilmagan uzun raqam bor (hujjat, telefon yoki "
-                    "hisob raqami bo‘lishi mumkin). Uni olib tashlang yoki qisqartiring."
-                )
+            if len(re.sub(r"\D", "", m.group())) >= 8 and m.group() in masked:
+                spans.append((a, b))  # no known pattern masked it
+        merged: list[list[int]] = []
+        for a, b in sorted(spans):
+            if merged and a <= merged[-1][1]:
+                merged[-1][1] = max(merged[-1][1], b)
+            else:
+                merged.append([a, b])
+        return [(a, b) for a, b in merged]
 
     def mask(self, text: str) -> str:
         """Mask everything outside PUBLIC markers; the markers themselves are removed."""
@@ -346,7 +353,19 @@ class Guard:
                 out.append(part[len(PUBLIC_START) : -len(PUBLIC_END)])
                 continue
             masked, _kinds = self._mask_part(part)
-            self._check(part, masked)
+            spans = self._uncertain(part, masked)
+            if spans:  # hide them, then mask the rest again around the hidden parts
+                held: list[str] = []
+                pieces, pos = [], 0
+                for a, b in spans:
+                    pieces += [part[pos:a], f"{_HOLD}{len(held)}{_HOLD_END}"]
+                    held.append(part[a:b])
+                    pos = b
+                pieces.append(part[pos:])
+                masked, _kinds = self._mask_part("".join(pieces))
+                masked = re.sub(f"{_HOLD}(\\d+){_HOLD_END}",
+                                lambda m, held=held: self._token("MAXFIY", held[int(m.group(1))]),
+                                masked)  # fmt: skip
             out.append(masked)
         return "".join(out)
 

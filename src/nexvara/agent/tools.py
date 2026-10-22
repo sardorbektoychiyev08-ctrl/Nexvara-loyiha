@@ -54,6 +54,14 @@ READ_ONLY = frozenset({
     "photo.read", "photo.compare_table",
 })  # fmt: skip
 
+# Only make something new or open a program — nothing of the user's is changed or deleted, so an
+# AI plan of these runs at once, like a chat assistant would (paid AI steps ask on their own).
+CREATES_NEW = frozenset({
+    "app.open", "office.write", "document.official", "photo.to_office", "drawing.create",
+    "education.test", "education.lesson", "education.presentation", "education.topic",
+    "report.weekly", "media.image",
+})  # fmt: skip
+
 
 def tool(tool_name: str, title: str, /, risky: bool = False, **params: tuple[str, bool, str]):
     def deco(fn):
@@ -431,6 +439,27 @@ def office_write(api, a):
         raise ToolError(snap.get("error", "Boshlanmadi"))
     name = "Word" if str(a.get("app") or "").lower().startswith(("w", "v")) else "Excel"
     return {"reply": f"{name} ochilmoqda — javobni yangi faylga yozyapman.", "task": snap}
+
+
+@tool("document.official",
+      "Rasmiy hujjat to‘g‘ri shaklda (ariza, tushuntirish xati, xizmat xati, ma’lumotnoma, "
+      "bildirishnoma): Word va PDF, ekranda ochiladi",
+      title=("string", True, "hujjat nomi: ARIZA, TUSHUNTIRISH XATI, XIZMAT XATI …"),
+      body=("string", True, "faqat asosiy matn (kimga/kimdan/sana/imzosiz), xatboshilar yangi "
+                            "qatordan; noma’lum joylar [qavs ichida]"),
+      kimga=("string", False, "yuqori o‘ngdagi manzil: tashkilot, lavozim, ism (-ga)"),
+      kimdan=("string", False, "kimdan: lavozim va to‘liq ism (-dan)"),
+      signer=("string", False, "imzo yonidagi F.I.Sh."),
+      date=("string", False, "kun.oy.yil; bo‘sh bo‘lsa bugun"))  # fmt: skip
+def document_official(api, a):
+    keys = ("title", "body", "kimga", "kimdan", "signer", "date")
+    snap = api.official_document(**{k: str(a.get(k) or "") for k in keys})
+    if "id" not in snap:
+        raise ToolError(snap.get("error", "Boshlanmadi"))
+    holes = "[" in "".join(str(a.get(k) or "") for k in ("body", "kimga", "kimdan", "signer"))
+    note = " [Qavs] ichidagi joylarni o‘zingiz to‘ldirasiz." if holes else ""
+    return {"reply": f"{str(a.get('title') or 'Hujjat').strip().capitalize()} Word’da rasmiy "
+            f"shaklda yozilmoqda (DOCX va PDF).{note}", "task": snap}  # fmt: skip
 
 
 @tool("app.open", "Dasturni ochish (Excel, Word, PowerPoint, Bloknot, Kalkulyator, Paint)",
