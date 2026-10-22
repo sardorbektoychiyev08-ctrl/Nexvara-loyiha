@@ -180,6 +180,7 @@ def test_open_app_commands(tmp_path, monkeypatch):
         ("pauerpointni och", "powerpoint"),
         ("iltimos wordni ishga tushir", "word"),
         ("kalkulyatorni och", "calc"),
+        ("noutbukimdagi exselni och", "excel"),
     ]:
         assert parse(fix(text))[0].tool == "app.open", text
         assert parse(fix(text))[0].args == {"app": app}, text

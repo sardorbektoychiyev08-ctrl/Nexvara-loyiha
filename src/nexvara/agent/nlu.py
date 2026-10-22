@@ -585,7 +585,7 @@ def _write_answer(text: str, f: str) -> list[ToolCall] | None:
 
 
 _OPEN_APP = re.compile(
-    r"^(?:(?:menga|iltimos|yangi|bosh|bitta)\s+)*"
+    r"^(?:(?:menga|iltimos|yangi|bosh|bitta|(?:noutbuk|kompyuter|komp)\w*)\s+)*"
     r"(?P<app>excel|word|power\s*point|bloknot|notepad|kalkulyator|calculator|paint)\w*"
     r"(?:\s+(?:dastur|ilova|programma|fayl|hujjat|kitob|ni)\w*)*\s+"
     r"(?:och|ishga\s+tushir|yoq)\w*(?:\s+(?:ber|qoy|chi)\w*)?$"
