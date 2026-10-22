@@ -4,6 +4,15 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-22 (45) — Claude Code — «Excel’ni och» ishlamasdi
+
+**Foydalanuvchi holati (jonli):** «Excel’ni och» desa ochilmaydi (egasi: «kamchiliklar juda ko‘p, bu bitta misol»). Sabab: fayl nomisiz «dasturni och» buyrug‘i umuman yo‘q edi — «Buni tushunmadim».
+**Qilindi:** yangi `app.open` buyrug‘i (`nlu._open_app`, `Api.open_app`): «Excel’ni och», «Word dasturini ochib ber», «iltimos Word’ni ishga tushir», «yangi Excel fayl och», shuningdek Bloknot, Kalkulyator, Paint. Dastur Windows App Paths orqali ochiladi; topilmasa — «o‘rnatilmagan bo‘lishi mumkin». AI rejalashtiruvchisi ham shu vositani ko‘radi. Xato-tuzatish: «pauerpoint» → PowerPoint.
+**Testlar:** `scripts/test.ps1` — 554 PASS, 96 skipped, smoke PASS; ruff format birinchi yugurishda yangi testda FAIL → tuzatildi, `ruff check`/`format --check` PASS, tegishli testlar qayta 67 PASS. Registrda excel/winword/powerpnt.exe App Paths bor (tekshirildi). Haqiqiy oynani ochish — NOT TESTED (Office ekranda ochiladi).
+**Keyingi qadam:** egasidan ishlamagan boshqa buyruqlar ro‘yxatini olish va bittalab tuzatish.
+
+---
+
 ## 2026-10-21 (44) — Claude Code — xato yozilgan buyruqlar, javobni Excel/Word’ga yozish
 
 **Foydalanuvchi holati (jonli):** «menga6-sinif informatikasidan test tuz 20 talik» — sinf yo‘qoldi, «Excel faylida» mavzu deb olindi, darslik topilmadi; «exselni ochib osha yerga yoz» tushunilmadi.

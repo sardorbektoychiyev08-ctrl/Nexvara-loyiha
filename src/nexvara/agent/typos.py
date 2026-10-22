@@ -18,7 +18,7 @@ _RULES = [
     (re.compile(r"\bsinif", re.I), "sinf"),
     (re.compile(r"\b(?:e[kx]s+e?l+|exe?l+|ekce?l+|excell?)(?!l?en)", re.I), "Excel"),
     (re.compile(r"\bvord", re.I), "Word"),
-    (re.compile(r"\bp(?:a?u|o)[vw]e?r\s*-?\s*p(?:o|oy|oi)nt", re.I), "PowerPoint"),
+    (re.compile(r"\bp(?:a?u|o)(?:[vw]e?|e)r\s*-?\s*p(?:o|oy|oi)nt", re.I), "PowerPoint"),
     (re.compile(r"\b(\d{1,3})\s*tal(?:ik|i)\b", re.I), r"\1 ta"),
 ]
 

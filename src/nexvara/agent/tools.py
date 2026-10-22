@@ -432,6 +432,12 @@ def office_write(api, a):
     return {"reply": f"{name} ochilmoqda — javobni yangi faylga yozyapman.", "task": snap}
 
 
+@tool("app.open", "Dasturni ochish (Excel, Word, PowerPoint, Bloknot, Kalkulyator, Paint)",
+      app=("string", True, "excel, word, powerpoint, notepad, calc yoki paint"))  # fmt: skip
+def app_open(api, a):
+    return {"reply": api.open_app(str(a.get("app") or ""))}
+
+
 # =====================================================================
 # NEXVARA BI
 # =====================================================================

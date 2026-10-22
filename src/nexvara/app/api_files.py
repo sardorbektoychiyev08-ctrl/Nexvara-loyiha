@@ -173,6 +173,24 @@ class FilesApi:
         name = "Excel" if app == "excel" else "Word"
         return self._runner.start(f"{name}’ga yozish", fn).snapshot()
 
+    def open_app(self, app: str) -> str:
+        """«Excel’ni och»: start the program itself (an empty Excel/Word/PowerPoint window)."""
+        from nexvara.agent.tools import ToolError
+
+        programs = {"excel": ("Excel", "excel.exe"), "word": ("Word", "winword.exe"),
+                    "powerpoint": ("PowerPoint", "powerpnt.exe"),
+                    "notepad": ("Bloknot", "notepad.exe"), "calc": ("Kalkulyator", "calc.exe"),
+                    "paint": ("Paint", "mspaint.exe")}  # fmt: skip
+        if app not in programs:
+            raise ToolError(f"Bu dasturni ochishni bilmayman: {app}")
+        name, exe = programs[app]
+        fn = self._overrides.get("open_app") or os.startfile  # Windows finds it via App Paths
+        try:
+            fn(exe)
+        except OSError as e:
+            raise ToolError(f"{name} ochilmadi: kompyuterda o‘rnatilmagan bo‘lishi mumkin") from e
+        return f"{name} ochildi."
+
     def open_file(self, path: str) -> bool:
         p = Path(path)
         if not p.is_absolute() or not p.exists():

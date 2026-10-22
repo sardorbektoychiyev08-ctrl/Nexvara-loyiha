@@ -164,3 +164,34 @@ def test_write_answer_commands_and_last_answer(tmp_path):
     assert "id" in snap and "Excel" in snap["title"]
     assert "error" in Api(TaskRunner(), overrides={"memory": MemoryStore(tmp_path / "b.db")}
                           ).office_write("word")  # fmt: skip
+
+
+def test_open_app_commands(tmp_path, monkeypatch):
+    """«Excel’ni och» (live 2026-10-22: «Buni tushunmadim») just starts the program."""
+    monkeypatch.setenv("NEXVARA_DATA", str(tmp_path / "data"))
+    from nexvara.agent.nlu import parse
+    from nexvara.agent.typos import fix
+    from nexvara.app.api import Api
+
+    for text, app in [
+        ("exelni och", "excel"),
+        ("Excel’ni ochib ber", "excel"),
+        ("word dasturini och", "word"),
+        ("pauerpointni och", "powerpoint"),
+        ("iltimos wordni ishga tushir", "word"),
+        ("kalkulyatorni och", "calc"),
+    ]:
+        assert parse(fix(text))[0].tool == "app.open", text
+        assert parse(fix(text))[0].args == {"app": app}, text
+    assert parse("exselni ochib osha yerga yoz")[0].tool == "office.write"
+    assert parse("Savdo.xlsx ni och") is None
+    started: list[str] = []
+    api = Api(overrides={"open_app": started.append})
+    assert api.chat("exelni och")["reply"] == "Excel ochildi."
+    assert started == ["excel.exe"]
+
+    def missing(exe):
+        raise FileNotFoundError(exe)
+
+    api._overrides["open_app"] = missing
+    assert "o‘rnatilmagan" in api.chat("PowerPointni och")["reply"]
