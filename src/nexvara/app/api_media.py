@@ -314,9 +314,22 @@ class MediaApi:
                 return client.edit_image(model, safe, image[0], image[1])
             return client.generate_image(model, safe)
 
+        from nexvara.ai.router import NeedsConfirmation
+
+        up_to = float(payload.get("up_to") or 0)
         try:
             png, est = self._router().media("image", 1, call, approved=True,
-                                            purpose="image_edit" if image else "image")  # fmt: skip
+                                            purpose="image_edit" if image else "image",
+                                            approved_up_to=up_to)  # fmt: skip
+        except NeedsConfirmation as e:
+            # The cheap model failed and a dearer one would answer: ask again WITH a button
+            # (live 2026-10-24: «Tasdiq kerak: …» came without one and the chat stopped).
+            import uuid
+
+            token = uuid.uuid4().hex[:12]
+            self._pending[token] = ("image", {**payload, "up_to": e.estimate.cost})
+            return {"reply": f"Arzon model javob bermadi. Boshqasi bilan: {e.estimate.describe()}."
+                    "\n\nDavom etaymi?", "confirm": token}  # fmt: skip
         except Exception as e:  # noqa: BLE001
             return {"reply": self._media_error(e)["error"], "error": True}
         folder = config.data_dir() / "AI rasmlar"
