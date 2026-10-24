@@ -51,7 +51,7 @@ def _api(tmp_path: Path, replies=(), error: Exception | None = None, enabled: bo
             "ai_router": router,
             "open_app": lambda app: f"{app} ochildi",
             "ocr": lambda _p, _lang: "Sana | Summa\n22.10.2026 | 1250",
-        }
+        },
     )
     return api, fake, router
 
