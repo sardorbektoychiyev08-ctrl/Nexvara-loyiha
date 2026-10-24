@@ -556,6 +556,9 @@ def _classify_extra(clause: str, f: str, app: str | None) -> Action | None:
         return _align(clause, f)
     if re.search(r"\bsarlavha (qil|uslub)", f) or _has(f, "birinchi qatorni sarlavha"):
         return Action("title", {}, clause)
+    # «sarlavhani qalin qil» (live 2026-10-24, a Teach rule from the phone was not understood)
+    if re.search(r"\bsarlavha\w*\b.*\b(qalin|bold|ajratib|ajrat|yorqin)", f):
+        return Action("title", {}, clause)
     if re.search(r"\b(soz|sahifa|belgi|harf)\w*\b.*\b(sana|nechta|hisobla)", f) or _has(
         f, "statistika"
     ):
