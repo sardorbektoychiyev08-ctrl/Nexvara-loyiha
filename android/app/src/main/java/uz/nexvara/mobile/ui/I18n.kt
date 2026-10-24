@@ -50,6 +50,8 @@ private val PATTERNS: List<Pair<Regex, (List<String>) -> String>> = listOf(
     Regex("Oxirgi: (.+) · shifrlangan") to { g -> "Последняя: ${g[1]} · зашифровано" },
     Regex("(\\d+) savol · (\\d+) variant · (\\d+) ta tekshirildi(.*)") to { g -> "${g[1]} вопр. · ${g[2]} вар. · проверено: ${g[3]}${g[4].replace(" · kalit yo‘q", " · нет ключа")}" },
     Regex("(\\d+)-sinf") to { g -> "${g[1]} класс" },
+    Regex("Kompyuterda: (.+)") to { g -> "На компьютере: ${g[1]}" },
+    Regex("NEXVARA Android (.+) · Kompyuter: (.+)") to { g -> "NEXVARA Android ${g[1]} · Компьютер: ${g[2]}" },
 )
 
 @Composable
@@ -130,6 +132,28 @@ private val RU: Map<String, String> = mapOf(
     "Mavzu" to "Тема", "Tizim bo‘yicha" to "Как в системе", "Yorug‘" to "Светлая", "Qorong‘i" to "Тёмная", "Til" to "Язык",
     "Xavfsizlik va ovoz" to "Безопасность и голос", "Ilova qulfi" to "Блокировка приложения", "Ovozli suhbat" to "Голосовой чат",
     "Ovoz tili" to "Язык голоса", "Gapirganda qaysi tilda tanisin" to "На каком языке распознавать речь",
+    // settings descriptions (live check 2026-10-24: they stayed Uzbek in Russian mode)
+    "Ochishda barmoq izi, yuz yoki telefon PIN-kodi. 1 daqiqa fonda turgach yana qulflanadi." to
+        "При открытии — отпечаток, лицо или PIN телефона. После 1 минуты в фоне блокируется снова.",
+    "Aytilgan buyruq darhol yuboriladi, javob ovoz bilan o‘qiladi. Bepul, telefonning o‘z ovoz xizmati." to
+        "Сказанная команда отправляется сразу, ответ читается голосом. Бесплатно, голосовая служба телефона.",
+    "AI ovozi" to "Голос AI",
+    // the sections grid subtitles
+    "O‘qituvchi, ofis, hujjat" to "Учитель, офис, документы", "Suratdan baholash" to "Проверка по фото",
+    "Baholar → Excel" to "Оценки → Excel", "Ariza, buyruq, xat…" to "Заявление, приказ, письмо…",
+    "Darslar va eslatma" to "Уроки и напоминания", "Ovozdan bayonnoma" to "Протокол с голоса",
+    "Jonli ko‘rish" to "Живой просмотр", "Qo‘lda chizish → AutoCAD" to "Эскиз → AutoCAD",
+    "Excel, Word, PowerPoint, chizma" to "Excel, Word, PowerPoint, чертёж",
+    "Darslikdan test tuzish" to "Тест по учебнику", "Yuborish va natijalar" to "Отправка и результаты",
+    "Balans va limitlar" to "Баланс и лимиты", "Ish va uy kompyuteri" to "Рабочий и домашний ПК",
+    "Mavzu, ovoz, Google" to "Тема, голос, Google",
+    "Faqat QR’dagi sertifikat izi (SHA-256) qabul qilinadi" to "Принимается только отпечаток сертификата из QR (SHA-256)",
+    "Telefon uchun Google hali sozlanmagan: Google Cloud’da Android va Web OAuth client kerak " +
+        "(docs/GOOGLE_LOGIN.md → Android). Parol yoki maxfiy kalit kerak emas." to
+        "Google для телефона ещё не настроен: в Google Cloud нужны Android и Web OAuth client " +
+        "(docs/GOOGLE_LOGIN.md → Android). Пароль или секретный ключ не нужны.",
+    "Javobni kompyuterdagi AI o‘qiydi (o‘zbekcha tabiiyroq). Gemini bepul; pullik bo‘lsa narxi aytilib so‘raladi." to
+        "Ответ читает AI на компьютере (узбекский звучит естественнее). Gemini бесплатно; платный — с вопросом о цене.",
     "O‘zbekcha" to "Узбекский", "Ruscha" to "Русский", "Inglizcha" to "Английский", "Kompyuter" to "Компьютер",
     "Windows bilan birga ishga tushsin" to "Запускать вместе с Windows",
     "Kompyuter yoqilganda NEXVARA o‘zi ochiladi va telefon ulanadi" to "NEXVARA откроется при включении ПК, и телефон подключится",

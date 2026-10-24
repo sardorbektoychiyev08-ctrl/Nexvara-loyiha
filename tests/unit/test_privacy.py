@@ -264,7 +264,7 @@ def test_facts_history_context_and_plan_args_are_protected(tmp_path, monkeypatch
     # (restored on this PC) and still waits for "Ha".
     assert out.get("confirm") and "Aliyev Vali" in out["reply"] and "765-43-21" in out["reply"]
     assert "⟦" not in out["reply"] and out["privacy_masked"] >= 4
-    assert re.search(r"yashirildi|AI’ga yuborilmadi", out["reply"])
+    assert not re.search(r"yashirildi|AI’ga yuborilmadi", out["reply"])
 
 
 def test_nexvara_file_names_with_timestamps_do_not_block():

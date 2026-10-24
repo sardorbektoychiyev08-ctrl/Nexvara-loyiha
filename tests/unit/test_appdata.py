@@ -56,6 +56,28 @@ def test_settings_read_while_another_thread_saves(tmp_path, monkeypatch):
     assert seen and all(seen) and s.load()["theme"] == "light"
 
 
+def test_settings_instances_do_not_race_on_the_same_file(tmp_path):
+    import threading
+
+    path = tmp_path / "settings.json"
+    first, second = Settings(path), Settings(path)
+    barrier = threading.Barrier(2)
+
+    def save_theme():
+        barrier.wait()
+        first.update({"theme": "light"})
+
+    worker = threading.Thread(target=save_theme)
+    worker.start()
+    barrier.wait()
+    second.update({"test_count": 15})
+    worker.join()
+
+    saved = Settings(path).load()
+    assert saved["theme"] == "light"
+    assert saved["test_count"] == 15
+
+
 def test_history_survives_and_is_trimmed(tmp_path):
     h = History(tmp_path / "app.db", keep=3)
     for i in range(5):

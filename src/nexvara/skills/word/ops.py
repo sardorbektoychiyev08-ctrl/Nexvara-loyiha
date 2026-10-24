@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from nexvara.skills.common import bring_to_front, validate_output_path
+from nexvara.skills.common import bring_to_front, file_in_use, validate_output_path
 from nexvara.skills.excel.table import excel_color
 from nexvara.skills.office_session import OfficeSession
 
@@ -90,7 +90,13 @@ class WordSession(OfficeSession):
         return self.own(self.app.Documents.Add())
 
     def open_document(self, path: str | Path) -> Any:
-        return self.own(self.app.Documents.Open(str(Path(path).resolve())))
+        p = Path(path).resolve()
+        # Open elsewhere (another Word window): read-only, or Word shows an invisible «file in
+        # use» question and the task hangs forever (live 2026-10-24). Results go to a new file.
+        # Positional: FileName, ConfirmConversions, ReadOnly.
+        if file_in_use(p):
+            return self.own(self.app.Documents.Open(str(p), False, True))
+        return self.own(self.app.Documents.Open(str(p)))
 
     def save_as(self, doc: Any, path: str | Path, overwrite: bool = False) -> Path:
         target = validate_output_path(path, (".docx",), overwrite)

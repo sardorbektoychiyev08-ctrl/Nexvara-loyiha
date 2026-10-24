@@ -262,13 +262,21 @@ QANDAY GAPLASHISH:
 - Avval o‘ylab ol: odam aslida nimani xohlayapti, nega so‘rayapti, oldingi gaplar bilan \
 qanday bog‘liq. So‘zma-so‘z emas, ma’nosiga qarab tushun: xato yozilgan, qisqartirilgan, \
 og‘zaki yoki ruscha-o‘zbekcha aralash gaplarni ham to‘g‘ri tushun.
-- Javob uzunligini xabarga moslashtir: salomga — bir-ikki jumla, jiddiy savolga — to‘liq, \
-lekin ortiqcha so‘zsiz. Ro‘yxat faqat haqiqatan foydali bo‘lsa.
+- Savolga faqat javobning o‘zini ber: kirish gap, savolni qayta aytish, ortiqcha izoh va \
+oxirida taklif («Xohlasangiz…», «Yana nima qilay?», «Ma’qulmi?») qo‘shma. Javob uzunligini \
+xabarga moslashtir: salom yoki rahmatga — bitta qisqa jumla (oldingi ishni takrorlama va \
+davom ettirma), oddiy savolga — bir-ikki jumla, jiddiy savolga — to‘liq, lekin ortiqcha \
+so‘zsiz. Ro‘yxat faqat haqiqatan foydali bo‘lsa. Formulani oddiy matnda yoz (F = m·a), \
+LaTeX ($…$) ishlatma.
 - Gap noaniq bo‘lsa va xato qilish qimmatga tushsa, bitta qisqa aniqlashtiruvchi savol ber; \
 aks holda eng ehtimolli ma’noda javob ber va taxminingni bir og‘iz ayt.
 - Odamning kayfiyatini sez: charchagan, xafa yoki shoshayotgan bo‘lsa, shunga mos gapir.
 - O‘z fikringni ayt, maslahat ber, kerak bo‘lsa xatoni muloyim ko‘rsat. Bilmasang — \
 «bilmayman» de, to‘qima.
+- Bu bitta davomli suhbat: «uni», «yana», «o‘shani» kabi gaplarni oldingi suhbatdan tushun, \
+lekin oldingi javobingni hech qachon qayta yozma; foydalanuvchi so‘ramagan ishni o‘zing boshlama.
+- Foydalanuvchi birga ishlashni so‘rasa, faqat umumiy maslahat bermay, hozir foydali bo‘lgan \
+aniq keyingi qadamni ayt yoki mavjud ma’lumot bilan ishni davom ettir.
 - Oldingi suhbatni esla va unga tabiiy tayan; ismini bilsang, ba’zan ism bilan murojaat qil."""
 
 MEMORY_NOTE = (
@@ -397,7 +405,9 @@ def plan(
 QA_SYSTEM = """Sen NEXVARA — o‘qituvchi va o‘quvchilar uchun yordamchisan. Javobni o‘zbek \
 tilida (lotin yozuvida), aniq va qisqa yoz. Agar quyida darslik parchalari berilgan bo‘lsa, \
 avvalo ularga tayan va qaysi darslik va betdan olganingni [kitob, bet] ko‘rinishida ko‘rsat. \
-Parchalarda javob bo‘lmasa, o‘z bilimingdan javob ber va buni ochiq ayt. To‘qib chiqarma. \
+Parchalar umuman berilmagan bo‘lsa, darslik yoki manba haqida gapirma — savolga bevosita \
+javob ber. Oddiy hisobda faqat natijani ayt (masalan: «5.»), misol yoki izoh qo‘shma. \
+Sodda fakt savoliga bir jumla yetadi. To‘qib chiqarma. \
 Tushuntirganda yaxshi o‘qituvchidek gapir: oddiy misol bilan, kerak bo‘lsa hayotiy \
 o‘xshatish bilan."""
 
@@ -458,7 +468,17 @@ def answer_question(
     recall: Recall | None = None,
 ) -> Answer:  # fmt: skip
     send = bool(router.config().get("send_textbook_text", True))
-    hits = find_passages(text, grade, subject) if send else []
+    # A generic question is ordinary chat, not an automatic textbook search. Searching every
+    # short question made «2 + 3» cite unrelated chemistry/biology pages containing a plus
+    # sign. Use the library only when the user actually names a grade, subject or source.
+    from nexvara.knowledge.catalog import detect_subject
+    from nexvara.knowledge.textnorm import fold
+
+    f = fold(text)
+    wants_textbook = bool(
+        detect_subject(text) or re.search(r"\b(darslik|kitob|manba|sini?f|fandan|fanidan)\w*\b", f)
+    )
+    hits = find_passages(text, grade, subject) if send and wants_textbook else []
     msgs = _qa_messages(text, hits, send)
     if recall:
         msgs[-1]["content"] = with_recall(msgs[-1]["content"], recall)
@@ -506,6 +526,9 @@ def chat_reply(
     from nexvara.knowledge.office_guide import for_prompt
 
     system += for_prompt(text)  # official rules when the request is about an office document
+    if quick:  # a greeting or thanks: the live 2026-10-24 «salom» re-sent the last tests
+        system += "\n\nBu salom yoki rahmat: faqat bitta qisqa, iliq jumla bilan javob ber."
+        recall = None  # earlier work in the history only invited «shall we continue it?»
     if recall:
         system += MEMORY_NOTE
     r = router.complete(
@@ -515,6 +538,80 @@ def chat_reply(
         tier="cheap" if quick else None,
     )  # fmt: skip
     return Answer(r.text.strip(), [], r.cost)
+
+
+# ---------------- presentation slides written by the AI ----------------
+
+SLIDES_SYSTEM = """Sen o‘qituvchi uchun darslik mavzusidan dars taqdimoti rejasini tuzasan.
+Darslik matni skanerdan olingan, unda harf xatolari bo‘lishi mumkin: ma’nosini tushunib, \
+to‘g‘ri o‘zbek lotin imlosida yoz. Faqat matndagi bilimga tayan, to‘qima.
+5–7 ta mazmun slaydi tuz: har birida aniq sarlavha va 3–5 ta qisqa band (har band 12 \
+so‘zgacha, to‘liq fikr), ma’ruzachi uchun 2–4 jumlali izoh. Oxirida «Asosiy tushunchalar» \
+va 3–4 ta savoldan iborat «Savollar» slaydi bo‘lsin.
+Faqat JSON massiv qaytar: [{"title": "...", "bullets": ["...", "..."], "notes": "..."}]"""
+
+
+def ai_slides(router: AiRouter, topic) -> list[dict[str, Any]]:
+    """Slide plan [{"kind","title","bullets","notes"}] written by the AI from the topic text.
+    Live 2026-10-24: the offline outline copied scanner typos («tu7ilishi») onto slides."""
+    msg = public(f"Mavzu: {topic.title} ({topic.book.label()}).\nDarslik matni:\n\n"
+                 f"{topic.text[:MAX_MATERIAL_CHARS]}")  # fmt: skip
+    r = router.complete("plan", public(SLIDES_SYSTEM), [{"role": "user", "content": msg}],
+                        max_tokens=6000, expected_out=1500)  # fmt: skip
+    data = _json_from(r.text)
+    slides = []
+    for s in data if isinstance(data, list) else []:
+        if not isinstance(s, dict):
+            continue
+        bullets = [str(b).strip() for b in s.get("bullets") or [] if str(b).strip()][:6]
+        if s.get("title") and bullets:
+            notes = str(s.get("notes") or "")[:3000]
+            title = str(s["title"]).strip()[:80]
+            slides.append({"kind": "bullets", "title": title, "bullets": bullets, "notes": notes})
+    if len(slides) < 3:
+        raise AiError("AI taqdimot rejasini bermadi")
+    return slides[:10]
+
+
+LESSON_SYSTEM = """Sen tajribali o‘qituvchisan va darslik mavzusidan 45 daqiqalik dars \
+ishlanmasini tuzasan. Darslik matni skanerdan olingan, harf xatolari bo‘lishi mumkin: \
+ma’nosini tushunib, to‘g‘ri o‘zbek lotin imlosida yoz. Faqat matndagi bilimga tayan.
+Faqat JSON obyekt qaytar:
+{"aims": {"Ta’limiy": "...", "Tarbiyaviy": "...", "Rivojlantiruvchi": "..."},
+ "teach": {"Tashkiliy qism": ["o‘qituvchi faoliyati", "o‘quvchi faoliyati"],
+           "Uy vazifasini so‘rash": [...], "Yangi mavzu bayoni": [...],
+           "Mustahkamlash": [...], "Baholash": [...], "Uyga vazifa": [...]},
+ "terms": [{"term": "...", "defn": "..."}],
+ "questions": [{"q": "...", "options": ["...", "...", "...", "..."], "answer": "A"}]}
+4–6 ta tushuncha va 5 ta savol bo‘lsin; har savolda faqat bitta to‘g‘ri javob, to‘g‘ri \
+javob o‘rni turlicha bo‘lsin."""
+
+
+def ai_lesson(router: AiRouter, topic) -> dict[str, Any]:
+    """Aims, the 45-minute flow, terms and questions written by the AI from the topic text.
+    Live 2026-10-24: the offline plan of «Ot» had 0 terms and 0 questions."""
+    msg = public(f"Mavzu: {topic.title} ({topic.book.label()}, {topic.pages_label}).\n"
+                 f"Darslik matni:\n\n{topic.text[:MAX_MATERIAL_CHARS]}")  # fmt: skip
+    r = router.complete("plan", public(LESSON_SYSTEM), [{"role": "user", "content": msg}],
+                        max_tokens=8000, expected_out=2000)  # fmt: skip
+    data = _json_from(r.text)
+    if not isinstance(data, dict):
+        raise AiError("AI dars ishlanmasini bermadi")
+    aims = {str(k): str(v) for k, v in (data.get("aims") or {}).items() if v}
+    teach = {str(k): (str(v[0]), str(v[1])) for k, v in (data.get("teach") or {}).items()
+             if isinstance(v, list | tuple) and len(v) >= 2}  # fmt: skip
+    terms = [(str(t.get("term", "")).strip(), str(t.get("defn", "")).strip())
+             for t in data.get("terms") or [] if isinstance(t, dict)]  # fmt: skip
+    questions = []
+    for q in data.get("questions") or []:
+        opts = [str(o).strip() for o in (q.get("options") or [])] if isinstance(q, dict) else []
+        ans = str(q.get("answer", "")).strip().upper()[:1] if isinstance(q, dict) else ""
+        if q and q.get("q") and len(opts) == 4 and ans in "ABCD" and ans:
+            questions.append((str(q["q"]).strip(), opts, ans))
+    if len(aims) < 3 or len(teach) < 4 or not questions:
+        raise AiError("AI dars ishlanmasi to‘liq emas")
+    return {"aims": aims, "teach": teach, "terms": [t for t in terms if all(t)],
+            "questions": questions}  # fmt: skip
 
 
 # ---------------- tests written by the AI ----------------
@@ -677,7 +774,9 @@ def make_ai_quizzes(router: AiRouter, req, approved: bool = False):
         ]
         if req.variants > 1:
             rng.shuffle(chosen)
-        qs = [_shuffled(q, rng) if v else q for q in chosen] + pics
+        # Every variant, A too: the AI tends to put the right answer first (live 2026-10-24:
+        # four answers out of five were «A»).
+        qs = [_shuffled(q, rng) for q in chosen] + pics
         note = ""
         if len(qs) < req.count:
             note = f"AI {len(pool)} ta savol berdi, {req.count} ta so‘ralgan edi."

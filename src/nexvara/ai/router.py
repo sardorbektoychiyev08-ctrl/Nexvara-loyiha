@@ -818,7 +818,9 @@ class AiRouter:
         return out
 
     def media_estimate(self, cap: str, units: float) -> Estimate:
-        p, row = self.candidates(cap)[0]
+        dead = getattr(self, "_media_dead", {}).get(cap, set())
+        cands = self.candidates(cap)
+        p, row = next(((p, r) for p, r in cands if p not in dead), cands[0])
         return Estimate(p, row["model"], cap, 0, 0, caps.cost(row, units), bool(row.get("free")))
 
     def media(
@@ -831,14 +833,26 @@ class AiRouter:
         purpose: str | None = None,
         confirm_always: bool = False,
         provider_override: str | None = None,
+        approved_up_to: float = 0.0,
     ):
         """Run a picture/speech call (`call(client, model)`) on the chosen model: budget and
-        «Ha» like text; in AUTO a busy provider falls back to the next candidate."""
+        «Ha» like text; in AUTO a busy provider falls back to the next candidate.
+        `approved_up_to`: a dearer fallback the user already said «Ha» to."""
         if not self.config().get("enabled"):
             raise AiUnavailable("AI o‘chirilgan (Sozlamalar → AI).")
         cands = self.candidates(cap, provider_override)
         last: AiError | None = None
-        for i, (p, row) in enumerate(cands):
+        # A provider whose account has no paid tier for this kind (Gemini «limit: 0») fails the
+        # same way for every model: skip the rest of its models instead of asking «Ha» for each
+        # dearer one (live 2026-10-24: three rising prices, all bound to fail).
+        if not hasattr(self, "_media_dead"):
+            self._media_dead: dict[str, set[str]] = {}
+        dead = self._media_dead.setdefault(cap, set())  # remembered for the next estimate
+        if dead and all(p in dead for p, _r in cands):
+            dead.clear()  # the account may have been upgraded: try again
+        for i, (p, row) in enumerate(c for c in cands if c[0] not in dead):
+            if p in dead:
+                continue
             est = Estimate(p, row["model"], cap, 0, 0, caps.cost(row, units), bool(row.get("free")))
             if i == 0:
                 self.check_budget(est, approved)
@@ -853,13 +867,15 @@ class AiRouter:
                     continue
                 if not approved and not self._cheap(est):
                     continue
-                if approved and est.cost > caps.cost(cands[0][1], units):
+                if approved and est.cost > max(caps.cost(cands[0][1], units), approved_up_to):
                     raise NeedsConfirmation(est)
             try:
                 out = call(self.media_factory(p, self.keys.load(p) or ""), row["model"])
             except AiError as e:
                 if not e.retryable or self.manual(cap) is not None:
                     raise
+                if "Free Tier" in str(e):
+                    dead.add(p)
                 last = e
                 continue
             self.ledger.record(p, row["model"], purpose or cap, 0, 0, est.cost)

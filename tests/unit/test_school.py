@@ -467,3 +467,13 @@ def test_route_morning_summary(env):
     assert m["weekday"] in ("Dushanba", "Seshanba", "Chorshanba", "Payshanba", "Juma", "Shanba",
                             "Yakshanba")  # fmt: skip
     assert call(srv, "GET", "/api/v1/morning")[0] == 401
+
+
+def test_results_file_name_has_no_colon(tmp_path, monkeypatch):
+    # Live 2026-10-24: «7-sinf Fizika (2017): 19-§…» made an NTFS stream, not an .xlsx.
+    from nexvara import omr
+
+    monkeypatch.setattr(omr, "folder", lambda: tmp_path)
+    s = {"id": "abc", "title": "7-sinf Fizika (2017): 19-§. Nyuton", "n": 5, "results": []}
+    out = omr.write_excel(s)
+    assert out.suffix == ".xlsx" and ":" not in out.name[2:] and out.is_file()

@@ -69,6 +69,8 @@ def run():
             "document.getElementById('page-bi').classList.contains('active') && "
             "document.getElementById('bi-msg').textContent.includes('Savdo')"
         )
+        res["bi_active"] = js("document.getElementById('page-bi').classList.contains('active')")
+        res["bi_msg"] = js("document.getElementById('bi-msg').textContent")
         res["summary"] = chat("«Savdo» dashboardi ko‘rsatkichlarini ayt", "2 ta qator")
         res["wf"] = chat(
             "«Ertalab» workflow yarat: oxirgi vazifalarni ko‘rsat. Har kuni soat 08:00 da",

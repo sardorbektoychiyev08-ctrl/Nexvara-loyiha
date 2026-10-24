@@ -126,7 +126,7 @@ def test_ai_planner_runs_tool_calls_in_order(env):
     api.router.save_key("anthropic", "sk-ant-test-1234567890")
     api.router.settings.update({"ai": {"enabled": True}})  # AI is switched on by the user
     arxiv = work / "Arxiv"
-    api.fake.replies = ['{"kind": "chat"}', "Salom!"]
+    api.fake.replies = ["Salom!"]
     api.chat("salom")  # an earlier turn the planner must see
     plan = {"kind": "tools", "say": "Excel fayllarni arxivlayman", "calls": [
         {"tool": "files.search", "args": {"folder": str(work), "ext": "xlsx"}},
@@ -135,9 +135,9 @@ def test_ai_planner_runs_tool_calls_in_order(env):
     ]}  # fmt: skip
     api.fake.replies = [json.dumps(plan)]
     r = api.chat("ish papkamdagi hamma excellarni arxivga olib qo‘y")
-    assert r["reply"].startswith("Tushundim: Excel fayllarni arxivlayman"), r
-    assert r["confirm"] and "to‘g‘rimi" in r["reply"] and not arxiv.exists()  # asks first
-    snap = done(api, api.confirm_ai(r["confirm"]))
+    assert r["reply"].startswith("Ketma-ket bajaraman"), r
+    assert "confirm" not in r  # safe copies/new archives run without a redundant «Ha»
+    snap = done(api, r)
     assert snap["status"] == "succeeded" and len(list(arxiv.glob("*.xlsx"))) == 3
     assert list(work.glob("Arxiv*.zip"))
     sent = api.fake.calls[-1]
@@ -163,7 +163,7 @@ def test_ai_planner_risky_and_unknown_tools(env):
     assert "Noma’lum amal" in api.chat("kompyuterimni tezlashtir")["reply"]
     api.fake.replies = ['{"kind": "command", "command": "Savdo.xlsx ni och va saqla"}']
     r = api.chat("menga savdo bo‘yicha yordam ber")  # the older one-command format still works
-    assert "Tushundim" in r["reply"] and r.get("task")
+    assert "Tushundim" not in r["reply"] and r.get("task")
 
 
 # ---------------- Memory ↔ Teach ↔ Office ----------------
@@ -207,7 +207,7 @@ def test_planner_gets_rules_and_facts(env):
         )
     ]
     r = api.chat("Har doim Excel raqamlarini markazga joyla")
-    r = api.confirm_ai(r["confirm"])
+    assert r.get("confirm") and "markazga" in r["reply"]  # saving a lasting rule still asks
     api.confirm_ai(r["confirm"])
     api.fake.calls.clear()
     api.fake.replies = ['{"kind": "chat"}', "Albatta!"]
@@ -260,6 +260,9 @@ def test_last_result_is_saved_under_a_new_name_and_named_with_spaces(env, tmp_pa
     api._ctx.result = str(made)
     assert api._bind_refs("1000006389 (2)_NEXVARA.xlsx ni och, shriftni Arial 12 qil") == (
         f"«{made}» ni och, shriftni Arial 12 qil")  # fmt: skip
+    other = tmp_path / "Boshqa" / made.name
+    explicit = f"{other} ni och, shriftni Arial 12 qil"
+    assert api._bind_refs(explicit) == explicit
     dest = tmp_path / "D"
     plan = {"kind": "tools", "calls": [{"tool": "files.save_as",
             "args": {"folder": str(dest), "name": "beton sinovi"}}]}  # fmt: skip

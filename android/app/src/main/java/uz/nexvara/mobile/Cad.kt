@@ -259,7 +259,10 @@ class CadState {
 
     fun toJson(): JSONObject {
         val ents = JSONArray()
-        fun o(type: String) = JSONObject().put("type", type).put("layer", "0")
+        // AutoCAD convention (live check 2026-10-24: everything sat on layer «0»): contour lines
+        // on KONTUR, text on MATN, dimensions on OLCHAM — the PC adds those layers' styles.
+        fun o(type: String) = JSONObject().put("type", type).put("layer",
+            when (type) { "text" -> "MATN"; "ldim" -> "OLCHAM"; else -> "KONTUR" })
         items.forEach { e ->
             val c = colorOf[e]
             ents.put(when (e) {

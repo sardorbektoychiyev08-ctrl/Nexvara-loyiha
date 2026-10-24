@@ -172,6 +172,13 @@ class WorkflowStore:
     def save(self, wf: Workflow) -> Workflow:
         wf.validate()
         now = time.time()
+        if wf.trigger.get("type") in ("daily", "weekly"):
+            # Saved after today's time: the first run is the next one, not «missed» at once
+            # (live 2026-10-24: made at 22:50 for 18:00, it ran right after the next start).
+            lt = time.localtime(now)
+            h, m = (int(x) for x in str(wf.trigger.get("time")).split(":"))
+            if (lt.tm_hour, lt.tm_min) >= (h, m):
+                wf.last_daily = time.strftime("%Y-%m-%d", lt)
         data = wf.to_dict()
         with self._lock, self._db() as db:
             if wf.id:

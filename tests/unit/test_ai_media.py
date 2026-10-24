@@ -601,3 +601,13 @@ def test_web_words_do_not_catch_office_work(tmp_path, monkeypatch):
     for text in ("Baholar.xlsx ni och", "word hujjat yarat", "rasm yarat: olma"):
         api.chat(text)
     assert not any(x[1] == "web" for x in r.log if len(x) > 2)
+
+
+def test_free_tier_provider_is_skipped_for_its_other_models(tmp_path):
+    # Live 2026-10-24: every Gemini image model failed with «limit: 0» and NEXVARA asked «Ha»
+    # three times for rising prices. One failure now skips that provider's other models.
+    r = make(tmp_path, KEYS, fallback=True)
+    r.fails["gemini"] = AiError("Gemini: bepul darajasida (Free Tier) ishlamaydi", retryable=True)
+    r.media("image", 1, lambda c, m: c.generate_image(m, "x"), approved=True, approved_up_to=9.0)
+    tried = [x[0] for x in r.log]
+    assert tried.count("gemini") <= 1 and tried[-1] == "openai"

@@ -4,6 +4,52 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-25 (57) — Claude Code — haqiqiy telefon orqali jonli to‘liq sinov
+
+**Egasi:** «telefon orqali hamma funksiyani jonli sina, pul ketsa ketsin; avval Codex ishini tekshir; chat savolga faqat javob bersin, ChatGPT kabi fikrlasin; Excel dashboard, AutoCAD chizma, NEXVARA BI».
+**Codex ishi (56) tekshirildi:** asosan to‘g‘ri; lekin «buyruqda javobni butunlay o‘chirish» 9 ta testni buzib, foydali ma’lumotni (fayl yo‘li, «Takrorlayman») yo‘qotardi — olib tashlandi.
+**Usul:** telefon (24115RA8EG) adb orqali boshqarildi; PC’da NEXVARA manba koddan fonda. Asosiy ilova qayta o‘rnatilgach biometrik qulf tufayli ochilmadi — shuning uchun debug nusxa `uz.nexvara.mobile.sinov` alohida o‘rnatilib, havola orqali ulandi (asosiy ilova va ma’lumotlari o‘zgarmadi).
+**Topilgan va tuzatilgan (jonli):**
+1. «salom»ga eski testlarni qayta yozardi; oxirida «Xohlasangiz…» takliflari; LaTeX — qisqa, faqat javob.
+2. Excel’ga yozish: jadval bitta «Matn» ustuniga tushardi (formulalar ishlamasdi) → tab/Markdown jadval ustunlarga, son/formula.
+3. Bo‘sh joyli yo‘l: AI rejasida, qo‘shtirnoqsiz yozilganda, tarjimada faqat oxirgi qism qidirilardi.
+4. Qayta ishga tushgach «oxirgi jadval» unutilardi → tarixdan tiklanadi.
+5. Test/taqdimot/mavzu: AI mavzu nomiga ko‘rsatma qo‘shib, mavzu topilmasdi yoki noto‘g‘ri bet olinardi; «tizimi»↔«SISTEMASI»; mundarija sahifasi olinardi.
+6. Test AI yoqiq bo‘lsa ham oflayn (kesilgan so‘zlar) tuzilardi; AI testida 4/5 javob «A» edi → har variantda aralashtiriladi.
+7. Taqdimot va dars ishlanmasi skaner xatolari bilan, 0 savol/0 tushuncha → AI bilan (oflayn zaxira).
+8. Chizma: AI qayta yozganda teshiklar yo‘qolardi; «markaziy teshik 30» Ø8 bo‘lardi; telefon eskizi «0» qatlamida.
+9. Excel dashboard yo‘q edi → yangi `excel.dashboard` (KPI, SUMIFS, 3 diagramma, qayta ochib tekshirish).
+10. BI: kichik ro‘yxatda diagramma yo‘q, bir oylik sanada bo‘sh grafik; telefon «0 ta panel».
+11. Workflow: asbob chaqiruvi matn bo‘lib saqlanardi; 22:50 da yaratilgan 18:00 jarayoni darhol ishlardi.
+12. Fondagi tekshiruv keyingi xabarni olib, dars ishlanmasini ikki marta tuzardi.
+13. Javob varaqasi natijasi «:» tufayli NTFS oqimiga yozilardi (Excel ochilmasdi).
+14. Sinf jurnali Excel’da ochiq bo‘lsa yangi baholar yozilmasdi.
+15. Word/Excel’da ochiq faylni qayta ochishda ko‘rinmas «Файл уже используется» oynasida vazifa qotardi → faqat o‘qish uchun.
+16. Bu PC’da PDF Word bilan ochiladi → chizma PDF’i Word’ni «PDF’ni o‘zgartirish» oynasida qotirardi → PNG ko‘rsatiladi.
+17. AI rasm: Gemini Free Tier «limit 0», har safar qimmatroq Gemini uchun «Ha»; oxirgisi tugmasiz → bepul darajadagi provayder o‘tkazib yuboriladi, tugmali tasdiq.
+18. Boshqa: «Hujjatlar» = Documents + D:\NEXVARA\Hujjatlar; «sarlavhani qalin qil»; rasmiy hujjat sanasi; o‘z-o‘zini tuzatish xabari qisqa; «o‘ng panel» iboralari; Android: bo‘limlar hisoblagichi, umumiy «O‘quvchi» maydoni, ruscha tarjimalar, «Ha, davom et» oxirgi buyruqlarda; unit test foydalanuvchi papkasiga ariza yozardi.
+**Telefon orqali PASS:** chat (salom, hisob, mantiqiy masala, davomli savol, tushuntirish), Excel jadval/formatlash/PDF/Excel dashboard, Word ariza/shrift/PDF, PowerPoint taqdimot, darslik testi (AI), mavzu, dars ishlanmasi, rasm→Excel, OCR, chizma (oflayn, AI val, tahrir, qo‘lda eskiz→DXF), BI dashboard (yaratish, telefonda ko‘rish), fayl qidirish/ZIP/yuklab olish, xotira (eslab qolish, eslash), o‘rgatish qoidasi, workflow (yaratish, ishga tushirish), shablon (tushuntirish xati), javob varaqasi (suratdan baholash), sinf jurnali, dars jadvali eslatmasi, kompyuter ekrani, AI balans, sozlamalar (mavzu, til), tarjima, AI rasm, «Ha/Yo‘q», 10 daqiqalik vaqt chegarasi.
+**NOT TESTED:** ovoz/mikrofon (telefon PC ovozini eshitmadi), Google (sozlanmagan), Wake-on-LAN (PC yoqiq), haqiqiy AutoCAD (o‘rnatilmagan). PC qulflangan edi — ekran sahifasida qulf ekrani ko‘rindi (to‘g‘ri).
+**Testlar:** `ruff` PASS; unit 591 PASS, 1 skip (yarim tundan keyingi vaqt testi); smoke PASS; Android debug + release build va unit PASS. Office testlari (`-Office`) — NOT TESTED (egasi ruxsati alohida).
+**Qolgan holat:** PC’da avvalgi sinovlardan Word/Excel oynalari ochiq; 2 ta Word jarayoni ko‘rinmas dialogda qotgan (21:08 dagi eski test va 23:32 dagi «fayl band» — ruxsat berilmagani uchun yopilmadi; Vazifa menejeridan yopish mumkin). Telefonda ikkinchi ilova `NEXVARA (sinov)` qoldi — keraksiz bo‘lsa o‘chirsa bo‘ladi.
+**Keyingi qadam:** egasi ruxsati bilan `test.ps1 -Office`, `main` ga merge va Windows 1.5.13 / Android 1.6.1 reliz.
+
+---
+
+## 2026-10-23 (56) — Codex — telefon chatini jonli sinash, tabiiy javob va Office barqarorligi
+
+**Davom ettirilgan ish:** `codex/office-ai-fixes` dagi commit qilinmagan tuzatishlar tekshirildi va yakunlandi. AI suhbatida salom bir marta tez modelga boradi; davomli suhbat ko‘rsatmasi kuchaytirildi; xavfsiz nusxa/yangi fayl amallari ortiqcha «Ha» so‘ramaydi, faqat xavfli amal tasdiq kutadi; maxfiylik soni javob matniga qo‘shilmaydi (ichki `privacy_masked` saqlanadi); dastur nomlari (`Excel`, `Microsoft PowerPoint` va boshqalar) to‘g‘ri normallashtiriladi. UI selftest vazifa sarlavhasi darslik mavzusiga almashsa ham yangi vazifani kuzatadi. PowerPoint Office 2016 uchun embedded workbook saqlab yopiladi va NEXVARA boshlagan jarayon chiqishi qisqa kutiladi.
+
+**Telefon:** Android chatda uzun javob yoki tasdiq kartasi kelganda ro‘yxatning haqiqiy oxiriga avtomatik siljiydi. Android debug/release build va unit test PASS; release APK 1.6.0 telefonga `adb install -r` bilan ma’lumotlarni saqlagan holda o‘rnatildi. Haqiqiy telefon (`24115RA8EG`) bilan biometrik ochish, PC serverga «Ulangan», balanslar, chatdan xabar yuborish, uzun tasdiq kartasida «Ha, davom et»/«Yo‘q» tugmalari ko‘rinishi va xavfsiz bekor qilish PASS.
+
+**Jonli chatdagi yangi topilma:** oddiy «2 plus 3» savolidagi son `detect_grade` tomonidan 2-sinf deb noto‘g‘ri olinib, kimyo/biologiya darsliklari aralashgan. Endi darslik qidiruvi faqat foydalanuvchi sinf, fan, darslik/kitob/manbani aniq aytganda ishlaydi; oddiy hisob faqat natijani, sodda fakt bitta jumlani qaytarishi promptda qat’iy yozildi. Maxfiylik texnik yozuvi yangi manba serverida jonli yo‘qoldi; «10 minus 4» darsliksiz toza javob berdi (so‘nggi «faqat natija» prompt kuchaytirilishi qayta jonli yuklanmadi).
+
+**Testlar:** `scripts/test.ps1` — 581 PASS, 98 Office skipped, smoke PASS; ruff check/format — PASS; dastlab yiqilgan yangi tasdiq xulqiga oid 3 test tuzatilib 3/3 PASS; oddiy savolda darslik aralashmasligi testi avval 3/3 va keyin alohida 1/1 PASS. Oxirgi prompt matni va import tuzatishidan so‘ng ruff PASS, lekin pytest qayta chaqiruvi avtomatik tizim-ruxsat limiti sabab **BLOCKED** (kod xatosi emas). Haqiqiy Office sinovi — **NOT TESTED**, egasining alohida ruxsati olinmadi.
+
+**Keyingi qadam:** pytest ruxsati tiklanganda `test.ps1`, egasi ruxsati bilan `test.ps1 -Office`; so‘ng Windows reliz raqamini oshirish/build va telefonda «faqat natija»ni yana bir marta jonli ko‘rish. Push/merge qilinmadi.
+
+---
+
 ## 2026-10-22 (55) — Claude Code — «saqlay olmayman deyapti», «o‘zi saqlasin»
 
 **Jonli (1.5.11):** rasm → Excel ishladi (`D:\NEXVARA\Telefondan\1000006389 (2)_NEXVARA.xlsx`, avtomatik saqlangan). Keyin: «chiroyli qilib ber» → buyruq «(2)_NEXVARA.xlsx» ni qidirdi (nomda bo‘sh joy va qavs) — topilmadi; «xali saqlamadingku» → AI «saqlanmagan» dedi; «beton sinovi deb d papkaga» → «saqlay olmayman, Ctrl+S bosing».

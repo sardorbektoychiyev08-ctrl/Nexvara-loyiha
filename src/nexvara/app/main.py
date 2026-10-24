@@ -355,14 +355,25 @@ def _click_and_watch(
     deadline = time.monotonic() + 30
     while js(f"document.getElementById('{button}').disabled") and time.monotonic() < deadline:
         time.sleep(0.3)
+    previous_title = js("document.getElementById('task-title').textContent") or ""
     js(f"document.getElementById('{button}').click()")
     status = ""
+    shown = previous_title
+    saw_new_task = False
     deadline = time.monotonic() + 300
     while time.monotonic() < deadline:
         time.sleep(0.5)
         status = js("document.getElementById('task-status').className") or ""
         shown = js("document.getElementById('task-title').textContent") or ""
-        if shown == title and any(s in status for s in ("succeeded", "failed", "cancelled")):
+        # Generated documents may use the matched textbook section as their real title,
+        # so it need not equal the request label above.  Watch for a new task instead;
+        # otherwise a successfully completed UI action can wait for the full five minutes.
+        saw_new_task = (
+            saw_new_task
+            or shown != previous_title
+            or any(s in status for s in ("pending", "running"))
+        )
+        if saw_new_task and any(s in status for s in ("succeeded", "failed", "cancelled")):
             break
     steps_ok = js("document.querySelectorAll('#task-steps li.succeeded').length")
     checks_ok = js("document.querySelectorAll('#task-result .check.ok').length")
@@ -370,7 +381,8 @@ def _click_and_watch(
     error = js("document.getElementById('task-error').textContent")
     ok = "succeeded" in status and steps_ok == steps and checks_ok == checks and checks_bad == 0
     print(
-        f"SELFTEST {'PASS' if ok else 'FAIL'} [{button}]: status={status!r} steps_ok={steps_ok} "
+        f"SELFTEST {'PASS' if ok else 'FAIL'} [{button}]: expected={title!r} shown={shown!r} "
+        f"status={status!r} steps_ok={steps_ok} "
         f"checks_ok={checks_ok} checks_bad={checks_bad} error={error!r}"
     )
     return ok

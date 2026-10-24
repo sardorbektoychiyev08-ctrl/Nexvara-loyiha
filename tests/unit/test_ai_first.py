@@ -46,11 +46,12 @@ def _api(tmp_path: Path, replies=(), error: Exception | None = None, enabled: bo
     )
     router.settings.update({"ai": {"enabled": enabled, "ai_first": True, "confirm_over_usd": 1.0}})
     api = Api(
+        output_dir=tmp_path,  # a fake ariza must not land in the real D:\NEXVARA\Hujjatlar
         overrides={
             "ai_router": router,
             "open_app": lambda app: f"{app} ochildi",
             "ocr": lambda _p, _lang: "Sana | Summa\n22.10.2026 | 1250",
-        }
+        },
     )
     return api, fake, router
 
@@ -114,20 +115,20 @@ def test_planner_is_first_and_selects_expected_tool(tmp_path, message, tool_name
     assert fake.calls[0]["messages"][0]["content"].rstrip().endswith(message)
     if tool_name == "photo.compare_table":
         assert out.get("confirm") and api._pending[out["confirm"]][0] == "compare_table"
-    elif tool_name in tools.CREATES_NEW:  # makes something new: runs without «Ha» for the plan
-        assert not (out.get("confirm") and api._pending[out["confirm"]][0] == "tools"), out
-    else:
+    elif tools.TOOLS[tool_name].risky:
         assert out.get("confirm")
         kind, calls = api._pending[out["confirm"]]
         assert kind == "tools" and calls[0].tool == tool_name
+    else:  # safe read/create/edit plans run directly; originals remain untouched
+        assert not (out.get("confirm") and api._pending[out["confirm"]][0] == "tools"), out
 
 
-def test_small_talk_also_goes_to_planner_first(tmp_path):
-    api, fake, _router = _api(tmp_path, ['{"kind":"chat"}', "Salom, ishlaringiz yaxshimi?"])
+def test_small_talk_skips_the_tool_planner(tmp_path):
+    api, fake, _router = _api(tmp_path, ["Salom, ishlaringiz yaxshimi?"])
     out = api.chat("salom")
     assert out["reply"].startswith("Salom")
-    assert len(fake.calls) == 2
-    assert "ASBOBLAR" in fake.calls[0]["system"]
+    assert len(fake.calls) == 1
+    assert "QANDAY GAPLASHISH" in fake.calls[0]["system"]
 
 
 def test_ai_disabled_keeps_old_handler_silently(tmp_path):
@@ -280,7 +281,7 @@ def test_made_document_is_checked_and_fixed(tmp_path):
     out = api.chat("1-noyabrdan ishdan bo‘shash haqida ariza yoz")
     assert out.get("task"), out
     replies = []
-    for _ in range(200):
+    for _ in range(600):  # a busy PC (full test run): up to 30 s, stops as soon as it is done
         replies += [e["reply"]["reply"] for e in api.ui_events() if e["kind"] == "nexvara_reply"]
         if any(r.startswith("✔ Tekshirdim") for r in replies):
             break

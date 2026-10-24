@@ -179,6 +179,19 @@ class FilesApi:
         name = "Excel" if app == "excel" else "Word"
         return self._runner.start(f"{name}’ga yozish", fn).snapshot()
 
+    def excel_user_dashboard(self, path: str) -> dict[str, Any]:
+        """«… dan Excelda dashboard yasa»: a new workbook with KPIs, summary and charts."""
+        fn = self._overrides.get("excel_user_dashboard")
+        if fn is None:
+            from nexvara.skills.excel.userdash import run_user_dashboard
+
+            keep = self._keep_open()
+
+            def fn(task: Any) -> dict[str, Any]:
+                return run_user_dashboard(task, path, keep_open=keep)
+
+        return self._runner.start(f"Excel dashboard: {Path(path).name}", fn).snapshot()
+
     def official_document(self, title: str, body: str, kimga: str = "", kimdan: str = "",
                           signer: str = "", date: str = "") -> dict[str, Any]:  # fmt: skip
         """An ariza / xat the AI wrote, in the official layout (doctemplates), DOCX + PDF."""
@@ -191,7 +204,8 @@ class FilesApi:
         except UserError as e:
             return {"error": str(e)}
         name = re.sub(r"[\\/:*?\"<>|]", " ", title.strip().capitalize())[:60].strip() or "Hujjat"
-        out = free_name(doctemplates.out_dir() / f"{name} {time.strftime('%Y%m%d-%H%M%S')}.docx")
+        folder = self._output_dir or doctemplates.out_dir()  # tests: never the user's D:\NEXVARA
+        out = free_name(folder / f"{name} {time.strftime('%Y%m%d-%H%M%S')}.docx")
         fake = self._overrides.get("doctemplate")
 
         def fn(task: Any) -> dict[str, Any]:
@@ -204,14 +218,27 @@ class FilesApi:
     def open_app(self, app: str) -> str:
         """«Excel’ni och»: start the program itself (an empty Excel/Word/PowerPoint window)."""
         from nexvara.agent.tools import ToolError
+        from nexvara.knowledge.textnorm import fold
 
         programs = {"excel": ("Excel", "excel.exe"), "word": ("Word", "winword.exe"),
                     "powerpoint": ("PowerPoint", "powerpnt.exe"),
                     "notepad": ("Bloknot", "notepad.exe"), "calc": ("Kalkulyator", "calc.exe"),
                     "paint": ("Paint", "mspaint.exe")}  # fmt: skip
-        if app not in programs:
+        aliases = {
+            "microsoft excel": "excel",
+            "ms excel": "excel",
+            "microsoft word": "word",
+            "ms word": "word",
+            "microsoft powerpoint": "powerpoint",
+            "power point": "powerpoint",
+            "bloknot": "notepad",
+            "kalkulyator": "calc",
+        }
+        key = fold(str(app)).strip()
+        key = aliases.get(key, key)
+        if key not in programs:
             raise ToolError(f"Bu dasturni ochishni bilmayman: {app}")
-        name, exe = programs[app]
+        name, exe = programs[key]
         fn = self._overrides.get("open_app") or os.startfile  # Windows finds it via App Paths
         try:
             fn(exe)

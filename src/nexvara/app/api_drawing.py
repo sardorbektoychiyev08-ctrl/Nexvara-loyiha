@@ -29,6 +29,14 @@ _DXF_VERBS = re.compile(
 )
 
 
+def _viewable(out: dict[str, Any]) -> str:
+    """The drawing's PDF, or its PNG when this PC opens PDFs with Word (Word then waits behind
+    an invisible «convert this PDF?» question — live 2026-10-24)."""
+    from nexvara.skills.common import pdf_opens_in_word
+
+    return out["png"] if out.get("png") and pdf_opens_in_word() else out["pdf"]
+
+
 class DrawingApi:
     _overrides: dict
     _history: Any
@@ -167,7 +175,7 @@ class DrawingApi:
         if show:
             with task.step("Kompyuter ekranida ochish"):
                 opener = self._overrides.get("open_file") or os.startfile
-                opener(out["pdf"])  # noqa: S606 - our own file
+                opener(_viewable(out))  # noqa: S606 - our own file
         report = [f"Chizma: {spec['title']}", f"{len(spec['shapes'])} ta element",
                   f"AutoCAD: {Path(out['dxf']).name} (DXF 2010, mm, qatlamlar bilan)"]  # fmt: skip
         return {"path": out["png"], "pdf": out["pdf"], "svg": out["svg"], "dxf": out["dxf"],
@@ -189,9 +197,8 @@ class DrawingApi:
 
         title = f"Chizma (AI’siz): {drawing_offline.describe(params)}"
         snap = self._runner.start(title, fn).snapshot()
-        return {"reply": f"Chizyapman (AI’siz, bepul): {drawing_offline.describe(params)}. "
-                "Tayyor bo‘lgach PDF ochiladi; AutoCAD uchun DXF fayl ham yoniga saqlanadi. "
-                "O‘zgartirish uchun: «oxirgi chizmani o‘zgartir: teshik 10 mm bo‘lsin».",
+        return {"reply": f"Chizyapman (AI’siz, bepul): {drawing_offline.describe(params)} "
+                "(PDF va AutoCAD DXF).",
                 "task": snap}  # fmt: skip
 
     def _run_drawing(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -220,7 +227,7 @@ class DrawingApi:
 
         title = "Chizma" + (" (rasmdan)" if image else "") + f": {text[:40]}"
         snap = self._runner.start(title, fn).snapshot()
-        return {"reply": "Chizyapman — jarayon vazifalar panelida. Tayyor bo‘lgach PDF kompyuter "
+        return {"reply": "Chizyapman. Tayyor bo‘lgach PDF kompyuter "
                 "ekranida ochiladi, PNG’ni telefonga olish mumkin.", "task": snap}  # fmt: skip
 
     # ----- an existing AutoCAD file -----
@@ -319,7 +326,7 @@ class DrawingApi:
             if show:
                 with task.step("Kompyuter ekranida ochish"):
                     opener = self._overrides.get("open_file") or os.startfile
-                    opener(out["docx" if word else "pdf"])  # noqa: S606 - our own file
+                    opener(out["docx"] if word else _viewable(out))  # noqa: S606 - our own file
             w, h = info["size"]
             report = [f"{path.name}: {info['entities']} ta obyekt, {len(info['layers'])} ta qatlam",
                       f"O‘lchami: {w:g} × {h:g} {info['units']}".strip()]  # fmt: skip

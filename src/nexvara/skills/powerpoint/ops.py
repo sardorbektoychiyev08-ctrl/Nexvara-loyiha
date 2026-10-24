@@ -9,11 +9,13 @@ Rules learned on Office 2016 (see AGENTS.md):
 
 from __future__ import annotations
 
+import time
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import win32gui
+import win32process
 
 from nexvara.skills.common import bring_to_front, validate_output_path
 from nexvara.skills.excel.table import col_letter, excel_color
@@ -59,6 +61,26 @@ class PowerPointSession(OfficeSession):
     def __init__(self, visible: bool = True, keep_open: bool = False) -> None:
         # PowerPoint cannot run hidden with charts; "visible=False" only skips focus-stealing.
         super().__init__(visible=visible, keep_open=keep_open)
+        self._process_id = 0
+
+    def _remember_process(self) -> None:
+        """Remember the single PowerPoint process after its first window exists."""
+        hwnd = win32gui.FindWindow("PPTFrameClass", None)
+        if hwnd:
+            self._process_id = int(win32process.GetWindowThreadProcessId(hwnd)[1])
+
+    def __exit__(self, *exc: object) -> None:
+        started_here = not self._preexisting
+        pid = self._process_id
+        super().__exit__(*exc)
+        # Quit() returns before Office 2016 has always removed its process. DispatchEx in a
+        # following task can then attach to that half-closed instance and hang on Open().
+        # Only wait for an instance that had no presentation before this session; never stop
+        # or otherwise disturb a user's pre-existing PowerPoint session.
+        if started_here and pid:
+            deadline = time.monotonic() + 5.0
+            while pid in win32process.EnumProcesses() and time.monotonic() < deadline:
+                time.sleep(0.05)
 
     def _collection(self) -> Any:
         return self.app.Presentations
@@ -78,13 +100,16 @@ class PowerPointSession(OfficeSession):
 
     def new_presentation(self) -> Any:
         pres = self.own(self.app.Presentations.Add(MSO_TRUE))
+        self._remember_process()
         pres.PageSetup.SlideWidth = SLIDE_W
         pres.PageSetup.SlideHeight = SLIDE_H
         return pres
 
     def open_presentation(self, path: str | Path) -> Any:
         # FileName, ReadOnly, Untitled, WithWindow
-        return self.own(self.app.Presentations.Open(str(Path(path).resolve()), 0, 0, MSO_TRUE))
+        pres = self.own(self.app.Presentations.Open(str(Path(path).resolve()), 0, 0, MSO_TRUE))
+        self._remember_process()
+        return pres
 
     def save_as(self, pres: Any, path: str | Path, overwrite: bool = False) -> Path:
         target = validate_output_path(path, (".pptx",), overwrite)
@@ -249,7 +274,10 @@ def add_chart_slide(
         chart.HasTitle = False
         del ws
     finally:
-        wb.Close()
+        # The embedded workbook is dirty. Office 2016 may otherwise wait for an invisible
+        # save prompt and hang the whole PowerPoint task. Keep this positional: named COM
+        # arguments are unreliable on localized Office installations.
+        wb.Close(True)
         del wb
     _brand_bar(slide)
     return slide

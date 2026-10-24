@@ -99,7 +99,9 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         notice = if (on) "Sevimlilarga qo‘shildi ★" else "Sevimlilardan olindi"
     }
     /** Commands this phone sent, newest first, without repeats. */
-    val recentCommands: List<String> get() = messages.filter { it.mine }.map { it.text }.asReversed().distinct().take(12)
+    // «Ha, davom et» / «Yo‘q» are answers to a question, not commands to repeat.
+    val recentCommands: List<String> get() = messages.filter { it.mine }.map { it.text }
+        .filter { it !in setOf("Ha, davom et", "Yo‘q", "Ha", "Yo'q") }.asReversed().distinct().take(12)
     var preview by mutableStateOf<android.graphics.Bitmap?>(null)
 
     // App lock: fingerprint/face or the phone's PIN before anything is shown (on by default
@@ -130,7 +132,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         screen = s
         if (s == Screen.PcScreen) startScreen()
         when (s) {
-            Screen.Home -> refreshAll()
+            Screen.Home, Screen.Sections -> refreshAll() // the grid shows live counts
             Screen.Tasks -> refreshTasks()
             Screen.Memory -> loadMemory()
             Screen.Teach -> loadTeach()

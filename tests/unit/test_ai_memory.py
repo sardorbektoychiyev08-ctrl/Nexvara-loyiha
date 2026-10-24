@@ -85,7 +85,7 @@ def test_ai_chat_gets_recent_and_month_old_conversation(env):
     mem.log_chat("user", "Mening maktabim 5-maktab, hisobotni har juma topshiraman")
     mem.log_chat("nexvara", "Yaxshi, eslab turaman.")
     _age(mem, 12)
-    api.fake.replies = ['{"kind": "chat"}', "Salom!"]
+    api.fake.replies = ["Salom!"]
     api.chat("salom")
     api.fake.replies = ['{"kind": "chat"}', "Juma kuni."]
     api.chat("hisobotni qachon topshiraman?")
@@ -213,17 +213,19 @@ def test_failed_office_task_is_repaired_in_the_background(env):
         ),
     ]
     r = api.chat(f"{work / 'Savdo.xlsx'} ni och, Narx bo‘yicha saralab saqla")
-    r = api.confirm_ai(r["confirm"])
+    assert "confirm" not in r  # Office executor saves a new copy; the original stays intact
     api._runner.get(r["task"]["id"]).wait(10)
-    for _ in range(300):  # the repair runs in the background: give a busy PC 15 s
+    for _ in range(600):  # the repair runs in the background: give a busy PC 30 s
         ev = [e for e in api.ui_events() if e["kind"] == "nexvara_reply"]
         if ev:
             break
         time.sleep(0.05)
     assert ev, "no repair reply"
     reply = ev[0]["reply"]
-    assert "Narx" in reply["reply"] and "🔧" in reply["reply"]
-    assert reply.get("confirm")  # the corrected command changes a file: «Ha» first
+    assert reply["reply"].startswith("🔧 Tuzatib bajardim")  # short: no technical error text
+    assert "confirm" not in reply and reply.get("task")
+    assert api._runner.get(reply["task"]["id"]).wait(10)
+    assert len(tries) == 2
     assert "Oldingi urinish bajarilmadi" in api.fake.calls[-1]["messages"][0]["content"]
 
 

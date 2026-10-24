@@ -560,6 +560,39 @@ def test_rows(text: str) -> list[list[str]] | None:
     return [["№", "Savol", "A", "B", "C", "D", "Javob"], *rows]
 
 
+_NUMBER = re.compile(r"^-?\d{1,3}(?:[  ]\d{3})+(?:[.,]\d+)?$|^-?\d+(?:[.,]\d+)?$")
+
+
+def _cell(v: str) -> Any:
+    v = v.strip().strip("*").strip()
+    if _NUMBER.match(v):
+        n = v.replace(" ", "").replace(" ", "").replace(",", ".")
+        return float(n) if "." in n else int(n)
+    return v
+
+
+def grid_rows(text: str) -> list[list[Any]] | None:
+    """A table in the text — tab-separated lines or a Markdown «| a | b |» table — as rows of
+    cells (numbers as numbers, «=B2*C2» stays a formula). Live 2026-10-24: an AI-written
+    sales table landed in one «Matn» column, so its formulas never worked."""
+    rows: list[list[Any]] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if "\t" in line:
+            cells = line.split("\t")
+        elif line.startswith("|") and line.count("|") >= 2:
+            cells = line.strip("|").split("|")
+            if all(re.fullmatch(r"\s*:?-{2,}:?\s*", c) for c in cells):
+                continue  # the |---|---| separator
+        else:
+            continue
+        rows.append([_cell(c) for c in cells])
+    if len(rows) < 2 or max(len(r) for r in rows) < 2:
+        return None
+    width = max(len(r) for r in rows)
+    return [r + [""] * (width - len(r)) for r in rows]
+
+
 def write_to_office(task: Any, text: str, app: str, title: str = "",
                     keep_open: bool = True) -> dict[str, Any]:  # fmt: skip
     """«Excel’ni ochib o‘sha yerga yoz»: the text (usually NEXVARA's last answer) into a new
@@ -577,7 +610,8 @@ def write_to_office(task: Any, text: str, app: str, title: str = "",
         from nexvara.skills.excel import ops as xl_ops
         from nexvara.skills.excel.bridge import ExcelSession
 
-        rows = table or [["Matn"], *[[x] for x in lines if x]]
+        grid = None if table else grid_rows(text)
+        rows = table or grid or [["Matn"], *[[x] for x in lines if x]]
         out = free_name(folder / f"{safe} {stamp}.xlsx")
         with ExcelSession(visible=True, keep_open=keep_open) as xl:
             with task.step("Excel’ga yozish") as s:
@@ -585,11 +619,14 @@ def write_to_office(task: Any, text: str, app: str, title: str = "",
                 ws = book.Worksheets(1)
                 rng = xl_ops.write_rows(ws, rows)
                 ws.Rows(1).Font.Bold = True
-                rng.WrapText = True
-                rng.VerticalAlignment = -4160  # xlTop
-                widths = [5, 60, 25, 25, 25, 25, 8] if table else [100]
-                for i, w in enumerate(widths, start=1):
-                    ws.Columns(i).ColumnWidth = w
+                if grid:
+                    rng.Columns.AutoFit()
+                else:
+                    rng.WrapText = True
+                    rng.VerticalAlignment = -4160  # xlTop
+                    widths = [5, 60, 25, 25, 25, 25, 8] if table else [100]
+                    for i, w in enumerate(widths, start=1):
+                        ws.Columns(i).ColumnWidth = w
                 s.detail = f"{len(rows) - 1} qator" + (" (test jadvali)" if table else "")
             with task.step("Saqlash") as s:
                 saved = xl.save_as(book, out)
@@ -603,10 +640,28 @@ def write_to_office(task: Any, text: str, app: str, title: str = "",
             with task.step("Word’ga yozish") as s:
                 doc = wd.new_document()
                 wd_ops.add_heading(doc, title, 1)
-                for line in lines:
-                    if line:
+                block: list[str] = []  # consecutive table lines → a real Word table
+
+                def flush() -> None:
+                    grid = grid_rows("\n".join(block))
+                    if grid:
+                        wd_ops.add_table(doc, [[str(c) for c in r] for r in grid])
+                    else:
+                        for b in block:
+                            wd_ops.add_paragraph(doc, _clean_line(b))
+                    block.clear()
+
+                for raw in text.splitlines():
+                    if "\t" in raw or raw.strip().startswith("|"):
+                        block.append(raw)
+                        continue
+                    if block:
+                        flush()
+                    if line := _clean_line(raw):
                         wd_ops.add_paragraph(doc, line)
-                s.detail = f"{sum(1 for x in lines if x)} xatboshi"
+                if block:
+                    flush()
+                s.detail = f"{sum(1 for x in lines if x)} qator"
             with task.step("Saqlash") as s:
                 saved = wd.save_as(doc, out)
                 s.detail = saved.name

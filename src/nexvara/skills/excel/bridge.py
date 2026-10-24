@@ -88,7 +88,12 @@ class ExcelSession:
         return self.app.Workbooks.Add()
 
     def open_workbook(self, path: str | Path) -> Any:
-        return self.app.Workbooks.Open(str(Path(path).resolve()))
+        from nexvara.skills.common import file_in_use
+
+        p = Path(path).resolve()
+        if file_in_use(p):  # open in another Excel: read-only instead of a hidden question
+            return self.app.Workbooks.Open(str(p), 0, True)  # FileName, UpdateLinks, ReadOnly
+        return self.app.Workbooks.Open(str(p))
 
     def save_as(self, wb: Any, path: str | Path, overwrite: bool = False) -> Path:
         target = validate_save_path(path, overwrite=overwrite)

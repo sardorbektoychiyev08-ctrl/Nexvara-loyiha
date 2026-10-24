@@ -60,6 +60,14 @@ def profile(t: Table) -> dict[str, Any]:
         if 2 <= len(distinct) <= 60 and len(distinct) < max(3, len(t.rows) * 0.9):
             cats.append((len(distinct), c))
     cats = [c for _n, c in sorted(cats)]
+    if not cats:
+        # A short list where every name is different (5 products, 30 pupils) still reads best
+        # as a bar per name (live 2026-10-24: only a scatter of two numbers was made).
+        for c in t.columns:
+            distinct = {v for v in t.values(c) if v is not None}
+            if t.types.get(c) == "text" and 2 <= len(distinct) <= 60:
+                cats.append(c)
+                break
     return {"numbers": nums, "dates": dates, "categories": cats}
 
 
@@ -75,6 +83,8 @@ def auto_dashboard(
     if rev and exp and rev != exp:
         steps.append({"op": "calc", "name": "Sof foyda", "expr": f"[{rev}] - [{exp}]"})
         measures = [rev, exp, "Sof foyda"] + [m for m in measures if m not in (rev, exp)]
+    elif total := _find(measures, ("jami", "summa", "total", "itogo", "umumiy")):
+        measures = [total] + [m for m in measures if m != total]  # the amount, not «Soni»
     main = measures[0] if measures else None
     date = p["dates"][0] if p["dates"] else None
     cat = p["categories"][0] if p["categories"] else None
@@ -87,6 +97,7 @@ def auto_dashboard(
         return f"w{n}"
 
     overview: list[dict[str, Any]] = []
+    by_day = False
     for m in measures[:3]:
         overview.append({"id": wid(), "type": "kpi", "title": f"{m} ({AGG_LABELS['sum']})",
                          "y": m, "agg": "sum", "growth": bool(date), "x": date})  # fmt: skip
@@ -95,8 +106,14 @@ def auto_dashboard(
                          "agg": "margin", "base": rev})  # fmt: skip
     overview.append({"id": wid(), "type": "kpi", "title": "Qatorlar soni", "agg": "count"})
     if date and main:
-        overview.append({"id": wid(), "type": "line", "title": "Oylar bo‘yicha", "x": date,
-                         "y": measures[:3], "agg": "sum", "period": "month"})  # fmt: skip
+        # All dates in one month: a month line is a single point (live 2026-10-24: an empty
+        # chart on the phone) — show the days instead.
+        months = {(d.year, d.month) for d in t.values(date) if hasattr(d, "month")}
+        by_day = len(months) <= 1
+        overview.append({"id": wid(), "type": "line",
+                         "title": "Kunlar bo‘yicha" if by_day else "Oylar bo‘yicha", "x": date,
+                         "y": measures[:3], "agg": "sum",
+                         "period": "day" if by_day else "month"})  # fmt: skip
     if cat and main:
         overview.append({"id": wid(), "type": "bar", "title": f"{cat} bo‘yicha {main}", "x": cat,
                          "y": main, "agg": "sum", "top": 12})  # fmt: skip
@@ -112,7 +129,7 @@ def auto_dashboard(
     if cat2 and main:
         details.append({"id": wid(), "type": "bar", "title": f"{cat2} bo‘yicha {main}", "x": cat2,
                         "y": main, "agg": "sum", "top": 15})  # fmt: skip
-    if date and main and not (rev and exp):
+    if date and main and not (rev and exp) and not by_day:  # by_day: already on «Umumiy»
         details.append({"id": wid(), "type": "line", "title": "Kunlar bo‘yicha", "x": date,
                         "y": [main], "agg": "sum", "period": "day"})  # fmt: skip
     details.append({"id": wid(), "type": "table", "title": "Barcha ma’lumotlar"})

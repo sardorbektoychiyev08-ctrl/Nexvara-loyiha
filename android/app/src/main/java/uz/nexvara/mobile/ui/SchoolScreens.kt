@@ -54,7 +54,6 @@ fun AnswerSheetsScreen(m: AppModel, act: PhoneActions) {
     var variants by rememberSaveable { mutableStateOf(1) }
     var key by rememberSaveable { mutableStateOf("") }
     var copies by rememberSaveable { mutableStateOf("30") }
-    var student by rememberSaveable { mutableStateOf("") }
     var keyFor by remember { mutableStateOf<OmrSet?>(null) }
     Screen(m, "Javob varaqalari", "Chop eting → o‘quvchilar bo‘yaydi → suratga oling → baho tayyor",
         actions = { IconButton(onClick = { m.loadOmr() }) { Icon(Icons.Default.Refresh, "Yangilash") } }) {
@@ -104,6 +103,8 @@ fun AnswerSheetsScreen(m: AppModel, act: PhoneActions) {
         }
         if (t.omrSets.isNotEmpty()) item { SectionTitle("Varaqalar") }
         items(t.omrSets, key = { it.id }) { s ->
+            // Each sheet has its own pupil name (live 2026-10-24: one field was shared by all).
+            var student by remember(s.id) { mutableStateOf("") }
             Panel {
                 Text(s.title, style = MaterialTheme.typography.titleSmall)
                 Text("${s.questions} savol · ${s.variants} variant · ${s.results.size} ta tekshirildi" +
@@ -119,7 +120,7 @@ fun AnswerSheetsScreen(m: AppModel, act: PhoneActions) {
                     TextButton(onClick = { keyFor = s }) { Text("Kalit") }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { val who = student; m.onUploaded = { p -> m.gradeSheet(s, p, who) }; act.pickImage() },
+                    TextButton(onClick = { val who = student; m.onUploaded = { p -> m.gradeSheet(s, p, who) }; act.pickImage(); student = "" },
                         enabled = s.keys.isNotEmpty()) { Text("Galereyadan") }
                     TextButton(onClick = { m.previewFile(s.pdf) }) { Text("Varaqani ko‘rish") }
                     IconButton(onClick = { act.saveResult(s.pdf) }) { Icon(Icons.Default.Download, "Telefonga yuklab olish") }
