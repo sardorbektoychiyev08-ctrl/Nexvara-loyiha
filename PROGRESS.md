@@ -4,6 +4,17 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-25 (58) — Claude Code — Office sinovi, `main` ga merge, 1.5.13 yig‘ildi
+
+**Egasi:** «kelgan joyingdan davom et», «meni aralashtirma, o‘zing qil».
+**Testlar:** `scripts/test.ps1` — 592 PASS, 98 skip, smoke PASS; `scripts/test.ps1 -Office` — **690 PASS, 0 FAIL**, smoke PASS, ruff PASS.
+**Git:** `codex/office-ai-fixes` → `main` (`--no-ff`), versiya 1.5.13. Push qilinmadi.
+**Reliz:** `build.ps1 -Publish dist\yangilanish-1.5.13` — `NEXVARA-Setup-1.5.13.exe` (64873834 bayt, SHA-256 `cfeb4f2a66186fd3540533e7a2261c1534839b5a95451c1e8e723b314d0a3b5a`), imzolangan `latest.json`; papkaga `NEXVARA-1.6.1.apk` (release, 00:38 dagi build — undan keyin `android/` o‘zgarmagan) qo‘shildi. GitHub’ga yuklash (`publish_github.py`) — **BLOCKED**: avtomatik ruxsat tizimi «ommaviy joyga chiqarish»ni to‘xtatdi; egasi ruxsat bersa bitta buyruq: `.venv\Scripts\python.exe scripts\publish_github.py dist\yangilanish-1.5.13 v1.5.13 "..."`, so‘ng `git push origin main`.
+**Kompyuterda qolgan:** jonli sinovdan NEXVARA yaratgan Word/Excel oynalari ochiq (tegilmadi).
+**Keyingi qadam:** ruxsat bilan GitHub reliz + internetdan 1.5.12 → 1.5.13 tekshiruvi, `main` push.
+
+---
+
 ## 2026-10-25 (57) — Claude Code — haqiqiy telefon orqali jonli to‘liq sinov
 
 **Egasi:** «telefon orqali hamma funksiyani jonli sina, pul ketsa ketsin; avval Codex ishini tekshir; chat savolga faqat javob bersin, ChatGPT kabi fikrlasin; Excel dashboard, AutoCAD chizma, NEXVARA BI».
