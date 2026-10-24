@@ -198,6 +198,9 @@ class Api(
             mem.log_chat("user", text)
         self._ctx.add_turn("user", text)
         self._repair_origin = [text, 0]  # a new message: its failures may be repaired again
+        # This thread's own words for the tools (agent.tools._own_text). A background check of
+        # an earlier task runs in another thread and must not pick up this newer message.
+        self._local.own_text = text
         forget = self._chat_forget(text)
         out = forget if forget is not None else self._chat_inner(text)
         if out.get("error") and not out.get("confirm") and self._self_repair_on():
@@ -617,7 +620,7 @@ class Api(
         snap = self.make_test({**payload, "approved": True})
         if "id" not in snap:
             return {"reply": snap.get("error") or "Test boshlanmadi"}
-        return {"reply": "AI test tuzmoqda — jarayon o‘ng panelda.", "task": snap}
+        return {"reply": "AI test tuzmoqda.", "task": snap}
 
     def ai_status(self) -> dict[str, Any]:
         return self._router().status()
@@ -891,14 +894,29 @@ class Api(
         else:
             from nexvara.knowledge.lessonplan import run_lesson
 
+            lesson, outline = self._ai_school_writers()
+
             def fn(task: Any) -> dict[str, Any]:
-                return run_lesson(task, req, self._output_dir, keep_open=self._keep_open())
+                return run_lesson(task, req, self._output_dir, keep_open=self._keep_open(),
+                                  ai_lesson=lesson, ai_outline=outline)  # fmt: skip
 
         snap = self._runner.start(f"Dars ishlanmasi: {topic.title}", fn).snapshot()
         return {"reply": f"{topic.book.label()}, {topic.pages_label}: «{topic.title}» bo‘yicha "
                 "dars ishlanmasini (maqsadlar, 45 daqiqalik dars borishi, tushunchalar, "
                 "mustahkamlash savollari, uyga vazifa) Word’da va dars taqdimotini PowerPoint’da "
                 "tayyorlayapman.", "task": snap}  # fmt: skip
+
+    def _ai_school_writers(self) -> tuple[Any, Any]:
+        """(lesson plan, slide outline) writers when «Avval AI» is on and AI works, else
+        (None, None): the documents are then made offline from the textbook text."""
+        if getattr(self._local, "ai_fallback", False) or not self._ai_first_on():
+            return None, None
+        if not self._ai_ready():
+            return None, None
+        from nexvara.ai import features
+
+        router = self._router()
+        return (lambda t: features.ai_lesson(router, t)), (lambda t: features.ai_slides(router, t))
 
     def _chat_presentation(self, req: Any) -> dict[str, Any]:
         from nexvara.knowledge.topicdoc import lookup
@@ -914,15 +932,7 @@ class Api(
         else:
             from nexvara.agent.ppt_exec import default_presentation_path, run_topic_presentation
 
-            outline = None
-            if self._ai_first_on() and not getattr(self._local, "ai_fallback", False):
-                if self._ai_ready():
-                    from nexvara.ai import features
-
-                    router = self._router()
-
-                    def outline(t: Any) -> list[dict[str, Any]]:
-                        return features.ai_slides(router, t)
+            _lesson, outline = self._ai_school_writers()
 
             def fn(task: Any) -> dict[str, Any]:
                 out = None

@@ -218,7 +218,7 @@ class DrawingApi:
 
         title = "Chizma" + (" (rasmdan)" if image else "") + f": {text[:40]}"
         snap = self._runner.start(title, fn).snapshot()
-        return {"reply": "Chizyapman — jarayon vazifalar panelida. Tayyor bo‘lgach PDF kompyuter "
+        return {"reply": "Chizyapman. Tayyor bo‘lgach PDF kompyuter "
                 "ekranida ochiladi, PNG’ni telefonga olish mumkin.", "task": snap}  # fmt: skip
 
     # ----- an existing AutoCAD file -----

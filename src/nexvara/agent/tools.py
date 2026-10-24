@@ -9,6 +9,7 @@ after the user's "Ha".
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -65,9 +66,10 @@ CREATES_NEW = frozenset({
 
 # Documents an AI plan made: when the task is done the AI reads the file back and checks it
 # against the request («bajar → tekshir → tuzat», ai/verify.py).
+# Not education.topic: it is the textbook's own text (scanner typos included), nothing to fix.
 VERIFIED = frozenset({
     "office.write", "document.official", "photo.to_office", "education.test",
-    "education.lesson", "education.presentation", "education.topic", "report.weekly",
+    "education.lesson", "education.presentation", "report.weekly",
 })  # fmt: skip
 
 
@@ -453,7 +455,7 @@ def files_pdf(api, a):
     snap = api.files_to_pdf(paths)
     if "id" not in snap:
         raise ToolError(snap.get("error", "Boshlanmadi"))
-    return {"reply": f"{len(paths)} ta fayl PDF qilinmoqda — jarayon o‘ng panelda.", "task": snap}
+    return {"reply": f"{len(paths)} ta fayl PDF qilinmoqda.", "task": snap}
 
 
 @tool("excel.combine", "Excel fayllarini bitta kitobga yig‘ish (har biri varaq)",
@@ -1126,14 +1128,23 @@ def wf_list(api, a):
 
 
 @tool("workflow.create", "Workflow yaratish", name=("string", True, "nomi"),
-      steps=("array", True, "buyruqlar ketma-ketligi (oddiy o‘zbekcha)"),
+      steps=("array", True, "buyruqlar ketma-ketligi: har biri oddiy o‘zbekcha buyruq MATNI "
+                            "(asbob chaqiruvi emas), masalan «D:\\Ish papkasidagi barcha xlsx "
+                            "fayllarni PDF qil»"),
       time=("string", False, "har kuni SS:DD da"), folder=("string", False, "kuzatiladigan papka"),
       retries=("integer", False, "qayta urinish 0–5"),
       on_error=("string", False, "stop yoki continue"))  # fmt: skip
 def wf_create(api, a):
     steps = []
     for s in a["steps"]:
+        s = s if isinstance(s, str) else json.dumps(s, ensure_ascii=False)
         s = s.strip()
+        if s.startswith("{") and "tool" in s:
+            # Live 2026-10-24: the planner gave tool calls; saved as text they would fail at
+            # 18:00. The error goes back to the planner (self-repair), which rewrites them.
+            raise ToolError("Workflow qadamlari asbob chaqiruvi emas, ilova tushunadigan oddiy "
+                            "o‘zbekcha buyruq matni bo‘lsin, masalan «D:\\NEXVARA\\Telefondan "
+                            "papkasidagi barcha xlsx fayllarni PDF qil»")  # fmt: skip
         m = re.fullmatch(r"(\d+)\s*(soniya|sekund|daqiqa|minut)\w*\s+kut\w*", fold(s))
         if m:
             sec = int(m.group(1)) * (60 if m.group(2) in ("daqiqa", "minut") else 1)
@@ -1178,7 +1189,7 @@ def wf_run(api, a):
     r = api.wf_run(wf.id, file if wf.trigger.get("type") == "folder" else "")
     if not r.get("ok"):
         raise ToolError(r["error"])
-    return {"reply": f"«{wf.name}» workflowi boshlandi — jarayon o‘ng panelda.", "task": r["task"]}
+    return {"reply": f"«{wf.name}» workflowi boshlandi.", "task": r["task"]}
 
 
 @tool("workflow.pause", "Workflowni pauza qilish", name=("string", False, "nomi"))
@@ -1405,12 +1416,18 @@ def drawing_create(api, a):
     # The user's own words when they already describe the part or a change: the planner's
     # rewrite lost both hole sizes of «… markazida diametri 20 mm teshik, burchaklarida 4 ta
     # 8 mm teshik», and «markaziy teshik 30 mm bo‘lsin» became Ø8 (live 2026-10-24).
-    own = str((getattr(api, "_repair_origin", None) or [""])[0] or "")
+    own = _own_text(api)
     try:
         mine = own and (drawing.is_edit_request(own) or drawing_offline.parse(own))
     except ValueError:
         mine = None
     return _handled(api._chat_drawing(own if mine else a["request"]), "Chizma")
+
+
+def _own_text(api) -> str:
+    """The user's message of this chat turn; "" in a background check of an older task (live
+    2026-10-24: such a repair picked up the next message and made a lesson plan twice)."""
+    return str(getattr(getattr(api, "_local", None), "own_text", "") or "")
 
 
 def _edu(api, a, parser: str) -> str:
@@ -1419,7 +1436,7 @@ def _edu(api, a, parser: str) -> str:
     which then matches the wrong textbook page."""
     from nexvara.knowledge import lessonplan, service
 
-    own = str((getattr(api, "_repair_origin", None) or [""])[0] or "")
+    own = _own_text(api)
     fn = getattr(lessonplan if parser == "parse_lesson_request" else service, parser)
     try:
         req = fn(own) if own else None

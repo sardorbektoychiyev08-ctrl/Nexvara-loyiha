@@ -573,6 +573,47 @@ def ai_slides(router: AiRouter, topic) -> list[dict[str, Any]]:
     return slides[:10]
 
 
+LESSON_SYSTEM = """Sen tajribali o‘qituvchisan va darslik mavzusidan 45 daqiqalik dars \
+ishlanmasini tuzasan. Darslik matni skanerdan olingan, harf xatolari bo‘lishi mumkin: \
+ma’nosini tushunib, to‘g‘ri o‘zbek lotin imlosida yoz. Faqat matndagi bilimga tayan.
+Faqat JSON obyekt qaytar:
+{"aims": {"Ta’limiy": "...", "Tarbiyaviy": "...", "Rivojlantiruvchi": "..."},
+ "teach": {"Tashkiliy qism": ["o‘qituvchi faoliyati", "o‘quvchi faoliyati"],
+           "Uy vazifasini so‘rash": [...], "Yangi mavzu bayoni": [...],
+           "Mustahkamlash": [...], "Baholash": [...], "Uyga vazifa": [...]},
+ "terms": [{"term": "...", "defn": "..."}],
+ "questions": [{"q": "...", "options": ["...", "...", "...", "..."], "answer": "A"}]}
+4–6 ta tushuncha va 5 ta savol bo‘lsin; har savolda faqat bitta to‘g‘ri javob, to‘g‘ri \
+javob o‘rni turlicha bo‘lsin."""
+
+
+def ai_lesson(router: AiRouter, topic) -> dict[str, Any]:
+    """Aims, the 45-minute flow, terms and questions written by the AI from the topic text.
+    Live 2026-10-24: the offline plan of «Ot» had 0 terms and 0 questions."""
+    msg = public(f"Mavzu: {topic.title} ({topic.book.label()}, {topic.pages_label}).\n"
+                 f"Darslik matni:\n\n{topic.text[:MAX_MATERIAL_CHARS]}")  # fmt: skip
+    r = router.complete("plan", public(LESSON_SYSTEM), [{"role": "user", "content": msg}],
+                        max_tokens=8000, expected_out=2000)  # fmt: skip
+    data = _json_from(r.text)
+    if not isinstance(data, dict):
+        raise AiError("AI dars ishlanmasini bermadi")
+    aims = {str(k): str(v) for k, v in (data.get("aims") or {}).items() if v}
+    teach = {str(k): (str(v[0]), str(v[1])) for k, v in (data.get("teach") or {}).items()
+             if isinstance(v, list | tuple) and len(v) >= 2}  # fmt: skip
+    terms = [(str(t.get("term", "")).strip(), str(t.get("defn", "")).strip())
+             for t in data.get("terms") or [] if isinstance(t, dict)]  # fmt: skip
+    questions = []
+    for q in data.get("questions") or []:
+        opts = [str(o).strip() for o in (q.get("options") or [])] if isinstance(q, dict) else []
+        ans = str(q.get("answer", "")).strip().upper()[:1] if isinstance(q, dict) else ""
+        if q and q.get("q") and len(opts) == 4 and ans in "ABCD" and ans:
+            questions.append((str(q["q"]).strip(), opts, ans))
+    if len(aims) < 3 or len(teach) < 4 or not questions:
+        raise AiError("AI dars ishlanmasi to‘liq emas")
+    return {"aims": aims, "teach": teach, "terms": [t for t in terms if all(t)],
+            "questions": questions}  # fmt: skip
+
+
 # ---------------- tests written by the AI ----------------
 
 TEST_SYSTEM = """Sen o‘qituvchiga darslikdan test loyihasini tayyorlashda yordam berasan.

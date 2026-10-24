@@ -198,3 +198,21 @@ def test_api(tmp_path):
     assert api.wf_list()[0]["last_run"]["status"] == "succeeded"
     assert api.wf_delete(r["id"]) == []
     assert Api().wf_list() == []  # plain tests never touch the user's workflows
+
+
+def test_daily_workflow_saved_after_its_time_waits_for_tomorrow(tmp_path):
+    # Live 2026-10-24: made at 22:50 «har kuni 18:00», it ran at once on the next start.
+    store = WorkflowStore(tmp_path / "app.db")
+    past = time.strftime("%H:%M", time.localtime(time.time() - 3600))
+    if past > time.strftime("%H:%M"):
+        pytest.skip("just after midnight")
+    wf = store.save(
+        Workflow.from_dict(
+            {
+                "name": "Kech",
+                "trigger": {"type": "daily", "time": past},
+                "steps": [{"kind": "command", "text": "salom"}],
+            }
+        )
+    )
+    assert store.get(wf.id).last_daily == time.strftime("%Y-%m-%d")

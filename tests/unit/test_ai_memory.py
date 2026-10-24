@@ -222,7 +222,7 @@ def test_failed_office_task_is_repaired_in_the_background(env):
         time.sleep(0.05)
     assert ev, "no repair reply"
     reply = ev[0]["reply"]
-    assert "Narx" in reply["reply"] and "🔧" in reply["reply"]
+    assert reply["reply"].startswith("🔧 Tuzatib bajardim")  # short: no technical error text
     assert "confirm" not in reply and reply.get("task")
     assert api._runner.get(reply["task"]["id"]).wait(10)
     assert len(tries) == 2

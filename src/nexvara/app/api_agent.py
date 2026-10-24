@@ -384,9 +384,9 @@ class AgentApi:
                 return None
             calls = [agent_tools.ToolCall(str(c["tool"]), dict(c.get("args") or {}))
                      for c in p.calls]  # fmt: skip
-            intro = (f"🔧 Birinchi urinish bajarilmadi: {error[:300]}\n"
-                     f"AI xatoni o‘qib, tuzatilgan rejani tuzdi ({attempt}-urinish)"
-                     + (f": {p.say}" if p.say else "") + "\n\n")  # fmt: skip
+            # One short line: the user asked for answers without technical commentary (the
+            # error itself stays in the task log).
+            intro = "🔧 Tuzatib bajardim.\n\n"
             out = self._run_calls(calls, intro=intro, from_ai=True)
             if not out.get("error"):
                 out["repaired"] = attempt

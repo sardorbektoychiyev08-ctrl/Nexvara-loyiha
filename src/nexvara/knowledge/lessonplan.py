@@ -139,14 +139,31 @@ def run_lesson(
     visible: bool = True,
     keep_open: bool = True,
     pause: float = 0.3,
+    ai_lesson: Any = None,
+    ai_outline: Any = None,
 ) -> dict[str, Any]:
+    """`ai_lesson(topic)` (features.ai_lesson) fills the plan; on any failure the offline
+    content from the textbook is used. `ai_outline` is passed on to the slides."""
+    from types import SimpleNamespace as NS
+
     from nexvara.skills.word import ops
     from nexvara.skills.word.ops import WordSession
 
     with task.step("Darslikdan mavzuni topish") as s:
         topic = lookup(req)
         data = lesson_content(topic)
-        s.detail = f"{topic.book.label()} · {topic.title} · {topic.pages_label}"
+        by = ""
+        if ai_lesson is not None:
+            try:
+                ai = ai_lesson(topic)
+                data["aims"], data["teach"] = ai["aims"], {**data["teach"], **ai["teach"]}
+                data["defs"] = [NS(term=t, defn=d, page=topic.start_page) for t, d in ai["terms"]]
+                data["facts"] = []
+                data["quiz"] = [NS(text=q, options=o, answer=a) for q, o, a in ai["questions"]]
+                by = "AI · "
+            except Exception:  # noqa: BLE001 — the offline plan below still works
+                pass
+        s.detail = f"{by}{topic.book.label()} · {topic.title} · {topic.pages_label}"
     out = default_path(topic)
     if out_dir is not None:
         out = Path(out_dir) / out.name
@@ -234,8 +251,9 @@ def run_lesson(
 
         deck = out.with_name(out.stem.replace("_", " ")[:60].replace(" ", "_") + "_taqdimot.pptx")
         res = run_topic_presentation(
-            task, req, deck, visible=visible, keep_open=keep_open, pause=pause
-        )
+            task, req, deck, visible=visible, keep_open=keep_open, pause=pause,
+            ai_outline=ai_outline,
+        )  # fmt: skip
         result["slides"] = res["path"]
         result["checks"] += res.get("checks", [])
     result["report"] = [f"Dars ishlanmasi: {out.name}"] + (

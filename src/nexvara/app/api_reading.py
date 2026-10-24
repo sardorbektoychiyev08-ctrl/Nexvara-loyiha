@@ -167,7 +167,7 @@ class ReadingApi:
                 snap = self._runner.start("Rasm → Excel", work).snapshot()
                 return {
                     "reply": f"📊 Rasmdagi jadvalni Excel’ga o‘tkazyapman ({how}) — Excel "
-                    "kompyuter ekranida ochiladi. Jarayon o‘ng panelda.",
+                    "kompyuter ekranida ochiladi.",
                     "task": snap,
                 }
             try:
@@ -194,8 +194,7 @@ class ReadingApi:
             return res
 
         snap = self._runner.start("Rasm → Word", work).snapshot()
-        return {"reply": f"📄 Rasmdagi matnni ({how}) Word hujjatga yozyapman — jarayon o‘ng "
-                "panelda.", "task": snap}  # fmt: skip
+        return {"reply": f"📄 Rasmdagi matnni ({how}) Word hujjatga yozyapman.", "task": snap}
 
     def _ask_read_ai(self, cur: str, to: str = "", request: str = "") -> dict[str, Any]:
         if not self._ai_ready():
