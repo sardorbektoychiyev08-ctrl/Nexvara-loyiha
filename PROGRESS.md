@@ -9,9 +9,9 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 **Egasi:** «kelgan joyingdan davom et», «meni aralashtirma, o‘zing qil».
 **Testlar:** `scripts/test.ps1` — 592 PASS, 98 skip, smoke PASS; `scripts/test.ps1 -Office` — **690 PASS, 0 FAIL**, smoke PASS, ruff PASS.
 **Git:** `codex/office-ai-fixes` → `main` (`--no-ff`), versiya 1.5.13. Push qilinmadi.
-**Reliz:** `build.ps1 -Publish dist\yangilanish-1.5.13` — `NEXVARA-Setup-1.5.13.exe` (64873834 bayt, SHA-256 `cfeb4f2a66186fd3540533e7a2261c1534839b5a95451c1e8e723b314d0a3b5a`), imzolangan `latest.json`; papkaga `NEXVARA-1.6.1.apk` (release, 00:38 dagi build — undan keyin `android/` o‘zgarmagan) qo‘shildi. GitHub’ga yuklash (`publish_github.py`) — **BLOCKED**: avtomatik ruxsat tizimi «ommaviy joyga chiqarish»ni to‘xtatdi; egasi ruxsat bersa bitta buyruq: `.venv\Scripts\python.exe scripts\publish_github.py dist\yangilanish-1.5.13 v1.5.13 "..."`, so‘ng `git push origin main`.
+**Reliz:** `build.ps1 -Publish dist\yangilanish-1.5.13` — `NEXVARA-Setup-1.5.13.exe` (64873834 bayt, SHA-256 `cfeb4f2a66186fd3540533e7a2261c1534839b5a95451c1e8e723b314d0a3b5a`), imzolangan `latest.json`; papkaga `NEXVARA-1.6.1.apk` (release, 00:38 dagi build — undan keyin `android/` o‘zgarmagan) qo‘shildi. Avval avtomatik ruxsat tizimi to‘xtatdi; egasi «ruxsat» dedi → GitHub’da `nexvara-yangilanish` v1.5.13 (4 fayl). Internetdan: 1.5.12 → 1.5.13 topildi, Ed25519 imzo, yuklab olish, hajm + SHA-256 — PASS; 1.5.13 → yangisi yo‘q — PASS; APK 1.6.1 (5423952 bayt) yuklab olinadi. Manba `main` push (maxfiy fayl/kalit tekshirildi — yo‘q).
 **Kompyuterda qolgan:** jonli sinovdan NEXVARA yaratgan Word/Excel oynalari ochiq (tegilmadi).
-**Keyingi qadam:** ruxsat bilan GitHub reliz + internetdan 1.5.12 → 1.5.13 tekshiruvi, `main` push.
+**Keyingi qadam:** egasi kompyuterda «Yangilash» (1.5.13) va telefonda 1.6.1; NOT TESTED qolganlar: ovoz, Google, Wake-on-LAN, haqiqiy AutoCAD.
 
 ---
 
