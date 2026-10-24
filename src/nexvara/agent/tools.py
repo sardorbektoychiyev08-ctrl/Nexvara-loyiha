@@ -480,7 +480,10 @@ def office_write(api, a):
       date=("string", False, "kun.oy.yil; bo‘sh bo‘lsa bugun"))  # fmt: skip
 def document_official(api, a):
     keys = ("title", "body", "kimga", "kimdan", "signer", "date")
-    snap = api.official_document(**{k: str(a.get(k) or "") for k in keys})
+    args = {k: str(a.get(k) or "") for k in keys}
+    if "[" in args["date"]:  # «[Ariza sanasi]» (live 2026-10-24): a document is dated today
+        args["date"] = ""
+    snap = api.official_document(**args)
     if "id" not in snap:
         raise ToolError(snap.get("error", "Boshlanmadi"))
     holes = "[" in "".join(str(a.get(k) or "") for k in ("body", "kimga", "kimdan", "signer"))
@@ -1373,28 +1376,57 @@ def drawing_create(api, a):
     return _handled(api._chat_drawing(a["request"]), "Chizma")
 
 
+def _edu(api, a, parser: str) -> str:
+    """The user's own message when it already is a complete request of this kind: the AI
+    planner tends to append wishes to the topic («… sistemasi faqat …», live 2026-10-24),
+    which then matches the wrong textbook page."""
+    from nexvara.knowledge import lessonplan, service
+
+    own = str((getattr(api, "_repair_origin", None) or [""])[0] or "")
+    fn = getattr(lessonplan if parser == "parse_lesson_request" else service, parser)
+    try:
+        req = fn(own) if own else None
+    except Exception:  # noqa: BLE001 — fall back to the planner's text
+        req = None
+    if req is not None and getattr(req, "topic", None) and getattr(req, "grade", None):
+        return own
+    return a["request"]
+
+
 @tool("education.test", "Darslikdan test tuzish",
-      request=("string", True, "sinf, fan, mavzu, savol va variantlar soni"))  # fmt: skip
+      request=("string", True, "qisqa: sinf, fan, darslikdagi mavzu nomi, savol va variantlar "
+                              "soni (masalan «7-sinf fizika Nyuton qonunlari 5 ta test»); sifat "
+                              "talablarini yozma — ular o‘zi bajariladi"))  # fmt: skip
 def education_test(api, a):
-    return _handled(api._chat_inner(a["request"], _use_ai=False), "Test tuzish")
+    return _handled(
+        api._chat_inner(_edu(api, a, "parse_test_request"), _use_ai=False), "Test tuzish"
+    )
 
 
 @tool("education.lesson", "Dars ishlanmasi tuzish",
-      request=("string", True, "sinf, fan, mavzu va dars talabi"))  # fmt: skip
+      request=("string", True, "qisqa: sinf, fan va darslikdagi mavzu nomi; qo‘shimcha "
+                              "ko‘rsatma yozma"))  # fmt: skip
 def education_lesson(api, a):
-    return _handled(api._chat_inner(a["request"], _use_ai=False), "Dars ishlanmasi")
+    return _handled(
+        api._chat_inner(_edu(api, a, "parse_lesson_request"), _use_ai=False), "Dars ishlanmasi"
+    )
 
 
 @tool("education.presentation", "Darslik mavzusidan taqdimot tuzish",
-      request=("string", True, "sinf, fan, mavzu va slayd talabi"))  # fmt: skip
+      request=("string", True, "qisqa: sinf, fan, darslikdagi mavzu nomi va «taqdimot» "
+                              "(masalan «8-sinf biologiya qon aylanish taqdimot»); qo‘shimcha "
+                              "ko‘rsatma yozma"))  # fmt: skip
 def education_presentation(api, a):
-    return _handled(api._chat_inner(a["request"], _use_ai=False), "Taqdimot")
+    return _handled(
+        api._chat_inner(_edu(api, a, "parse_presentation_request"), _use_ai=False), "Taqdimot"
+    )
 
 
 @tool("education.topic", "Darslikdan mavzuni chiqarish",
-      request=("string", True, "sinf, fan va mavzu"))  # fmt: skip
+      request=("string", True, "qisqa: sinf, fan va darslikdagi mavzu nomi"))  # fmt: skip
 def education_topic(api, a):
-    return _handled(api._chat_inner(a["request"], _use_ai=False), "Mavzu")
+    text = _edu(api, a, "parse_topic_request")
+    return _handled(api._chat_inner(text, _use_ai=False), "Mavzu")
 
 
 @tool("report.weekly", "Papka yoki fayllardan haftalik hisobot tuzish",
@@ -1430,6 +1462,7 @@ def memory_teach(api, a):
 def command(api, a):
     from nexvara.agent.parse import find_file, parse_command
 
+    a["text"] = api._bind_refs(a["text"])  # a known path with spaces → one quoted name
     if find_file(a["text"]):  # a part the executors do not know is an error, not dropped
         plan = parse_command(a["text"], api._context_file)
         if plan is not None and plan.unknown:

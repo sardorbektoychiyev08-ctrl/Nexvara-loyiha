@@ -72,7 +72,7 @@ def parse_test_request(text: str) -> TestRequest | None:
 _TOPIC_WORDS = ("mavzu", "chiqar", "korsat", "matn", "oqib", "topib", "kerak", "ochib", "bolim")
 _FILLER = (
     r"\b(?:test\w*|savol\w*|tuz\w*|ber\w*|yarat\w*|kerak\w*|iltimos|menga|uchun|boyicha|"
-    r"mavzu\w*|dan|haqida|darslik\w*|chiqar\w*|korsat\w*|matn\w*|oqib|topib|top|ochib|och|"
+    r"mavzu\w*|fan\w*|dan|haqida|darslik\w*|chiqar\w*|korsat\w*|matn\w*|oqib|topib|top|ochib|och|"
     r"bolim\w*|shu|ushbu|qilib|ham|va|bilan|mana|bu|ni|kitob\w*|taqdimot\w*|prezentats\w*|"
     r"slayd\w*|tayyorla\w*|yasa\w*|ai|sun\W?iy|intellekt\w*|aqlli|yordamida)\b"
 )
@@ -183,14 +183,22 @@ def _pages_for(lib: Library, req: TestRequest) -> tuple[Book, list[tuple[int, st
     if req.topic:
         # Search every part of the current edition (1-chorak, 2-chorak, ...).
         hits = []
-        for g, s in dict.fromkeys((b.grade, b.subject) for b in books):
-            hits += lib.search(req.topic, g, s, limit=12)
+        # The AI planner may append its quality wishes to the topic («… inersiya tinch holat
+        # … aniq to‘liq bo‘lsin», live 2026-10-24); then the leading words are the topic.
+        words = req.topic.split()
+        topic = req.topic
+        for n in dict.fromkeys((len(words), 6, 4, 3, 2)):
+            if hits or n > len(words):
+                continue
+            topic = " ".join(words[:n])
+            for g, s in dict.fromkeys((b.grade, b.subject) for b in books):
+                hits += lib.search(topic, g, s, limit=12)
         hits.sort(key=lambda h: -h.score)
         pages = [(h.page_no, h.text) for h in hits[:12]]
         if not pages:
             raise LookupError(f"«{req.topic}» mavzusi {book.label()} darsligida topilmadi")
         book = hits[0].book
-        return book, sorted(pages), req.topic
+        return book, sorted(pages), topic
     pages = [pg for b in books if (b.grade, b.subject) == (book.grade, book.subject)
              for pg in lib.book_pages(b.id)]  # fmt: skip
     return book, pages, "umumiy"

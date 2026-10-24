@@ -4,6 +4,20 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-23 (56) — Codex — telefon chatini jonli sinash, tabiiy javob va Office barqarorligi
+
+**Davom ettirilgan ish:** `codex/office-ai-fixes` dagi commit qilinmagan tuzatishlar tekshirildi va yakunlandi. AI suhbatida salom bir marta tez modelga boradi; davomli suhbat ko‘rsatmasi kuchaytirildi; xavfsiz nusxa/yangi fayl amallari ortiqcha «Ha» so‘ramaydi, faqat xavfli amal tasdiq kutadi; maxfiylik soni javob matniga qo‘shilmaydi (ichki `privacy_masked` saqlanadi); dastur nomlari (`Excel`, `Microsoft PowerPoint` va boshqalar) to‘g‘ri normallashtiriladi. UI selftest vazifa sarlavhasi darslik mavzusiga almashsa ham yangi vazifani kuzatadi. PowerPoint Office 2016 uchun embedded workbook saqlab yopiladi va NEXVARA boshlagan jarayon chiqishi qisqa kutiladi.
+
+**Telefon:** Android chatda uzun javob yoki tasdiq kartasi kelganda ro‘yxatning haqiqiy oxiriga avtomatik siljiydi. Android debug/release build va unit test PASS; release APK 1.6.0 telefonga `adb install -r` bilan ma’lumotlarni saqlagan holda o‘rnatildi. Haqiqiy telefon (`24115RA8EG`) bilan biometrik ochish, PC serverga «Ulangan», balanslar, chatdan xabar yuborish, uzun tasdiq kartasida «Ha, davom et»/«Yo‘q» tugmalari ko‘rinishi va xavfsiz bekor qilish PASS.
+
+**Jonli chatdagi yangi topilma:** oddiy «2 plus 3» savolidagi son `detect_grade` tomonidan 2-sinf deb noto‘g‘ri olinib, kimyo/biologiya darsliklari aralashgan. Endi darslik qidiruvi faqat foydalanuvchi sinf, fan, darslik/kitob/manbani aniq aytganda ishlaydi; oddiy hisob faqat natijani, sodda fakt bitta jumlani qaytarishi promptda qat’iy yozildi. Maxfiylik texnik yozuvi yangi manba serverida jonli yo‘qoldi; «10 minus 4» darsliksiz toza javob berdi (so‘nggi «faqat natija» prompt kuchaytirilishi qayta jonli yuklanmadi).
+
+**Testlar:** `scripts/test.ps1` — 581 PASS, 98 Office skipped, smoke PASS; ruff check/format — PASS; dastlab yiqilgan yangi tasdiq xulqiga oid 3 test tuzatilib 3/3 PASS; oddiy savolda darslik aralashmasligi testi avval 3/3 va keyin alohida 1/1 PASS. Oxirgi prompt matni va import tuzatishidan so‘ng ruff PASS, lekin pytest qayta chaqiruvi avtomatik tizim-ruxsat limiti sabab **BLOCKED** (kod xatosi emas). Haqiqiy Office sinovi — **NOT TESTED**, egasining alohida ruxsati olinmadi.
+
+**Keyingi qadam:** pytest ruxsati tiklanganda `test.ps1`, egasi ruxsati bilan `test.ps1 -Office`; so‘ng Windows reliz raqamini oshirish/build va telefonda «faqat natija»ni yana bir marta jonli ko‘rish. Push/merge qilinmadi.
+
+---
+
 ## 2026-10-22 (55) — Claude Code — «saqlay olmayman deyapti», «o‘zi saqlasin»
 
 **Jonli (1.5.11):** rasm → Excel ishladi (`D:\NEXVARA\Telefondan\1000006389 (2)_NEXVARA.xlsx`, avtomatik saqlangan). Keyin: «chiroyli qilib ber» → buyruq «(2)_NEXVARA.xlsx» ni qidirdi (nomda bo‘sh joy va qavs) — topilmadi; «xali saqlamadingku» → AI «saqlanmagan» dedi; «beton sinovi deb d papkaga» → «saqlay olmayman, Ctrl+S bosing».

@@ -7,6 +7,7 @@ may be rebuilt at any time. Settings are a small JSON file the user could even e
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 import time
@@ -91,6 +92,16 @@ CREATE TABLE IF NOT EXISTS history (
 CREATE INDEX IF NOT EXISTS history_created ON history(created_at DESC);
 """
 
+_SETTINGS_LOCKS_GUARD = threading.Lock()
+_SETTINGS_LOCKS: dict[str, threading.RLock] = {}
+
+
+def _settings_lock(path: Path) -> threading.RLock:
+    """Share one lock between all Settings objects for the same file."""
+    key = str(path.resolve())
+    with _SETTINGS_LOCKS_GUARD:
+        return _SETTINGS_LOCKS.setdefault(key, threading.RLock())
+
 
 def _merge(base: dict, extra: dict) -> dict:
     out = deepcopy(base)
@@ -105,7 +116,7 @@ def _merge(base: dict, extra: dict) -> dict:
 class Settings:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or (config.data_dir() / "settings.json")
-        self._lock = threading.Lock()
+        self._lock = _settings_lock(self.path)
 
     def load(self) -> dict[str, Any]:
         """The stored settings over the defaults. While another thread replaces the file,
@@ -137,16 +148,21 @@ class Settings:
             merged = _merge(current, clean)
             _validate(merged)
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_suffix(".tmp")
+            tmp = self.path.with_name(
+                f".{self.path.name}.{os.getpid()}.{threading.get_ident()}.tmp"
+            )
             tmp.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
-            for attempt in range(20):  # Windows: a reader may hold the file open for a moment
-                try:
-                    tmp.replace(self.path)
-                    break
-                except PermissionError:
-                    if attempt == 19:
-                        raise
-                    time.sleep(0.05)
+            try:
+                for attempt in range(20):  # Windows may briefly hold the destination open
+                    try:
+                        tmp.replace(self.path)
+                        break
+                    except PermissionError:
+                        if attempt == 19:
+                            raise
+                        time.sleep(0.05)
+            finally:
+                tmp.unlink(missing_ok=True)
             return merged
 
 

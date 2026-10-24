@@ -106,11 +106,25 @@ def find_sections(page_text: str) -> list[str]:
     return out
 
 
+# Same meaning, different word in older textbooks (live 2026-10-24: «qon aylanish tizimi»
+# is «QON AYLANISH SISTEMASI» in the 8th-grade biology book). Folded stems.
+_SYNONYMS = {
+    "tizim": "sistem", "sistem": "tizim", "harorat": "temperatur", "temperatur": "harorat",
+    "jarayon": "protsess", "protsess": "jarayon", "azo": "organ", "organ": "azo",
+    "tenglik": "tenglam", "foiz": "protsent", "protsent": "foiz",
+}  # fmt: skip
+
+
 def fts_query(text: str) -> str:
     """User words -> FTS5 query: every word must match (prefix match for stems)."""
     words = [w for w in re.findall(r"\w+", fold(text)) if len(w) >= 2]
     # Uzbek is agglutinative: "kasrlarni" should find "kasr". Use a short stem as a prefix.
-    return " ".join(f'"{w[: max(4, len(w) - 3)]}"*' for w in words)
+    out = []
+    for w in words:
+        stem = f'"{w[: max(4, len(w) - 3)]}"*'
+        syn = next((v for k, v in _SYNONYMS.items() if w.startswith(k)), None)
+        out.append(f'({stem} OR "{syn}"*)' if syn else stem)
+    return " AND ".join(out)  # FTS5 needs an explicit AND next to a bracketed OR
 
 
 class Library:

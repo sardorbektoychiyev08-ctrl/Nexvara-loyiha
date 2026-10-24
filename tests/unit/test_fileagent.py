@@ -190,9 +190,25 @@ def test_open_app_commands(tmp_path, monkeypatch):
     api = Api(overrides={"open_app": started.append})
     assert api.chat("exelni och")["reply"] == "Excel ochildi."
     assert started == ["excel.exe"]
+    assert api.open_app("Excel") == "Excel ochildi."
+    assert api.open_app(" Microsoft PowerPoint ") == "PowerPoint ochildi."
+    assert started == ["excel.exe", "excel.exe", "powerpnt.exe"]
 
     def missing(exe):
         raise FileNotFoundError(exe)
 
     api._overrides["open_app"] = missing
     assert "o‘rnatilmagan" in api.chat("PowerPointni och")["reply"]
+
+
+def test_tab_and_markdown_tables_become_columns():
+    # Live 2026-10-24: an AI sales table was written into one «Matn» column.
+    tab = "Mahsulot\tNarxi\tSoni\tJami\nDaftar\t5 000\t10\t=B2*C2\nRuchka\t3000\t20\t=B3*C3"
+    assert fileagent.grid_rows(tab) == [
+        ["Mahsulot", "Narxi", "Soni", "Jami"],
+        ["Daftar", 5000, 10, "=B2*C2"],
+        ["Ruchka", 3000, 20, "=B3*C3"],
+    ]
+    md = "Jadval:\n| Fan | Baho |\n|---|:---:|\n| Fizika | 4,5 |\n| Ona tili |\nOxiri"
+    assert fileagent.grid_rows(md) == [["Fan", "Baho"], ["Fizika", 4.5], ["Ona tili", ""]]
+    assert fileagent.grid_rows("Oddiy matn\nikkinchi qator") is None

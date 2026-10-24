@@ -153,12 +153,18 @@ def _stems(text: str) -> list[str]:
 
 
 def _title_score(query: str, title: str) -> float:
+    from nexvara.knowledge.store import _SYNONYMS
+
     stems = _stems(query)
     if not stems:
         return 0.0
     words = re.findall(r"\w+", fold(title))
-    hit = sum(1 for s in stems if any(w.startswith(s) for w in words))
-    return hit / len(stems)
+
+    def match(s: str) -> bool:
+        syn = next((v for k, v in _SYNONYMS.items() if s.startswith(k)), None)
+        return any(w.startswith(s) or (syn and w.startswith(syn)) for w in words)
+
+    return sum(1 for s in stems if match(s)) / len(stems)
 
 
 def _slice(lib: Library, book: Book, start: tuple[int, str], nxt: tuple[int, str] | None):
@@ -227,16 +233,34 @@ def find_topic(lib: Library, grade: int | None, subject: str | None, query: str)
     # Several candidate books: prefer one whose section title matches, else the first that
     # mentions the topic at all.
     found: list[tuple[float, Topic]] = []
-    for book in books:
-        try:
-            t = _find_in_book(lib, book, query)
-        except LookupError:
+    # The AI planner may append its wishes to the topic («qon aylanish tizimi aynan sarlavha
+    # topilmasa …», live 2026-10-24): then the leading words are the topic.
+    words = query.split()
+    for n in dict.fromkeys((len(words), 6, 4, 3, 2)):
+        if found or n > len(words):
             continue
-        found.append((_title_score(query, t.title), t))
+        part = " ".join(words[:n])
+        for book in books:
+            try:
+                t = _find_in_book(lib, book, part)
+            except LookupError:
+                continue
+            found.append((_title_score(part, t.title), t))
     if not found:
         where = books[0].label() if len(books) == 1 else "mos darsliklar"
         raise LookupError(f"«{query}» mavzusi {where}da topilmadi")
     return max(found, key=lambda st: st[0])[1]
+
+
+def _looks_like_contents(text: str, page: int, pages: int) -> bool:
+    """A table of contents: several chapter headings or many lines ending in a page number."""
+    f = fold(text)
+    chapters = len(re.findall(r"\b(bob|mundarija|§)", f)) + text.count("§")
+    numbered = sum(
+        1 for line in text.splitlines() if re.search(r"(\.{2,}|…|\s)\d{1,3}\s*\.?$", line)
+    )
+    edge = page <= 4 or page > pages - 6
+    return chapters >= 3 or numbered >= 8 or (edge and (chapters >= 2 or numbered >= 4))
 
 
 def _find_in_book(lib: Library, book: Book, query: str) -> Topic:
@@ -256,7 +280,10 @@ def _find_in_book(lib: Library, book: Book, query: str) -> Topic:
     else:
         if not hits:
             raise LookupError(f"«{query}» mavzusi {book.label()} darsligida topilmadi")
-        page = hits[0].page_no
+        # The contents page names every topic, so it often ranks first (live 2026-10-24: a
+        # biology presentation was made from the contents on p.189). Prefer a real page.
+        real = [h for h in hits if not _looks_like_contents(h.text, h.page_no, book.pages)]
+        page = (real or hits)[0].page_no
         before = [i for i, (p, _t) in enumerate(starts) if p <= page]
         if not before:  # no § headings in this book: return the matching page and its neighbour
             end = min(page + 1, book.pages)

@@ -337,6 +337,20 @@ def test_api_chat_with_ai(router, monkeypatch):
     assert "eskirgan" in api.confirm_ai(out["confirm"])["reply"]
 
 
+def test_generic_question_does_not_mix_in_unrelated_textbooks(router, monkeypatch):
+    router.save_key("anthropic", "sk-ant-test-1234567890")
+    router.settings.update({"ai": {"enabled": True}})
+    calls = []
+    monkeypatch.setattr(features, "find_passages", lambda *a, **k: calls.append(a) or [])
+    router.fake.replies = ["5.", "Nyuton qonuni."]
+
+    answer = features.answer_question(router, "2 plus 3 necha?", approved=True)
+    assert answer.text == "5." and calls == []
+    assert "faqat natijani ayt" in router.fake.calls[-1]["system"]
+    features.answer_question(router, "7-sinf fizika darsligidan Nyuton qonuni nima?", approved=True)
+    assert len(calls) == 1
+
+
 def test_ai_word_is_not_part_of_the_topic():
     from nexvara.app.api import _wants_ai
     from nexvara.knowledge.service import parse_test_request
@@ -432,7 +446,7 @@ def test_chosen_provider_goes_first_and_cheap_call_needs_no_yes(router):
         router.check_budget(first, approved=False)
 
 
-def test_small_talk_uses_ai_first_planner(router, monkeypatch):
+def test_small_talk_uses_one_fast_chat_call(router, monkeypatch):
     from nexvara.app.api import Api
 
     assert features.small_talk("Salom!") and features.small_talk("assalomu alaykum, qalaysiz?")
@@ -443,12 +457,11 @@ def test_small_talk_uses_ai_first_planner(router, monkeypatch):
     router.save_key("anthropic", "sk-ant-test-1234567890")
     router.settings.update({"ai": {"enabled": True}})
     api = Api(overrides={"ai_router": router})
-    router.fake.replies = ['{"kind":"chat"}', "Salom! Yaxshimisiz?"]
+    router.fake.replies = ["Salom! Yaxshimisiz?"]
     calls = len(router.fake.calls)
     assert api.chat("salom")["reply"] == "Salom! Yaxshimisiz?"
-    assert len(router.fake.calls) == calls + 2
-    assert router.fake.calls[-2]["model"] == "claude-opus-5-5"  # strong planner
-    assert router.fake.calls[-1]["model"] == "claude-sonnet-5-5"  # normal chat
+    assert len(router.fake.calls) == calls + 1
+    assert router.fake.calls[-1]["model"] == "claude-haiku-5-5"  # quick chat
 
 
 def test_plan_json_with_fast_model_mistakes_is_read():

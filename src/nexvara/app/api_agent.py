@@ -111,9 +111,19 @@ class AgentApi:
         # A file of this conversation named without its folder: «1000006389 (2)_NEXVARA.xlsx
         # ni och» (spaces, brackets) is read as the whole name, not «(2)_NEXVARA.xlsx».
         for known in (self._ctx.result, self._ctx.file):
+            if known and " " in known and known in text and f"«{known}»" not in text:
+                # The AI planner wrote the full path unquoted (live 2026-10-24): «Savdo
+                # jadvali 2026….xlsx» was read as just «2026….xlsx» and not found.
+                return text.replace(known, f"«{known}»", 1)
             name = Path(known).name if known else ""
-            if name and name in text and known not in text and f"«{name}»" not in text:
-                return text.replace(name, f"«{known}»", 1)
+            # Only expand a bare file name.  The same basename may already be
+            # present in a different full path (for example after copying
+            # Ish\savdo.csv to Arxiv\savdo.csv); replacing that suffix corrupts
+            # the explicit path and can also turn a dashboard title into a path.
+            bare = re.search(rf"(?<![\w\\/]){re.escape(name)}", text) if name else None
+            if bare and known not in text and f"«{name}»" not in text:
+                start, end = bare.span()
+                return text[:start] + f"«{known}»" + text[end:]
         res = self._ctx.result
         if not res or find_file(text) or not res.lower().endswith(_OFFICE_EXT):
             return text
@@ -145,8 +155,11 @@ class AgentApi:
     def _run_calls(
         self, calls: list, approved: bool = False, intro: str = "", from_ai: bool = False
     ) -> dict[str, Any]:
-        """`from_ai`: the plan came from the AI planner. Then anything that changes data or
-        settings is shown first and runs only after "Ha" (read-only lookups run at once)."""
+        """Run a validated plan; only destructive/irreversible tools require explicit approval.
+
+        Safe edits already preserve the original or create a new result, so an AI-authored plan
+        should feel like a direct assistant command instead of asking «Ha» for every step.
+        """
         from nexvara.agent import tools
 
         try:
@@ -154,15 +167,11 @@ class AgentApi:
         except tools.ToolError as e:
             return {"reply": str(e), "error": True}
         risky = [c for c in calls if tools.TOOLS[c.tool].risky]
-        changes = [c for c in calls if c.tool not in tools.READ_ONLY | tools.CREATES_NEW]
-        if (risky or (from_ai and changes)) and not (approved or self._approved_now()):
+        if risky and not (approved or self._approved_now()):
             token = uuid.uuid4().hex[:12]
             self._pending[token] = ("tools", calls)
             lines = "\n".join(f"{i}. {c.describe()}" for i, c in enumerate(calls, 1))
-            if risky:
-                warn = "Diqqat: " + "; ".join(tools.TOOLS[c.tool].title for c in risky) + ". "
-            else:
-                warn = "AI shunday tushundi — to‘g‘rimi? "
+            warn = "Diqqat: " + "; ".join(tools.TOOLS[c.tool].title for c in risky) + ". "
             return {"reply": f"{intro}Bajaraman:\n{lines}\n\n{warn}Davom etaymi?",
                     "confirm": token}  # fmt: skip
         if len(calls) == 1:
@@ -345,8 +354,8 @@ class AgentApi:
             return True
 
     def _repair(self, text: str, error: str, tries: int = 2) -> dict[str, Any] | None:
-        """Re-plan with the error message (max `tries`). Steps that change something still
-        wait for «Ha» (`from_ai`). None when the AI could not help: the error stays."""
+        """Re-plan with the error message (max `tries`). Only risky corrected steps wait for
+        «Ha»; safe edits preserve the original and run directly. None means AI could not help."""
         from nexvara.agent import tools as agent_tools
         from nexvara.ai import features
         from nexvara.ai.router import NeedsConfirmation

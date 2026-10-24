@@ -114,20 +114,20 @@ def test_planner_is_first_and_selects_expected_tool(tmp_path, message, tool_name
     assert fake.calls[0]["messages"][0]["content"].rstrip().endswith(message)
     if tool_name == "photo.compare_table":
         assert out.get("confirm") and api._pending[out["confirm"]][0] == "compare_table"
-    elif tool_name in tools.CREATES_NEW:  # makes something new: runs without «Ha» for the plan
-        assert not (out.get("confirm") and api._pending[out["confirm"]][0] == "tools"), out
-    else:
+    elif tools.TOOLS[tool_name].risky:
         assert out.get("confirm")
         kind, calls = api._pending[out["confirm"]]
         assert kind == "tools" and calls[0].tool == tool_name
+    else:  # safe read/create/edit plans run directly; originals remain untouched
+        assert not (out.get("confirm") and api._pending[out["confirm"]][0] == "tools"), out
 
 
-def test_small_talk_also_goes_to_planner_first(tmp_path):
-    api, fake, _router = _api(tmp_path, ['{"kind":"chat"}', "Salom, ishlaringiz yaxshimi?"])
+def test_small_talk_skips_the_tool_planner(tmp_path):
+    api, fake, _router = _api(tmp_path, ["Salom, ishlaringiz yaxshimi?"])
     out = api.chat("salom")
     assert out["reply"].startswith("Salom")
-    assert len(fake.calls) == 2
-    assert "ASBOBLAR" in fake.calls[0]["system"]
+    assert len(fake.calls) == 1
+    assert "QANDAY GAPLASHISH" in fake.calls[0]["system"]
 
 
 def test_ai_disabled_keeps_old_handler_silently(tmp_path):

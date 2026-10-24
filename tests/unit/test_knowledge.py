@@ -62,7 +62,9 @@ def test_folder_gives_grade(tmp_path):
 def test_sections_and_query():
     assert find_sections("1-§. MEXANIK HARAKAT\nmatn") == ["1-§. MEXANIK HARAKAT"]
     assert find_sections("IV bob. Harakat qonunlari") == ["IV bob. Harakat qonunlari"]
-    assert fts_query("Kasrlarni qo‘shish") == '"kasrla"* "qosh"*'
+    assert fts_query("Kasrlarni qo‘shish") == '"kasrla"* AND "qosh"*'
+    # «tizimi» finds an older book's «SISTEMASI» (live 2026-10-24)
+    assert fts_query("qon tizimi") == '"qon"* AND ("tizi"* OR "sistem"*)'
 
 
 def test_library_search_prefers_newest_edition(tmp_path):
@@ -153,6 +155,8 @@ def test_quiz_reports_shortfall():
         ("9 sinf o‘zbekiston tarixi Buxoro amirligi bo‘yicha 15 ta savol 2 variant",
          TestRequest(9, "O‘zbekiston tarixi", "buxoro amirligi", 15, 2)),
         ("Algebra 8-sinf kasrlar mavzusidan test", TestRequest(8, "Algebra", "kasrlar", 20, 1)),
+        ("7-sinf fizika fanidan «Nyuton qonunlari» mavzusidan 20 ta test, 2 variant",
+         TestRequest(7, "Fizika", "nyuton qonunlari", 20, 2)),
     ],
 )  # fmt: skip
 def test_parse_test_request(text, expected):

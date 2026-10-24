@@ -35,6 +35,8 @@ ko‘rsatma (ok bo‘lsa bo‘sh)"}"""
 
 def _xml_text(data: bytes) -> str:
     text = data.decode("utf-8", "replace")
+    # Slide animations hold «style.visibility» etc.: not text the reader sees.
+    text = re.sub(r"<p:timing>.*?</p:timing>", "", text, flags=re.S)
     text = re.sub(r"</w:p>|</a:p>", "\n", text)  # paragraph ends (Word, PowerPoint)
     text = re.sub(r"<w:tab/>", "\t", text)
     text = re.sub(r"<[^>]+>", "", text)

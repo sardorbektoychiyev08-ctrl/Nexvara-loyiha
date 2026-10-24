@@ -138,13 +138,22 @@ def run_topic_presentation(
     visible: bool = True,
     keep_open: bool = True,
     pause: float = 0.3,
+    ai_outline: Any = None,
 ) -> dict[str, Any]:
+    """`ai_outline(topic)` -> AI-written slides; on any failure the offline outline is used."""
     from nexvara.skills.powerpoint.ops import PowerPointSession
 
     with task.step("Darslikdan mavzuni topish") as s:
         topic = lookup(req)
-        plan = outline_slides(topic)
-        s.detail = f"{topic.book.label()} · {topic.title} · {len(plan) + 1} slayd"
+        plan, by = None, ""
+        if ai_outline is not None:
+            try:
+                plan = ai_outline(topic) + [outline_slides(topic)[-1]]  # + «Uyga vazifa»
+                by = "AI · "
+            except Exception:  # noqa: BLE001 — the offline outline below still works
+                plan = None
+        plan = plan or outline_slides(topic)
+        s.detail = f"{by}{topic.book.label()} · {topic.title} · {len(plan) + 1} slayd"
         if not any(sl["bullets"] for sl in plan[:-1]):
             raise CommandError("Mavzu matnidan slayd tuzib bo‘lmadi (ehtimol skaner sahifa)")
     out = Path(out_path) if out_path else default_presentation_path(topic)

@@ -109,6 +109,13 @@ class Api(
             from nexvara.appdata import History
 
             self._history = History()
+            # After a restart «uni» / «oxirgi jadval» still means the last file made
+            # (live 2026-10-24: the phone's follow-up found nothing after a PC restart).
+            try:
+                for snap in reversed(self._history.list(20)):
+                    self._ctx.task_done(snap)
+            except Exception:  # an unreadable history must not stop the app
+                pass
         prev_hook = self._runner.on_finish
 
         def on_finish(t: Any) -> None:
@@ -213,6 +220,12 @@ class Api(
         # is unavailable, the exact old offline chain below remains the fallback.
         if _use_ai and self._ai_first_on() and not getattr(self._local, "skip_first", False):
             if self._ai_ready():
+                # A greeting or thanks is unquestionably conversation, not an app command.
+                # Avoid a redundant JSON-planner call so it feels like a normal live chat.
+                from nexvara.ai import features
+
+                if features.small_talk(text):
+                    return self._chat_ai(text)
                 return self._after_plan(text, self._chat_ai(text, ai_first=True))
             return self._ordinary_fallback(text)
 
@@ -290,7 +303,14 @@ class Api(
                 "topic": req.topic,
                 "count": req.count,
                 "variants": req.variants,
-                "ai": _wants_ai(text),
+                # With AI switched on, tests are always written by the AI: the offline
+                # generator cut words mid-way («Agar kuch yo‘na», live 2026-10-24).
+                "ai": _wants_ai(text)
+                or (
+                    self._ai_first_on()
+                    and not getattr(self._local, "ai_fallback", False)
+                    and self._ai_ready()
+                ),
             }
             self._apply_test_rules(text, params)
             snap = self.make_test(params)
@@ -302,10 +322,8 @@ class Api(
             by = "AI yordamida " if params["ai"] else ""
             return {
                 "reply": (
-                    f"Tushundim: {what or 'darslik'}{topic}, {req.count} ta savol, "
-                    f"{req.variants} ta variant. {by}Word'da tuzyapman — jarayon o‘ng panelda. "
-                    "Variantlar A, B, C… harflari bilan; javob varaqasi (PDF) ham tayyorlanadi, "
-                    "to‘ldirilganini telefonda suratga olib tekshirasiz."
+                    f"{by}Word'da tuzyapman: {what or 'darslik'}{topic}, {req.count} ta savol, "
+                    f"{req.variants} ta variant, javob varaqasi (PDF) bilan."
                 ),
                 "task": snap,
             }
@@ -473,14 +491,12 @@ class Api(
     def _chat_ai(
         self, text: str, approved: bool = False, *, ai_first: bool = False
     ) -> dict[str, Any]:
-        """The AI path, plus a note when personal data was kept on this PC."""
+        """Run the AI path and retain privacy-mask metadata without cluttering the reply."""
         router = self._router()
         before = getattr(router, "masked_total", 0)
         out = self._chat_ai_inner(text, approved, ai_first=ai_first)
         hidden = getattr(router, "masked_total", 0) - before
         if hidden and out.get("reply"):
-            out["reply"] += (f"\n\n🔒 {hidden} ta shaxsiy ma’lumot AI’ga yuborilmadi: "
-                             "kompyuterda yashirildi va javobda qayta tiklandi.")  # fmt: skip
             out["privacy_masked"] = hidden
         return out
 
@@ -509,13 +525,11 @@ class Api(
                          for c in p.calls]  # fmt: skip
                 if not calls:
                     return {"reply": p.say or "Nima qilishni tushunmadim, aniqroq yozing."}
-                intro = f"Tushundim: {p.say}\n\n" if p.say else ""
-                return self._run_calls(calls, intro=intro, from_ai=True)
+                return self._run_calls(calls, intro="", from_ai=True)
             intent = p.intent
             if intent.kind in ("test", "topic", "presentation", "command") and intent.command:
                 out = self._chat_inner(intent.command, _use_ai=False)
                 if not out.get("unhandled"):
-                    out["reply"] = f"Tushundim: «{intent.command}»\n\n" + out["reply"]
                     return out
             if intent.kind == "question":
                 ans = features.answer_question(
@@ -900,11 +914,22 @@ class Api(
         else:
             from nexvara.agent.ppt_exec import default_presentation_path, run_topic_presentation
 
+            outline = None
+            if self._ai_first_on() and not getattr(self._local, "ai_fallback", False):
+                if self._ai_ready():
+                    from nexvara.ai import features
+
+                    router = self._router()
+
+                    def outline(t: Any) -> list[dict[str, Any]]:
+                        return features.ai_slides(router, t)
+
             def fn(task: Any) -> dict[str, Any]:
                 out = None
                 if self._output_dir is not None:
                     out = self._output_dir / default_presentation_path(topic).name
-                return run_topic_presentation(task, req, out, keep_open=self._keep_open())
+                return run_topic_presentation(task, req, out, keep_open=self._keep_open(),
+                                              ai_outline=outline)  # fmt: skip
 
         snap = self._runner.start(f"Taqdimot: {topic.title}", fn).snapshot()
         return {

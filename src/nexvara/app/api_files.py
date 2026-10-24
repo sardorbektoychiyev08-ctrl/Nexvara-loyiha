@@ -204,14 +204,27 @@ class FilesApi:
     def open_app(self, app: str) -> str:
         """«Excel’ni och»: start the program itself (an empty Excel/Word/PowerPoint window)."""
         from nexvara.agent.tools import ToolError
+        from nexvara.knowledge.textnorm import fold
 
         programs = {"excel": ("Excel", "excel.exe"), "word": ("Word", "winword.exe"),
                     "powerpoint": ("PowerPoint", "powerpnt.exe"),
                     "notepad": ("Bloknot", "notepad.exe"), "calc": ("Kalkulyator", "calc.exe"),
                     "paint": ("Paint", "mspaint.exe")}  # fmt: skip
-        if app not in programs:
+        aliases = {
+            "microsoft excel": "excel",
+            "ms excel": "excel",
+            "microsoft word": "word",
+            "ms word": "word",
+            "microsoft powerpoint": "powerpoint",
+            "power point": "powerpoint",
+            "bloknot": "notepad",
+            "kalkulyator": "calc",
+        }
+        key = fold(str(app)).strip()
+        key = aliases.get(key, key)
+        if key not in programs:
             raise ToolError(f"Bu dasturni ochishni bilmayman: {app}")
-        name, exe = programs[app]
+        name, exe = programs[key]
         fn = self._overrides.get("open_app") or os.startfile  # Windows finds it via App Paths
         try:
             fn(exe)

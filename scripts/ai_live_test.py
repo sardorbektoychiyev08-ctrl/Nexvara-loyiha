@@ -33,6 +33,10 @@ TESTS = [
 
 
 def main() -> int:
+    # Windows may inherit a legacy console code page (for example cp1254), which cannot
+    # print the Uzbek punctuation and the estimate symbol used by this diagnostic.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
     ap.add_argument("provider", choices=["openai", "gemini", "anthropic", "deepseek"])
     ap.add_argument("--run", action="store_true", help="really call the provider (paid)")

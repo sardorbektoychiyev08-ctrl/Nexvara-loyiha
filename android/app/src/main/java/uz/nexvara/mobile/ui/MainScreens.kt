@@ -382,7 +382,16 @@ fun ChatScreen(m: AppModel, act: PhoneActions) {
         }
     }
     val list = rememberLazyListState()
-    LaunchedEffect(m.messages.size) { if (m.messages.isNotEmpty()) list.animateScrollToItem(m.messages.size - 1) }
+    LaunchedEffect(m.messages.size, m.confirm, m.aiv.askSpeak) {
+        if (m.messages.isNotEmpty()) {
+            // Confirmation and paid-voice cards are lazy-list items after the messages.
+            // Wait for Compose to add them, then reveal the actual last item; otherwise a
+            // long plan leaves «Ha, davom et» below the fold and the user cannot proceed.
+            kotlinx.coroutines.yield()
+            val last = list.layoutInfo.totalItemsCount - 1
+            if (last >= 0) list.animateScrollToItem(last)
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("AI suhbat", if (m.speakReplies) "Ovozli suhbat yoqilgan" else "Buyruqlar kompyuterda bajariladi") {
             IconButton(onClick = { m.loadAiDirections(); m.open(Screen.Ai) }) { Text("🧠") }
