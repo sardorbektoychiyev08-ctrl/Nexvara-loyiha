@@ -46,10 +46,15 @@ class OfficeAiApi:
         job = officeai.what_to_do(text)
         if job is None:
             return None
+        from nexvara.agent.parse import find_file
+
         m = _FILE.search(text)
         cur = self._context_file
         name = (m.group(1) or m.group(2)) if m else (
             cur if cur and Path(cur).suffix.lower() in OFFICE_EXT else None)  # fmt: skip
+        whole = find_file(text)  # «D:\…\Tushuntirish xati 2026….docx» with spaces, unquoted
+        if m and whole and Path(whole).suffix.lower() in OFFICE_EXT and len(whole) > len(name):
+            name = whole
         if not name:
             return None
         try:
