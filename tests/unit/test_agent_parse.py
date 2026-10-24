@@ -275,3 +275,14 @@ def test_live_phrases_official_letter_and_small_text():
         "slayd raqamlarini qo‘y"
     )
     assert "fix" in kinds(p) and not p.unknown, p
+
+
+def test_unquoted_full_path_with_spaces_is_one_file(tmp_path):
+    # Live 2026-10-24: «D:\NEXVARA\Hujjatlar\Ariza 2026….docx ni och» searched only «2026….docx».
+    from nexvara.agent.parse import find_file
+
+    f = tmp_path / "Ish papka" / "Ariza 20261024-213232.docx"
+    f.parent.mkdir()
+    f.write_bytes(b"")
+    assert find_file(f"{f} ni och, PDF qilib saqla") == str(f)
+    assert find_file("Hisobot.xlsx ni och") == "Hisobot.xlsx"

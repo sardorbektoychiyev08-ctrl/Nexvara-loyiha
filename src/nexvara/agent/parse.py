@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from nexvara.knowledge.textnorm import fold
 
@@ -151,6 +152,14 @@ def find_file(text: str) -> str | None:
     m = _FILE.search(text)
     if not m:
         return None
+    if m.group(2):
+        # «D:\NEXVARA\Hujjatlar\Ariza 2026….docx ni och» without quotes: the regex stops at the
+        # space (live 2026-10-24: only «2026….docx» was searched). Take the longest existing
+        # path that starts at a drive letter before it.
+        for d in re.finditer(r"[A-Za-z]:[\\/]", text[: m.start(2)]):
+            cand = text[d.start() : m.end(2)].strip()
+            if " " in cand and Path(cand).is_file():
+                return cand
     return (m.group(1) or m.group(2)).strip()
 
 

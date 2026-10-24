@@ -16,6 +16,25 @@ from typing import Any
 from nexvara import config
 from nexvara.core.task import UserError
 
+
+def _close_if_unchanged(path: Path) -> bool:
+    """Close `path` in a running Excel when it has no unsaved changes; False otherwise."""
+    try:
+        import win32com.client
+
+        xl = win32com.client.GetActiveObject("Excel.Application")
+        target = str(path.resolve()).lower()
+        for wb in list(xl.Workbooks):
+            if str(wb.FullName).lower() == target:
+                if not wb.Saved:
+                    return False
+                wb.Close(False)
+                return True
+    except Exception:  # noqa: BLE001 — no Excel / COM: the caller saves under a new name
+        return False
+    return False
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS journal_classes (
     id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, created REAL NOT NULL);
@@ -225,7 +244,17 @@ class Journal:
         out_dir.mkdir(parents=True, exist_ok=True)
         safe = re.sub(r"[^\w -]", "", view["name"])
         out = out_dir / f"Jurnal {safe}.xlsx"
-        wb.save(out)
+        try:
+            wb.save(out)
+        except PermissionError:
+            # The last export is still open in Excel (live 2026-10-24: new grades never reached
+            # the file). An unchanged copy is closed and replaced; one with the user's own
+            # edits stays untouched and the new journal gets a fresh name next to it.
+            if _close_if_unchanged(out):
+                wb.save(out)
+            else:
+                out = out_dir / f"Jurnal {safe} {time.strftime('%Y%m%d-%H%M%S')}.xlsx"
+                wb.save(out)
         return out
 
     def _all(self, student_id: int, subject: str) -> list[dict[str, Any]]:

@@ -39,3 +39,34 @@ def validate_output_path(path, suffixes: tuple[str, ...], overwrite: bool = Fals
     if p.exists() and not overwrite:
         raise FileExistsError(f"file already exists, refusing to overwrite: {p}")
     return p.resolve()
+
+
+def file_in_use(path) -> bool:
+    """True while another program (an open Word/Excel window) holds the file locked."""
+    from pathlib import Path
+
+    p = Path(path)
+    if not p.is_file():
+        return False
+    try:
+        with open(p, "r+b"):
+            return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def pdf_opens_in_word() -> bool:
+    """Windows opens .pdf with Word on some PCs: Word then waits behind an invisible «convert
+    this PDF?» question (live 2026-10-24) — show a picture of the result instead."""
+    import ctypes
+
+    buf = ctypes.create_unicode_buffer(520)
+    size = ctypes.c_ulong(len(buf))
+    try:  # ASSOCF_NONE, ASSOCSTR_EXECUTABLE = 2
+        hr = ctypes.windll.shlwapi.AssocQueryStringW(0, 2, ".pdf", None, buf, ctypes.byref(size))
+    except (AttributeError, OSError):
+        return False
+    exe = buf.value.lower() if hr == 0 else ""
+    return "winword" in exe or "pdfreflow" in exe

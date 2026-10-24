@@ -9,6 +9,7 @@ nothing leaves the PC). Results go to an Excel file per sheet set.
 from __future__ import annotations
 
 import json
+import re
 import time
 import uuid
 from pathlib import Path
@@ -439,6 +440,9 @@ def write_excel(s: dict[str, Any]) -> Path:
         )
     for col, width in zip("ABCDEFGH", (17, 28, 9, 9, 7, 8, 7, 40), strict=True):
         ws.column_dimensions[col].width = width
-    out = folder() / f"Natijalar {s['title'][:40]} {s['id']}.xlsx"
+    # «7-sinf Fizika (2017): 19-§…» — a «:» in a Windows file name silently writes an NTFS
+    # stream instead (live 2026-10-24: the results «file» had no .xlsx and could not be opened).
+    title = re.sub(r'[\\/:*?"<>|]+', " ", s["title"])[:40].strip()
+    out = folder() / f"Natijalar {title} {s['id']}.xlsx"
     wb.save(out)
     return out
