@@ -60,6 +60,14 @@ def profile(t: Table) -> dict[str, Any]:
         if 2 <= len(distinct) <= 60 and len(distinct) < max(3, len(t.rows) * 0.9):
             cats.append((len(distinct), c))
     cats = [c for _n, c in sorted(cats)]
+    if not cats:
+        # A short list where every name is different (5 products, 30 pupils) still reads best
+        # as a bar per name (live 2026-10-24: only a scatter of two numbers was made).
+        for c in t.columns:
+            distinct = {v for v in t.values(c) if v is not None}
+            if t.types.get(c) == "text" and 2 <= len(distinct) <= 60:
+                cats.append(c)
+                break
     return {"numbers": nums, "dates": dates, "categories": cats}
 
 
@@ -75,6 +83,8 @@ def auto_dashboard(
     if rev and exp and rev != exp:
         steps.append({"op": "calc", "name": "Sof foyda", "expr": f"[{rev}] - [{exp}]"})
         measures = [rev, exp, "Sof foyda"] + [m for m in measures if m not in (rev, exp)]
+    elif total := _find(measures, ("jami", "summa", "total", "itogo", "umumiy")):
+        measures = [total] + [m for m in measures if m != total]  # the amount, not «Soni»
     main = measures[0] if measures else None
     date = p["dates"][0] if p["dates"] else None
     cat = p["categories"][0] if p["categories"] else None

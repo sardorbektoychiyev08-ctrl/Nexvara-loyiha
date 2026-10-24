@@ -189,9 +189,7 @@ class DrawingApi:
 
         title = f"Chizma (AI’siz): {drawing_offline.describe(params)}"
         snap = self._runner.start(title, fn).snapshot()
-        return {"reply": f"Chizyapman (AI’siz, bepul): {drawing_offline.describe(params)}. "
-                "Tayyor bo‘lgach PDF ochiladi; AutoCAD uchun DXF fayl ham yoniga saqlanadi. "
-                "O‘zgartirish uchun: «oxirgi chizmani o‘zgartir: teshik 10 mm bo‘lsin».",
+        return {"reply": f"Chizyapman: {drawing_offline.describe(params)} (PDF va AutoCAD DXF).",
                 "task": snap}  # fmt: skip
 
     def _run_drawing(self, payload: dict[str, Any]) -> dict[str, Any]:

@@ -96,7 +96,15 @@ def parse(text: str, base: dict[str, Any] | None = None) -> dict[str, Any] | Non
                     "Plastinada bir nechta teshikni faqat 4 ta burchakka joylayman "
                     "(«burchaklarida 4 ta 10 mm teshik»)"
                 )
-            if hole.get("center_hole"):
+            corner_change = (
+                not many
+                and p.get("corner_holes")
+                and re.search(r"burchak\w*\s+(?:\w+\s+)?teshik|teshiklar", f)
+                and not re.search(r"markaz\w*", f)
+            )
+            if corner_change:  # «burchakdagi teshiklar 10 mm bo‘lsin» changes those four
+                p["corner_holes"] = hole["center_hole"]
+            elif hole.get("center_hole"):
                 p["center_hole"] = hole["center_hole"]
         if not (p.get("w") and p.get("h")):
             return None

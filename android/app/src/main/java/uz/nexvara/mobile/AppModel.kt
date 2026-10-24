@@ -130,7 +130,7 @@ class AppModel(app: Application) : AndroidViewModel(app) {
         screen = s
         if (s == Screen.PcScreen) startScreen()
         when (s) {
-            Screen.Home -> refreshAll()
+            Screen.Home, Screen.Sections -> refreshAll() // the grid shows live counts
             Screen.Tasks -> refreshTasks()
             Screen.Memory -> loadMemory()
             Screen.Teach -> loadTeach()

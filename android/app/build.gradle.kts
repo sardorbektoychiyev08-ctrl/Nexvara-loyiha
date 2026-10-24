@@ -20,8 +20,8 @@ android {
         applicationId = "uz.nexvara.mobile"
         minSdk = 29
         targetSdk = 36
-        versionCode = 13
-        versionName = "1.6.0"
+        versionCode = 14
+        versionName = "1.6.1"
     }
     signingConfigs {
         if (releaseStore != null) create("nexvaraRelease") {
@@ -32,6 +32,12 @@ android {
         }
     }
     buildTypes {
+        // A test build installs next to the real app on the same phone (its data and pairing
+        // are kept): adb sessions never have to replace the user's signed release.
+        debug {
+            applicationIdSuffix = ".sinov"
+            versionNameSuffix = "-sinov"
+        }
         release {
             isMinifyEnabled = true
             signingConfig = signingConfigs.findByName("nexvaraRelease")

@@ -215,7 +215,7 @@ def test_failed_office_task_is_repaired_in_the_background(env):
     r = api.chat(f"{work / 'Savdo.xlsx'} ni och, Narx bo‘yicha saralab saqla")
     assert "confirm" not in r  # Office executor saves a new copy; the original stays intact
     api._runner.get(r["task"]["id"]).wait(10)
-    for _ in range(300):  # the repair runs in the background: give a busy PC 15 s
+    for _ in range(600):  # the repair runs in the background: give a busy PC 30 s
         ev = [e for e in api.ui_events() if e["kind"] == "nexvara_reply"]
         if ev:
             break

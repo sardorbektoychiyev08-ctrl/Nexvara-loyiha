@@ -236,3 +236,18 @@ def test_drawing_above_the_task_limit_uses_the_balanced_model(tmp_path, monkeypa
     api._router().settings.update({"ai": {"task_limit_usd": 0.0001}})
     out = api.chat("AI bilan chizma chiz: L shaklidagi kronshteyn 100x60, qalinligi 10")
     assert not out.get("confirm") and "limit" in out["reply"].lower()
+
+
+def test_plate_edit_changes_the_named_holes():
+    # Live 2026-10-24: «markaziy teshik 30 mm bo‘lsin» must not touch the corner holes, and
+    # «burchakdagi teshiklar 10 mm» must not touch the centre hole.
+    from nexvara import drawing_offline as d
+
+    base = d.parse(
+        "100x60 mm plastina, markazida diametri 20 mm teshik, burchaklarida 4 ta 8 mm teshik"
+    )
+    assert (base["center_hole"], base["corner_holes"]) == (20, 8)
+    p = d.parse("oxirgi chizmani o‘zgartir: markaziy teshik 30 mm bo‘lsin", base)
+    assert (p["center_hole"], p["corner_holes"]) == (30, 8)
+    p = d.parse("oxirgi chizmani o‘zgartir: burchakdagi teshiklar 10 mm bo‘lsin", base)
+    assert (p["center_hole"], p["corner_holes"]) == (20, 10)

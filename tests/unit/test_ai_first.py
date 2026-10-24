@@ -46,6 +46,7 @@ def _api(tmp_path: Path, replies=(), error: Exception | None = None, enabled: bo
     )
     router.settings.update({"ai": {"enabled": enabled, "ai_first": True, "confirm_over_usd": 1.0}})
     api = Api(
+        output_dir=tmp_path,  # a fake ariza must not land in the real D:\NEXVARA\Hujjatlar
         overrides={
             "ai_router": router,
             "open_app": lambda app: f"{app} ochildi",
@@ -280,7 +281,7 @@ def test_made_document_is_checked_and_fixed(tmp_path):
     out = api.chat("1-noyabrdan ishdan bo‘shash haqida ariza yoz")
     assert out.get("task"), out
     replies = []
-    for _ in range(200):
+    for _ in range(600):  # a busy PC (full test run): up to 30 s, stops as soon as it is done
         replies += [e["reply"]["reply"] for e in api.ui_events() if e["kind"] == "nexvara_reply"]
         if any(r.startswith("✔ Tekshirdim") for r in replies):
             break

@@ -210,8 +210,14 @@ class AgentApi:
                 self._local.approved = self._local.in_chain = False
 
         snap = self._runner.start(f"Ketma-ket: {len(steps)} ta topshiriq", fn, timeout=3 * 3600)
-        lines = "\n".join(f"{i}. {x}" for i, x in enumerate(labels, 1))
-        return {"reply": f"{intro}Ketma-ket bajaraman:\n{lines}\n\nJarayon o‘ng panelda.",
+        from nexvara.agent.tools import TOOLS
+
+        # The chat gets plain step names; the arguments («name: …, agg: sum») stay in the task
+        # card (live 2026-10-24 on the phone they read as noise, and there is no «o‘ng panel»).
+        short = [TOOLS[s.tool].title.split(" (")[0].split(" — ")[0].split(";")[0]
+                 if isinstance(s, ToolCall) else s for s in steps]  # fmt: skip
+        lines = "\n".join(f"{i}. {x}" for i, x in enumerate(short, 1))
+        return {"reply": f"{intro}Ketma-ket bajaraman:\n{lines}",
                 "task": snap.snapshot(), "plan": labels}  # fmt: skip
 
     def _risky_steps(self, steps: list) -> list[str]:

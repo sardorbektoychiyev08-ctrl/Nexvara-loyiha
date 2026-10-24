@@ -179,6 +179,19 @@ class FilesApi:
         name = "Excel" if app == "excel" else "Word"
         return self._runner.start(f"{name}’ga yozish", fn).snapshot()
 
+    def excel_user_dashboard(self, path: str) -> dict[str, Any]:
+        """«… dan Excelda dashboard yasa»: a new workbook with KPIs, summary and charts."""
+        fn = self._overrides.get("excel_user_dashboard")
+        if fn is None:
+            from nexvara.skills.excel.userdash import run_user_dashboard
+
+            keep = self._keep_open()
+
+            def fn(task: Any) -> dict[str, Any]:
+                return run_user_dashboard(task, path, keep_open=keep)
+
+        return self._runner.start(f"Excel dashboard: {Path(path).name}", fn).snapshot()
+
     def official_document(self, title: str, body: str, kimga: str = "", kimdan: str = "",
                           signer: str = "", date: str = "") -> dict[str, Any]:  # fmt: skip
         """An ariza / xat the AI wrote, in the official layout (doctemplates), DOCX + PDF."""
@@ -191,7 +204,8 @@ class FilesApi:
         except UserError as e:
             return {"error": str(e)}
         name = re.sub(r"[\\/:*?\"<>|]", " ", title.strip().capitalize())[:60].strip() or "Hujjat"
-        out = free_name(doctemplates.out_dir() / f"{name} {time.strftime('%Y%m%d-%H%M%S')}.docx")
+        folder = self._output_dir or doctemplates.out_dir()  # tests: never the user's D:\NEXVARA
+        out = free_name(folder / f"{name} {time.strftime('%Y%m%d-%H%M%S')}.docx")
         fake = self._overrides.get("doctemplate")
 
         def fn(task: Any) -> dict[str, Any]:

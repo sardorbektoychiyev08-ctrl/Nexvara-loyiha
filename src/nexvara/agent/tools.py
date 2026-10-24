@@ -58,7 +58,7 @@ READ_ONLY = frozenset({
 # AI plan of these runs at once, like a chat assistant would (paid AI steps ask on their own).
 CREATES_NEW = frozenset({
     "app.open", "office.write", "document.official", "photo.to_office", "drawing.create",
-    "files.save_as",
+    "files.save_as", "excel.dashboard",
     "education.test", "education.lesson", "education.presentation", "education.topic",
     "report.weekly", "media.image",
 })  # fmt: skip
@@ -271,7 +271,21 @@ def files_search(api, a):
     r = api.files_search(" ".join(keep), folder, ext)
     if not r.get("ok"):
         raise ToolError(r["error"])
-    paths = [f["path"] for f in r["files"]][:30]
+    paths = [f["path"] for f in r["files"]]
+    # «Hujjatlar papkasida» is Windows' Documents, but NEXVARA itself saves arizalar to
+    # D:\NEXVARA\Hujjatlar (live 2026-10-24: today's ariza was not found). Search both.
+    raw = str(a.get("folder") or "").strip().strip('«»"“”')
+    if raw:
+        from nexvara import config
+
+        name = re.sub(r"(?i)\s*papka\w*$", "", Path(raw).name or raw).strip()
+        if folder and Path(folder) == Path.home() / "Documents":
+            name = "Hujjatlar"
+        own = config.data_dir() / name if name else None
+        if own is not None and own.is_dir() and str(own) != folder:
+            r2 = api.files_search(" ".join(keep), str(own), ext)
+            paths += [f["path"] for f in r2.get("files", []) if f["path"] not in paths]
+    paths = paths[:30]
     api._ctx.set_files(paths)
     if folder:
         api._ctx.folder = folder
@@ -594,6 +608,19 @@ def _bi_state(api, cfg: dict[str, Any], flt: str, a: dict[str, Any] | None = Non
 _VIEW = {"filter": ("string", False, "masalan Toshkent yoki Hudud=Toshkent"),
          "date_from": ("string", False, "sanadan"), "date_to": ("string", False, "sanagacha"),
          "page": ("integer", False, "sahifa raqami")}  # fmt: skip
+
+
+@tool("excel.dashboard",
+      "Excel faylida dashboard (KPI, turkum bo‘yicha jami, diagrammalar) — yangi Excel fayl; "
+      "foydalanuvchi «Excelda dashboard» desa shuni tanla, NEXVARA BI emas",
+      file=("string", True, "ma’lumot jadvali (xlsx/csv)"))  # fmt: skip
+def excel_dashboard(api, a):
+    src = resolve_file(api, a.get("file", ""))
+    api._ctx.file = str(src)
+    snap = api.excel_user_dashboard(str(src))
+    if "id" not in snap:
+        raise ToolError(snap.get("error", "Boshlanmadi"))
+    return {"reply": f"{src.name} dan Excel dashboard yasayapman.", "task": snap}
 
 
 @tool("bi.create", "Dashboard yaratish", file=("string", False, "ma’lumot fayli yoki papka"),
@@ -1373,7 +1400,17 @@ def photo_compare_table(api, a):
 @tool("drawing.create", "Chizma chizish yoki rasmdagi eskizni qayta chizish",
       request=("string", True, "foydalanuvchining to‘liq talabi"))  # fmt: skip
 def drawing_create(api, a):
-    return _handled(api._chat_drawing(a["request"]), "Chizma")
+    from nexvara import drawing, drawing_offline
+
+    # The user's own words when they already describe the part or a change: the planner's
+    # rewrite lost both hole sizes of «… markazida diametri 20 mm teshik, burchaklarida 4 ta
+    # 8 mm teshik», and «markaziy teshik 30 mm bo‘lsin» became Ø8 (live 2026-10-24).
+    own = str((getattr(api, "_repair_origin", None) or [""])[0] or "")
+    try:
+        mine = own and (drawing.is_edit_request(own) or drawing_offline.parse(own))
+    except ValueError:
+        mine = None
+    return _handled(api._chat_drawing(own if mine else a["request"]), "Chizma")
 
 
 def _edu(api, a, parser: str) -> str:
