@@ -68,6 +68,18 @@ fun AppRoot(m: AppModel, act: PhoneActions) {
         if (m.pairing && m.profile != null) m.pairing = false else m.goBack()
     }
     if (m.locked) { LockScreen(act); return }
+    if (m.updateOffer) m.update?.let { u ->
+        AlertDialog(onDismissRequest = { m.laterUpdate() },
+            title = { Text("Yangi versiya: ${u.version}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("NEXVARA ilovasining yangi versiyasi chiqdi. Yangilansa ham kompyuter bilan ulanish va sozlamalar saqlanadi.")
+                    if (u.notes.isNotBlank()) Text(u.notes, style = MaterialTheme.typography.bodySmall)
+                }
+            },
+            confirmButton = { TextButton(onClick = { m.startUpdate() }) { Text("Yangilash") } },
+            dismissButton = { TextButton(onClick = { m.laterUpdate() }) { Text("Keyinroq") } })
+    }
     m.preview?.let { bmp ->
         androidx.compose.ui.window.Dialog(onDismissRequest = { m.preview = null }) {
             Panel(padding = 8.dp) {
