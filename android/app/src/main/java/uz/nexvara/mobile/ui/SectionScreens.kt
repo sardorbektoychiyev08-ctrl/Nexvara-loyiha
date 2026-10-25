@@ -898,6 +898,23 @@ fun SettingsScreen(m: AppModel, act: PhoneActions) {
                 ListRow(Icons.Default.Shield, "Shaxsiy ma’lumotlar himoyasi", "AI’ga ketadigan har so‘rov kompyuterda yashiriladi", x.success)
             }
         }
+        item { SectionTitle("Ilova versiyasi") }
+        item {
+            Panel {
+                val u = m.update
+                val p = m.updateProgress
+                ListRow(Icons.Default.SystemUpdate, "NEXVARA Android ${BuildConfigInfo.version}", when {
+                    p != null -> "Yuklanmoqda… $p%"
+                    u != null -> "Yangi versiya bor: ${u.version}"
+                    else -> "Yangi versiya chiqsa, ilova o‘zi xabar beradi"
+                }, if (u != null) x.success else Brand.Cyan)
+                if (p != null) LinearProgressIndicator(progress = { p / 100f }, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp))
+                else if (u != null) Button(onClick = { m.startUpdate() }) { Text("Yangilash (${u.version})") }
+                else TextButton(onClick = { m.checkUpdate() }, enabled = !m.updateChecking) {
+                    Text(if (m.updateChecking) "Tekshirilmoqda…" else "Yangilanishni tekshirish")
+                }
+            }
+        }
         item {
             Text("NEXVARA Android ${BuildConfigInfo.version} · Kompyuter: ${ov?.version ?: "—"}", style = MaterialTheme.typography.bodySmall,
                 color = x.muted, modifier = Modifier.padding(top = 12.dp))

@@ -52,6 +52,11 @@ private val PATTERNS: List<Pair<Regex, (List<String>) -> String>> = listOf(
     Regex("(\\d+)-sinf") to { g -> "${g[1]} класс" },
     Regex("Kompyuterda: (.+)") to { g -> "На компьютере: ${g[1]}" },
     Regex("NEXVARA Android (.+) · Kompyuter: (.+)") to { g -> "NEXVARA Android ${g[1]} · Компьютер: ${g[2]}" },
+    Regex("Yangi versiya: (.+)") to { g -> "Новая версия: ${g[1]}" },
+    Regex("Yangi versiya bor: (.+)") to { g -> "Есть новая версия: ${g[1]}" },
+    Regex("Yuklanmoqda… (\\d+)%") to { g -> "Загрузка… ${g[1]}%" },
+    Regex("Yangilash \\((.+)\\)") to { g -> "Обновить (${g[1]})" },
+    Regex("Eng so‘nggi versiya o‘rnatilgan \\((.+)\\)") to { g -> "Установлена последняя версия (${g[1]})" },
 )
 
 @Composable
@@ -63,6 +68,15 @@ fun Text(
     overflow = overflow, maxLines = maxLines, style = style)
 
 private val RU: Map<String, String> = mapOf(
+    "Ilova versiyasi" to "Версия приложения", "Yangilash" to "Обновить", "Keyinroq" to "Позже",
+    "Yangilanishni tekshirish" to "Проверить обновления", "Tekshirilmoqda…" to "Проверка…",
+    "Yangi versiya chiqsa, ilova o‘zi xabar beradi" to "Приложение само сообщит о новой версии",
+    "NEXVARA ilovasining yangi versiyasi chiqdi. Yangilansa ham kompyuter bilan ulanish va sozlamalar saqlanadi." to
+        "Вышла новая версия NEXVARA. После обновления подключение к компьютеру и настройки сохранятся.",
+    "Sinov nusxasi yangilanmaydi" to "Тестовая копия не обновляется",
+    "Yangilanishni tekshirib bo‘lmadi. Internetni tekshiring." to "Не удалось проверить обновления. Проверьте интернет.",
+    "NEXVARA’ga ilova o‘rnatishga ruxsat bering, so‘ng ilovaga qayting" to "Разрешите NEXVARA установку приложений и вернитесь в приложение",
+    "Ruxsat berilmadi — yangilash uchun «Yangilash»ni yana bosing" to "Разрешение не дано — нажмите «Обновить» ещё раз",
     // navigation and screens
     "Bosh sahifa" to "Главная", "Suhbat" to "Чат", "Vazifalar" to "Задачи", "Bo‘limlar" to "Разделы",
     "AI suhbat" to "AI-чат", "Office yordamchisi" to "Помощник Office", "Darsliklar va testlar" to "Учебники и тесты",

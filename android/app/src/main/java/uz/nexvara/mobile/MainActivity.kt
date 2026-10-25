@@ -175,6 +175,8 @@ class MainActivity : FragmentActivity() {
         model.background = false
         model.cameForeground()
         if (model.profile != null) model.refreshAll()
+        model.resumeUpdate()
+        model.checkUpdate(auto = true)
     }
     override fun onStop() { model.background = true; model.wentBackground(); super.onStop() }
 

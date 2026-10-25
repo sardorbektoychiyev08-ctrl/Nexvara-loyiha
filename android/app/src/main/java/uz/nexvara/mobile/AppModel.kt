@@ -158,6 +158,75 @@ class AppModel(app: Application) : AndroidViewModel(app) {
     fun useSecureScreen(v: Boolean) { secureScreen = v; prefs.edit().putBoolean("secure_screen", v).apply() }
     fun useBackgroundAlerts(v: Boolean) { backgroundAlerts = v; prefs.edit().putBoolean("bg_alerts", v).apply() }
 
+    // ---------------- app update (GitHub releases, AppUpdate) ----------------
+    var update by mutableStateOf<AppUpdate.Info?>(null); private set
+    var updateOffer by mutableStateOf(false)  // the «Yangi versiya bor» dialog
+    var updateProgress by mutableStateOf<Int?>(null); private set
+    var updateChecking by mutableStateOf(false); private set
+    private val appVersion get() = BuildConfig.VERSION_NAME
+    private var awaitingInstallPermission = false
+
+    /** [auto]: at most every 6 hours, silent when nothing is new or the network is down. */
+    fun checkUpdate(auto: Boolean = false) {
+        val ctx = getApplication<Application>()
+        if (!AppUpdate.supported(ctx)) { if (!auto) notice = "Sinov nusxasi yangilanmaydi"; return }
+        if (updateChecking || updateProgress != null || (auto && !AppUpdate.dueForAutoCheck(ctx))) return
+        viewModelScope.launch {
+            updateChecking = true
+            try {
+                val info = withContext(Dispatchers.IO) { AppUpdate.check(ctx, appVersion) }
+                update = info
+                when {
+                    info == null -> if (!auto) notice = "Eng so‘nggi versiya o‘rnatilgan ($appVersion)"
+                    !auto || AppUpdate.dismissed(ctx) != info.version -> updateOffer = true
+                }
+            } catch (e: Exception) {
+                if (!auto) notice = "Yangilanishni tekshirib bo‘lmadi. Internetni tekshiring."
+            } finally { updateChecking = false }
+        }
+    }
+
+    fun laterUpdate() { update?.let { AppUpdate.dismiss(getApplication(), it.version) }; updateOffer = false }
+
+    fun startUpdate() {
+        val info = update ?: return
+        val ctx = getApplication<Application>()
+        updateOffer = false
+        if (updateProgress != null) return
+        viewModelScope.launch {
+            updateProgress = 0
+            try {
+                val apk = withContext(Dispatchers.IO) { AppUpdate.download(ctx, info) { p -> updateProgress = p } }
+                installWaiting(apk)
+            } catch (e: Exception) {
+                notice = e.message ?: "Yangilanish yuklanmadi"
+            } finally { updateProgress = null }
+        }
+    }
+
+    /** Opens the installer, or first the «allow installing» setting (resumed in [resumeUpdate]). */
+    private fun installWaiting(apk: java.io.File) {
+        val ctx = getApplication<Application>()
+        if (!AppUpdate.allowed(ctx)) {
+            notice = "NEXVARA’ga ilova o‘rnatishga ruxsat bering, so‘ng ilovaga qayting"
+            awaitingInstallPermission = true
+            AppUpdate.askPermission(ctx)
+            return
+        }
+        AppUpdate.install(ctx, apk)
+    }
+
+    /** Back from the permission screen: continue with the already checked file. */
+    fun resumeUpdate() {
+        if (!awaitingInstallPermission) return
+        awaitingInstallPermission = false
+        val ctx = getApplication<Application>()
+        val apk = AppUpdate.waiting(ctx) ?: return
+        if (!AppUpdate.allowed(ctx)) { notice = "Ruxsat berilmadi — yangilash uchun «Yangilash»ni yana bosing"; return }
+        if (AppUpdate.verify(ctx, apk) != null) { apk.delete(); return }  // already installed or stale
+        AppUpdate.install(ctx, apk)
+    }
+
     /** Puts a ready command into the chat box for the user to finish and send. */
     fun compose(text: String) { draft = text; open(Screen.Chat) }
 
