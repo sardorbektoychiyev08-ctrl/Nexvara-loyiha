@@ -1,6 +1,7 @@
 """Publish a signed release to the public GitHub updates repository (the internet channel).
 
     python scripts\\publish_github.py <folder> <tag> [notes]
+    python scripts\\publish_github.py --add <tag> <file>...   (e.g. a newer Android APK)
 
 <folder> holds what `build.ps1 -Publish <folder>` wrote (latest.json, latest.json.sig, the
 installer) and optionally the Android APK. A GitHub release <tag> is created in
@@ -65,7 +66,27 @@ def publish(folder: Path, tag: str, notes: str = "") -> str:
     return rel["html_url"]
 
 
+def add(tag: str, paths: list[Path]) -> str:
+    """Attaches more files (a newer Android APK) to an existing release <tag>."""
+    for p in paths:
+        if not p.is_file() or p.suffix.lower() not in ALLOWED:
+            raise SystemExit(f"Qo‘shib bo‘lmaydi: {p}")
+    token = _token()
+    rel = _call("GET", f"{API}/releases/tags/{tag}", token)
+    have = {a["name"] for a in rel.get("assets", [])}
+    for p in paths:
+        if p.name in have:
+            raise SystemExit(f"{p.name} relizda allaqachon bor")
+        _call("POST", f"{UPLOADS}/releases/{rel['id']}/assets?name={p.name}", token,
+              p.read_bytes(), "application/octet-stream")  # fmt: skip
+        print("yuklandi:", p.name)
+    return rel["html_url"]
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 3:
         raise SystemExit(__doc__)
+    if sys.argv[1] == "--add":
+        print(add(sys.argv[2], [Path(a) for a in sys.argv[3:]]))
+        raise SystemExit(0)
     print(publish(Path(sys.argv[1]), sys.argv[2], " ".join(sys.argv[3:])))

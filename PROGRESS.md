@@ -4,6 +4,16 @@ Claude Code va Codex shu faylni ishni boshlashda o'qiydi va yakunida **yuqoriga*
 
 ---
 
+## 2026-10-25 (59) — Claude Code — Android ilova o‘zini yangilaydi (1.6.2)
+
+**Egasi:** «telefondagi qanday yangilanadi» → «qil shuni». Avval Android’da yangilash yo‘q edi (faqat qo‘lda APK).
+**Qilindi (`claude/android-v1` → `main`):** `AppUpdate.kt` — GitHub `nexvara-yangilanish` oxirgi relizidan eng yangi `NEXVARA-<versiya>.apk` (faqat `https://github.com/` havolasi, hajmi bor); ilova ochilganda 6 soatda bir marta jim tekshiradi, yangisi bo‘lsa «Yangi versiya: X — Yangilash / Keyinroq» oynasi; Sozlamalar → «Ilova versiyasi»: tekshirish, foizli yuklash, «Yangilash». O‘rnatishdan oldin: hajm aynan mos, paket nomi bizniki, versionCode kattaroq, imzo sertifikati (SHA-256) o‘rnatilgan ilovaniki bilan bir xil — aks holda fayl o‘chiriladi. Android 8+ «noma’lum ilovalarni o‘rnatish» ruxsati so‘raladi, qaytgach o‘zi davom etadi. Debug `.sinov` nusxasi yangilanmaydi. `REQUEST_INSTALL_PACKAGES`, `cache/updates` FileProvider, ruscha tarjimalar. Versiya 1.6.2 (code 15). `scripts/publish_github.py --add <tag> <fayl>` — mavjud relizga APK qo‘shish.
+**Testlar:** `android_build.ps1 -Release` — debug + release build PASS, unit 31 PASS (yangi `AppUpdateTest` 4/4). Release APK imzosi 1.6.1 bilan bir xil (`a5ece346…3a75`) — PASS. `scripts/test.ps1` — 592 PASS, smoke PASS. Haqiqiy telefonda yangilanish — NOT TESTED (telefon ulanmagan; 1.6.1 da yangilash yo‘q, shuning uchun 1.6.2 bir marta qo‘lda o‘rnatiladi).
+**Reliz:** `dist\android-1.6.2\NEXVARA-1.6.2.apk` (5440396 bayt, SHA-256 `dfda4d3c66ca3feabaa7c1c1e3c525f9e8f6e36d806d6b51fa19339a1e9f434a`). GitHub v1.5.13 ga qo‘shish (`publish_github.py --add v1.5.13 …`) — **BLOCKED** (avtomatik ruxsat tizimi), egasi ruxsatini kutadi.
+**Keyingi qadam:** ruxsat bilan APK’ni yuklash, `main` push; egasi telefonda 1.6.2 ni bir marta havola orqali o‘rnatadi, keyingilari ilova ichidan.
+
+---
+
 ## 2026-10-25 (58) — Claude Code — Office sinovi, `main` ga merge, 1.5.13 yig‘ildi
 
 **Egasi:** «kelgan joyingdan davom et», «meni aralashtirma, o‘zing qil».
