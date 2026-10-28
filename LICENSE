@@ -1,1 +1,321 @@
+                    GNU UMUMIY JAMOAT LITSENZIYASI
+                       3-versiya, 2007-yil 29-iyun
 
+ Mualliflik huquqi (C) 2007 Free Software Foundation, Inc. <https://fsf.org/> ga tegishli.
+ Har kim so'zma-so'z nusxalarini nusxalash va tarqatishga ruxsat beriladi
+ ushbu litsenziya hujjatining, lekin uni o'zgartirishga yo'l qo'yilmaydi.
+
+                            Muqaddima
+
+  GNU General Public License - bu bepul, copyleft litsenziyasi.
+dasturiy ta'minot va boshqa turdagi ishlar.
+
+  Ko'pgina dasturiy ta'minot va boshqa amaliy ishlar uchun litsenziyalar ishlab chiqilgan
+asarlarni baham ko'rish va o'zgartirish erkinligingizni tortib olish uchun. Aksincha,
+GNU Umumiy Davlat Litsenziyasi sizning erkinligingizni kafolatlash uchun mo'ljallangan
+dasturning barcha versiyalarini ulashish va o'zgartirish - uning bepul bo'lib qolishiga ishonch hosil qilish uchun
+barcha foydalanuvchilari uchun dasturiy ta'minot. Biz, Erkin Dasturiy Ta'minot Jamg'armasi, quyidagilardan foydalanamiz
+Ko'pgina dasturiy ta'minotimiz uchun GNU Umumiy Davlat Litsenziyasi; u shuningdek, quyidagilarga ham tegishli
+mualliflari tomonidan shu tarzda nashr etilgan boshqa har qanday asar. Siz uni qo'llashingiz mumkin
+dasturlaringiz ham.
+
+  Erkin dasturiy ta'minot haqida gapirganda, biz erkinlikni emas, balki
+narx. Bizning umumiy litsenziyalarimiz sizga ishonch hosil qilish uchun mo'ljallangan
+bepul dasturiy ta'minot nusxalarini tarqatish erkinligiga ega (va buning uchun haq oladi)
+agar xohlasangiz, ularni), siz manba kodini olishingiz yoki agar xohlasangiz, uni olishingiz mumkin
+dasturiy ta'minotni o'zgartirishingiz yoki uning qismlaridan yangisini ishlatishingiz mumkinligini xohlaysiz
+bepul dasturlar va siz bu narsalarni qilishingiz mumkinligini bilasiz.
+
+  Huquqlaringizni himoya qilish uchun biz boshqalarning sizni rad etishiga yo'l qo'ymasligimiz kerak
+ushbu huquqlardan voz kechishingizni so'rash yoki sizdan huquqlardan voz kechishingizni so'rash. Shuning uchun sizda
+dasturiy ta'minot nusxalarini tarqatsangiz yoki agar siz ma'lum majburiyatlarga ega bo'lsangiz
+siz uni o'zgartirasiz: boshqalarning erkinligini hurmat qilish majburiyatlari.
+
+  Masalan, agar siz bunday dasturning nusxalarini tarqatsangiz,
+bepul yoki pullik evaziga, siz uni oluvchilarga topshirishingiz kerak
+siz olgan erkinliklar. Siz ularning ham olishiga ishonch hosil qilishingiz kerak
+yoki manba kodini olishingiz mumkin. Va siz ularga ushbu atamalarni ko'rsatishingiz kerak, shunda ular
+o'z huquqlarini bilishadi.
+
+  GNU GPL dan foydalanadigan dasturchilar sizning huquqlaringizni ikki bosqichda himoya qiladi:
+(1) dasturiy ta'minotga mualliflik huquqini himoya qilish va (2) sizga ushbu Litsenziyani taqdim etish
+sizga uni nusxalash, tarqatish va/yoki o'zgartirish uchun qonuniy ruxsat berish.
+
+  Ishlab chiquvchilar va mualliflarni himoya qilish uchun GPL aniq tushuntiradi
+ushbu bepul dasturiy ta'minot uchun hech qanday kafolat yo'q. Ham foydalanuvchilar, ham
+mualliflar uchun, GPL o'zgartirilgan versiyalar quyidagicha belgilanishini talab qiladi
+o'zgartirildi, shunda ularning muammolari noto'g'ri ravishda ularga yuklanmaydi
+oldingi versiyalar mualliflari.
+
+  Ba'zi qurilmalar foydalanuvchilarga o'rnatish yoki ishga tushirishga ruxsat berishni rad etish uchun mo'ljallangan
+ishlab chiqaruvchi bo'lsa ham, ular ichidagi dasturiy ta'minotning o'zgartirilgan versiyalari
+buni qila oladi. Bu maqsadga tubdan mos kelmaydi
+foydalanuvchilarning dasturiy ta'minotni o'zgartirish erkinligini himoya qilish. Tizimli
+bunday suiiste'mollik holatlari jismoniy shaxslar uchun mo'ljallangan mahsulotlar sohasida uchraydi
+foydalanish, aynan shu yerda u eng nomaqbul hisoblanadi. Shuning uchun biz
+GPLning ushbu versiyasini amaliyotni taqiqlash uchun ishlab chiqdilar
+mahsulotlar. Agar bunday muammolar boshqa sohalarda jiddiy ravishda yuzaga kelsa, biz
+ushbu qoidani kelajakdagi versiyalarda ushbu domenlarga kengaytirishga tayyormiz
+foydalanuvchilarning erkinligini himoya qilish uchun zarur bo'lganda GPL.
+
+  Nihoyat, har bir dastur doimiy ravishda dasturiy ta'minot patentlari tomonidan tahdid ostida.
+Davlatlar patentlarga ishlab chiqish va ulardan foydalanishni cheklashga yo'l qo'ymasliklari kerak
+umumiy maqsadli kompyuterlardagi dasturiy ta'minot, lekin bunday kompyuterlarda biz buni xohlaymiz
+bepul dasturga qo'llaniladigan patentlar keltirib chiqarishi mumkin bo'lgan maxsus xavfdan qoching
+uni samarali ravishda mulkka aylantiring. Buning oldini olish uchun GPL buni kafolatlaydi
+patentlardan dasturni bepul qilmaslik uchun foydalanib bo'lmaydi.
+
+  Nusxalash, tarqatish va boshqa narsalar uchun aniq shartlar va qoidalar
+o'zgartirish amal qiladi.
+
+                       FOYDALANISH SHARTLARI
+
+  0. Ta'riflar.
+
+  "Ushbu litsenziya" GNU General Public License ning 3-versiyasini anglatadi.
+
+  "Mualliflik huquqi" shuningdek, boshqa turlarga ham tegishli bo'lgan mualliflik huquqiga o'xshash qonunlarni ham anglatadi
+yarimo'tkazgich niqoblari kabi ishlar.
+
+  "Dastur" ushbu litsenziyaga muvofiq litsenziyalangan har qanday mualliflik huquqi bilan himoyalangan asarni anglatadi
+Litsenziya. Har bir litsenziatga "siz" deb murojaat qilinadi. "Litsenziatlar" va
+"Oluvchilar" jismoniy shaxslar yoki tashkilotlar bo'lishi mumkin.
+
+  Asarni "o'zgartirish" deganda asarning to'liq yoki bir qismini nusxalash yoki moslashtirish tushuniladi.
+mualliflik huquqi bilan himoyalangan ruxsatni talab qiladigan tarzda, yaratishdan tashqari
+aniq nusxasi. Natijada hosil bo'lgan asar "o'zgartirilgan versiyasi" deb ataladi
+avvalgi ish yoki avvalgi ish "asosidagi" ish.
+
+  "Yopiq ish" deganda o'zgartirilmagan Dastur yoki ishga asoslangan ish tushuniladi
+Dastur bo'yicha.
+
+  Biror asarni "targ'ib qilish" deganda, u bilan hech qanday aloqasi bo'lmagan har qanday ishni qilish tushuniladi.
+ruxsatnoma, sizni bevosita yoki ikkilamchi javobgarlikka tortadi
+amaldagi mualliflik huquqi to'g'risidagi qonunga muvofiq buzilish, uni amalga oshirish bundan mustasno
+kompyuter yoki shaxsiy nusxani o'zgartirish. Ko'paytirish nusxa ko'chirishni o'z ichiga oladi,
+tarqatish (o'zgartirish bilan yoki o'zgartirishsiz), mavjud qilish
+ommaviy, ba'zi mamlakatlarda esa boshqa faoliyatlar ham mavjud.
+
+  Asarni "yetkazish" boshqa odamlarga imkon beradigan har qanday targ'ibotni anglatadi
+nusxalarini yaratish yoki olish uchun tomonlar. Foydalanuvchi bilan shunchaki o'zaro aloqa
+nusxasini uzatmasdan kompyuter tarmog'i ma'lumot uzatmayapti.
+
+  Interaktiv foydalanuvchi interfeysi "Tegishli huquqiy bildirishnomalar" ni ko'rsatadi
+qulay va ko'zga ko'rinadigan darajada
+(1) tegishli mualliflik huquqi bildirishnomasini ko'rsatadigan xususiyat va (2)
+foydalanuvchiga ish uchun hech qanday kafolat yo'qligini aytadi (bundan tashqari
+kafolatlar taqdim etilgan hollarda), litsenziatlar quyidagilarni taqdim etishlari mumkin
+ushbu Litsenziya bo'yicha ishlash va ushbu Litsenziyaning nusxasini qanday ko'rish mumkin. Agar
+interfeys foydalanuvchi buyruqlari yoki parametrlari ro'yxatini taqdim etadi, masalan,
+menyuda, ro'yxatdagi ko'zga ko'ringan element ushbu mezonga javob beradi.
+
+  1. Manba kodi.
+
+  Asar uchun "manba kodi" asarning afzal ko'rilgan shaklini anglatadi
+unga o'zgartirishlar kiritish uchun. "Ob'ekt kodi" har qanday manba bo'lmagan narsani anglatadi
+asar shakli.
+
+  "Standart interfeys" rasmiy bo'lgan interfeysni anglatadi
+tan olingan standartlar organi tomonidan belgilangan standart, yoki, agar shunday bo'lsa
+ma'lum bir dasturlash tili uchun belgilangan interfeyslar, ya'ni
+ushbu tilda ishlaydigan dasturchilar orasida keng qo'llaniladi.
+
+  Bajariladigan ishning "Tizim kutubxonalari" boshqa har qanday narsani o'z ichiga oladi
+butun asarga qaraganda, (a) oddiy shaklga kiritilgan
+asosiy komponentni qadoqlash, lekin u asosiy komponentning bir qismi emas
+Komponent va (b) faqat asardan foydalanishga imkon berish uchun xizmat qiladi
+Asosiy komponent yoki standart interfeysni amalga oshirish uchun
+Amalga oshirish manba kodi shaklida ommaga taqdim etiladi. A
+"Asosiy komponent" bu kontekstda asosiy muhim komponentni anglatadi
+(yadro, oyna tizimi va boshqalar) ma'lum bir operatsion tizimning
+(agar mavjud bo'lsa) bajariladigan fayl ishlaydigan fayl yoki ishlatiladigan kompilyator
+ishni yoki uni ishga tushirish uchun ishlatiladigan obyekt kodi tarjimonini ishlab chiqaradi.
+
+  Ob'ekt kodi shaklidagi ish uchun "mos keladigan manba" hamma narsani anglatadi
+yaratish, o'rnatish va (bajariladigan fayl uchun) zarur bo'lgan manba kodi
+work) obyekt kodini ishga tushirish va skriptlarni o'z ichiga olgan ishni o'zgartirish uchun
+ushbu faoliyatni nazorat qilish. Biroq, bu ishning tarkibiga kirmaydi
+Tizim kutubxonalari yoki umumiy maqsadli vositalar yoki umuman bepul mavjud
+ushbu faoliyatni amalga oshirishda o'zgartirilmagan holda ishlatiladigan dasturlar, ammo
+ishning bir qismi bo'lmagan. Masalan, mos keladigan manba
+manba fayllari bilan bog'liq interfeys ta'rifi fayllarini o'z ichiga oladi
+ish va umumiy kutubxonalar uchun manba kodi va dinamik ravishda
+ish uchun maxsus ishlab chiqilgan bog'langan kichik dasturlar,
+masalan, ular orasidagi maxfiy ma'lumotlar almashinuvi yoki boshqaruv oqimi orqali
+kichik dasturlar va ishning boshqa qismlari.
+
+  Tegishli manba foydalanuvchilar kiritadigan hech narsani o'z ichiga olmaydi
+mos keladigan boshqa qismlardan avtomatik ravishda qayta tiklanishi mumkin
+Manba.
+
+  Manba kodi shaklidagi ish uchun mos keladigan manba bu
+xuddi shu ish.
+
+  2. Asosiy ruxsatnomalar.
+
+  Ushbu Litsenziya bo'yicha berilgan barcha huquqlar muddatga beriladi
+Dasturga mualliflik huquqi bilan himoyalangan va ko'rsatilgan shartlar asosida qaytarib olinmaydi
+shartlar bajarilgan taqdirda. Ushbu litsenziya sizning cheksiz huquqlaringizni aniq tasdiqlaydi
+o'zgartirilmagan dasturni ishga tushirish uchun ruxsat. Ishga tushirishdan olingan natija
+qoplangan ish ushbu Litsenziya bilan faqat mahsulot, agar uning qiymati hisobga olinsa, qamrab olinadi
+kontent, qamrab olingan asarni tashkil qiladi. Ushbu litsenziya sizning
+mualliflik huquqi to'g'risidagi qonunda nazarda tutilganidek, adolatli foydalanish huquqlari yoki boshqa ekvivalent huquqlar.
+
+  Siz o'zingiz yaratmagan yopiq asarlarni yaratishingiz, nashr etishingiz va tarqatishingiz mumkin
+litsenziyangiz aks holda saqlanib qolsa, shartlarsiz yetkazib bering
+kuchda. Siz faqat shu maqsadda yoritilgan asarlarni boshqalarga topshirishingiz mumkin
+ulardan faqat siz uchun o'zgartirishlar kiritishlari yoki sizga taqdim etishlari
+ushbu ishlarni bajarish uchun qulayliklar bilan, agar siz quyidagilarga rioya qilsangiz
+siz bajaradigan barcha materiallarni yetkazib berishda ushbu Litsenziya shartlari
+mualliflik huquqini nazorat qilmaydi. Shunday qilib, qamrab olingan asarlarni yaratgan yoki boshqarganlar
+chunki buni faqat o'z nomingizdan, sizning ko'rsatmangiz ostida qilishingiz kerak
+va nazorat qilish, ularga biron bir nusxasini yaratishni taqiqlovchi shartlar asosida
+siz bilan munosabatlaridan tashqarida mualliflik huquqi bilan himoyalangan materialingiz.
+
+  Boshqa har qanday sharoitda tashishga faqat quyidagi hollarda ruxsat beriladi
+quyida ko'rsatilgan shartlar. Sublitsenziyalashga yo'l qo'yilmaydi; 10-bo'lim
+uni keraksiz qiladi.
+
+  3. Foydalanuvchilarning qonuniy huquqlarini aylanib o'tishga qarshi qonundan himoya qilish.
+
+  Hech qanday qoplangan ish samarali texnologik jarayonning bir qismi deb hisoblanmaydi
+moddasi bo'yicha majburiyatlarni bajaradigan har qanday amaldagi qonunchilikka muvofiq choralar
+1996-yil 20-dekabrda qabul qilingan BIMT mualliflik huquqi shartnomasining 11-moddasi, yoki
+bunday qonunlarni chetlab o'tishni taqiqlovchi yoki cheklovchi shunga o'xshash qonunlar
+choralar.
+
+  Yoritilgan asarni taqdim etganingizda, siz taqiqlash uchun har qanday qonuniy vakolatdan voz kechasiz
+texnologik choralarni chetlab o'tish, bunday chetlab o'tish darajasida
+ushbu Litsenziya bo'yicha huquqlarni amalga oshirish orqali amalga oshiriladi
+qoplangan ish va siz operatsiyani cheklash niyatidan voz kechasiz yoki
+asarga qarshi majburlash vositasi sifatida asarni o'zgartirish
+foydalanuvchilar, sizning yoki uchinchi shaxslarning chetlab o'tishni taqiqlash bo'yicha qonuniy huquqlari
+texnologik choralar.
+
+  4. So'zma-so'z nusxalarni yetkazib berish.
+
+  Siz dasturning manba kodining so'zma-so'z nusxalarini taqdim etishingiz mumkin
+uni istalgan vositada, agar siz aniq va aniq ko'rsatsangiz, qabul qiling
+har bir nusxada tegishli mualliflik huquqi to'g'risidagi bildirishnomani tegishli ravishda nashr etish;
+ushbu Litsenziya va har qanday bildirishnomalarni o'z kuchida saqlang
+7-bo'limga muvofiq qo'shilgan ruxsat etuvchi bo'lmagan atamalar kodeksga qo'llaniladi;
+kafolat yo'qligi haqidagi barcha bildirishnomalarni o'z kuchida saqlang; va barchasini bering
+oluvchilarga ushbu Litsenziyaning nusxasi va Dastur.
+
+  Siz yetkazib bergan har bir nusxa uchun istalgan narxni yoki narxsiz undirishingiz mumkin,
+va siz haq evaziga qo'llab-quvvatlash yoki kafolat himoyasini taklif qilishingiz mumkin.
+
+  5. O'zgartirilgan manba versiyalarini yetkazib berish.
+
+  Siz Dasturga asoslangan ish yoki unga kiritilgan o'zgartirishlarni taqdim etishingiz mumkin
+uni Dasturdan, manba kodi shaklida ishlab chiqaring
+4-bo'lim shartlari, agar siz ushbu shartlarning barchasiga javob bersangiz:
+
+    a) Ishda siz o'zgartirganingizni ko'rsatuvchi ko'zga ko'ringan eslatmalar bo'lishi kerak
+    va tegishli sanani ko'rsatish.
+
+    b) Ishda uning mavjudligini ko'rsatuvchi ko'zga ko'ringan yozuvlar bo'lishi kerak
+    ushbu Litsenziya va ushbu bo'limga qo'shilgan har qanday shartlar asosida chiqarilgan
+    7. Ushbu talab 4-bo'limdagi talabni quyidagicha o'zgartiradi
+    "Barcha bildirishnomalarni o'z kuchida saqlang".
+
+    c) Siz ushbu hujjatga muvofiq butun asarni litsenziyalashingiz kerak
+    Nusxaga ega bo'lgan har bir kishiga litsenziya. Bu
+    Shuning uchun litsenziya, tegishli 7-bo'lim bilan birga qo'llaniladi
+    asarning butun qismiga va uning barcha qismlariga qo'shimcha shartlar,
+    ular qanday qadoqlanganidan qat'i nazar. Ushbu litsenziya hech qanday ma'lumot bermaydi
+    asarni boshqa har qanday usulda litsenziyalash uchun ruxsat, lekin u bunday qilmaydi
+    agar siz alohida olgan bo'lsangiz, bunday ruxsatnomani bekor qiling.
+
+    d) Agar ish interaktiv foydalanuvchi interfeyslariga ega bo'lsa, ularning har biri ko'rsatilishi kerak
+    Tegishli huquqiy bildirishnomalar; ammo, agar Dastur interaktiv bo'lsa
+    tegishli huquqiy bildirishnomalarni ko'rsatmaydigan interfeyslar, sizning
+    ish ularni bunga majburlashi shart emas.
+
+  Boshqa alohida va mustaqil ishlar bilan qoplangan asarlar to'plami
+o'z tabiatiga ko'ra yoritilgan asarning kengaytmasi bo'lmagan asarlar,
+va ular kattaroq dasturni tashkil qilish uchun u bilan birlashtirilmagan,
+saqlash yoki tarqatish vositasining hajmida yoki hajmida, deyiladi
+agar kompilyatsiya va undan kelib chiqadigan mualliflik huquqi bo'lmasa, "yig'ma"
+kompilyatsiya foydalanuvchilarining kirish huquqini yoki qonuniy huquqlarini cheklash uchun ishlatiladi
+shaxsning ishlashiga ruxsat berganidan tashqari. Yopiq ishni kiritish
+umumiy holda, ushbu Litsenziyaning boshqasiga qo'llanilishiga olib kelmaydi
+agregatning qismlari.
+
+  6. Manba bo'lmagan shakllarni yetkazib berish.
+
+  Siz shartlarga muvofiq ob'ekt kodi shaklida qoplangan ishni topshirishingiz mumkin
+4 va 5-bo'limlarning qoidalari, agar siz ham quyidagilarni taqdim etsangiz
+ushbu Litsenziya shartlariga muvofiq mashinada o'qiladigan mos keladigan manba,
+shu usullardan birida:
+
+    a) Obyekt kodini jismoniy mahsulotga yetkazish yoki unda mujassamlash
+    (jismoniy tarqatish vositasini ham o'z ichiga olgan holda), hamrohlik qiladi
+    Bardoshli jismoniy muhitga o'rnatilgan mos keladigan manba
+    odatda dasturiy ta'minot almashinuvi uchun ishlatiladi.
+
+    b) Obyekt kodini jismoniy mahsulotga yetkazish yoki unda mujassamlash
+    (jismoniy tarqatish vositasini o'z ichiga olgan holda), a bilan birga keladi
+    yozma taklif, kamida uch yil davomida amal qiladi va ... gacha amal qiladi
+    agar siz ushbu mahsulot uchun ehtiyot qismlar yoki mijozlarni qo'llab-quvvatlashni taklif qilsangiz
+    model, ob'ekt kodiga ega bo'lgan har bir kishiga (1) a berish uchun
+    barcha dasturiy ta'minot uchun mos keladigan manbaning nusxasi
+    ushbu litsenziya bilan qamrab olingan mahsulot, bardoshli jismoniy holatda
+    odatda dasturiy ta'minot almashinuvi uchun ishlatiladigan vosita, hech qanday narxda emas
+    buni jismoniy bajarish uchun sarflagan oqilona xarajatlaringizdan ko'proq
+    manbani uzatish yoki (2) nusxa ko'chirishga kirish
+    Tarmoq serveridan mos keladigan manba bepul.
+
+    c) Obyekt kodining alohida nusxalarini nusxasi bilan birga yetkazing
+    tegishli manbani taqdim etish bo'yicha yozma taklif. Bu
+    muqobil variantga faqat vaqti-vaqti bilan va tijorat maqsadlarida bo'lmagan holda ruxsat beriladi va
+    faqat siz ob'ekt kodini bunday taklif bilan olgan bo'lsangiz, muvofiq
+    6b-kichik band bilan.
+
+    d) Belgilangan manbadan kirishni taklif qilish orqali obyekt kodini yetkazish
+    joy (bepul yoki pullik) va unga tenglashtirilgan kirish imkoniyatini taklif eting
+    Tegishli manba xuddi shu tarzda, xuddi shu joyda, yo'q joyda
+    qo'shimcha to'lov. Qabul qiluvchilardan nusxa ko'chirishni talab qilishingiz shart emas
+    Ob'ekt kodi bilan birga mos keladigan manba. Agar joy bo'lsa
+    obyekt kodini nusxalash tarmoq serveri, mos keladigan manba
+    boshqa serverda bo'lishi mumkin (siz yoki uchinchi tomon tomonidan boshqariladi)
+    agar siz uni saqlab tursangiz, ekvivalent nusxa ko'chirish imkoniyatlarini qo'llab-quvvatlaydi
+    obyekt kodining yonida qaerdan topish mumkinligini ko'rsatuvchi aniq ko'rsatmalar
+    Tegishli manba. Qaysi serverda joylashganligidan qat'i nazar
+    Tegishli manba, siz uning mavjudligiga ishonch hosil qilishingiz shart.
+    ushbu talablarni qondirish uchun zarur bo'lgan vaqt davomida mavjud.
+
+    e) Obyekt kodini tengdoshdan tengdoshga uzatish orqali uzatish, agar mavjud bo'lsa
+    Siz boshqa tengdoshlaringizga ob'ekt kodi va mos keladigan joy haqida xabar berasiz
+    Ish manbai keng jamoatchilikka yo'q joyda taqdim etilmoqda
+    6d-kichik bandga muvofiq ayblov.
+
+  Ob'ekt kodining ajratiladigan qismi, uning manba kodi chiqarib tashlangan
+Tizim kutubxonasi sifatida mos keladigan manbadan, shart emas
+obyekt kodi ishini yetkazib berishga kiritilgan.
+
+  "Foydalanuvchi mahsuloti" bu (1) "iste'mol mahsuloti" bo'lib, bu har qanday degan ma'noni anglatadi
+odatda shaxsiy, oilaviy,
+yoki maishiy maqsadlar uchun, yoki (2) ro'yxatga olish uchun mo'ljallangan yoki sotiladigan har qanday narsa
+turar-joyga. Mahsulot iste'mol mahsuloti ekanligini aniqlashda,
+Shubhali holatlar sug'urta foydasiga hal qilinadi. Muayyan shaxs uchun
+ma'lum bir foydalanuvchi tomonidan qabul qilingan mahsulot, "odatda ishlatiladigan" deganda a tushuniladi
+holatidan qat'i nazar, ushbu mahsulot sinfining odatiy yoki keng tarqalgan ishlatilishi
+muayyan foydalanuvchining yoki muayyan foydalanuvchining qanday yo'l bilan
+mahsulotdan aslida foydalanadi yoki undan foydalanishni kutadi yoki undan foydalanishi kutilmoqda. Mahsulot
+mahsulot sezilarli darajada bo'lishidan qat'i nazar, iste'mol mahsulotidir
+tijorat, sanoat yoki iste'molchi bo'lmagan maqsadlarda foydalanish, agar bunday maqsadlar aks ettirmasa
+mahsulotdan foydalanishning yagona muhim usuli.
+
+  Foydalanuvchi mahsuloti uchun "O'rnatish haqida ma'lumot" har qanday usulni anglatadi,
+o'rnatish uchun zarur bo'lgan protseduralar, avtorizatsiya kalitlari yoki boshqa ma'lumotlar
+va ushbu Foydalanuvchi Mahsulotidagi yoritilgan ishning o'zgartirilgan versiyalarini ishga tushiring
+tegishli manbaning o'zgartirilgan versiyasi. Ma'lumot kerak
+o'zgartirilgan obyektning uzluksiz ishlashini ta'minlash uchun yetarli
+kod hech qanday holatda faqat shu sababli to'sqinlik qilinmaydi yoki aralashmaydi
+oʻzgartirish kiritildi.
+
+  Agar siz ushbu bo'lim ostida obyekt kodini, yoki bilan yoki bilan yetkazsangiz
+xususan, foydalanuvchi mahsulotida foydalanish uchun va yetkazib berish quyidagicha sodir bo'ladi
+egalik qilish va undan foydalanish huquqini o'z ichiga olgan bitimning bir qismi
+Foydalanuvchi mahsuloti oluvchiga abadiy yoki b
